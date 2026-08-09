@@ -1,0 +1,50 @@
+{
+  "manifestVersion": 1,
+  "id": "earnings-drift-watcher",
+  "publisher": "aumos",
+  "name": "Earnings Drift Watcher",
+  "version": "0.1.0",
+  "description": "Judges one thing only: whether the market has finished reacting to a reported surprise. Compares the reported figure against what was expected, then against how far the price has already travelled, and mostly concludes that it is too late.",
+  "readme": "./README.md",
+  "license": "MIT",
+  "engines": {
+    "aumos": ">=0.2.0"
+  },
+  "aapVersion": 1,
+  "lane": "closed",
+  "contributes": {
+    "agents": [
+      {
+        "id": "earnings-drift-watcher",
+        "name": "Earnings Drift Watcher",
+        "description": "Post-announcement drift, as a single question. Reads the reported figure against expectation, measures how much of the resulting move has already happened, and returns WATCH far more often than it returns anything else — because the answer to 'has the market finished reacting' is usually 'ask again later'.",
+        "tasks": ["EVENT_REVIEW", "ASSET_REVIEW"],
+        "assetClasses": ["equity"],
+        "markets": ["XNAS", "XNYS"]
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "fundamentals:read",
+      "reason": "The reported figure and the expectation it is measured against. This agent has one input and this is it."
+    },
+    {
+      "kind": "market:read",
+      "reason": "Price history around the announcement, to measure how much of the reaction has already happened. A surprise nobody has priced and a surprise fully priced are the same fundamental fact and opposite judgements."
+    },
+    {
+      "kind": "portfolio:read",
+      "reason": "Whether the book already holds it. Drift on a position you own is a question about sizing; drift on one you do not is a question about entering, and they are not the same judgement."
+    }
+  ],
+  "requires": {
+    "skills": ["portfolio_read", "market_history", "fundamentals_latest"]
+  },
+  "network": {
+    "mode": "deny"
+  },
+  "memory": {
+    "persistent": false
+  }
+}
