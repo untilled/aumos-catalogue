@@ -1,5 +1,7 @@
 # aumos-agents
 
+<sub><a href="docs/readme/README.ko.md">한국어</a></sub>
+
 The submission path for the [Aumos](https://aumos.app) agent catalogue.
 
 An **AgentPackage** is an investment methodology written as prose: a manifest that
@@ -23,8 +25,8 @@ agents/
     NOTICE.md              required if this is a port of somebody else's work
 ```
 
-Read **[CONTRIBUTING.md](CONTRIBUTING.md)** before opening one. It is short, and it is
-where the rules are argued rather than merely listed.
+Read **[CONTRIBUTING.md](CONTRIBUTING.md)** before opening one — [한국어](docs/contributing/CONTRIBUTING.ko.md).
+It is short, and it is where the rules are argued rather than merely listed.
 
 ## What happens to a merged package
 

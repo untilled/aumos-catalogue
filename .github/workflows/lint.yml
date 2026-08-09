@@ -46,3 +46,9 @@ jobs:
 
       - run: npm install --no-audit --no-fund
       - run: npm run lint
+
+      # The English and Korean documents are the same document twice, and a
+      # section on one side and not the other is a rule a contributor is never
+      # told about — and is then refused for. Structure only; nothing here
+      # judges a translation, because a script cannot.
+      - run: npm run check:docs

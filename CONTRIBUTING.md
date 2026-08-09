@@ -1,5 +1,7 @@
 # Submitting an AgentPackage
 
+<sub><a href="docs/contributing/CONTRIBUTING.ko.md">한국어</a></sub>
+
 ## The shape
 
 One directory under `agents/`, named exactly what your `manifest.json` says its `id`
