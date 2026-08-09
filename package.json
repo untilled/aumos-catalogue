@@ -1,0 +1,17 @@
+{
+  "name": "aumos-agents",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Submitted AgentPackages for the Aumos catalogue",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "node --experimental-strip-types tools/lint/main.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1"
+  }
+}

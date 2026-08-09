@@ -1,0 +1,48 @@
+# The AgentPackage rules, on every submission.
+#
+# This runs the *same* rules the Aumos repository runs at merge: `tools/lint/` is
+# copied out of it, and a test there fails Aumos's own build the moment the copy
+# differs from its source. See `tools/lint/VENDORED.md`.
+#
+# ── Why the rules are copied here rather than installed ────────────────────
+#
+# The Aumos repository is private, and a pull request from a fork is given no
+# secrets by GitHub — by design, and correctly. So "check out the private repo
+# with a token" is unavailable for exactly the pull requests this workflow
+# exists to greet. Copying readable source is the answer that survives that,
+# and the cost is written down where it can be checked: a stale copy can pass a
+# submission the merge will refuse, and can never publish one.
+
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only. This workflow judges submitted text and has no reason to touch
+# anything, and a fork's pull request should be able to see that from here.
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 22 for `--experimental-strip-types`: the vendored lint is TypeScript
+          # source a contributor can read, run directly, with no build step to
+          # go stale between the code and what ran.
+          node-version: 22
+
+      - run: npm install --no-audit --no-fund
+      - run: npm run lint
