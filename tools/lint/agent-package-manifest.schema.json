@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aumos.app/spec/aap/1/agent-package-manifest.schema.json",
+  "title": "agent-package-manifest",
+  "type": "object",
+  "properties": {
+    "manifestVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*(?:\\/[a-z0-9][a-z0-9-]*)?$"
+    },
+    "publisher": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?(?:\\+[0-9A-Za-z-.]+)?$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "readme": {
+      "type": "string",
+      "minLength": 1
+    },
+    "license": {
+      "type": "string"
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "sourceRepo": {
+          "type": "string",
+          "format": "uri"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1
+        },
+        "licenseHolder": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notice": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["sourceRepo", "commit", "license", "licenseHolder", "notice"],
+      "additionalProperties": false
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri"
+    },
+    "engines": {
+      "type": "object",
+      "properties": {
+        "aumos": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["aumos"],
+      "additionalProperties": false
+    },
+    "aapVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "contributes": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*(?:\\/[a-z0-9][a-z0-9-]*)?$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string"
+              },
+              "tasks": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["PORTFOLIO_REVIEW", "ASSET_REVIEW", "THESIS_REVIEW", "EVENT_REVIEW"]
+                }
+              },
+              "assetClasses": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["equity", "etf", "crypto", "cash"]
+                }
+              },
+              "markets": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]{1,12}$",
+                  "description": "MIC-style market identifier, e.g. XNAS"
+                }
+              }
+            },
+            "required": ["id", "name", "tasks", "assetClasses", "markets"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["agents"],
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "portfolio:read",
+              "thesis:read",
+              "evidence:read",
+              "market:read",
+              "fundamentals:read",
+              "news:read",
+              "skill:invoke",
+              "agent-memory:read",
+              "agent-memory:write"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": ["kind"],
+        "additionalProperties": false
+      }
+    },
+    "lane": {
+      "default": "closed",
+      "type": "string",
+      "enum": ["closed", "open"]
+    },
+    "requires": {
+      "type": "object",
+      "properties": {
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "optionalSkills": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["skills"],
+      "additionalProperties": false
+    },
+    "network": {
+      "default": {
+        "mode": "deny"
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "deny"
+            }
+          },
+          "required": ["mode"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "allowlist"
+            },
+            "hosts": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": ["mode", "hosts"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["schema"],
+      "additionalProperties": false
+    },
+    "memory": {
+      "type": "object",
+      "properties": {
+        "persistent": {
+          "type": "boolean"
+        }
+      },
+      "required": ["persistent"],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "manifestVersion",
+    "id",
+    "publisher",
+    "name",
+    "version",
+    "engines",
+    "aapVersion",
+    "contributes",
+    "capabilities",
+    "requires"
+  ],
+  "additionalProperties": false
+}

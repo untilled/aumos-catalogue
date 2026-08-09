@@ -1,0 +1,355 @@
+/**
+ * The rules an AgentPackage has to keep, as a function rather than as a test.
+ * (M10g)
+ *
+ * ── Why this stopped being a `describe` and became a package ───────────────
+ *
+ * Every rule below was written in `packages/agent-runtime/src/package.test.ts`,
+ * where M10a-1 first established that it held rules rather than a description of
+ * `basic-investor`. It is moved here for one reason: **the repository these
+ * rules live in is private, and the repository third-party packages arrive in
+ * cannot be.** `untilled/aumos` is private (2026-08-09), so a submission is a
+ * pull request against a *different* repository, and the CI that greets a
+ * contributor there has no access to any of this.
+ *
+ * A rule with two implementations is two rules — this codebase says so about
+ * `broker-book.ts` and about `closedPortfolioIds`, and it is more true here than
+ * in either: a submissions checker that drifted from the real lint would greet a
+ * contributor with a green tick and then be refused at the merge, which is the
+ * one failure mode a submission path exists to prevent.
+ *
+ * So the rules are:
+ *
+ * - **pure**, and take a map of path → text rather than a directory. That map is
+ *   `@aumos/registry`'s bundle format exactly (`bundle.ts`), so what is linted is
+ *   the *published form* of the package rather than a working copy of it. A
+ *   directory reduces to it through `readPackageFiles`; so does a downloaded
+ *   artifact, with no second reader.
+ * - **dependency-free** — no zod, no `@aumos/aap`, no `node:fs`. The whole file
+ *   is copied verbatim into the submissions repository by
+ *   `scripts/vendor.ts`, and a copy that needed this workspace to run would not
+ *   be a copy of anything useful.
+ *
+ * ── What is deliberately **not** here ──────────────────────────────────────
+ *
+ * The manifest schema. §37 makes the manifest the permission document and
+ * `agentPackageManifestSchema` is its only definition; restating it in this file
+ * would be the exact fork the file exists to avoid. Both sides read the *same*
+ * schema instead — this workspace through zod, the submissions repository
+ * through `ajv` over the generated `agent-package-manifest.schema.json`, which
+ * is a stock validator reading our document rather than a second opinion about
+ * it. Everything below assumes that check has already passed and reads the
+ * manifest defensively anyway, because a linter that throws on the input it was
+ * given to judge tells a contributor nothing.
+ */
+
+/** A package as its published bundle carries it: relative path → file text. */
+export interface PackageFiles {
+  readonly [path: string]: string
+}
+
+export interface Problem {
+  /** Stable id, so a contributor can be pointed at the paragraph that argues it. */
+  readonly rule: string
+  readonly message: string
+}
+
+export interface LintOptions {
+  /**
+   * `DECISION_ACTIONS`, passed in rather than imported.
+   *
+   * Never a hard-coded list: an action added to AAP and not to a bundle is
+   * exactly the staleness the `worked-example-per-action` rule exists to catch,
+   * and a copy of the enum here would go stale in the same breath. This
+   * workspace passes `@aumos/aap`'s export; the vendored copy reads the enum out
+   * of the generated `decision-proposal.schema.json`. Both are the zod schema,
+   * one step apart.
+   */
+  readonly decisionActions: readonly string[]
+}
+
+/** The one substitution a prompt bundle may contain. Mirrors `agent-runtime`. */
+export const INVOCATION_MARKER = '{{INVOCATION}}'
+
+interface ManifestView {
+  readonly lane: 'closed' | 'open'
+  readonly capabilities: readonly string[]
+  readonly configSchema: string | undefined
+  readonly readme: string | undefined
+  readonly provenance:
+    | { readonly notice: string; readonly licenseHolder: string; readonly commit: string }
+    | undefined
+}
+
+function field(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>)[key]
+    : undefined
+}
+
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
+}
+
+function readManifest(raw: unknown): ManifestView {
+  const provenance = field(raw, 'provenance')
+  const notice = text(field(provenance, 'notice'))
+  const licenseHolder = text(field(provenance, 'licenseHolder'))
+  const commit = text(field(provenance, 'commit'))
+
+  return {
+    // Absent means `closed` everywhere else in the system — a manifest written
+    // before M11 described a package for which there was no other lane — and
+    // reading it any other way here would quietly exempt those packages from the
+    // closed-lane rules they were written under.
+    lane: text(field(raw, 'lane')) === 'open' ? 'open' : 'closed',
+    capabilities: Array.isArray(field(raw, 'capabilities'))
+      ? (field(raw, 'capabilities') as unknown[])
+          .map((capability) => text(field(capability, 'kind')))
+          .filter((kind): kind is string => kind !== undefined)
+      : [],
+    configSchema: text(field(field(raw, 'config'), 'schema')),
+    readme: text(field(raw, 'readme')),
+    provenance:
+      notice !== undefined && licenseHolder !== undefined && commit !== undefined
+        ? { notice, licenseHolder, commit }
+        : undefined,
+  }
+}
+
+/**
+ * A path a manifest names, resolved the way `loadAgentPackage` resolves one.
+ *
+ * The map has no directories and no `..` to walk, so the check is a string
+ * check — which is the same posture `bundlePathSchema` takes and for the same
+ * reason: a rewritten path is a file that lands somewhere its author did not
+ * name.
+ */
+function normalise(path: string): string {
+  return path.replace(/^\.\//, '')
+}
+
+export function lintAgentPackage(files: PackageFiles, options: LintOptions): readonly Problem[] {
+  const problems: Problem[] = []
+  const problem = (rule: string, message: string): void => {
+    problems.push({ rule, message })
+  }
+
+  // ── the manifest exists and is JSON ──────────────────────────────────────
+  const manifestText = files['manifest.json']
+  if (manifestText === undefined) {
+    return [{ rule: 'manifest-present', message: 'there is no manifest.json' }]
+  }
+  let raw: unknown
+  try {
+    raw = JSON.parse(manifestText)
+  } catch (error) {
+    return [
+      {
+        rule: 'manifest-present',
+        message: `manifest.json is not JSON: ${error instanceof Error ? error.message : String(error)}`,
+      },
+    ]
+  }
+  const manifest = readManifest(raw)
+
+  // ── the prompt bundle ────────────────────────────────────────────────────
+  //
+  // Lexical filename order and nothing else — the numeric prefixes *are* the
+  // ordering, so a renamed file reorders the reasoning and a reader can see it
+  // in the diff.
+  const sections = Object.keys(files)
+    .filter((path) => path.startsWith('prompt/') && path.endsWith('.md'))
+    .sort()
+  if (sections.length === 0) {
+    problem('prompt-bundle', 'there is no prompt/ directory with .md sections in it')
+  }
+  const bundle = sections.map((path) => files[path] ?? '').join('\n')
+  const lowered = bundle.toLowerCase()
+  const jsonBlocks = (bundle.match(/```json\n[\s\S]*?```/g) ?? []).join('\n')
+
+  // ── the paths the manifest names lead somewhere ──────────────────────────
+  //
+  // `loadAgentPackage` refuses a dead path at load, and refuses one that escapes
+  // the package directory. Here the escape is not expressible — a bundle has no
+  // path outside itself — so what is left is the failure a path field actually
+  // has, which is pointing at nothing.
+  for (const [name, path] of [
+    ['readme', manifest.readme],
+    ['config.schema', manifest.configSchema],
+    ['provenance.notice', manifest.provenance?.notice],
+  ] as const) {
+    if (path === undefined) continue
+    if (files[normalise(path)] === undefined) {
+      problem('declared-path-resolves', `${name} points at ${path}, which is not in the package`)
+    }
+  }
+
+  // ── capabilities ─────────────────────────────────────────────────────────
+  //
+  // Not a fixed list: packages ask for deliberately different sets, and that
+  // difference is what the install screen shows. What is common to all of them
+  // is that none goes looking for a way to trade. Invariant 5 is enforced by the
+  // capability enum having no such member; this asserts no package is written as
+  // though it might one day gain one — and it holds in **both** lanes, because a
+  // lane opens the vendor's tools and never ours.
+  for (const kind of manifest.capabilities) {
+    if (/broker|order|execut|trade/.test(kind)) {
+      problem(
+        'no-execution-capability',
+        `capability ${kind} reads as a way to trade. There is no broker:write capability and there will not be one (design invariant 5)`,
+      )
+    }
+  }
+
+  // `portfolio:read` was required unconditionally until M11, and that turned out
+  // to be a rule about the *closed lane* rather than about a package: a closed
+  // agent that asks for nothing can see nothing at all, so a bundle that reasons
+  // about a book without it is describing a book it was never shown. An open
+  // agent has the web, and a package may legitimately ask for zero capabilities.
+  if (manifest.lane === 'closed' && !manifest.capabilities.includes('portfolio:read')) {
+    problem(
+      'closed-lane-sees-the-book',
+      'a closed-lane package reaches everything through the Skill Gateway, so without portfolio:read it reasons about a book it was never shown',
+    )
+  }
+
+  // ── the marker ───────────────────────────────────────────────────────────
+  //
+  // What makes a bundle a *prompt* rather than an essay. The failure it guards
+  // is silent: a run against a markerless bundle produces a beautifully
+  // structured set of instructions about no particular asset, and succeeds.
+  const markers = bundle.split(INVOCATION_MARKER).length - 1
+  if (markers !== 1) {
+    problem(
+      'invocation-marker',
+      `the bundle carries ${markers} ${INVOCATION_MARKER} markers and must carry exactly one`,
+    )
+  }
+
+  // ── shape is shown, never described ──────────────────────────────────────
+  //
+  // `invalid-proposal` has now been reached three times by a real `claude`, for
+  // the same reason every time:
+  //
+  // | | what was missing |
+  // |---|---|
+  // | M6.5 | `watches` described in prose and never *shown* → the model invented `note` |
+  // | M8s  | a WAIT example only, so `target` was described and never shown → invented `target.type` |
+  // | M11d | `uncertainty` named in one sentence → guessed a string where the schema wants a list |
+  //
+  // Each time a strict schema discarded the entire judgement. **Prose beside a
+  // strict schema is not a specification**, and the failure recurs one field
+  // along each time a bundle grows. So: shape is checked, prose is not.
+  const shown = new Set<string>()
+  for (const match of jsonBlocks.matchAll(/"action"\s*:\s*"([A-Z_]+)"/g)) {
+    shown.add(match[1] as string)
+  }
+  const missingActions = options.decisionActions.filter((action) => !shown.has(action))
+  if (missingActions.length > 0) {
+    problem(
+      'worked-example-per-action',
+      `no worked JSON example for ${missingActions.join(', ')} — a mention in a sentence is what all three lost runs already had`,
+    )
+  }
+
+  // The same rule for the fields inside `rationale`, and deliberately
+  // conditional on the bundle *naming* the field: a package that never asks for
+  // `counterArguments` is not obliged to document it, and the required fields
+  // are covered by the worked examples anyway. What is forbidden is naming a
+  // field and leaving its shape to be guessed.
+  for (const prose of ['counterArguments', 'uncertainty']) {
+    if (bundle.includes(prose) && !new RegExp(`"${prose}"\\s*:\\s*\\[`).test(jsonBlocks)) {
+      problem(
+        'rationale-field-shape',
+        `${prose} is named in prose but never shown as an array in a fenced JSON example — a model that reads the name and cannot see the shape guesses a string, and the strict schema then throws the whole judgement away (M11d)`,
+      )
+    }
+  }
+
+  // ── another language, shown rather than described ────────────────────────
+  //
+  // `language` invites M6.5's mistake one level worse: a model told to answer in
+  // Korean has every reason to translate `action` too, and one translated enum
+  // discards the judgement entirely. The second half of this is the load-bearing
+  // one — an example that translated its keys would teach the failure rather
+  // than the rule.
+  if (!bundle.includes('language')) {
+    problem('language-is-shown', 'the bundle never mentions language')
+  }
+  if (!/[가-힣]/.test(bundle)) {
+    problem(
+      'language-is-shown',
+      'the bundle has no worked example in a non-English language, so a model answering in one has to guess what stays English',
+    )
+  }
+  for (const key of bundle.match(/"[^"\n]+"\s*:/g) ?? []) {
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: the ASCII range is the point
+    if (!/^[\x00-\x7f]+$/.test(key)) {
+      problem('language-is-shown', `a JSON key in the bundle is not English: ${key}`)
+    }
+  }
+
+  // ── the lane ─────────────────────────────────────────────────────────────
+  if (manifest.lane === 'closed') {
+    // A closed bundle that says "check the current price" produces an agent that
+    // fights the gateway, and the transcript then reads like a leak that was
+    // blocked rather than a run that never tried. Invariant 6 has to be stated
+    // as the frame, not as a rule to work around.
+    for (const phrase of ["today's price", 'current price', 'latest news', 'right now, check']) {
+      if (lowered.includes(phrase)) {
+        problem(
+          'closed-lane-states-the-frame',
+          `the bundle says "${phrase}", which invites the agent around the TimeGate it cannot cross`,
+        )
+      }
+    }
+    if (!lowered.includes('asof')) {
+      problem('closed-lane-states-the-frame', 'the bundle never mentions asOf')
+    }
+  } else {
+    // The counterpart, and the reason the rule above is skipped rather than
+    // deleted. A closed agent is told the frame it is inside; an open one has no
+    // frame, and the two things it must not do — file Evidence it did not
+    // receive, and treat `asOf` as decoration — are exactly the mistakes a model
+    // makes when nothing stops it. Both failures are silent.
+    for (const [needle, why] of [
+      [
+        'evidenceids',
+        'the bundle never mentions evidenceIds, so nothing stops the model inventing one',
+      ],
+      ['asof', 'the bundle never mentions asOf'],
+      ['open lane', 'the bundle never names the lane it runs in'],
+    ] as const) {
+      if (!lowered.includes(needle)) problem('open-lane-says-what-it-costs', why)
+    }
+  }
+
+  // ── attribution, by shape ────────────────────────────────────────────────
+  //
+  // `harness-porting.md` §5 makes a ported prompt a derivative work.
+  // `harness-spec` enforces that by shape — `provenance.license` has no
+  // `.optional()` and `provenance.notice` is a path — and this is the same
+  // enforcement one repository over: declaring a provenance is not a claim a
+  // package can make cheaply. The licence obligation is about the copyright
+  // *line* rather than the SPDX id, so the holder's name being in the text is
+  // the smallest thing that distinguishes a retained notice from a placeholder.
+  const provenance = manifest.provenance
+  if (provenance !== undefined) {
+    const notice = files[normalise(provenance.notice)]
+    if (notice !== undefined && !notice.includes(provenance.licenseHolder)) {
+      problem(
+        'notice-travels-with-the-derivative',
+        `${provenance.notice} does not contain ${provenance.licenseHolder}, so it is a placeholder rather than the retained notice the licence obliges this package to ship`,
+      )
+    }
+    if (!/^[0-9a-f]{40}$/.test(provenance.commit)) {
+      problem(
+        'notice-travels-with-the-derivative',
+        `provenance.commit is ${provenance.commit}, which is not a full 40-character commit — a branch name moves and then names nothing`,
+      )
+    }
+  }
+
+  return problems
+}

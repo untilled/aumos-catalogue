@@ -1,0 +1,824 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aumos.app/spec/aap/1/decision-proposal.schema.json",
+  "title": "decision-proposal",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["WAIT", "WATCH", "BUY", "SELL", "RESIZE", "HEDGE", "REBALANCE"]
+    },
+    "subject": {
+      "type": "object",
+      "properties": {
+        "class": {
+          "type": "string",
+          "enum": ["equity", "etf", "crypto", "cash"]
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "market": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{1,12}$",
+          "description": "MIC-style market identifier, e.g. XNAS"
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "ISO 4217 currency code"
+        }
+      },
+      "required": ["class", "symbol"],
+      "additionalProperties": false
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "thesisRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "rationale": {
+      "type": "object",
+      "properties": {
+        "conclusion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "keyReasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "counterArguments": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "uncertainty": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["conclusion", "keyReasons", "risks"],
+      "additionalProperties": false
+    },
+    "forecast": {
+      "type": "object",
+      "properties": {
+        "horizonDays": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expectedReturnRange": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": ["horizonDays"],
+      "additionalProperties": false
+    },
+    "target": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "position-weight"
+            },
+            "asset": {
+              "type": "object",
+              "properties": {
+                "class": {
+                  "type": "string",
+                  "enum": ["equity", "etf", "crypto", "cash"]
+                },
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "market": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]{1,12}$",
+                  "description": "MIC-style market identifier, e.g. XNAS"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$",
+                  "description": "ISO 4217 currency code"
+                }
+              },
+              "required": ["class", "symbol"],
+              "additionalProperties": false
+            },
+            "targetWeight": {
+              "type": "number",
+              "description": "Fraction of portfolio value. 0.12 is 12%."
+            }
+          },
+          "required": ["type", "asset", "targetWeight"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "cash-weight"
+            },
+            "targetWeight": {
+              "type": "number",
+              "description": "Fraction of portfolio value. 0.12 is 12%."
+            }
+          },
+          "required": ["type", "targetWeight"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "exit"
+            },
+            "asset": {
+              "type": "object",
+              "properties": {
+                "class": {
+                  "type": "string",
+                  "enum": ["equity", "etf", "crypto", "cash"]
+                },
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "market": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]{1,12}$",
+                  "description": "MIC-style market identifier, e.g. XNAS"
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$",
+                  "description": "ISO 4217 currency code"
+                }
+              },
+              "required": ["class", "symbol"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["type", "asset"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "watches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "object",
+            "properties": {
+              "class": {
+                "type": "string",
+                "enum": ["equity", "etf", "crypto", "cash"]
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "market": {
+                "type": "string",
+                "pattern": "^[A-Z0-9]{1,12}$",
+                "description": "MIC-style market identifier, e.g. XNAS"
+              },
+              "currency": {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$",
+                "description": "ISO 4217 currency code"
+              }
+            },
+            "required": ["class", "symbol"],
+            "additionalProperties": false
+          },
+          "intent": {
+            "type": "string",
+            "minLength": 1
+          },
+          "trigger": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "price-below"
+                  },
+                  "asset": {
+                    "type": "object",
+                    "properties": {
+                      "class": {
+                        "type": "string",
+                        "enum": ["equity", "etf", "crypto", "cash"]
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "market": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9]{1,12}$",
+                        "description": "MIC-style market identifier, e.g. XNAS"
+                      },
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      }
+                    },
+                    "required": ["class", "symbol"],
+                    "additionalProperties": false
+                  },
+                  "price": {
+                    "type": "object",
+                    "properties": {
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      },
+                      "minorUnits": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["currency", "minorUnits"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["kind", "asset", "price"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "price-above"
+                  },
+                  "asset": {
+                    "type": "object",
+                    "properties": {
+                      "class": {
+                        "type": "string",
+                        "enum": ["equity", "etf", "crypto", "cash"]
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "market": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9]{1,12}$",
+                        "description": "MIC-style market identifier, e.g. XNAS"
+                      },
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      }
+                    },
+                    "required": ["class", "symbol"],
+                    "additionalProperties": false
+                  },
+                  "price": {
+                    "type": "object",
+                    "properties": {
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      },
+                      "minorUnits": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["currency", "minorUnits"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["kind", "asset", "price"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "weight-drift"
+                  },
+                  "asset": {
+                    "type": "object",
+                    "properties": {
+                      "class": {
+                        "type": "string",
+                        "enum": ["equity", "etf", "crypto", "cash"]
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "market": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9]{1,12}$",
+                        "description": "MIC-style market identifier, e.g. XNAS"
+                      },
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      }
+                    },
+                    "required": ["class", "symbol"],
+                    "additionalProperties": false
+                  },
+                  "beyond": {
+                    "type": "number",
+                    "description": "Fraction of portfolio value. 0.12 is 12%."
+                  }
+                },
+                "required": ["kind", "asset", "beyond"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "at-time"
+                  },
+                  "at": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$",
+                    "description": "RFC 3339 timestamp, e.g. 2026-08-04T13:24:59.000Z"
+                  }
+                },
+                "required": ["kind", "at"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "event"
+                  },
+                  "eventKind": {
+                    "type": "string",
+                    "enum": [
+                      "earnings",
+                      "price-move",
+                      "news",
+                      "filing",
+                      "macro",
+                      "schedule",
+                      "plan-trigger",
+                      "manual"
+                    ]
+                  },
+                  "subject": {
+                    "type": "object",
+                    "properties": {
+                      "class": {
+                        "type": "string",
+                        "enum": ["equity", "etf", "crypto", "cash"]
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "market": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9]{1,12}$",
+                        "description": "MIC-style market identifier, e.g. XNAS"
+                      },
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      }
+                    },
+                    "required": ["class", "symbol"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["kind", "eventKind"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "description": "RFC 3339 timestamp, e.g. 2026-08-04T13:24:59.000Z"
+          }
+        },
+        "required": ["intent", "trigger"],
+        "additionalProperties": false
+      }
+    },
+    "plans": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "object",
+            "properties": {
+              "class": {
+                "type": "string",
+                "enum": ["equity", "etf", "crypto", "cash"]
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "market": {
+                "type": "string",
+                "pattern": "^[A-Z0-9]{1,12}$",
+                "description": "MIC-style market identifier, e.g. XNAS"
+              },
+              "currency": {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$",
+                "description": "ISO 4217 currency code"
+              }
+            },
+            "required": ["class", "symbol"],
+            "additionalProperties": false
+          },
+          "intent": {
+            "type": "string",
+            "minLength": 1
+          },
+          "trigger": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "price-below"
+                  },
+                  "asset": {
+                    "type": "object",
+                    "properties": {
+                      "class": {
+                        "type": "string",
+                        "enum": ["equity", "etf", "crypto", "cash"]
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "market": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9]{1,12}$",
+                        "description": "MIC-style market identifier, e.g. XNAS"
+                      },
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      }
+                    },
+                    "required": ["class", "symbol"],
+                    "additionalProperties": false
+                  },
+                  "price": {
+                    "type": "object",
+                    "properties": {
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      },
+                      "minorUnits": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["currency", "minorUnits"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["kind", "asset", "price"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "price-above"
+                  },
+                  "asset": {
+                    "type": "object",
+                    "properties": {
+                      "class": {
+                        "type": "string",
+                        "enum": ["equity", "etf", "crypto", "cash"]
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "market": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9]{1,12}$",
+                        "description": "MIC-style market identifier, e.g. XNAS"
+                      },
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      }
+                    },
+                    "required": ["class", "symbol"],
+                    "additionalProperties": false
+                  },
+                  "price": {
+                    "type": "object",
+                    "properties": {
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      },
+                      "minorUnits": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["currency", "minorUnits"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["kind", "asset", "price"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "weight-drift"
+                  },
+                  "asset": {
+                    "type": "object",
+                    "properties": {
+                      "class": {
+                        "type": "string",
+                        "enum": ["equity", "etf", "crypto", "cash"]
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "market": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9]{1,12}$",
+                        "description": "MIC-style market identifier, e.g. XNAS"
+                      },
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      }
+                    },
+                    "required": ["class", "symbol"],
+                    "additionalProperties": false
+                  },
+                  "beyond": {
+                    "type": "number",
+                    "description": "Fraction of portfolio value. 0.12 is 12%."
+                  }
+                },
+                "required": ["kind", "asset", "beyond"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "at-time"
+                  },
+                  "at": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$",
+                    "description": "RFC 3339 timestamp, e.g. 2026-08-04T13:24:59.000Z"
+                  }
+                },
+                "required": ["kind", "at"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "event"
+                  },
+                  "eventKind": {
+                    "type": "string",
+                    "enum": [
+                      "earnings",
+                      "price-move",
+                      "news",
+                      "filing",
+                      "macro",
+                      "schedule",
+                      "plan-trigger",
+                      "manual"
+                    ]
+                  },
+                  "subject": {
+                    "type": "object",
+                    "properties": {
+                      "class": {
+                        "type": "string",
+                        "enum": ["equity", "etf", "crypto", "cash"]
+                      },
+                      "symbol": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "market": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9]{1,12}$",
+                        "description": "MIC-style market identifier, e.g. XNAS"
+                      },
+                      "currency": {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$",
+                        "description": "ISO 4217 currency code"
+                      }
+                    },
+                    "required": ["class", "symbol"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["kind", "eventKind"],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "description": "RFC 3339 timestamp, e.g. 2026-08-04T13:24:59.000Z"
+          }
+        },
+        "required": ["intent", "trigger"],
+        "additionalProperties": false
+      }
+    },
+    "thesisUpdates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "thesisId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "subject": {
+            "type": "object",
+            "properties": {
+              "class": {
+                "type": "string",
+                "enum": ["equity", "etf", "crypto", "cash"]
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "market": {
+                "type": "string",
+                "pattern": "^[A-Z0-9]{1,12}$",
+                "description": "MIC-style market identifier, e.g. XNAS"
+              },
+              "currency": {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$",
+                "description": "ISO 4217 currency code"
+              }
+            },
+            "required": ["class", "symbol"],
+            "additionalProperties": false
+          },
+          "stance": {
+            "type": "string",
+            "enum": ["BULLISH", "BEARISH", "NEUTRAL"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "CHALLENGED", "INVALIDATED", "REALISED", "RETIRED"]
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supportingReasons": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "invalidationConditions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "changeSummary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "stance",
+          "status",
+          "claim",
+          "supportingReasons",
+          "invalidationConditions",
+          "evidenceIds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "evidenceIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    }
+  },
+  "required": ["action", "thesisRefs", "rationale"],
+  "additionalProperties": false
+}
