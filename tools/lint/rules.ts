@@ -43,6 +43,26 @@
  * given to judge tells a contributor nothing.
  */
 
+/**
+ * ── The documents are bilingual and these messages are not, on purpose ─────
+ *
+ * `untilled/aumos-agents` carries its README, its contributing guide and its
+ * pull request template in English and Korean, because a submission path
+ * somebody cannot read is not a path. A problem message is a different kind of
+ * string and takes the treatment `CLAUDE.md`'s conventions give
+ * `verbatim()`: almost every one of these names a field, a capability, an enum
+ * value or a rule id — `portfolio:read`, `evidenceIds`, `provenance.commit` —
+ * and those spellings are the wire format, which is exactly what a package must
+ * **not** translate. A message that put `portfolio:read` inside a Korean
+ * sentence would be teaching the mistake the `language-is-shown` rule exists to
+ * prevent, one layer up.
+ *
+ * There is also no dictionary to reach for: this file has no dependencies at
+ * all, which is what lets it be copied into a repository that has none of
+ * `@aumos/i18n`. If that ever changes the rule ids are the seam — they are
+ * stable, and a translation would key off them rather than off the prose.
+ */
+
 /** A package as its published bundle carries it: relative path → file text. */
 export interface PackageFiles {
   readonly [path: string]: string
