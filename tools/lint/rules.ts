@@ -61,6 +61,13 @@
  * all, which is what lets it be copied into a repository that has none of
  * `@aumos/i18n`. If that ever changes the rule ids are the seam — they are
  * stable, and a translation would key off them rather than off the prose.
+ *
+ * ⚠️ This paragraph lived in the **vendored copy** until 2026-08-13, added by
+ * `untilled/aumos-agents` PR #2 — an edit to a generated file, which is the one
+ * thing `VENDORED.md` tells a contributor not to do. It was right about the
+ * content and wrong about the place: the next `vendor` run would have deleted
+ * it, and this branch is the run that nearly did. Moved to the source, where it
+ * survives.
  */
 
 /** A package as its published bundle carries it: relative path → file text. */

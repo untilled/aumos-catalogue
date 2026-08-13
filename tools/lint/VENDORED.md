@@ -1,8 +1,9 @@
 # Vendored
 
-Everything in this directory except this file is **generated**. It is copied out of
-the Aumos repository by `packages/package-lint/scripts/vendor.ts`, and a test there
-fails Aumos's own build the moment the copy differs from its source.
+Everything in this directory is **generated**, this file included — it is written
+from a template in `packages/package-lint/scripts/vendor.ts`, which also copies the
+rest out of the Aumos repository, and a test there fails Aumos's own build the
+moment a copy differs from its source.
 
 Do not edit it here. A fix made here would pass this repository's CI and be
 refused at the merge, which is the exact failure this arrangement exists to

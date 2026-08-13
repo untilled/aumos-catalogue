@@ -207,6 +207,104 @@
         }
       ]
     },
+    "targets": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "position-weight"
+              },
+              "asset": {
+                "type": "object",
+                "properties": {
+                  "class": {
+                    "type": "string",
+                    "enum": ["equity", "etf", "crypto", "cash"]
+                  },
+                  "symbol": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "market": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9]{1,12}$",
+                    "description": "MIC-style market identifier, e.g. XNAS"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "description": "ISO 4217 currency code"
+                  }
+                },
+                "required": ["class", "symbol"],
+                "additionalProperties": false
+              },
+              "targetWeight": {
+                "type": "number",
+                "description": "Fraction of portfolio value. 0.12 is 12%."
+              }
+            },
+            "required": ["type", "asset", "targetWeight"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "cash-weight"
+              },
+              "targetWeight": {
+                "type": "number",
+                "description": "Fraction of portfolio value. 0.12 is 12%."
+              }
+            },
+            "required": ["type", "targetWeight"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "exit"
+              },
+              "asset": {
+                "type": "object",
+                "properties": {
+                  "class": {
+                    "type": "string",
+                    "enum": ["equity", "etf", "crypto", "cash"]
+                  },
+                  "symbol": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "market": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9]{1,12}$",
+                    "description": "MIC-style market identifier, e.g. XNAS"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "description": "ISO 4217 currency code"
+                  }
+                },
+                "required": ["class", "symbol"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["type", "asset"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
     "watches": {
       "type": "array",
       "items": {
