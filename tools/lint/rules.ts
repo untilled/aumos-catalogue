@@ -129,7 +129,19 @@ function readManifest(raw: unknown): ManifestView {
     // before M11 described a package for which there was no other lane — and
     // reading it any other way here would quietly exempt those packages from the
     // closed-lane rules they were written under.
-    lane: text(field(raw, 'lane')) === 'open' ? 'open' : 'closed',
+    //
+    // §E14: read off `tools` rather than a `lane` field, and the derivation is
+    // spelled out here rather than imported because this package has **no
+    // dependencies** — `scripts/vendor.ts` copies this file verbatim into a
+    // public repository, so a copy that needed `@aumos/domain` would not be a
+    // copy of anything useful. Same posture as `DECISION_ACTIONS` arriving as a
+    // parameter. It is a second *implementation* of `laneOf` and that is the
+    // price of the vendoring; what keeps it honest is that the rule is one
+    // comparison against zero, and `rules.test.ts` asserts both directions.
+    lane:
+      Array.isArray(field(raw, 'tools')) && (field(raw, 'tools') as unknown[]).length > 0
+        ? 'open'
+        : 'closed',
     capabilities: Array.isArray(field(raw, 'capabilities'))
       ? (field(raw, 'capabilities') as unknown[])
           .map((capability) => text(field(capability, 'kind')))

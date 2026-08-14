@@ -161,10 +161,23 @@
         "additionalProperties": false
       }
     },
-    "lane": {
-      "default": "closed",
-      "type": "string",
-      "enum": ["closed", "open"]
+    "tools": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["web", "shell", "files", "fanout"]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": ["kind"],
+        "additionalProperties": false
+      }
     },
     "requires": {
       "type": "object",
