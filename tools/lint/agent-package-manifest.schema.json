@@ -150,7 +150,8 @@
               "news:read",
               "skill:invoke",
               "agent-memory:read",
-              "agent-memory:write"
+              "agent-memory:write",
+              "source:passthrough"
             ]
           },
           "reason": {
