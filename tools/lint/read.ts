@@ -19,6 +19,39 @@ import { join, relative } from 'node:path'
 import type { PackageFiles } from './rules.ts'
 
 /**
+ * Directories a tool made and a tool maintains, skipped at every depth.
+ *
+ * The rule everywhere else in this file is *take the directory whole* — a
+ * publisher that chose a subset would be editing somebody's package on the way
+ * past — and this is the one exception, so the criterion is narrow and stated
+ * here rather than grown case by case: **the contents are recreated by a tool
+ * without being asked, and they are about the package rather than part of it.**
+ * Both members qualify and nothing else has yet:
+ *
+ * - `.git` is version control's own store, and version-controlling an authored
+ *   package is an ordinary thing to do. Reading it as package content is worse
+ *   than awkward: `.git/index` is not UTF-8, so the lint refuses the package
+ *   with a message about a file the author never wrote — and the *fingerprint*
+ *   half is worse still, because `readShippedFiles` would hash `.git/**` and
+ *   §24's row identity would then change on every commit. That is the exact
+ *   inversion of what a fingerprint is for: the same system, a different hash,
+ *   every time.
+ * - `__pycache__` is compiled bytecode of `.py` files that are already in the
+ *   package. Binary, so it breaks the read the same way, and derived, so
+ *   hashing it adds nothing the source files do not already say. One appeared
+ *   the first time the ported harness was run (`tasks/done/E8-harness-port.md`
+ *   ③).
+ *
+ * A `.DS_Store` fails the same read and is deliberately **not** here: it is a
+ * file rather than a directory, and — unlike these two — deleting it is a repair
+ * that holds. The refusal names it, which is what lets its author act.
+ *
+ * Skipping is by name at any depth, because `__pycache__` sits beside every
+ * `.py` and a submodule puts a `.git` below the root.
+ */
+export const TOOL_DIRECTORIES: readonly string[] = ['.git', '__pycache__']
+
+/**
  * Every file in the directory, as text, keyed by its path relative to the root.
  *
  * Everything is taken rather than a chosen subset. What a package *is* is the
@@ -41,6 +74,7 @@ export function readPackageFiles(directory: string): PackageFiles {
     )) {
       const full = join(current, entry.name)
       if (entry.isDirectory()) {
+        if (TOOL_DIRECTORIES.includes(entry.name)) continue
         walk(full)
         continue
       }
