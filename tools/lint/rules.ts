@@ -130,7 +130,7 @@ function readManifest(raw: unknown): ManifestView {
     // reading it any other way here would quietly exempt those packages from the
     // closed-lane rules they were written under.
     //
-    // §E14: read off `tools` rather than a `lane` field, and the derivation is
+    // §E18: read off `tools` rather than a `lane` field, and the derivation is
     // spelled out here rather than imported because this package has **no
     // dependencies** — `scripts/vendor.ts` copies this file verbatim into a
     // public repository, so a copy that needed `@aumos/domain` would not be a
