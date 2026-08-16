@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aumos.app/spec/source/1/source-spec.schema.json",
+  "title": "source-spec",
+  "type": "object",
+  "properties": {
+    "spec": {
+      "type": "string",
+      "const": "SourceSpec/1"
+    },
+    "id": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?(?:\\+[0-9A-Za-z-.]+)?$"
+    },
+    "vendor": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:+-]{1,80}$"
+    },
+    "caveat": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "local": {
+      "type": "boolean",
+      "const": true
+    },
+    "hosts": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$"
+      }
+    },
+    "headers": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Za-z][A-Za-z0-9-]{0,39}$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 200
+      }
+    },
+    "credentials": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "header": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9-]{0,39}$"
+          },
+          "default": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "required": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": ["name", "header"],
+        "additionalProperties": false
+      }
+    },
+    "auth": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "oauth2-client-credentials"
+        },
+        "tokenUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "clientId": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "clientSecret": {
+          "type": "string",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "header": {
+          "default": "authorization",
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9-]{0,39}$"
+        }
+      },
+      "required": ["kind", "tokenUrl", "clientId", "clientSecret"],
+      "additionalProperties": false
+    },
+    "endpoints": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^(\\/(\\{symbol\\}|(?!\\.\\.?(?:\\/|$))[A-Za-z0-9._~-]+))+\\/?$"
+          },
+          "query": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:+-]{1,80}$"
+            }
+          }
+        },
+        "required": ["host", "path"],
+        "additionalProperties": false
+      }
+    },
+    "port": {
+      "default": "library",
+      "type": "string",
+      "const": "library"
+    }
+  },
+  "required": ["spec", "id", "version", "vendor", "hosts", "endpoints"],
+  "additionalProperties": false
+}

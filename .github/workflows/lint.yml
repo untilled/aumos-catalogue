@@ -1,8 +1,17 @@
-# The AgentPackage rules, on every submission.
+# The submission rules, on every pull request. Two kinds of thing arrive here —
+# an AgentPackage under `agents/` and a data source under `sources/` — and each
+# has its own checker, both copied out of the Aumos repository, both guarded by
+# a test there that fails Aumos's own build the moment a copy differs from its
+# source. See `tools/lint/VENDORED.md` and `tools/lint-sources/VENDORED.md`.
 #
-# This runs the *same* rules the Aumos repository runs at merge: `tools/lint/` is
-# copied out of it, and a test there fails Aumos's own build the moment the copy
-# differs from its source. See `tools/lint/VENDORED.md`.
+# ── The two are not equally strong, and the difference is written down ──────
+#
+# The AgentPackage lint is your **fast feedback**: the real rules run again in
+# the Aumos repository at merge, so a stale copy here can pass something the
+# merge refuses. The source lint runs **both halves of the real check** — a
+# schema generated from the same zod source Aumos parses with, and
+# `coherence.ts`, which is the same file Aumos runs — so a green tick there
+# means what the merge means, minus one named rule (the broker ceiling).
 #
 # ── Why the rules are copied here rather than installed ────────────────────
 #
@@ -11,7 +20,10 @@
 # with a token" is unavailable for exactly the pull requests this workflow
 # exists to greet. Copying readable source is the answer that survives that,
 # and the cost is written down where it can be checked: a stale copy can pass a
-# submission the merge will refuse, and can never publish one.
+# submission the merge will refuse, and can **never** publish one — the Aumos
+# repository regenerates the catalogue from these files with its own rules, and
+# a test there bounds how long any copy can be behind. The paragraph above is
+# which of the two copies that caveat still bites.
 
 name: lint
 
@@ -46,6 +58,7 @@ jobs:
 
       - run: npm install --no-audit --no-fund
       - run: npm run lint
+      - run: npm run lint:sources
 
       # The English and Korean documents are the same document twice, and a
       # section on one side and not the other is a rule a contributor is never

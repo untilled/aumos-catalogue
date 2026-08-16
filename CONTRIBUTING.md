@@ -1,6 +1,11 @@
-# Submitting an AgentPackage
+# Submitting to the Aumos catalogue
 
 <sub><a href="docs/contributing/CONTRIBUTING.ko.md">한국어</a></sub>
+
+Two kinds of thing arrive here and they are not alike. An **AgentPackage** is an
+investment methodology written as prose. A **data source** is one JSON document naming
+a vendor, its endpoints, and what you have to supply to reach it. The first half of
+this page is the package; [the second](#submitting-a-data-source) is the source.
 
 ## The shape
 
@@ -109,6 +114,83 @@ politeness — it is the licence.
 
 Every file in your directory is UTF-8 text. No binaries, no symlinks. The published
 format is a map of path to file contents, and it cannot carry anything else.
+
+## Submitting a data source
+
+A data source is a vendor Aumos holds a credential for and will make requests to. It is
+**one document**, not a directory of prose, and what it can say is deliberately small:
+an id, the hosts it reaches, what the investor has to supply, and the endpoints an
+agent may ask for.
+
+```
+sources/your-source-id/
+  source.json
+  README.md
+```
+
+```bash
+npm install
+npm run lint:sources
+```
+
+⚠️ That command is **not** the AgentPackage lint's counterpart, and the difference is
+in your favour. The package lint is fast feedback and the real rules run again at the
+merge. This one runs both halves of the real check — a schema generated from the same
+zod source Aumos parses with, and `coherence.ts`, which is the same file Aumos runs.
+A green tick here means what the merge means, minus one rule named below.
+
+### What a source may and may not say
+
+`source.json` is `SourceSpec/1`. Every field is a literal, a number, or a member of a
+closed enum, and an unanticipated key does not parse — so **a document cannot express
+an executable**, by shape rather than by inspection. There is no field whose contents
+are evaluated, no regular expression you supply, and no way to name an environment
+variable: Aumos composes the variable your credential arrives in, because the process
+that reads it is the one holding broker keys.
+
+What a document also cannot say is **what shape the answer should be**. Aumos does not
+map, rename, date or trim a vendor's response; the agent receives what the vendor sent
+and makes whatever it needs out of it, with its own code.
+
+### It reaches only where it declared
+
+`https` only. No loopback, link-local or private address — a credential pointed at a
+local address is how a credential *fetch* becomes a credential *theft*, and cloud
+metadata lives in exactly that range. Every endpoint's host must be one your `hosts`
+declares, no path may contain a `..` segment, and the filled URL is re-checked before
+every request rather than trusted from parse time.
+
+The one exception is a document that declares `"local": true`, and it is a bargain
+rather than a hole: such a document may declare loopback hosts **only**, so it is never
+a bridge, and may declare **no credentials at all**, so there is nothing to carry to
+that address. It also does not run until the investor names its id on their own
+machine.
+
+### It may not relay a broker
+
+A broker is the one vendor where the credential that reads is the credential that
+trades. A document declaring an endpoint on a broker's host is refused — and this is
+the **one rule `npm run lint:sources` cannot run**, because it reads Aumos's own
+connector table, which is not published. It runs at the merge and at the install, so it
+can never publish anything; it can only refuse a submission that tried.
+
+### If the vendor issues a session
+
+`auth` names one behaviour — RFC 6749 client credentials — and the flow is Aumos's,
+written once. You name the token endpoint and which two of your declared credentials
+are the client id and secret; both must be `required`, because a document whose session
+cannot be established is one that stands up and then fails every request with a 401,
+which reads on screen as a broken vendor rather than as a missing key. Cursor
+pagination is **not** expressible, and that is not a near miss of the same thing: a
+cursor loop's termination depends on a response, so there is no fixed behaviour to
+name.
+
+### Your README is for a person
+
+It is required, and nothing checks what is in it. It is the page an investor reads
+before they type a credential into their keychain — so say what the vendor is, what an
+agent gets from it, what a key costs and where to get one, and what the data does not
+cover.
 
 ## Review
 

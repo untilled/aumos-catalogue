@@ -46,7 +46,7 @@
 /**
  * ── The documents are bilingual and these messages are not, on purpose ─────
  *
- * `untilled/aumos-agents` carries its README, its contributing guide and its
+ * `untilled/aumos-catalogue` carries its README, its contributing guide and its
  * pull request template in English and Korean, because a submission path
  * somebody cannot read is not a path. A problem message is a different kind of
  * string and takes the treatment `CLAUDE.md`'s conventions give
@@ -63,7 +63,7 @@
  * stable, and a translation would key off them rather than off the prose.
  *
  * ⚠️ This paragraph lived in the **vendored copy** until 2026-08-13, added by
- * `untilled/aumos-agents` PR #2 — an edit to a generated file, which is the one
+ * `untilled/aumos-catalogue` PR #2 — an edit to a generated file, which is the one
  * thing `VENDORED.md` tells a contributor not to do. It was right about the
  * content and wrong about the place: the next `vendor` run would have deleted
  * it, and this branch is the run that nearly did. Moved to the source, where it

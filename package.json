@@ -1,15 +1,16 @@
 {
-  "name": "aumos-agents",
+  "name": "aumos-catalogue",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Submitted AgentPackages for the Aumos catalogue",
+  "description": "Submitted AgentPackages and data sources for the Aumos catalogue",
   "license": "MIT",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "lint": "node --experimental-strip-types tools/lint/main.ts",
+    "lint:sources": "node --experimental-strip-types tools/lint-sources/main.ts",
     "check:docs": "node tools/check-docs.mjs"
   },
   "dependencies": {
