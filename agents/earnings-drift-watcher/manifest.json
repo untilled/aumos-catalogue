@@ -8,7 +8,7 @@
   "readme": "./README.md",
   "license": "MIT",
   "engines": {
-    "aumos": ">=0.2.0"
+    "aumos": ">=0.2.4"
   },
   "aapVersion": 1,
   "contributes": {
