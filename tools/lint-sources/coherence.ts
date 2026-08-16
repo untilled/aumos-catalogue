@@ -7,7 +7,7 @@ import {
 } from './hosts.ts'
 
 /**
- * The half of reading a document that is **not** the schema. (§E18 D)
+ * The half of reading a document that is **not** the schema. (§E21 D)
  *
  * ── Why this is its own file, and why it takes a structural type ───────────
  *
@@ -96,7 +96,7 @@ export function assertCoherent(spec: CoherentDocument): void {
     }
   }
 
-  // ── The session, if the vendor issues one (§E18 slice 2) ──────────────────
+  // ── The session, if the vendor issues one (§E21 slice 2) ──────────────────
   //
   // Three relations between fields, which is why they are here and not in the
   // schema. The third is the one that matters most and is the least obvious:

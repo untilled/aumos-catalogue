@@ -50,7 +50,7 @@ catalogue of agents that are all wrong at the same time.
 filesystem of its own: everything it sees arrives through the Aumos Skill Gateway, and
 every call it makes is recorded as evidence you can re-read afterwards.
 
-⚠️ **What that no longer buys, said plainly.** Until §E18 an empty tool list meant the
+⚠️ **What that no longer buys, said plainly.** Until §E21 an empty tool list meant the
 *closed lane*, and the closed lane meant more than "no shell": the gateway read each
 vendor, mapped the answer onto a port, dated every fact and refused anything published
 after the instant the judgement was pinned to. There are no ports now. A data source is a
@@ -67,6 +67,6 @@ honest, and the gateway is what keeps the record of what was asked.
 | `portfolio:read` | whether the book holds it, which decides which question is being asked |
 
 No headlines, deliberately. A drift judgement that reads the coverage is a sentiment
-judgement wearing a number — and since §E18 that is a restraint the prompt has to keep
+judgement wearing a number — and since §E21 that is a restraint the prompt has to keep
 rather than one a missing capability enforces, because one capability now reaches every
 source the investor installed.
