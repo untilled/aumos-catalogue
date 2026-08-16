@@ -100,6 +100,8 @@ export const INVOCATION_MARKER = '{{INVOCATION}}'
 
 interface ManifestView {
   readonly lane: 'closed' | 'open'
+  /** Every `tools[].reason`, as written. Absent entries are simply not here. */
+  readonly toolReasons: readonly string[]
   readonly capabilities: readonly string[]
   readonly configSchema: string | undefined
   readonly readme: string | undefined
@@ -142,6 +144,11 @@ function readManifest(raw: unknown): ManifestView {
       Array.isArray(field(raw, 'tools')) && (field(raw, 'tools') as unknown[]).length > 0
         ? 'open'
         : 'closed',
+    toolReasons: Array.isArray(field(raw, 'tools'))
+      ? (field(raw, 'tools') as unknown[])
+          .map((tool) => text(field(tool, 'reason')))
+          .filter((reason): reason is string => reason !== undefined)
+      : [],
     capabilities: Array.isArray(field(raw, 'capabilities'))
       ? (field(raw, 'capabilities') as unknown[])
           .map((capability) => text(field(capability, 'kind')))
@@ -251,6 +258,36 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
       'closed-lane-sees-the-book',
       'a closed-lane package reaches everything through the Skill Gateway, so without portfolio:read it reasons about a book it was never shown',
     )
+  }
+
+  // ── the reason a tool was asked for, actually written ────────────────────
+  //
+  // §37 makes the manifest the whole permission document and `reason` is the
+  // sentence the consent screen reads out loud. The schema has it **optional**
+  // and nothing else checks its contents, so the template's placeholders could
+  // be published verbatim — an investor consenting to a shell on the strength
+  // of *"Say here why this agent needs a shell."*
+  //
+  // ⚠️ This is a rule about **placeholders**, not about quality. A missing or
+  // empty `reason` still passes, because the field is optional in AAP/1 and a
+  // lint that quietly required it would be a second schema. What it refuses is
+  // the one string a person definitely did not mean to publish, and it is
+  // matched by the opener rather than by the whole sentence so that editing the
+  // rest of the line is what clears it.
+  //
+  // ⚠️ **The template does not write one.** It did, and §E19 removed it in the
+  // same session this rule was added: a generated open-lane package would have
+  // been born failing its own lint, against the property that makes the
+  // template an example rather than a stub. So this guards what it is actually
+  // for — a placeholder that arrived by copy-paste, or from a package written
+  // before today. (§E19)
+  for (const reason of manifest.toolReasons) {
+    if (/^say here why/i.test(reason.trim())) {
+      problem(
+        'tool-reason-unwritten',
+        `a tool still carries the template's placeholder reason ("${reason}") — this is the sentence an investor reads before granting it`,
+      )
+    }
   }
 
   // ── the marker ───────────────────────────────────────────────────────────
