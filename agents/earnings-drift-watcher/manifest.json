@@ -17,20 +17,24 @@
         "id": "earnings-drift-watcher",
         "name": "Earnings Drift Watcher",
         "description": "Post-announcement drift, as a single question. Reads the reported figure against expectation, measures how much of the resulting move has already happened, and returns WATCH far more often than it returns anything else — because the answer to 'has the market finished reacting' is usually 'ask again later'.",
-        "tasks": ["EVENT_REVIEW", "ASSET_REVIEW"],
-        "assetClasses": ["equity"],
-        "markets": ["XNAS", "XNYS"]
+        "tasks": [
+          "EVENT_REVIEW",
+          "ASSET_REVIEW"
+        ],
+        "assetClasses": [
+          "equity"
+        ],
+        "markets": [
+          "XNAS",
+          "XNYS"
+        ]
       }
     ]
   },
   "capabilities": [
     {
-      "kind": "fundamentals:read",
-      "reason": "The reported figure and the expectation it is measured against. This agent has one input and this is it."
-    },
-    {
-      "kind": "market:read",
-      "reason": "Price history around the announcement, to measure how much of the reaction has already happened. A surprise nobody has priced and a surprise fully priced are the same fundamental fact and opposite judgements."
+      "kind": "source:passthrough",
+      "reason": "The reported figure, the expectation it is measured against, and the price history around the announcement — asked of the data sources this machine holds credentials for. The responses are the vendors’, unread by Aumos. A surprise nobody has priced and a surprise fully priced are the same fundamental fact and opposite judgements, so both halves are one ask."
     },
     {
       "kind": "portfolio:read",
@@ -38,7 +42,12 @@
     }
   ],
   "requires": {
-    "skills": ["portfolio_read", "market_history", "fundamentals_latest"]
+    "skills": [
+      "source_request"
+    ],
+    "optionalSkills": [
+      "portfolio_read"
+    ]
   },
   "network": {
     "mode": "deny"
