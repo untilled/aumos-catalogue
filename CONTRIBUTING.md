@@ -115,6 +115,54 @@ politeness — it is the licence.
 Every file in your directory is UTF-8 text. No binaries, no symlinks. The published
 format is a map of path to file contents, and it cannot carry anything else.
 
+### Another language, if you have one
+
+`aumos.app` is read in English and in Korean, and until now the *chrome* was
+translated and everything a package carried was not: your summary, your methodology
+and your README arrived in whatever language you wrote them in, on a page whose
+headings were in the reader's. A package may now carry its own translations, and it is
+never required to — a page draws the original and **says** which case it is in.
+
+**Both halves are files.** Nothing goes into `manifest.json`, and that is a
+measurement rather than a style: the manifest schema is strict, so a key that a
+*shipped* copy of Aumos does not know makes your package `unreadable` on that
+machine — not "installs with a warning", unreadable, a catalogue row nobody can get.
+Files are free: nothing validates the set of files a package contains.
+
+```
+agents/your-package-id/
+  README.md
+  README.ko.md            ← the declared `readme` path with the locale before the extension
+  translations/ko.json    ← the short strings
+```
+
+```jsonc
+// translations/ko.json
+{
+  "description": "카탈로그 격자에 실리는 한 줄.",
+  "agents": [{ "id": "your-package-id", "description": "방법론 문단." }]
+}
+```
+
+- The **filename** is a language and optionally a region: `ko.json`, `pt-BR.json`. A
+  name that is not one is refused, because nothing can draw a translation it cannot
+  find.
+- A document carries **two keys** and no others — `description` and `agents` — so a
+  `summary` you wrote is refused here rather than silently never drawn.
+- Each entry in `agents` is matched **by `id`**, so reordering `contributes.agents`
+  never reattaches a paragraph to the wrong agent. An id your package does not
+  contribute is refused for the same reason: that paragraph would be drawn for nobody.
+- The translated README's path is **derived, not declared** — `README.md` becomes
+  `README.ko.md`, and a manifest declaring `docs/METHOD.md` translates it at
+  `docs/METHOD.ko.md`. A file in that shape whose middle segment is not a locale is
+  refused, because it would be published and read by nothing.
+- **Your package's `name` is not translatable and there is no field for it.** One id
+  means one thing across the catalogue, the kill list and the investor's own log.
+- Neither is `NOTICE.md`. A translated licence notice is not the notice.
+
+Translate one half and not the other if that is what you have time for. A Korean
+summary over an English README is an ordinary state and the page says so.
+
 ## Submitting a data source
 
 A data source is a vendor Aumos holds a credential for and will make requests to. It is
@@ -191,6 +239,22 @@ It is required, and nothing checks what is in it. It is the page an investor rea
 before they type a credential into their keychain — so say what the vendor is, what an
 agent gets from it, what a key costs and where to get one, and what the data does not
 cover.
+
+### And a source may be read in two languages too
+
+The same two files, and a document carries the one string in `SourceSpec/1` that a
+person reads and the interpreter does not — `caveat`. Everything else in that format
+is a host, a path, a header or a credential name, which is the wire and is never
+translated. It does **not** go into `source.json`, for the reason it does not go into
+a manifest: that schema is strict too, and an installed source that stops parsing is a
+source that stops answering on a machine that was working.
+
+```
+sources/your-source-id/
+  README.md
+  README.ko.md
+  translations/ko.json      // { "caveat": "이 주장이 깨지는 지점." }
+```
 
 ## Review
 
