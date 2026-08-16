@@ -98,11 +98,24 @@ export interface LintOptions {
 /** The one substitution a prompt bundle may contain. Mirrors `agent-runtime`. */
 export const INVOCATION_MARKER = '{{INVOCATION}}'
 
+/**
+ * A locale tag a translation may be keyed by. (§E22)
+ *
+ * A second implementation of `@aumos/aap`'s `LOCALE_TAG`, and it is here for
+ * `lane`'s reason two paragraphs down: this file is copied verbatim into a
+ * public repository, so it may not import the schema that owns the pattern. What
+ * keeps the copy honest is the same thing that keeps `laneOf`'s copy honest —
+ * the rule is one regex, and `rules.test.ts` asserts both directions of it.
+ */
+const LOCALE_TAG = /^[a-z]{2}(-[A-Z]{2})?$/
+
 interface ManifestView {
   readonly lane: 'closed' | 'open'
   readonly capabilities: readonly string[]
   readonly configSchema: string | undefined
   readonly readme: string | undefined
+  /** Contributed agent ids, so a translation cannot name one that is not here. */
+  readonly agentIds: readonly string[]
   readonly provenance:
     | { readonly notice: string; readonly licenseHolder: string; readonly commit: string }
     | undefined
@@ -149,6 +162,11 @@ function readManifest(raw: unknown): ManifestView {
       : [],
     configSchema: text(field(field(raw, 'config'), 'schema')),
     readme: text(field(raw, 'readme')),
+    agentIds: Array.isArray(field(field(raw, 'contributes'), 'agents'))
+      ? (field(field(raw, 'contributes'), 'agents') as unknown[])
+          .map((agent) => text(field(agent, 'id')))
+          .filter((id): id is string => id !== undefined)
+      : [],
     provenance:
       notice !== undefined && licenseHolder !== undefined && commit !== undefined
         ? { notice, licenseHolder, commit }
@@ -221,6 +239,107 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
     if (path === undefined) continue
     if (files[normalise(path)] === undefined) {
       problem('declared-path-resolves', `${name} points at ${path}, which is not in the package`)
+    }
+  }
+
+  // ── the package in another language ──────────────────────────────────────
+  //
+  // A translation is `translations/<locale>.json` beside `README.<locale>.md`,
+  // and **neither is a manifest field**. That is a measurement rather than a
+  // preference: the manifest schema is strict, so a key a shipped binary's own
+  // copy predates makes the whole package `unreadable` on that machine — all
+  // five published packages refused under `0.2.4`'s schema when this was tried
+  // as a field. Files are free; nothing validates the set of them.
+  //
+  // Nothing here requires a package to be translated. What is checked is the
+  // ways a translation fails **silently** — each symptom being a document that
+  // ships inside the artifact and is drawn for nobody.
+  for (const path of Object.keys(files)) {
+    if (!path.startsWith('translations/') || !path.endsWith('.json')) continue
+    const locale = path.slice('translations/'.length, path.length - '.json'.length)
+
+    // (1) A locale that is not one. `translations/korean.json` passes every
+    //     other rule and is read by nothing, because the catalogue looks a
+    //     locale tag up rather than listing the directory and guessing.
+    if (!LOCALE_TAG.test(locale)) {
+      problem(
+        'translation-locale-tag',
+        `${path} is not named for a locale — a language, optionally a region, as in translations/ko.json or translations/pt-BR.json. Nothing draws a translation it cannot find`,
+      )
+      continue
+    }
+
+    let translation: unknown
+    try {
+      translation = JSON.parse(files[path] ?? '')
+    } catch (error) {
+      problem(
+        'translation-is-a-document',
+        `${path} is not JSON: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      continue
+    }
+
+    // (2) A key nobody reads. There are two, and a `descriptions` or a
+    //     `summary` is a translation the author wrote and the catalogue will not
+    //     draw — which is what a strict schema exists to refuse, made by hand
+    //     here because this file has no zod to reach for.
+    for (const key of Object.keys(
+      (typeof translation === 'object' && translation !== null ? translation : {}) as Record<
+        string,
+        unknown
+      >,
+    )) {
+      if (key !== 'description' && key !== 'agents') {
+        problem(
+          'translation-is-a-document',
+          `${path} has a key called ${key}, and a translation carries two: description, and agents[] matched by id`,
+        )
+      }
+    }
+
+    // (3) A methodology filed against an agent this package does not
+    //     contribute. The entries are matched by id precisely so a reordered
+    //     `contributes.agents` cannot reattach a paragraph to the wrong agent;
+    //     an id matching nothing is that same defect arriving as a typo.
+    const agents = field(translation, 'agents')
+    if (Array.isArray(agents)) {
+      for (const entry of agents) {
+        const id = text(field(entry, 'id'))
+        if (id !== undefined && !manifest.agentIds.includes(id)) {
+          problem(
+            'translation-names-an-agent',
+            `${path} names the agent ${id}, which this package does not contribute — so that paragraph is drawn for nobody`,
+          )
+        }
+      }
+    }
+  }
+
+  // (4) A translated README whose locale is not a locale. The path is
+  //     **derived** rather than declared — `./README.md` translated into Korean
+  //     is `./README.ko.md` — which is what keeps a long document out of a JSON
+  //     string, and it is also what makes a misspelling invisible:
+  //     `README.KO.md` ships inside the artifact, passes every other rule, and
+  //     is read by nothing. There is no rule the other way round (a translation
+  //     document with no translated README), because translating the one-line
+  //     summary and leaving the body alone is a legitimate thing to do and the
+  //     catalogue says so, per field.
+  const readmePath = normalise(manifest.readme ?? 'README.md')
+  const dot = readmePath.lastIndexOf('.')
+  if (dot > 0) {
+    const base = readmePath.slice(0, dot)
+    const extension = readmePath.slice(dot)
+    for (const path of Object.keys(files)) {
+      if (!path.startsWith(`${base}.`) || !path.endsWith(extension)) continue
+      const middle = path.slice(base.length + 1, path.length - extension.length)
+      if (middle.length === 0 || middle.includes('.')) continue
+      if (!LOCALE_TAG.test(middle)) {
+        problem(
+          'translated-readme-locale',
+          `${path} reads as ${base}${extension} in "${middle}", which is not a locale tag — the catalogue looks for ${base}.<locale>${extension}, so this document would be published and never drawn`,
+        )
+      }
     }
   }
 
