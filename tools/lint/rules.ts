@@ -509,5 +509,47 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
     }
   }
 
+  // ── the cadence suggestion, when there is one (§E47 path A) ───────────────
+  //
+  // ⚠️ **A file, not a manifest field, and the linter is the only reader that
+  // reports on it.** `agentPackageManifestSchema` is a `strictObject`, so a new
+  // key makes a shipped binary refuse the whole document; §E47 measured that
+  // `engines.aumos` cannot gate it either, because the manifest is parsed
+  // *before* engines is read. So the value lives in `cadence.json`, which an
+  // old binary simply does not look at.
+  //
+  // The cost of that invisibility is that the **app** cannot complain: a
+  // suggestion that will not parse is dropped there, because a pre-fill must
+  // never be able to stop an install. This is where the author hears about it,
+  // which is the only place the message can reach the person who wrote the file.
+  const cadenceText = files['cadence.json']
+  if (cadenceText !== undefined) {
+    let cadence: unknown
+    try {
+      cadence = JSON.parse(cadenceText)
+    } catch (error) {
+      problem(
+        'cadence-is-readable',
+        `cadence.json is not JSON: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      cadence = undefined
+    }
+    if (cadence !== undefined) {
+      const value =
+        typeof cadence === 'object' && cadence !== null
+          ? (cadence as { readonly cadenceDays?: unknown }).cadenceDays
+          : undefined
+      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+        problem(
+          'cadence-is-readable',
+          'cadence.json has to be {"cadenceDays": n} where n is a number of days greater than ' +
+            'zero. Aumos drops a file it cannot read rather than refusing the package, so a ' +
+            'typo here is a suggestion that silently never appears. Delete the file to suggest ' +
+            'nothing — that is what an absent one means.',
+        )
+      }
+    }
+  }
+
   return problems
 }
