@@ -439,6 +439,12 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
   // decoration. ⚠️ The third needle was the literal words *open lane*, and it
   // went with the lane rather than being reworded — a bundle naming a concept
   // this host no longer has would be a bundle the lint taught to lie.
+  //
+  // That needle had already been measured doing harm before §E48 reached it: on
+  // 2026-08-20 it failed `undervalued-now` **for no longer saying the word**,
+  // which is a lint demanding vocabulary the project had stopped using. Removing
+  // a needle can only turn a red bundle green, so no submission that passed
+  // before can fail now.
   for (const [needle, why] of [
     [
       'evidenceids',
