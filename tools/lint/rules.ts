@@ -467,17 +467,30 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
     }
   } else {
     // The counterpart, and the reason the rule above is skipped rather than
-    // deleted. A closed agent is told the frame it is inside; an open one has no
-    // frame, and the two things it must not do — file Evidence it did not
-    // receive, and treat `asOf` as decoration — are exactly the mistakes a model
-    // makes when nothing stops it. Both failures are silent.
+    // deleted. A package that asks Aumos for nothing is told no frame, and the
+    // two things it must not do — file Evidence it did not receive, and treat
+    // `asOf` as decoration — are exactly the mistakes a model makes when nothing
+    // stops it. Both failures are silent.
+    //
+    // ⚠️ **A third needle stood here and required the literal words `open
+    // lane`** — *the bundle never names the lane it runs in*. §E21 removed the
+    // closed lane as a product concept, so there is no longer a lane to name and
+    // the check was demanding a word this project had stopped using: on
+    // 2026-08-20 it failed `undervalued-now` for the crime of no longer saying
+    // it. The needle goes rather than being renamed, because the thing it was
+    // asking a bundle to disclose is what the other two already check — that
+    // nothing it read was observed, and that `asOf` is not enforced for it.
+    //
+    // Removing a needle can only turn a red bundle green, so no submission that
+    // passed before can fail now. `scripts/vendor.ts` has to run after this:
+    // the copy under `submissions/tools/lint/` is what the public repository's
+    // CI reads, and a fork's PR is given no secret to fetch this one with.
     for (const [needle, why] of [
       [
         'evidenceids',
         'the bundle never mentions evidenceIds, so nothing stops the model inventing one',
       ],
       ['asof', 'the bundle never mentions asOf'],
-      ['open lane', 'the bundle never names the lane it runs in'],
     ] as const) {
       if (!lowered.includes(needle)) problem('open-lane-says-what-it-costs', why)
     }
