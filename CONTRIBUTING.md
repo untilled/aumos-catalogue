@@ -46,26 +46,27 @@ beside each entry, on the screen where they decide.
 There is no `broker:write` capability. Not "it is denied" — the enum does not contain
 it, and a capability whose name reads like a way to trade is refused.
 
-### Say which lane you run in
+### Say what your bundle costs
 
-| `lane` | what your agent gets | what it gives up |
-|---|---|---|
-| `closed` (default) | everything through the Aumos Skill Gateway | nothing — every figure it reads is recorded as evidence the investor can re-read, and none of it is dated later than the moment being judged |
-| `open` | the web and a shell, on the investor's machine | evidence, the as-of bound, and the ability to be linked to a broker account at all |
+⚠️ **There was a `lane` field and there is not one any more.** A manifest used to declare
+`tools` — `web`, `shell`, `files`, `fanout` — and a `closed` package was one that declared
+none: no shell, no web, everything through the Aumos Skill Gateway. **Aumos withholds none
+of that any longer.** Whatever the coding CLI your agent is launched on happens to ship, the
+session holds; there is no field that takes a tool away, and no screen says there is.
 
-A **closed** bundle has to state the frame it is inside: it must mention `asOf`, and
-it must not tell the agent to go and look at today's price. An agent told to do
-something it structurally cannot produces a transcript that reads like a blocked leak
-rather than a run that never tried.
+That is not a relaxation Aumos made lightly. What it replaced was a hand-written list of
+one vendor's built-in tool names, at one version, and it was measured: a built-in nobody
+had written down ran **without so much as asking**, and the check built to keep the list
+current could not see names the CLI's own inventory omits. A permission a host does not
+enforce is the author's prose wearing a permission document's clothes.
 
-A **closed** package must also ask for `portfolio:read`. Without it, a closed agent
-can see nothing at all, and a bundle that reasons about a book is describing a book it
-was never shown.
+So every bundle has to say out loud what its reach costs — it must name `evidenceIds` and
+`asOf`. The two mistakes a model makes when nothing stops it are filing evidence it never
+received and treating `asOf` as decoration, and both failures are silent.
 
-An **open** bundle has to say out loud what the lane costs — it must name
-`evidenceIds`, `asOf` and the open lane itself. The two mistakes a model makes when
-nothing stops it are filing evidence it never received and treating `asOf` as
-decoration, and both failures are silent.
+**Do not write that your agent has no shell, no web, or no filesystem.** It has whatever
+its CLI ships. What actually contains it is the OS account Aumos launches that CLI as, and
+that is a property of the investor's machine rather than of your package.
 
 ### Show the shape. Never describe it.
 

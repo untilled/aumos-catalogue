@@ -159,24 +159,6 @@
         "additionalProperties": false
       }
     },
-    "tools": {
-      "default": [],
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": ["web", "shell", "files", "fanout"]
-          },
-          "reason": {
-            "type": "string"
-          }
-        },
-        "required": ["kind"],
-        "additionalProperties": false
-      }
-    },
     "requires": {
       "type": "object",
       "properties": {
