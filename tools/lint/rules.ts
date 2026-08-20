@@ -101,16 +101,14 @@ export const INVOCATION_MARKER = '{{INVOCATION}}'
 /**
  * A locale tag a translation may be keyed by. (§E22)
  *
- * A second implementation of `@aumos/aap`'s `LOCALE_TAG`, and it is here for
- * `lane`'s reason two paragraphs down: this file is copied verbatim into a
- * public repository, so it may not import the schema that owns the pattern. What
- * keeps the copy honest is the same thing that keeps `laneOf`'s copy honest —
- * the rule is one regex, and `rules.test.ts` asserts both directions of it.
+ * A second implementation of `@aumos/aap`'s `LOCALE_TAG`, and it is here because
+ * this file is copied verbatim into a public repository, so it may not import
+ * the schema that owns the pattern. What keeps the copy honest is that the rule
+ * is one regex, and `rules.test.ts` asserts both directions of it.
  */
 const LOCALE_TAG = /^[a-z]{2}(-[A-Z]{2})?$/
 
 interface ManifestView {
-  readonly lane: 'closed' | 'open'
   readonly capabilities: readonly string[]
   readonly configSchema: string | undefined
   readonly readme: string | undefined
@@ -138,23 +136,6 @@ function readManifest(raw: unknown): ManifestView {
   const commit = text(field(provenance, 'commit'))
 
   return {
-    // Absent means `closed` everywhere else in the system — a manifest written
-    // before M11 described a package for which there was no other lane — and
-    // reading it any other way here would quietly exempt those packages from the
-    // closed-lane rules they were written under.
-    //
-    // §E18: read off `tools` rather than a `lane` field, and the derivation is
-    // spelled out here rather than imported because this package has **no
-    // dependencies** — `scripts/vendor.ts` copies this file verbatim into a
-    // public repository, so a copy that needed `@aumos/domain` would not be a
-    // copy of anything useful. Same posture as `DECISION_ACTIONS` arriving as a
-    // parameter. It is a second *implementation* of `laneOf` and that is the
-    // price of the vendoring; what keeps it honest is that the rule is one
-    // comparison against zero, and `rules.test.ts` asserts both directions.
-    lane:
-      Array.isArray(field(raw, 'tools')) && (field(raw, 'tools') as unknown[]).length > 0
-        ? 'open'
-        : 'closed',
     capabilities: Array.isArray(field(raw, 'capabilities'))
       ? (field(raw, 'capabilities') as unknown[])
           .map((capability) => text(field(capability, 'kind')))
@@ -349,8 +330,8 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
   // difference is what the install screen shows. What is common to all of them
   // is that none goes looking for a way to trade. Invariant 5 is enforced by the
   // capability enum having no such member; this asserts no package is written as
-  // though it might one day gain one — and it holds in **both** lanes, because a
-  // lane opens the vendor's tools and never ours.
+  // though it might one day gain one. Nothing about a session's own tools bears
+  // on it: the CLI's tools are the vendor's and never ours.
   for (const kind of manifest.capabilities) {
     if (/broker|order|execut|trade/.test(kind)) {
       problem(
@@ -360,18 +341,14 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
     }
   }
 
-  // `portfolio:read` was required unconditionally until M11, and that turned out
-  // to be a rule about the *closed lane* rather than about a package: a closed
-  // agent that asks for nothing can see nothing at all, so a bundle that reasons
-  // about a book without it is describing a book it was never shown. An open
-  // agent has the web, and a package may legitimately ask for zero capabilities.
-  if (manifest.lane === 'closed' && !manifest.capabilities.includes('portfolio:read')) {
-    problem(
-      'closed-lane-sees-the-book',
-      'a closed-lane package reaches everything through the Skill Gateway, so without portfolio:read it reasons about a book it was never shown',
-    )
-  }
-
+  // ⚠️ **`closed-lane-sees-the-book` stood here and §E48 deleted it.**
+  //
+  // It required `portfolio:read` of a package that declared no CLI tools, on the
+  // argument that such an agent could see nothing at all, so a bundle reasoning
+  // about a book without it was describing a book it was never shown. There is
+  // no such package: every session reaches the web and a shell whatever the
+  // manifest says, and a package may legitimately ask for zero capabilities.
+  //
   // ── the marker ───────────────────────────────────────────────────────────
   //
   // What makes a bundle a *prompt* rather than an essay. The failure it guards
@@ -448,52 +425,34 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
     }
   }
 
-  // ── the lane ─────────────────────────────────────────────────────────────
-  if (manifest.lane === 'closed') {
-    // A closed bundle that says "check the current price" produces an agent that
-    // fights the gateway, and the transcript then reads like a leak that was
-    // blocked rather than a run that never tried. Invariant 6 has to be stated
-    // as the frame, not as a rule to work around.
-    for (const phrase of ["today's price", 'current price', 'latest news', 'right now, check']) {
-      if (lowered.includes(phrase)) {
-        problem(
-          'closed-lane-states-the-frame',
-          `the bundle says "${phrase}", which invites the agent around the TimeGate it cannot cross`,
-        )
-      }
-    }
-    if (!lowered.includes('asof')) {
-      problem('closed-lane-states-the-frame', 'the bundle never mentions asOf')
-    }
-  } else {
-    // The counterpart, and the reason the rule above is skipped rather than
-    // deleted. A package that asks Aumos for nothing is told no frame, and the
-    // two things it must not do — file Evidence it did not receive, and treat
-    // `asOf` as decoration — are exactly the mistakes a model makes when nothing
-    // stops it. Both failures are silent.
-    //
-    // ⚠️ **A third needle stood here and required the literal words `open
-    // lane`** — *the bundle never names the lane it runs in*. §E21 removed the
-    // closed lane as a product concept, so there is no longer a lane to name and
-    // the check was demanding a word this project had stopped using: on
-    // 2026-08-20 it failed `undervalued-now` for the crime of no longer saying
-    // it. The needle goes rather than being renamed, because the thing it was
-    // asking a bundle to disclose is what the other two already check — that
-    // nothing it read was observed, and that `asOf` is not enforced for it.
-    //
-    // Removing a needle can only turn a red bundle green, so no submission that
-    // passed before can fail now. `scripts/vendor.ts` has to run after this:
-    // the copy under `submissions/tools/lint/` is what the public repository's
-    // CI reads, and a fork's PR is given no secret to fetch this one with.
-    for (const [needle, why] of [
-      [
-        'evidenceids',
-        'the bundle never mentions evidenceIds, so nothing stops the model inventing one',
-      ],
-      ['asof', 'the bundle never mentions asOf'],
-    ] as const) {
-      if (!lowered.includes(needle)) problem('open-lane-says-what-it-costs', why)
-    }
+  // ── what the bundle has to say out loud ──────────────────────────────────
+  //
+  // ⚠️ **This was two branches until §E48**, split on the lane. The closed one
+  // required the bundle to state the `asOf` frame and refused phrases that
+  // invited the agent around a TimeGate (`closed-lane-states-the-frame`); the
+  // open one required it to name what the lane cost. There is no lane, so there
+  // is one branch — and it is the second one, because the frame the first one
+  // described stopped binding at §E21.
+  //
+  // The two failures below are the ones a model makes when nothing stops it, and
+  // both are silent: filing Evidence it did not receive, and treating `asOf` as
+  // decoration. ⚠️ The third needle was the literal words *open lane*, and it
+  // went with the lane rather than being reworded — a bundle naming a concept
+  // this host no longer has would be a bundle the lint taught to lie.
+  //
+  // That needle had already been measured doing harm before §E48 reached it: on
+  // 2026-08-20 it failed `undervalued-now` **for no longer saying the word**,
+  // which is a lint demanding vocabulary the project had stopped using. Removing
+  // a needle can only turn a red bundle green, so no submission that passed
+  // before can fail now.
+  for (const [needle, why] of [
+    [
+      'evidenceids',
+      'the bundle never mentions evidenceIds, so nothing stops the model inventing one',
+    ],
+    ['asof', 'the bundle never mentions asOf'],
+  ] as const) {
+    if (!lowered.includes(needle)) problem('bundle-says-what-it-costs', why)
   }
 
   // ── attribution, by shape ────────────────────────────────────────────────
@@ -519,6 +478,48 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
         'notice-travels-with-the-derivative',
         `provenance.commit is ${provenance.commit}, which is not a full 40-character commit — a branch name moves and then names nothing`,
       )
+    }
+  }
+
+  // ── the cadence suggestion, when there is one (§E47 path A) ───────────────
+  //
+  // ⚠️ **A file, not a manifest field, and the linter is the only reader that
+  // reports on it.** `agentPackageManifestSchema` is a `strictObject`, so a new
+  // key makes a shipped binary refuse the whole document; §E47 measured that
+  // `engines.aumos` cannot gate it either, because the manifest is parsed
+  // *before* engines is read. So the value lives in `cadence.json`, which an
+  // old binary simply does not look at.
+  //
+  // The cost of that invisibility is that the **app** cannot complain: a
+  // suggestion that will not parse is dropped there, because a pre-fill must
+  // never be able to stop an install. This is where the author hears about it,
+  // which is the only place the message can reach the person who wrote the file.
+  const cadenceText = files['cadence.json']
+  if (cadenceText !== undefined) {
+    let cadence: unknown
+    try {
+      cadence = JSON.parse(cadenceText)
+    } catch (error) {
+      problem(
+        'cadence-is-readable',
+        `cadence.json is not JSON: ${error instanceof Error ? error.message : String(error)}`,
+      )
+      cadence = undefined
+    }
+    if (cadence !== undefined) {
+      const value =
+        typeof cadence === 'object' && cadence !== null
+          ? (cadence as { readonly cadenceDays?: unknown }).cadenceDays
+          : undefined
+      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+        problem(
+          'cadence-is-readable',
+          'cadence.json has to be {"cadenceDays": n} where n is a number of days greater than ' +
+            'zero. Aumos drops a file it cannot read rather than refusing the package, so a ' +
+            'typo here is a suggestion that silently never appears. Delete the file to suggest ' +
+            'nothing — that is what an absent one means.',
+        )
+      }
     }
   }
 

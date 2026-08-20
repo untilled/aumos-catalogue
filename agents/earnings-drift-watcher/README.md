@@ -40,17 +40,25 @@ catalogue of agents that are all wrong at the same time.
 - **Faded moves.** It is instructed to treat a reversal as evidence against its own reading
   rather than as an opportunity, and it will therefore miss the cases where the market was
   wrong and later agreed with it.
-- **Short horizons.** It runs in the closed lane and its judgements are approved by a
-  person by hand. Anything that only works if executed within hours is something it is
+- **Short horizons.** Its judgements are approved by a person by hand. Anything that only works if executed within hours is something it is
   told to write as a WATCH instead.
 
-## Lane
+## What it reaches, and what that costs
 
-**No CLI tools.** `tools` is empty, so this agent is launched with no shell, no web and no
-filesystem of its own: everything it sees arrives through the Aumos Skill Gateway, and
-every call it makes is recorded as evidence you can re-read afterwards.
+**It asks Aumos for everything it reasons from**, and every call it makes through the Aumos
+Skill Gateway is recorded as evidence you can re-read afterwards.
 
-⚠️ **What that no longer buys, said plainly.** Until §E21 an empty tool list meant the
+⚠️ **It is not launched with no shell.** This section said so — *"`tools` is empty, so this
+agent is launched with no shell, no web and no filesystem of its own"* — and that stopped
+being true when Aumos deleted the `tools` field and the deny list behind it. The sentence is
+corrected rather than deleted because it was a **safety claim on a published page**, and a
+reader who saw it once should be able to find out that it was withdrawn. What is true now:
+this agent's prompt asks the gateway for everything, so everything it *reasons from* is on
+the record — and the session it runs in holds whatever its coding CLI ships, which nothing
+in this package can narrow. What contains that session is the OS account Aumos launches it
+as, on the investor's own machine.
+
+⚠️ **And what the empty tool list stopped buying before that.** Until §E21 it meant the
 *closed lane*, and the closed lane meant more than "no shell": the gateway read each
 vendor, mapped the answer onto a port, dated every fact and refused anything published
 after the instant the judgement was pinned to. There are no ports now. A data source is a
