@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Basic Investor instance configuration",
+  "description": "Reaches the agent as AgentInvocation.config. Every field bounds how much the agent gathers before it reasons; none of them can loosen the TimeGate, which is the gateway's and not configurable from here.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "historyDays": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 365,
+      "default": 30,
+      "description": "Calendar days of daily bars to request, counting back from asOf."
+    },
+    "newsLimit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50,
+      "default": 10,
+      "description": "Maximum articles to request. Articles published or revised after asOf are excluded by the gateway regardless."
+    }
+  }
+}

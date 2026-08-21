@@ -1,0 +1,38 @@
+{
+  "manifestVersion": 1,
+  "id": "undervalued-now",
+  "publisher": "aumos",
+  "name": "Undervalued Now",
+  "version": "0.2.0",
+  "description": "One paragraph, no capabilities, and its own web and shell. A benchmark of the model rather than of a methodology — the prompt is the question, and the forward return is the answer.",
+  "readme": "./README.md",
+  "prompt": "./PROMPT.md",
+  "cadence": {
+    "days": 1
+  },
+  "runtimes": ["claude"],
+  "license": "MIT",
+  "engines": {
+    "aumos": ">=0.2.6"
+  },
+  "aapVersion": 1,
+  "contributes": {
+    "agents": [
+      {
+        "id": "undervalued-now",
+        "name": "Undervalued Now",
+        "description": "Asked to find one undervalued listed equity and propose a position in it, by whatever means it likes.",
+        "tasks": ["PORTFOLIO_REVIEW", "ASSET_REVIEW", "EVENT_REVIEW"],
+        "assetClasses": ["equity", "etf"],
+        "markets": ["XNAS", "XNYS"]
+      }
+    ]
+  },
+  "capabilities": [],
+  "requires": {
+    "skills": []
+  },
+  "memory": {
+    "persistent": false
+  }
+}

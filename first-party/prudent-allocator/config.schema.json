@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Prudent Allocator instance configuration",
+  "description": "Reaches the agent as AgentInvocation.config. Every field is a threshold this methodology compares the book against; none of them can loosen the TimeGate, which is the gateway's and is not configurable from here. Aumos resolves this file and deliberately does not validate instance config against it — a half-validator would report a pass it did not establish.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "historyDays": {
+      "type": "integer",
+      "minimum": 20,
+      "maximum": 365,
+      "default": 90,
+      "description": "Calendar days of daily bars to request, counting back from asOf. Longer than a bottom-up reader would ask for, because the question here is how far a position has already travelled."
+    },
+    "concentrationHeadroom": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.5,
+      "default": 0.02,
+      "description": "How close to the mandate's maxPositionWeight a position may sit before this agent treats it as concentrated. 0.02 means a 15% cap starts drawing attention at 13%."
+    },
+    "actOnlyIfWorth": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.2,
+      "default": 0.01,
+      "description": "The smallest change in a position's weight worth proposing, as a fraction of the book. Below it this agent returns WAIT rather than churning the portfolio for a rounding difference."
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "FinRobot의 Data-CoT → Concept-CoT → Thesis-CoT에 포트폴리오 컨텍스트와 결정 단계를 더한 구성. 표준이 되는 AgentPackage입니다.",
+  "agents": [
+    {
+      "id": "basic-investor",
+      "description": "asOf 시점에 스킬 게이트웨이가 내어주는 것을 읽고, 세 단계로 추론한 뒤, 하나의 DecisionProposal을 돌려줍니다."
+    }
+  ]
+}

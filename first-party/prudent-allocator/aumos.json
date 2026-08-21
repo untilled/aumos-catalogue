@@ -1,0 +1,55 @@
+{
+  "manifestVersion": 1,
+  "id": "prudent-allocator",
+  "publisher": "aumos",
+  "name": "Prudent Allocator",
+  "version": "0.2.0",
+  "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong.",
+  "readme": "./README.md",
+  "prompt": "./PROMPT.md",
+  "runtimes": ["claude"],
+  "license": "MIT",
+  "engines": {
+    "aumos": ">=0.2.6"
+  },
+  "aapVersion": 1,
+  "contributes": {
+    "agents": [
+      {
+        "id": "prudent-allocator",
+        "name": "Prudent Allocator",
+        "description": "Reads the book and the mandate first and the event second. Judges an event by what it does to the portfolio's downside, not by what it says about the asset, and returns one DecisionProposal.",
+        "tasks": ["ASSET_REVIEW", "EVENT_REVIEW", "THESIS_REVIEW"],
+        "assetClasses": ["equity", "etf"],
+        "markets": ["XNAS", "XNYS"]
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "source:passthrough",
+      "reason": "Price history for each holding, asked of the market vendor this machine holds a credential for. The response is the vendor’s, unread by Aumos."
+    },
+    {
+      "kind": "portfolio:read",
+      "reason": "The book is the subject. Every judgement this agent makes is about the portfolio's exposure, not about an asset in the abstract."
+    },
+    {
+      "kind": "thesis:read",
+      "reason": "The invalidation conditions already written down, so a position is judged against the reason it was taken."
+    }
+  ],
+  "requires": {
+    "skills": ["source_request"],
+    "optionalSkills": ["portfolio_read", "thesis_read"]
+  },
+  "network": {
+    "mode": "deny"
+  },
+  "config": {
+    "schema": "config.schema.json"
+  },
+  "memory": {
+    "persistent": false
+  }
+}

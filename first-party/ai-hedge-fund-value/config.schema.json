@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AI Hedge Fund — Deep Value instance configuration",
+  "description": "Reaches the agent as AgentInvocation.config. Every field here corresponds to something the source harness put in its own YAML: the analyst blend weights are `StrategySpec.models[].weight` and the conviction floor is the `min-conviction floor` its portfolio-construction module names as the obvious next knob. What is deliberately NOT here is anything the Kernel owns — position caps and gross exposure were `RiskLimits` upstream and are the investor's Mandate here, so putting them in an agent's config would let a package argue with the constraint it is judged against. Aumos resolves this file and deliberately does not validate instance config against it — a half-validator would report a pass it did not establish.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "analystWeights": {
+      "type": "object",
+      "description": "How much each analyst's conviction counts in the blend. The defaults are the source's own `hedge_fund/strategies/deep-value.yaml`, in which Graham leads at double weight and Buffett and Munger keep quality in the mix.",
+      "additionalProperties": false,
+      "properties": {
+        "graham": { "type": "number", "exclusiveMinimum": 0, "default": 2.0 },
+        "buffett": { "type": "number", "exclusiveMinimum": 0, "default": 1.0 },
+        "munger": { "type": "number", "exclusiveMinimum": 0, "default": 1.0 }
+      }
+    },
+    "convictionFloor": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.2,
+      "description": "The smallest blended conviction that may move the book. Below it the judgement is WAIT or WATCH rather than a target. Upstream this floor did not exist and its absence is documented as a known wart — a lone weak view received the full gross target and the risk stage then clamped it. Aumos cannot inherit that shape: a breaching target is not clamped here, it is downgraded to WAIT and the whole judgement is lost, so the floor moves from a nice-to-have to a requirement."
+    },
+    "requireMajority": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether a target needs at least two of the three analysts on the same side. The source blended arithmetically with no such rule; this exists because Aumos records one judgement per run rather than a continuously rebalanced sleeve, so a single dissenting-but-loud analyst is not diluted by tomorrow's tick."
+    }
+  }
+}
