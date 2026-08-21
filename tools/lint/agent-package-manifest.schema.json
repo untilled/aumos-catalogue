@@ -43,9 +43,7 @@
           "exclusiveMinimum": 0
         }
       },
-      "required": [
-        "days"
-      ],
+      "required": ["days"],
       "additionalProperties": false
     },
     "translations": {
@@ -74,10 +72,7 @@
                   "minLength": 1
                 }
               },
-              "required": [
-                "id",
-                "description"
-              ],
+              "required": ["id", "description"],
               "additionalProperties": false
             }
           }
@@ -86,18 +81,12 @@
       }
     },
     "runtimes": {
-      "default": [
-        "claude",
-        "codex"
-      ],
+      "default": ["claude", "codex"],
       "minItems": 1,
       "type": "array",
       "items": {
         "type": "string",
-        "enum": [
-          "claude",
-          "codex"
-        ]
+        "enum": ["claude", "codex"]
       }
     },
     "credentials": {
@@ -113,9 +102,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "additionalProperties": false
       }
     },
@@ -146,13 +133,7 @@
           "minLength": 1
         }
       },
-      "required": [
-        "sourceRepo",
-        "commit",
-        "license",
-        "licenseHolder",
-        "notice"
-      ],
+      "required": ["sourceRepo", "commit", "license", "licenseHolder", "notice"],
       "additionalProperties": false
     },
     "homepage": {
@@ -167,9 +148,7 @@
           "minLength": 1
         }
       },
-      "required": [
-        "aumos"
-      ],
+      "required": ["aumos"],
       "additionalProperties": false
     },
     "aapVersion": {
@@ -201,12 +180,7 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "enum": [
-                    "PORTFOLIO_REVIEW",
-                    "ASSET_REVIEW",
-                    "THESIS_REVIEW",
-                    "EVENT_REVIEW"
-                  ]
+                  "enum": ["PORTFOLIO_REVIEW", "ASSET_REVIEW", "THESIS_REVIEW", "EVENT_REVIEW"]
                 }
               },
               "assetClasses": {
@@ -214,12 +188,7 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "enum": [
-                    "equity",
-                    "etf",
-                    "crypto",
-                    "cash"
-                  ]
+                  "enum": ["equity", "etf", "crypto", "cash"]
                 }
               },
               "markets": {
@@ -232,20 +201,12 @@
                 }
               }
             },
-            "required": [
-              "id",
-              "name",
-              "tasks",
-              "assetClasses",
-              "markets"
-            ],
+            "required": ["id", "name", "tasks", "assetClasses", "markets"],
             "additionalProperties": false
           }
         }
       },
-      "required": [
-        "agents"
-      ],
+      "required": ["agents"],
       "additionalProperties": false
     },
     "capabilities": {
@@ -269,9 +230,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "kind"
-        ],
+        "required": ["kind"],
         "additionalProperties": false
       }
     },
@@ -293,9 +252,7 @@
           }
         }
       },
-      "required": [
-        "skills"
-      ],
+      "required": ["skills"],
       "additionalProperties": false
     },
     "network": {
@@ -311,9 +268,7 @@
               "const": "deny"
             }
           },
-          "required": [
-            "mode"
-          ],
+          "required": ["mode"],
           "additionalProperties": false
         },
         {
@@ -332,10 +287,7 @@
               }
             }
           },
-          "required": [
-            "mode",
-            "hosts"
-          ],
+          "required": ["mode", "hosts"],
           "additionalProperties": false
         }
       ]
@@ -348,9 +300,7 @@
           "minLength": 1
         }
       },
-      "required": [
-        "schema"
-      ],
+      "required": ["schema"],
       "additionalProperties": false
     },
     "memory": {
@@ -360,9 +310,7 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "persistent"
-      ],
+      "required": ["persistent"],
       "additionalProperties": false
     }
   },
