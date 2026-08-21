@@ -1,0 +1,51 @@
+{
+  "manifestVersion": 1,
+  "id": "basic-investor",
+  "publisher": "aumos",
+  "name": "Basic Investor",
+  "version": "0.2.0",
+  "description": "FinRobot's Data-CoT → Concept-CoT → Thesis-CoT, extended with Portfolio Context and a Decision stage. The reference AgentPackage.",
+  "readme": "./README.md",
+  "prompt": "./PROMPT.md",
+  "runtimes": ["claude"],
+  "license": "MIT",
+  "engines": {
+    "aumos": ">=0.2.6"
+  },
+  "aapVersion": 1,
+  "contributes": {
+    "agents": [
+      {
+        "id": "basic-investor",
+        "name": "Basic Investor",
+        "description": "Reads what the Skill Gateway will serve at asOf, reasons in three stages, and returns one DecisionProposal.",
+        "tasks": ["ASSET_REVIEW", "EVENT_REVIEW", "THESIS_REVIEW"],
+        "assetClasses": ["equity", "etf"],
+        "markets": ["XNAS", "XNYS"]
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "source:passthrough",
+      "reason": "Prices, filings and headlines, asked of the vendors this machine holds credentials for. The response is theirs, unread by Aumos — this package does the reading."
+    },
+    {
+      "kind": "portfolio:read",
+      "reason": "The book as it stood, so a judgement is about this portfolio rather than about the asset in the abstract."
+    }
+  ],
+  "requires": {
+    "skills": ["source_request"],
+    "optionalSkills": ["portfolio_read"]
+  },
+  "network": {
+    "mode": "deny"
+  },
+  "config": {
+    "schema": "config.schema.json"
+  },
+  "memory": {
+    "persistent": false
+  }
+}

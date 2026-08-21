@@ -31,6 +31,81 @@
       "type": "string",
       "minLength": 1
     },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cadence": {
+      "type": "object",
+      "properties": {
+        "days": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": ["days"],
+      "additionalProperties": false
+    },
+    "translations": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["id", "description"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "runtimes": {
+      "default": ["claude", "codex"],
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["claude", "codex"]
+      }
+    },
+    "credentials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      }
+    },
     "license": {
       "type": "string"
     },
@@ -250,6 +325,5 @@
     "contributes",
     "capabilities",
     "requires"
-  ],
-  "additionalProperties": false
+  ]
 }

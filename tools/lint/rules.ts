@@ -94,8 +94,17 @@ export interface Problem {
  * `decision-proposal.schema.json` to recover an enum nobody compares against.
  */
 
-/** The one substitution a prompt bundle may contain. Mirrors `agent-runtime`. */
-export const INVOCATION_MARKER = '{{INVOCATION}}'
+/**
+ * The one file in a package Aumos parses. Mirrors `agent-runtime`. (#286)
+ *
+ * A second copy of the name for `LOCALE_TAG`'s reason below — this file is
+ * vendored verbatim into a public repository and may not import from the
+ * workspace. `rules.test.ts` is what keeps the two in step.
+ */
+export const MANIFEST_FILENAME = 'aumos.json'
+
+/** The prompt a package ships when its manifest names none. Mirrors `agent-runtime`. */
+export const DEFAULT_PROMPT_PATH = 'PROMPT.md'
 
 /**
  * A locale tag a translation may be keyed by. (#233)
@@ -111,6 +120,12 @@ interface ManifestView {
   readonly capabilities: readonly string[]
   readonly configSchema: string | undefined
   readonly readme: string | undefined
+  /** `manifest.prompt`, unresolved. Absent means the conventional `PROMPT.md`. (#286) */
+  readonly prompt: string | undefined
+  /** Which CLI loaders this package's files are written for. (#286) */
+  readonly runtimes: readonly string[] | undefined
+  /** The package id, so a credential rule can say whether it is spellable. (#286) */
+  readonly id: string | undefined
   /** Contributed agent ids, so a translation cannot name one that is not here. */
   readonly agentIds: readonly string[]
   readonly provenance:
@@ -142,6 +157,16 @@ function readManifest(raw: unknown): ManifestView {
       : [],
     configSchema: text(field(field(raw, 'config'), 'schema')),
     readme: text(field(raw, 'readme')),
+    prompt: text(field(raw, 'prompt')),
+    id: text(field(raw, 'id')),
+    // Members that are not strings are dropped rather than reported: the schema
+    // owns the shape of this field, and a linter that re-litigates it would give
+    // one mistake two messages that do not agree.
+    runtimes: Array.isArray(field(raw, 'runtimes'))
+      ? (field(raw, 'runtimes') as unknown[]).filter(
+          (runtime): runtime is string => typeof runtime === 'string',
+        )
+      : undefined,
     agentIds: Array.isArray(field(field(raw, 'contributes'), 'agents'))
       ? (field(field(raw, 'contributes'), 'agents') as unknown[])
           .map((agent) => text(field(agent, 'id')))
@@ -173,9 +198,9 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   }
 
   // ── the manifest exists and is JSON ──────────────────────────────────────
-  const manifestText = files['manifest.json']
+  const manifestText = files[MANIFEST_FILENAME]
   if (manifestText === undefined) {
-    return [{ rule: 'manifest-present', message: 'there is no manifest.json' }]
+    return [{ rule: 'manifest-present', message: `there is no ${MANIFEST_FILENAME}` }]
   }
   let raw: unknown
   try {
@@ -184,25 +209,32 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
     return [
       {
         rule: 'manifest-present',
-        message: `manifest.json is not JSON: ${error instanceof Error ? error.message : String(error)}`,
+        message: `${MANIFEST_FILENAME} is not JSON: ${error instanceof Error ? error.message : String(error)}`,
       },
     ]
   }
   const manifest = readManifest(raw)
 
-  // ── the prompt bundle ────────────────────────────────────────────────────
-  //
-  // Lexical filename order and nothing else — the numeric prefixes *are* the
-  // ordering, so a renamed file reorders the reasoning and a reader can see it
-  // in the diff.
-  const sections = Object.keys(files)
-    .filter((path) => path.startsWith('prompt/') && path.endsWith('.md'))
-    .sort()
-  if (sections.length === 0) {
-    problem('prompt-bundle', 'there is no prompt/ directory with .md sections in it')
+  /**
+   * ── the prompt ───────────────────────────────────────────────────────────
+   *
+   * ⚠️ **`prompt-bundle` is retired and this replaced it (#286).** The rule was
+   * *there is a `prompt/` directory with `.md` sections in it*, and the
+   * directory no longer exists: a package's prompt is one file, and everything
+   * an agent should read *conditionally* is a skill the CLI loads and Aumos
+   * never sees. The check that survives is the one the bundle rule was really
+   * making — **a package must ship the file it will be run from** — because a
+   * package whose prompt path is dead fails on its first run rather than at
+   * lint, which is the failure this tool exists to move earlier.
+   */
+  const promptPath = normalise(manifest.prompt ?? DEFAULT_PROMPT_PATH)
+  const bundle = files[promptPath]
+  if (bundle === undefined) {
+    problem('prompt-present', `the prompt file ${promptPath} is not in the package`)
+  } else if (bundle.trim().length === 0) {
+    problem('prompt-present', `the prompt file ${promptPath} is empty`)
   }
-  const bundle = sections.map((path) => files[path] ?? '').join('\n')
-  const jsonBlocks = (bundle.match(/```json\n[\s\S]*?```/g) ?? []).join('\n')
+  const jsonBlocks = ((bundle ?? '').match(/```json\n[\s\S]*?```/g) ?? []).join('\n')
 
   // ── the paths the manifest names lead somewhere ──────────────────────────
   //
@@ -347,32 +379,17 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   // no such package: every session reaches the web and a shell whatever the
   // manifest says, and a package may legitimately ask for zero capabilities.
   //
-  // ── the marker ───────────────────────────────────────────────────────────
+  // ⚠️ **`invocation-marker` stood here and #286 retired it.**
   //
-  // ⚠️ **This required exactly one until #270 and now permits none.**
+  // The rule required exactly one `{{INVOCATION}}` in the bundle, #270 relaxed
+  // it to *at most* one, and #286 deleted the substitution itself. There is no
+  // templating in a prompt file: `invocation_read` is the only way an agent gets
+  // the AAP document, which is the trade #270 made deliberately — a prompt that
+  // was interpolated leaves no row, and a tool call does.
   //
-  // It guarded a silent failure: a run against a markerless bundle produced a
-  // beautifully structured set of instructions about no particular asset, and
-  // succeeded. `invocation_read` is the other way an agent gets that document —
-  // through the gateway, where the call is observed — so a bundle with no marker
-  // is no longer a bundle that knows nothing.
-  //
-  // Two is still refused, and that half never depended on the tool: substituting
-  // the invocation twice leaves a reader unable to say which copy the model
-  // read.
-  //
-  // ⛔ What a *contributor* has to know is not enforceable here and is said in
-  // prose instead: dropping the marker raises the binary this package needs.
-  // `engines.aumos` is the field that says so, and an old binary refuses the
-  // install rather than failing the run.
-  const markers = bundle.split(INVOCATION_MARKER).length - 1
-  if (markers > 1) {
-    problem(
-      'invocation-marker',
-      `the bundle carries ${markers} ${INVOCATION_MARKER} markers and may carry at most one. ` +
-        'Two substitutions leave a reader unable to say which copy the model read',
-    )
-  }
+  // Nothing replaces it. A rule about a marker no reader substitutes would be
+  // this file asserting a property nothing enforces, which is the failure the
+  // repository's own comment convention names.
 
   // ⚠️ **`worked-example-per-action` and `rationale-field-shape` stood here, and
   // #269 retired them.** (2026-08-21)
@@ -413,28 +430,31 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   // strict, and still the judge's own. If that stops being true, every package
   // is back to prose — and these rules would be right again.
 
-  // ── another language, shown rather than described ────────────────────────  // ── another language, shown rather than described ────────────────────────
+  // ⚠️ **`language-is-shown` stood here, and #286 retired it.**
   //
-  // `language` invites #265's mistake one level worse: a model told to answer in
-  // Korean has every reason to translate `action` too, and one translated enum
-  // discards the judgement entirely. The second half of this is the load-bearing
-  // one — an example that translated its keys would teach the failure rather
-  // than the rule.
-  if (!bundle.includes('language')) {
-    problem('language-is-shown', 'the bundle never mentions language')
-  }
-  if (!/[가-힣]/.test(bundle)) {
-    problem(
-      'language-is-shown',
-      'the bundle has no worked example in a non-English language, so a model answering in one has to guess what stays English',
-    )
-  }
-  for (const key of bundle.match(/"[^"\n]+"\s*:/g) ?? []) {
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: the ASCII range is the point
-    if (!/^[\x00-\x7f]+$/.test(key)) {
-      problem('language-is-shown', `a JSON key in the bundle is not English: ${key}`)
-    }
-  }
+  // It required the bundle to mention `language`, to carry a worked example in a
+  // non-English language, and to keep every JSON key in that example ASCII. The
+  // failure it guarded is real and unchanged — a model told to answer in Korean
+  // has every reason to translate `action` too, and one translated enum discards
+  // the judgement entirely.
+  //
+  // What changed is where that instruction belongs. #286 makes the prompt file
+  // the run's **entry point** and moves everything read conditionally into
+  // skills the CLI loads and Aumos never reads. A rule that greps the entry
+  // point for a Korean worked example is a rule that forces content back into
+  // the one file the format exists to keep short — and it cannot follow the
+  // content into `skills/`, because the whole point is that Aumos does not
+  // interpret what is in there.
+  //
+  // It is also no longer the only channel, which is the argument
+  // `bundle-says-what-it-costs` made two rules down: the Aumos MCP server
+  // returns `instructions` from `initialize`, so what stays English is stated
+  // once by the host to every package rather than re-asserted by each one.
+  //
+  // ⛔ **This is the weakest of the three retirements and it is worth saying so.**
+  // `invocation-marker` went because the mechanism was deleted, and
+  // `prompt-bundle` because the directory was; this one goes because the rule
+  // sits in the wrong place, and nothing yet checks the place it moved to.
 
   // ⚠️ **`bundle-says-what-it-costs` stood here, and #271 retired it.**
   // (2026-08-21)
@@ -487,47 +507,155 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
     }
   }
 
-  // ── the cadence suggestion, when there is one (#257 path A) ───────────────
-  //
-  // ⚠️ **A file, not a manifest field, and the linter is the only reader that
-  // reports on it.** `agentPackageManifestSchema` is a `strictObject`, so a new
-  // key makes a shipped binary refuse the whole document; #257 measured that
-  // `engines.aumos` cannot gate it either, because the manifest is parsed
-  // *before* engines is read. So the value lives in `cadence.json`, which an
-  // old binary simply does not look at.
-  //
-  // The cost of that invisibility is that the **app** cannot complain: a
-  // suggestion that will not parse is dropped there, because a pre-fill must
-  // never be able to stop an install. This is where the author hears about it,
-  // which is the only place the message can reach the person who wrote the file.
-  const cadenceText = files['cadence.json']
-  if (cadenceText !== undefined) {
-    let cadence: unknown
+  /**
+   * ── the runtime a package's files are written for (#286) ─────────────────
+   *
+   * The one real constraint the plugin format costs us, so it is the one new
+   * rule. A package carrying `.claude-plugin/plugin.json` is loaded by
+   * `claude --plugin-dir`; codex has no counterpart and reads `AGENTS.md`. Aumos
+   * interprets neither — it hands the directory to the CLI whole — so the
+   * *manifest* is the only place that can say which loader the files are for,
+   * and a mismatch between the declaration and what is on disk is a package that
+   * installs and then starts a session with none of its own material in it.
+   *
+   * ⚠️ **Only the absence is checked, never the presence of extra files.** A
+   * package may legitimately ship both sets, and a package listing `claude` that
+   * also carries `AGENTS.md` is not making a mistake — codex reads that file
+   * whether or not this manifest mentions it.
+   */
+  const runtimes = manifest.runtimes ?? []
+  if (runtimes.includes('claude') && files['.claude-plugin/plugin.json'] === undefined) {
+    problem(
+      'runtime-files-are-present',
+      'runtimes lists "claude" but there is no .claude-plugin/plugin.json, so ' +
+        '`--plugin-dir` loads a directory with no plugin in it and the session starts without ' +
+        'this package’s skills, hooks or MCP servers',
+    )
+  }
+  if (runtimes.includes('codex') && files['AGENTS.md'] === undefined) {
+    problem(
+      'runtime-files-are-present',
+      'runtimes lists "codex" but there is no AGENTS.md, which is the only convention codex ' +
+        'reads. Aumos does not translate the claude plugin for it',
+    )
+  }
+
+  /**
+   * ── the servers a package brings, and what it asks the investor for (#286 3) ─
+   *
+   * Aumos parses `.mcp.json` only as far as the server names, because
+   * `--strict-mcp-config` means a server it does not write into the run's config
+   * does not exist. That makes two mistakes possible that nothing else catches,
+   * and both are silent at run time:
+   *
+   * - a file that will not parse — the loader **refuses the package**, and this
+   *   is where the author hears which line;
+   * - a server named `aumos` — the gateway is written under that name, so one of
+   *   the two would silently replace the other.
+   *
+   * ⛔ **What is deliberately not checked is whether the servers are safe.** A
+   * `command` pointing into `bin/`, a `url` on the open internet — both are
+   * legal, and #286 settled that this cannot be prevented and is disclosed
+   * instead. A linter that graded them would be asserting a judgement the host
+   * does not make.
+   */
+  const mcpText = files['.mcp.json']
+  if (mcpText !== undefined) {
+    let mcp: unknown
     try {
-      cadence = JSON.parse(cadenceText)
+      mcp = JSON.parse(mcpText)
     } catch (error) {
       problem(
-        'cadence-is-readable',
-        `cadence.json is not JSON: ${error instanceof Error ? error.message : String(error)}`,
+        'mcp-config-is-readable',
+        `.mcp.json is not JSON: ${error instanceof Error ? error.message : String(error)}. ` +
+          'Aumos refuses a package whose server list it cannot read, because a server the ' +
+          'investor approved and that then does not start is a run doing less than they agreed to',
       )
-      cadence = undefined
+      mcp = undefined
     }
-    if (cadence !== undefined) {
-      const value =
-        typeof cadence === 'object' && cadence !== null
-          ? (cadence as { readonly cadenceDays?: unknown }).cadenceDays
-          : undefined
-      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    const servers =
+      typeof mcp === 'object' && mcp !== null
+        ? (mcp as { readonly mcpServers?: unknown }).mcpServers
+        : undefined
+    if (servers !== undefined) {
+      if (typeof servers !== 'object' || servers === null || Array.isArray(servers)) {
         problem(
-          'cadence-is-readable',
-          'cadence.json has to be {"cadenceDays": n} where n is a number of days greater than ' +
-            'zero. Aumos drops a file it cannot read rather than refusing the package, so a ' +
-            'typo here is a suggestion that silently never appears. Delete the file to suggest ' +
-            'nothing — that is what an absent one means.',
+          'mcp-config-is-readable',
+          '.mcp.json has an "mcpServers" member that is not an object',
         )
+      } else {
+        for (const [name, body] of Object.entries(servers as Record<string, unknown>)) {
+          if (name === 'aumos') {
+            problem(
+              'mcp-config-is-readable',
+              'the server name "aumos" is the one Aumos writes its own gateway under, so one of ' +
+                'the two would silently replace the other. Rename it',
+            )
+          }
+          if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+            problem(
+              'mcp-config-is-readable',
+              `.mcp.json server ${JSON.stringify(name)} is not an object`,
+            )
+          }
+        }
       }
     }
   }
+
+  /**
+   * A credential a package asks for has to be spellable as a variable. (#286 3)
+   *
+   * The host composes `AUMOS_AGENT_CREDENTIAL_<ID>__<NAME>` and **refuses**
+   * rather than composing a name two ids could share — so a package declaring a
+   * credential it can never be given would install, and fail at the first run
+   * with a message about environment variables. This is where the author hears
+   * it instead.
+   *
+   * The shape is `SOURCE_ID_PATTERN`'s, restated rather than imported for
+   * `LOCALE_TAG`'s reason: this file is vendored verbatim into a public
+   * repository and may not import the workspace.
+   */
+  const CREDENTIAL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+  const declaredCredentials = Array.isArray(field(raw, 'credentials'))
+    ? (field(raw, 'credentials') as unknown[])
+    : []
+  if (declaredCredentials.length > 0 && !CREDENTIAL_NAME.test(manifest.id ?? '')) {
+    problem(
+      'credential-is-nameable',
+      `this package asks for credentials, but its id ${JSON.stringify(manifest.id)} is not ` +
+        'lowercase letters, digits and single hyphens. A scoped id cannot be composed into an ' +
+        'environment variable without two ids becoming one, so the host refuses at run time',
+    )
+  }
+  for (const credential of declaredCredentials) {
+    const name = text(field(credential, 'name'))
+    if (name !== undefined && !CREDENTIAL_NAME.test(name)) {
+      problem(
+        'credential-is-nameable',
+        `credential ${JSON.stringify(name)} has to be lowercase letters, digits and single ` +
+          'hyphens, beginning and ending with a letter or digit — the host composes an ' +
+          'environment variable from it and refuses a name it cannot make unique',
+      )
+    }
+  }
+
+  // ⚠️ **`cadence-is-readable` stood here, and #286 retired it.** (#257 path A)
+  //
+  // The rule existed because the cadence suggestion was a **file** —
+  // `cadence.json` — and it was a file for one reason: the manifest schema was a
+  // `strictObject`, so a new key made a shipped binary refuse the whole
+  // document, and #257 measured that `engines.aumos` could not gate it either
+  // because the manifest is parsed *before* engines is read. The file was
+  // invisible to the schema, which meant the **app** could not complain about a
+  // bad one either — a pre-fill must never stop an install — so this was the
+  // only reader that could tell the author their file said nothing.
+  //
+  // #286 released `strictObject`, so the value is `manifest.cadence` and zod
+  // rejects a bad one at the manifest, where refusing is right. The rule is not
+  // replaced because it has nothing left to say: `readManifest` below already
+  // reports an unparseable manifest, and a cadence outside range is now a
+  // `manifest-present` problem rather than a silent drop.
 
   return problems
 }

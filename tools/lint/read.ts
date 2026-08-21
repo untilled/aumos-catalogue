@@ -104,7 +104,7 @@ export function readPackageFiles(directory: string): PackageFiles {
  * A submissions repository is a directory of them and the generator has to
  * enumerate it without being told what is there — which is the difference
  * between a catalogue and `PUBLISHED`, the hand-kept list of what we ourselves
- * offer. `manifest.json` is the marker, so a README, a licence and a workflow
+ * offer. `aumos.json` is the marker, so a README, a licence and a workflow
  * beside the packages are not mistaken for one.
  */
 export function findPackageDirectories(root: string): readonly string[] {
@@ -114,7 +114,7 @@ export function findPackageDirectories(root: string): readonly string[] {
     .sort()
     .filter((name) => {
       try {
-        return readdirSync(join(root, name)).includes('manifest.json')
+        return readdirSync(join(root, name)).includes('aumos.json')
       } catch {
         return false
       }

@@ -1,0 +1,58 @@
+{
+  "manifestVersion": 1,
+  "id": "ai-hedge-fund-value",
+  "publisher": "aumos",
+  "name": "AI Hedge Fund — Deep Value",
+  "version": "0.2.0",
+  "description": "A port of ai-hedge-fund's deep-value pod: Graham, Buffett and Munger read the same point-in-time fundamentals independently, and one reconciliation weighs their convictions. Graham's view counts double, as the source's own strategy file specifies.",
+  "readme": "./README.md",
+  "prompt": "./PROMPT.md",
+  "runtimes": ["claude"],
+  "license": "MIT",
+  "provenance": {
+    "sourceRepo": "https://github.com/virattt/ai-hedge-fund",
+    "commit": "69e5946dcb7b5fbe739b516455d1b5392cb5f7ac",
+    "license": "MIT",
+    "licenseHolder": "Virat Singh",
+    "notice": "./NOTICE.md"
+  },
+  "engines": {
+    "aumos": ">=0.2.6"
+  },
+  "aapVersion": 1,
+  "contributes": {
+    "agents": [
+      {
+        "id": "ai-hedge-fund-value",
+        "name": "AI Hedge Fund — Deep Value",
+        "description": "Three value analysts judge the same filed figures without seeing each other's answers, and their convictions are weighed into one judgement. Reasons from fundamentals and price alone — it is given no news and no thesis, because the harness it was ported from reads neither.",
+        "tasks": ["ASSET_REVIEW", "EVENT_REVIEW"],
+        "assetClasses": ["equity", "etf"],
+        "markets": ["XNAS", "XNYS"]
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "source:passthrough",
+      "reason": "Filings and price history, asked of the vendors this machine holds credentials for. Each persona reads the vendor’s own response; nothing is mapped on the way."
+    },
+    {
+      "kind": "portfolio:read",
+      "reason": "The book as it stood, so a conviction about a business becomes a judgement about this portfolio rather than a rating in the abstract."
+    }
+  ],
+  "requires": {
+    "skills": ["source_request"],
+    "optionalSkills": ["portfolio_read"]
+  },
+  "network": {
+    "mode": "deny"
+  },
+  "config": {
+    "schema": "config.schema.json"
+  },
+  "memory": {
+    "persistent": false
+  }
+}

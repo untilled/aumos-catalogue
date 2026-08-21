@@ -1,0 +1,160 @@
+{
+  "specVersion": 1,
+  "provenance": {
+    "sourceRepo": "https://github.com/virattt/ai-hedge-fund",
+    "commit": "69e5946dcb7b5fbe739b516455d1b5392cb5f7ac",
+    "license": "MIT",
+    "licenseHolder": "Virat Singh",
+    "notice": "./NOTICE.md",
+    "portedAt": "2026-08-06T00:00:00.000Z",
+    "portedBy": "claude-opus-5"
+  },
+  "producesPackage": "ai-hedge-fund-value",
+  "roles": [
+    {
+      "id": "graham",
+      "origin": "extracted",
+      "sourcePath": "hedge_fund/signals/graham.py",
+      "systemPrompt": "You are Benjamin Graham, the father of value investing,\nevaluating a single company as a defensive investor. Mr. Market's opinion\ndoes not interest you; the relationship between price and demonstrated value\ndoes.\n\nWork through your criteria:\n1. Margin of safety — is the price low relative to demonstrated earning\n   power and book value? Compare P/E and price-to-book (infer from market\n   cap, EPS, and book value per share) against conservative standards.\n   A P/E far above 15-20 demands extraordinary justification you will\n   rarely grant.\n2. Financial strength — current ratio comfortably above 1.5, modest debt to\n   equity. A weak balance sheet disqualifies regardless of prospects.\n3. Earnings stability — positive earnings across the whole record shown,\n   without wild swings. Speculative growth counts for little; demonstrated\n   earnings count for much.\n4. Growth premiums — be deeply suspicious of paying for projected growth.\n   The future is uncertain; the balance sheet is not.\n\nSignal rules:\n- bullish: sound business, strong balance sheet, price offering a genuine\n  margin of safety.\n- bearish: weak finances, unstable earnings, or a price that capitalizes\n  hope rather than demonstrated results. Overvaluation IS a bearish fact.\n- neutral: sound enterprise, inadequate margin of safety.\n\nConfidence scale (0-100): 90-100 clear quantitative case on every criterion;\n70-89 most criteria met; 40-69 mixed; 10-39 speculative territory.\n\nHard rules:\n- Reason ONLY from the data provided. Treat the most recent filing date\n  shown as the present day; do not use any knowledge of anything that\n  happened after it. Do not invent numbers.\n- If the data is insufficient to judge, say so and go neutral.\n\nRespond with JSON only, in exactly this schema:\n{\"signal\": \"bullish\" | \"bearish\" | \"neutral\", \"confidence\": <0-100>,\n \"reasoning\": \"<your thesis in Graham's voice, 2-4 sentences>\"}",
+      "inputs": ["fundamentals"],
+      "outputs": ["signal", "confidence", "reasoning"]
+    },
+    {
+      "id": "buffett",
+      "origin": "extracted",
+      "sourcePath": "hedge_fund/signals/buffett.py",
+      "systemPrompt": "You are Warren Buffett, evaluating a single company as a\nlong-term business owner, not a trader.\n\nWork through your checklist:\n1. Circle of competence — can this business be understood from the data given?\n2. Competitive moat — durable high returns on equity, stable or improving\n   margins, pricing power.\n3. Management quality — capital allocation visible in the numbers: book value\n   compounding, sensible leverage, consistent free cash flow.\n4. Financial strength — low debt, healthy current ratio, consistent earnings.\n5. Valuation — is the price (market cap, P/E) sensible relative to the\n   quality and growth of the business? A wonderful company at a fair price\n   beats a fair company at a wonderful price.\n6. Long-term prospects — would you be comfortable holding this for ten years?\n\nSignal rules:\n- bullish: a strong, durable business at a reasonable or better price.\n- bearish: a weak or deteriorating business, or a price that demands\n  perfection.\n- neutral: mixed evidence, or a great business at a clearly excessive price.\n\nConfidence scale (0-100): 90-100 exceptional conviction with strong evidence;\n70-89 solid conviction; 40-69 mixed; 10-39 weak or speculative.\n\nHard rules:\n- Reason ONLY from the data provided. Treat the most recent filing date\n  shown as the present day; do not use any knowledge of anything that\n  happened after it. Do not invent numbers.\n- If the data is insufficient to judge, say so and go neutral.\n\nRespond with JSON only, in exactly this schema:\n{\"signal\": \"bullish\" | \"bearish\" | \"neutral\", \"confidence\": <0-100>,\n \"reasoning\": \"<your thesis in Buffett's voice, 2-4 sentences>\"}",
+      "inputs": ["fundamentals"],
+      "outputs": ["signal", "confidence", "reasoning"]
+    },
+    {
+      "id": "munger",
+      "origin": "extracted",
+      "sourcePath": "hedge_fund/signals/munger.py",
+      "systemPrompt": "You are Charlie Munger, evaluating a single company with your\nusual severity. You would rather miss ten good ideas than accept one bad one.\n\nWork through your mental models:\n1. Invert, always invert — what would make this investment fail? Look for\n   deteriorating margins, rising leverage, eroding returns on equity.\n2. Quality of the business — a great business earns high returns on capital\n   year after year without heroic assumptions. Look for consistency across\n   the whole history, not one good year.\n3. Incentives and capital allocation — is book value compounding? Is free\n   cash flow real and growing, or is the business consuming capital?\n4. Price — a great business at a fair price is acceptable; anything at a\n   silly price is not. Check the P/E against the actual growth and quality.\n5. The too-hard pile — if the numbers don't paint a clear picture, this\n   belongs in the too-hard pile. Say so and go neutral. Most things do.\n\nSignal rules:\n- bullish: an unmistakably great business at a price that isn't foolish.\n- bearish: a mediocre or deteriorating business, dishonest-looking numbers,\n  or a valuation that requires believing something stupid.\n- neutral: the too-hard pile, or great quality at a price you won't pay.\n\nConfidence scale (0-100): 90-100 rare, obvious, both quality and price align;\n70-89 solid case; 40-69 mixed evidence; 10-39 mostly the too-hard pile.\n\nHard rules:\n- Reason ONLY from the data provided. Treat the most recent filing date\n  shown as the present day; do not use any knowledge of anything that\n  happened after it. Do not invent numbers.\n- Be blunt. No hedging in the thesis — say what the numbers show.\n\nRespond with JSON only, in exactly this schema:\n{\"signal\": \"bullish\" | \"bearish\" | \"neutral\", \"confidence\": <0-100>,\n \"reasoning\": \"<your thesis in Munger's voice, 2-4 sentences>\"}",
+      "inputs": ["fundamentals"],
+      "outputs": ["signal", "confidence", "reasoning"]
+    },
+    {
+      "id": "blend",
+      "origin": "authored",
+      "standsInFor": "hedge_fund/portfolio/construction.py::blend_signals — the source reconciles its analysts in deterministic Python, so a prompt bundle that must reconcile them in prose has no text to extract. The weighted mean is reproduced faithfully; the cross-sectional normalisation around it is not reproducible and is replaced (see omitted).",
+      "inputs": ["signal[]", "confidence[]", "mandate.constraints.maxPositionWeight"],
+      "outputs": ["conviction", "targetWeight", "action"]
+    }
+  ],
+  "graph": {
+    "kind": "fanout-aggregate",
+    "fanout": ["graham", "buffett", "munger"],
+    "aggregate": ["blend"]
+  },
+  "omitted": [
+    {
+      "sourceNode": "blend_signals — the cross-sectional normalisation",
+      "sourcePath": "hedge_fund/portfolio/construction.py",
+      "reason": "weight = conviction / sum(|convictions|) * gross_target ranks a universe of names against each other. An Aumos invocation has one subject, and dividing one conviction by its own absolute value yields 1.0 for every conviction — a barely-positive view and an overwhelming one would size identically. The source names this exact failure as a known wart of its v0 policy; upstream the risk stage caught the consequence by clamping, and Aumos does not clamp.",
+      "ownedBy": "prompt/50-blend.md sizes against Mandate.maxPositionWeight instead, so the constraint the investor wrote is what sets the scale"
+    },
+    {
+      "sourceNode": "apply_limits",
+      "sourcePath": "hedge_fund/risk/limits.py",
+      "reason": "Deterministic clamping of target weights against the fund's hard limits — 'conviction requests, risk disposes'. Not a prompt, and not ours to re-implement: an agent that clamped its own proposal would be arguing with the constraint it is judged against.",
+      "ownedBy": "Kernel.judge() against MandateConstraints — which downgrades to WAIT rather than clamping, so the difference is stated to the agent in prompt/60-mandate.md"
+    },
+    {
+      "sourceNode": "build_orders",
+      "sourcePath": "hedge_fund/pipeline/execution.py",
+      "reason": "Turning target weights into share counts. Every AAP payload is deliberately incapable of carrying a quantity, a limit price or an order type (plan.md §12).",
+      "ownedBy": "planOrders in packages/kernel/src/execution/ — behind an investor Approval (M8x)"
+    },
+    {
+      "sourceNode": "run_cycle",
+      "sourcePath": "hedge_fund/pipeline/run_cycle.py",
+      "reason": "The fund's heartbeat: mark, run analysts, blend, clamp, execute, record. This is the wiring harness-porting.md §1 says the Kernel already does better, and porting it would have meant an agent that decides when it runs and writes its own record.",
+      "ownedBy": "the Wake Engine (services/kernel-host/src/wake/) plus the run worker, which is the only writer"
+    },
+    {
+      "sourceNode": "_mark_prices",
+      "sourcePath": "hedge_fund/pipeline/run_cycle.py",
+      "reason": "Last close on or before as_of for every held and tradeable name, with a lookback window. Pricing the book is not something an agent may do — a book an agent priced is a book an agent could misprice in its own favour.",
+      "ownedBy": "markBooks (services/kernel-host/src/wake/books.ts) — one instant, one quote map, every book"
+    },
+    {
+      "sourceNode": "normalize_universe / the per-ticker fanout",
+      "sourcePath": "hedge_fund/fund/spec.py",
+      "reason": "run_cycle fans out over tickers x models; graph.fanout names roles only. This is not an IR gap: which names a run is about is not something a harness declares in Aumos, it is what the invocation says.",
+      "ownedBy": "AgentInvocation.task and .events — the host chooses what a run is about, and an agent cannot widen it"
+    },
+    {
+      "sourceNode": "PromptCache",
+      "sourcePath": "hedge_fund/llm/cache.py",
+      "reason": "Persists every prompt and response and makes an unchanged snapshot free to re-ask. Aumos records the Run, the observed tool calls and the Evidence, but it does not cache the model's answer and cannot: it drives the investor's own CLI as an opaque child process (plan.md §5).",
+      "ownedBy": null
+    },
+    {
+      "sourceNode": "FundSpec.strategies[].weight — capital slices across pods",
+      "sourcePath": "hedge_fund/fund/spec.py",
+      "reason": "A fund nets several strategies by capital slice. Aumos allows one LIVE agent per Portfolio (design invariant 10) precisely because two agents proposing targets for the same positions have no resolution rule, so there is nothing here to slice.",
+      "ownedBy": null
+    },
+    {
+      "sourceNode": "the quant alpha models (pead, and QuantModel's numeric helpers)",
+      "sourcePath": "hedge_fund/signals/pead.py",
+      "reason": "Pure Python math rather than a prompt — harness-porting.md §1's (b) layer. A port that reimplemented RSI and percentile ranks in prose would be asking a language model to be a calculator, and the numbers would be wrong in a way nobody could see.",
+      "ownedBy": null
+    },
+    {
+      "sourceNode": "the backtesting engine",
+      "sourcePath": "hedge_fund/backtesting/engine.py",
+      "reason": "Replays the same cycle over history with a simulated broker. Aumos measures forward and never backward, and a back-filled line beside a forward-recorded one is a backtest drawn next to a track record.",
+      "ownedBy": "the Shadow Portfolio (M7b), which is recorded forward from the moment an instance opens"
+    },
+    {
+      "sourceNode": "SimBroker and the Broker protocol",
+      "sourcePath": "hedge_fund/brokers/sim.py",
+      "reason": "The harness places its own orders. No AgentPackage can: capabilities.kind has no broker member to ask for (design invariant 5).",
+      "ownedBy": "BrokerReadPort for the book, and adapters/alpaca-execution.ts behind an Approval, neither reachable from an agent"
+    }
+  ],
+  "capabilities": ["source:passthrough", "portfolio:read"],
+  "correspondence": {
+    "describes": ["graham", "buffett", "munger"],
+    "entries": [
+      {
+        "sourceField": "signal",
+        "aapField": null,
+        "rule": "There is no equivalent and deliberately so. bullish/bearish/neutral is an *input* to the blend, not an answer; what leaves this agent is a DecisionProposal.action reached in prompt/50-blend.md. Mapping signal straight onto action would have made each analyst a decision-maker, which is the one thing the source is careful they are not."
+      },
+      {
+        "sourceField": "signal == 'neutral'",
+        "aapField": "action",
+        "rule": "Becomes WAIT or WATCH, never 'no position'. Upstream a neutral view demeans into a weight near zero and the fund quietly closes to flat, which is a trade nobody decided to make. Design invariant 4 makes WAIT and WATCH first-class judgements, so the same view becomes a sentence with reasons attached."
+      },
+      {
+        "sourceField": "metadata.abstained",
+        "aapField": null,
+        "rule": "Stays inside the reasoning: an abstaining analyst does not vote in stage 4 and is named in rationale.uncertainty. The source excludes an abstention from the blend's numerator and denominator both, and Aumos draws the same line one level up — a run that could not answer is recorded as invalid-proposal or an AgentError, never as a WAIT."
+      },
+      {
+        "sourceField": "confidence (0-100)",
+        "aapField": "confidence",
+        "rule": "Divided by 100. AAP confidence is a unit interval, and the blended figure is the desk's, not any one analyst's — the per-analyst numbers go in rationale.keyReasons so the blend can be recomputed by a reader."
+      },
+      {
+        "sourceField": "reasoning",
+        "aapField": "rationale.keyReasons[]",
+        "rule": "One entry per analyst, prefixed with the analyst's name, blend weight and confidence. Not rationale.conclusion: the conclusion is the desk's single sentence, and three voices collapsed into it would lose the disagreement that is the whole point of a fanout."
+      },
+      {
+        "sourceField": "Signal.value (conviction in [-1, +1])",
+        "aapField": "target.targetWeight",
+        "rule": "conviction x mandate.constraints.maxPositionWeight, rather than the source's cross-sectional normalisation, which has no meaning on one subject. See omitted."
+      },
+      {
+        "sourceField": "a negative Signal.value on an unheld name",
+        "aapField": null,
+        "rule": "Dropped. The source's market_neutral mode shorts its least-liked names; allowShorting is a Mandate constraint and is normally false, so a bearish blend on something unheld is a WAIT that records the bearish case. The port loses the short side of this methodology and says so rather than approximating it with a hedge."
+      }
+    ]
+  }
+}
