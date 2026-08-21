@@ -202,7 +202,6 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
     problem('prompt-bundle', 'there is no prompt/ directory with .md sections in it')
   }
   const bundle = sections.map((path) => files[path] ?? '').join('\n')
-  const lowered = bundle.toLowerCase()
   const jsonBlocks = (bundle.match(/```json\n[\s\S]*?```/g) ?? []).join('\n')
 
   // ── the paths the manifest names lead somewhere ──────────────────────────
@@ -437,35 +436,30 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
     }
   }
 
-  // ── what the bundle has to say out loud ──────────────────────────────────
+  // ⚠️ **`bundle-says-what-it-costs` stood here, and §E58 retired it.**
+  // (2026-08-21)
   //
-  // ⚠️ **This was two branches until §E48**, split on the lane. The closed one
-  // required the bundle to state the `asOf` frame and refused phrases that
-  // invited the agent around a TimeGate (`closed-lane-states-the-frame`); the
-  // open one required it to name what the lane cost. There is no lane, so there
-  // is one branch — and it is the second one, because the frame the first one
-  // described stopped binding at §E21.
+  // It required the bundle to mention `evidenceIds` and `asOf` by name. The two
+  // failures it guarded are real and both are silent — filing Evidence the agent
+  // did not receive, and treating `asOf` as decoration — and the rule was the
+  // only thing saying so, because the bundle was the only channel to the model.
   //
-  // The two failures below are the ones a model makes when nothing stops it, and
-  // both are silent: filing Evidence it did not receive, and treating `asOf` as
-  // decoration. ⚠️ The third needle was the literal words *open lane*, and it
-  // went with the lane rather than being reworded — a bundle naming a concept
-  // this host no longer has would be a bundle the lint taught to lie.
+  // It is not any more. The Aumos MCP server returns `instructions` from
+  // `initialize` (MCP's own slot for *"how to use this server"*), and
+  // `AAP_AGENT_INSTRUCTIONS` states both, once per session, before any tool
+  // call. ✅ Measured on claude 2.1.238: a probe server's instructions came back
+  // quoted verbatim by the model without any tool call. So the rule became a
+  // demand that every package restate what the host now says — §E55's shape
+  // exactly, one channel over.
   //
-  // That needle had already been measured doing harm before §E48 reached it: on
-  // 2026-08-20 it failed `undervalued-now` **for no longer saying the word**,
-  // which is a lint demanding vocabulary the project had stopped using. Removing
-  // a needle can only turn a red bundle green, so no submission that passed
-  // before can fail now.
-  for (const [needle, why] of [
-    [
-      'evidenceids',
-      'the bundle never mentions evidenceIds, so nothing stops the model inventing one',
-    ],
-    ['asof', 'the bundle never mentions asOf'],
-  ] as const) {
-    if (!lowered.includes(needle)) problem('bundle-says-what-it-costs', why)
-  }
+  // ⚠️ **It was also passing for the wrong reason.** After the §E58 trim, three
+  // of the four first-party bundles still satisfied it — because their Korean
+  // worked example happens to contain `"evidenceIds": ["ev_…"]`. A rule met by
+  // an illustrative JSON block is a rule about the presence of a string, not
+  // about what the bundle taught.
+  //
+  // What is *not* replaced: a bundle can still teach the opposite of the
+  // instructions. Nothing here checks for that, and nothing did before.
 
   // ── attribution, by shape ────────────────────────────────────────────────
   //
