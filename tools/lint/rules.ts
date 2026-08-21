@@ -81,19 +81,18 @@ export interface Problem {
   readonly message: string
 }
 
-export interface LintOptions {
-  /**
-   * `DECISION_ACTIONS`, passed in rather than imported.
-   *
-   * Never a hard-coded list: an action added to AAP and not to a bundle is
-   * exactly the staleness the `worked-example-per-action` rule exists to catch,
-   * and a copy of the enum here would go stale in the same breath. This
-   * workspace passes `@aumos/aap`'s export; the vendored copy reads the enum out
-   * of the generated `decision-proposal.schema.json`. Both are the zod schema,
-   * one step apart.
-   */
-  readonly decisionActions: readonly string[]
-}
+/**
+ * ⚠️ **`LintOptions` stood here and §E54 emptied it.** (2026-08-21)
+ *
+ * It carried one member, `decisionActions`, and one rule read it —
+ * `worked-example-per-action`, retired below. An option nothing reads is worse
+ * than none: its comment argued a staleness the code had stopped checking, and
+ * this repository has a rule about indicative comments that no longer hold.
+ *
+ * Removing it rather than leaving it empty is what makes the vendored copy
+ * honest too — `submissions/tools/lint/` no longer needs
+ * `decision-proposal.schema.json` to recover an enum nobody compares against.
+ */
 
 /** The one substitution a prompt bundle may contain. Mirrors `agent-runtime`. */
 export const INVOCATION_MARKER = '{{INVOCATION}}'
@@ -167,7 +166,7 @@ function normalise(path: string): string {
   return path.replace(/^\.\//, '')
 }
 
-export function lintAgentPackage(files: PackageFiles, options: LintOptions): readonly Problem[] {
+export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   const problems: Problem[] = []
   const problem = (rule: string, message: string): void => {
     problems.push({ rule, message })
@@ -362,10 +361,13 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
     )
   }
 
-  // ── shape is shown, never described ──────────────────────────────────────
+  // ⚠️ **`worked-example-per-action` and `rationale-field-shape` stood here, and
+  // §E54 retired them.** (2026-08-21)
   //
-  // `invalid-proposal` has now been reached three times by a real `claude`, for
-  // the same reason every time:
+  // They existed because `decision_submit` published `{"type":"object"}` and
+  // nothing else, so the only specification a model could read was whatever
+  // prose the package happened to carry. Three real `claude` runs reached
+  // `invalid-proposal` that way, one field along each time:
   //
   // | | what was missing |
   // |---|---|
@@ -373,36 +375,32 @@ export function lintAgentPackage(files: PackageFiles, options: LintOptions): rea
   // | M8s  | a WAIT example only, so `target` was described and never shown → invented `target.type` |
   // | M11d | `uncertainty` named in one sentence → guessed a string where the schema wants a list |
   //
-  // Each time a strict schema discarded the entire judgement. **Prose beside a
-  // strict schema is not a specification**, and the failure recurs one field
-  // along each time a bundle grows. So: shape is checked, prose is not.
-  const shown = new Set<string>()
-  for (const match of jsonBlocks.matchAll(/"action"\s*:\s*"([A-Z_]+)"/g)) {
-    shown.add(match[1] as string)
-  }
-  const missingActions = options.decisionActions.filter((action) => !shown.has(action))
-  if (missingActions.length > 0) {
-    problem(
-      'worked-example-per-action',
-      `no worked JSON example for ${missingActions.join(', ')} — a mention in a sentence is what all three lost runs already had`,
-    )
-  }
+  // The reading was right — *prose beside a strict schema is not a
+  // specification* — and the conclusion was the affordable one at the time:
+  // make every package write the specification out again, in JSON, in its own
+  // words. §E54 published the specification instead. `decision_submit`'s input
+  // schema is `decisionProposalSchema` itself, derived at run time from the
+  // object `judgeProposal` validates against, and it states every one of the
+  // three things above directly — `watches`' members, which actions take a
+  // `target`, that `uncertainty` is an array.
+  //
+  // So the rules did not become wrong; they became a demand that each package
+  // **duplicate a published schema**, which is the cost §E54 exists to remove.
+  // Enforcing them now would mean a package cannot both pass lint and stop
+  // repeating the contract.
+  //
+  // ✅ **Retired against a measurement, not an argument** — a real `claude` run
+  // against a trimmed bundle reached `decided`. Without that this paragraph
+  // would be a hypothesis about what models do with a schema they have never
+  // been shown before, and the three rows above are what hypotheses of that
+  // shape have cost.
+  //
+  // What replaces them is not nothing: `packages/skill-gateway`'s
+  // `decision-submit.test.ts` asserts the schema is still published, still
+  // strict, and still the judge's own. If that stops being true, every package
+  // is back to prose — and these rules would be right again.
 
-  // The same rule for the fields inside `rationale`, and deliberately
-  // conditional on the bundle *naming* the field: a package that never asks for
-  // `counterArguments` is not obliged to document it, and the required fields
-  // are covered by the worked examples anyway. What is forbidden is naming a
-  // field and leaving its shape to be guessed.
-  for (const prose of ['counterArguments', 'uncertainty']) {
-    if (bundle.includes(prose) && !new RegExp(`"${prose}"\\s*:\\s*\\[`).test(jsonBlocks)) {
-      problem(
-        'rationale-field-shape',
-        `${prose} is named in prose but never shown as an array in a fenced JSON example — a model that reads the name and cannot see the shape guesses a string, and the strict schema then throws the whole judgement away (M11d)`,
-      )
-    }
-  }
-
-  // ── another language, shown rather than described ────────────────────────
+  // ── another language, shown rather than described ────────────────────────  // ── another language, shown rather than described ────────────────────────
   //
   // `language` invites M6.5's mistake one level worse: a model told to answer in
   // Korean has every reason to translate `action` too, and one translated enum
