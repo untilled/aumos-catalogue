@@ -82,7 +82,7 @@ export interface Problem {
 }
 
 /**
- * ⚠️ **`LintOptions` stood here and §E54 emptied it.** (2026-08-21)
+ * ⚠️ **`LintOptions` stood here and §E55 emptied it.** (2026-08-21)
  *
  * It carried one member, `decisionActions`, and one rule read it —
  * `worked-example-per-action`, retired below. An option nothing reads is worse
@@ -362,7 +362,7 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   }
 
   // ⚠️ **`worked-example-per-action` and `rationale-field-shape` stood here, and
-  // §E54 retired them.** (2026-08-21)
+  // §E55 retired them.** (2026-08-21)
   //
   // They existed because `decision_submit` published `{"type":"object"}` and
   // nothing else, so the only specification a model could read was whatever
@@ -378,14 +378,14 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   // The reading was right — *prose beside a strict schema is not a
   // specification* — and the conclusion was the affordable one at the time:
   // make every package write the specification out again, in JSON, in its own
-  // words. §E54 published the specification instead. `decision_submit`'s input
+  // words. §E55 published the specification instead. `decision_submit`'s input
   // schema is `decisionProposalSchema` itself, derived at run time from the
   // object `judgeProposal` validates against, and it states every one of the
   // three things above directly — `watches`' members, which actions take a
   // `target`, that `uncertainty` is an array.
   //
   // So the rules did not become wrong; they became a demand that each package
-  // **duplicate a published schema**, which is the cost §E54 exists to remove.
+  // **duplicate a published schema**, which is the cost §E55 exists to remove.
   // Enforcing them now would mean a package cannot both pass lint and stop
   // repeating the contract.
   //
