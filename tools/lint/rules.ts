@@ -350,14 +350,28 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   //
   // ── the marker ───────────────────────────────────────────────────────────
   //
-  // What makes a bundle a *prompt* rather than an essay. The failure it guards
-  // is silent: a run against a markerless bundle produces a beautifully
-  // structured set of instructions about no particular asset, and succeeds.
+  // ⚠️ **This required exactly one until §E56 and now permits none.**
+  //
+  // It guarded a silent failure: a run against a markerless bundle produced a
+  // beautifully structured set of instructions about no particular asset, and
+  // succeeded. `invocation_read` is the other way an agent gets that document —
+  // through the gateway, where the call is observed — so a bundle with no marker
+  // is no longer a bundle that knows nothing.
+  //
+  // Two is still refused, and that half never depended on the tool: substituting
+  // the invocation twice leaves a reader unable to say which copy the model
+  // read.
+  //
+  // ⛔ What a *contributor* has to know is not enforceable here and is said in
+  // prose instead: dropping the marker raises the binary this package needs.
+  // `engines.aumos` is the field that says so, and an old binary refuses the
+  // install rather than failing the run.
   const markers = bundle.split(INVOCATION_MARKER).length - 1
-  if (markers !== 1) {
+  if (markers > 1) {
     problem(
       'invocation-marker',
-      `the bundle carries ${markers} ${INVOCATION_MARKER} markers and must carry exactly one`,
+      `the bundle carries ${markers} ${INVOCATION_MARKER} markers and may carry at most one. ` +
+        'Two substitutions leave a reader unable to say which copy the model read',
     )
   }
 
