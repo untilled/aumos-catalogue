@@ -29,12 +29,6 @@ const schema = (name: string): Record<string, unknown> =>
   JSON.parse(readFileSync(join(HERE, name), 'utf8')) as Record<string, unknown>
 
 const manifestSchema = schema('agent-package-manifest.schema.json')
-const proposalSchema = schema('decision-proposal.schema.json')
-
-/** The enum itself, never a copy of it — a hard-coded list goes stale silently. */
-const decisionActions = (
-  (proposalSchema['properties'] as Record<string, { enum?: string[] }>)['action']?.enum ?? []
-) as readonly string[]
 
 // `strict: false`: the schemas are generated from zod and carry annotations ajv
 // does not recognise. Refusing to *read* our own published schema would be the
@@ -88,7 +82,7 @@ for (const name of packages) {
       }
     }
 
-    for (const problem of lintAgentPackage(files, { decisionActions })) {
+    for (const problem of lintAgentPackage(files)) {
       problems.push(problem.rule + ': ' + problem.message)
     }
   }

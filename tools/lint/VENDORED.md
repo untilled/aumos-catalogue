@@ -14,7 +14,6 @@ prevent.
 | `rules.ts` | `packages/package-lint/src/rules.ts` |
 | `read.ts` | `packages/package-lint/src/read.ts` |
 | `agent-package-manifest.schema.json` | `packages/aap/schema/` — generated from zod |
-| `decision-proposal.schema.json` | `packages/aap/schema/` — generated from zod |
 | `main.ts` | written by `vendor.ts`; it is the only glue |
 
 **This lint is not the gate.** It is your fast feedback. The catalogue is
@@ -39,7 +38,6 @@ publishes anything.
 | `rules.ts` | `packages/package-lint/src/rules.ts` |
 | `read.ts` | `packages/package-lint/src/read.ts` |
 | `agent-package-manifest.schema.json` | `packages/aap/schema/` — zod에서 생성 |
-| `decision-proposal.schema.json` | `packages/aap/schema/` — zod에서 생성 |
 | `main.ts` | `vendor.ts`가 쓴다. 유일한 접착 코드 |
 
 **이 린트는 게이트가 아니다.** 당신을 위한 빠른 피드백이다. 카탈로그는 Aumos 저장소에서
