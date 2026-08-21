@@ -78,7 +78,7 @@ function unsafeHostReason(host: string): string | undefined {
  * document is one describing a program the investor runs *here*, and `10.0.0.0/8`
  * is somebody's office network, not this machine. Widening it would turn a flag
  * that means *my own computer* into one that means *anything behind my router*,
- * which is the exact reach `unsafeHostReason` exists to refuse. (§E9)
+ * which is the exact reach `unsafeHostReason` exists to refuse. (#220)
  */
 export function isLoopbackHost(host: string): boolean {
   const lower = host.toLowerCase()
@@ -97,7 +97,7 @@ export function isLoopbackHost(host: string): boolean {
  * cloud metadata endpoint is among them. `spec.ts` carries the full argument for
  * why the reversal is affordable; the short version is that a `local` document
  * is refused any credentials at all, so nothing it could carry to a local
- * address exists. (§E9)
+ * address exists. (#220)
  */
 export function assertDeclarableHost(host: string, where: string, local = false): void {
   if (local && isLoopbackHost(host)) return
@@ -144,7 +144,7 @@ export function assertSafeUrlTemplate(
   // to send plaintext anywhere. TLS to a process on this machine secures nothing
   // that the machine boundary does not already secure, and no local program has a
   // certificate a client would accept — so requiring `https` here would not make
-  // the traffic safer, it would make the source unreachable. (§E9)
+  // the traffic safer, it would make the source unreachable. (#220)
   const plaintextHere = local && url.protocol === 'http:' && isLoopbackHost(url.hostname)
   if (url.protocol !== 'https:' && !plaintextHere) {
     throw new SourceSpecError(

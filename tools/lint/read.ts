@@ -1,5 +1,5 @@
 /**
- * A package directory, read as the map its published bundle is. (M10g)
+ * A package directory, read as the map its published bundle is. (#183)
  *
  * Moved here from `apps/web/registry/generate.ts`, where it was `collectFiles`
  * and was the publisher's private business. It stops being private the moment a
@@ -39,7 +39,7 @@ import type { PackageFiles } from './rules.ts'
  * - `__pycache__` is compiled bytecode of `.py` files that are already in the
  *   package. Binary, so it breaks the read the same way, and derived, so
  *   hashing it adds nothing the source files do not already say. One appeared
- *   the first time the ported harness was run (`tasks/done/E8-harness-port.md`
+ *   the first time the ported harness was run (#219
  *   ③).
  *
  * A `.DS_Store` fails the same read and is deliberately **not** here: it is a

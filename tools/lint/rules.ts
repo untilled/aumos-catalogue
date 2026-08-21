@@ -1,11 +1,11 @@
 /**
  * The rules an AgentPackage has to keep, as a function rather than as a test.
- * (M10g)
+ * (#183)
  *
  * ── Why this stopped being a `describe` and became a package ───────────────
  *
  * Every rule below was written in `packages/agent-runtime/src/package.test.ts`,
- * where M10a-1 first established that it held rules rather than a description of
+ * where #173 first established that it held rules rather than a description of
  * `basic-investor`. It is moved here for one reason: **the repository these
  * rules live in is private, and the repository third-party packages arrive in
  * cannot be.** `untilled/aumos` is private (2026-08-09), so a submission is a
@@ -82,7 +82,7 @@ export interface Problem {
 }
 
 /**
- * ⚠️ **`LintOptions` stood here and §E55 emptied it.** (2026-08-21)
+ * ⚠️ **`LintOptions` stood here and #269 emptied it.** (2026-08-21)
  *
  * It carried one member, `decisionActions`, and one rule read it —
  * `worked-example-per-action`, retired below. An option nothing reads is worse
@@ -98,7 +98,7 @@ export interface Problem {
 export const INVOCATION_MARKER = '{{INVOCATION}}'
 
 /**
- * A locale tag a translation may be keyed by. (§E22)
+ * A locale tag a translation may be keyed by. (#233)
  *
  * A second implementation of `@aumos/aap`'s `LOCALE_TAG`, and it is here because
  * this file is copied verbatim into a public repository, so it may not import
@@ -339,7 +339,7 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
     }
   }
 
-  // ⚠️ **`closed-lane-sees-the-book` stood here and §E48 deleted it.**
+  // ⚠️ **`closed-lane-sees-the-book` stood here and #258 deleted it.**
   //
   // It required `portfolio:read` of a package that declared no CLI tools, on the
   // argument that such an agent could see nothing at all, so a bundle reasoning
@@ -349,7 +349,7 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   //
   // ── the marker ───────────────────────────────────────────────────────────
   //
-  // ⚠️ **This required exactly one until §E56 and now permits none.**
+  // ⚠️ **This required exactly one until #270 and now permits none.**
   //
   // It guarded a silent failure: a run against a markerless bundle produced a
   // beautifully structured set of instructions about no particular asset, and
@@ -375,7 +375,7 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   }
 
   // ⚠️ **`worked-example-per-action` and `rationale-field-shape` stood here, and
-  // §E55 retired them.** (2026-08-21)
+  // #269 retired them.** (2026-08-21)
   //
   // They existed because `decision_submit` published `{"type":"object"}` and
   // nothing else, so the only specification a model could read was whatever
@@ -384,21 +384,21 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   //
   // | | what was missing |
   // |---|---|
-  // | M6.5 | `watches` described in prose and never *shown* → the model invented `note` |
-  // | M8s  | a WAIT example only, so `target` was described and never shown → invented `target.type` |
-  // | M11d | `uncertainty` named in one sentence → guessed a string where the schema wants a list |
+  // | #265 | `watches` described in prose and never *shown* → the model invented `note` |
+  // | #163  | a WAIT example only, so `target` was described and never shown → invented `target.type` |
+  // | #196 | `uncertainty` named in one sentence → guessed a string where the schema wants a list |
   //
   // The reading was right — *prose beside a strict schema is not a
   // specification* — and the conclusion was the affordable one at the time:
   // make every package write the specification out again, in JSON, in its own
-  // words. §E55 published the specification instead. `decision_submit`'s input
+  // words. #269 published the specification instead. `decision_submit`'s input
   // schema is `decisionProposalSchema` itself, derived at run time from the
   // object `judgeProposal` validates against, and it states every one of the
   // three things above directly — `watches`' members, which actions take a
   // `target`, that `uncertainty` is an array.
   //
   // So the rules did not become wrong; they became a demand that each package
-  // **duplicate a published schema**, which is the cost §E55 exists to remove.
+  // **duplicate a published schema**, which is the cost #269 exists to remove.
   // Enforcing them now would mean a package cannot both pass lint and stop
   // repeating the contract.
   //
@@ -415,7 +415,7 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
 
   // ── another language, shown rather than described ────────────────────────  // ── another language, shown rather than described ────────────────────────
   //
-  // `language` invites M6.5's mistake one level worse: a model told to answer in
+  // `language` invites #265's mistake one level worse: a model told to answer in
   // Korean has every reason to translate `action` too, and one translated enum
   // discards the judgement entirely. The second half of this is the load-bearing
   // one — an example that translated its keys would teach the failure rather
@@ -436,7 +436,7 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
     }
   }
 
-  // ⚠️ **`bundle-says-what-it-costs` stood here, and §E58 retired it.**
+  // ⚠️ **`bundle-says-what-it-costs` stood here, and #271 retired it.**
   // (2026-08-21)
   //
   // It required the bundle to mention `evidenceIds` and `asOf` by name. The two
@@ -449,10 +449,10 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   // `AAP_AGENT_INSTRUCTIONS` states both, once per session, before any tool
   // call. ✅ Measured on claude 2.1.238: a probe server's instructions came back
   // quoted verbatim by the model without any tool call. So the rule became a
-  // demand that every package restate what the host now says — §E55's shape
+  // demand that every package restate what the host now says — #269's shape
   // exactly, one channel over.
   //
-  // ⚠️ **It was also passing for the wrong reason.** After the §E58 trim, three
+  // ⚠️ **It was also passing for the wrong reason.** After the #271 trim, three
   // of the four first-party bundles still satisfied it — because their Korean
   // worked example happens to contain `"evidenceIds": ["ev_…"]`. A rule met by
   // an illustrative JSON block is a rule about the presence of a string, not
@@ -487,11 +487,11 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
     }
   }
 
-  // ── the cadence suggestion, when there is one (§E47 path A) ───────────────
+  // ── the cadence suggestion, when there is one (#257 path A) ───────────────
   //
   // ⚠️ **A file, not a manifest field, and the linter is the only reader that
   // reports on it.** `agentPackageManifestSchema` is a `strictObject`, so a new
-  // key makes a shipped binary refuse the whole document; §E47 measured that
+  // key makes a shipped binary refuse the whole document; #257 measured that
   // `engines.aumos` cannot gate it either, because the manifest is parsed
   // *before* engines is read. So the value lives in `cadence.json`, which an
   // old binary simply does not look at.
