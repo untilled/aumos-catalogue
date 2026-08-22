@@ -17,10 +17,6 @@ The rules, and how to check them before you open the pull request, are in
 **[CONTRIBUTING.md](../CONTRIBUTING.md#submitting-a-data-source)** —
 [한국어](../docs/contributing/CONTRIBUTING.ko.md).
 
-⚠️ **This directory is empty on purpose.** The sources Aumos itself publishes
-(`sec-edgar`, `alpaca`, `openbb-fmp`, `toss`) live in **`first-party-sources/`** in
-this repository and are listed beside whatever is here in
-[`.aumos/sources.json`](../.aumos/sources.json) — the same arrangement `agents/` and
-`first-party/` are in. A separate directory because the publisher name `aumos` is
-reserved, and one directory holding both would let a submission claim it.
-Nothing has been submitted yet; yours would be the first.
+Each directory contains one data source. Sources published by Aumos and future
+submissions share this directory and are listed together in
+[`.aumos/sources.json`](../.aumos/sources.json).
