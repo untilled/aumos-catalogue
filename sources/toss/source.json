@@ -9,8 +9,8 @@
     "accept": "application/json"
   },
   "credentials": [
-    { "name": "client-id", "header": "x-client-id" },
-    { "name": "client-secret", "header": "x-client-secret" }
+    { "name": "client-id", "header": "x-client-id", "required": true },
+    { "name": "client-secret", "header": "x-client-secret", "required": true }
   ],
   "auth": {
     "kind": "oauth2-client-credentials",

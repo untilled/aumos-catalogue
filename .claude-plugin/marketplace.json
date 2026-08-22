@@ -11,9 +11,9 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
-        "path": "first-party/ai-hedge-fund-value",
+        "path": "agents/ai-hedge-fund-value",
         "ref": "main",
-        "sha": "1be9d98736aa76642c7ac61cf4f1d1f2d1d9cee0"
+        "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
       "description": "A port of ai-hedge-fund's deep-value pod: Graham, Buffett and Munger read the same point-in-time fundamentals independently, and one reconciliation weighs their convictions. Graham's view counts double, as the source's own strategy file specifies.",
       "version": "0.2.0",
@@ -57,9 +57,9 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
-        "path": "first-party/basic-investor",
+        "path": "agents/basic-investor",
         "ref": "main",
-        "sha": "1be9d98736aa76642c7ac61cf4f1d1f2d1d9cee0"
+        "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
       "description": "FinRobot's Data-CoT → Concept-CoT → Thesis-CoT, extended with Portfolio Context and a Decision stage. The reference AgentPackage.",
       "version": "0.2.0",
@@ -101,7 +101,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "agents/earnings-drift-watcher",
         "ref": "main",
-        "sha": "1be9d98736aa76642c7ac61cf4f1d1f2d1d9cee0"
+        "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
       "description": "Judges one thing only: whether the market has finished reacting to a reported surprise. Compares the reported figure against what was expected, then against how far the price has already travelled, and mostly concludes that it is too late.",
       "version": "0.2.0",
@@ -138,9 +138,9 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
-        "path": "first-party/prudent-allocator",
+        "path": "agents/prudent-allocator",
         "ref": "main",
-        "sha": "1be9d98736aa76642c7ac61cf4f1d1f2d1d9cee0"
+        "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
       "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong.",
       "version": "0.2.0",
@@ -183,9 +183,9 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
-        "path": "first-party/undervalued-now",
+        "path": "agents/undervalued-now",
         "ref": "main",
-        "sha": "1be9d98736aa76642c7ac61cf4f1d1f2d1d9cee0"
+        "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
       "description": "One paragraph, no capabilities, and its own web and shell. A benchmark of the model rather than of a methodology — the prompt is the question, and the forward return is the answer.",
       "version": "0.2.0",
