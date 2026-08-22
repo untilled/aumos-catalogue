@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Atlas Trend US instance configuration",
+  "description": "Reaches the agent as AgentInvocation.config. These are the constants of the methodology, exposed because an investor's risk appetite is theirs and not the author's — but the shape of the method is not configurable from here: the horizons are fixed, the ensemble rule is fixed, and nothing in this file can loosen the Mandate or the TimeGate. Aumos resolves this file and deliberately does not validate instance config against it.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "historyDays": {
+      "type": "integer",
+      "minimum": 400,
+      "maximum": 1500,
+      "default": 420,
+      "description": "Calendar days of daily bars to request in the single window, counting back from asOf. The floor is 400 because the longest horizon is twelve months and the 200-session moving average needs roughly ten more; a shorter window silently produces a 12-month return measured over less than twelve months."
+    },
+    "feed": {
+      "type": "string",
+      "enum": ["delayed_sip", "sip", "iex"],
+      "default": "delayed_sip",
+      "description": "Alpaca's feed parameter. delayed_sip is the consolidated tape fifteen minutes behind, which is what a free account can read and is no delay at all for a bar that closed hours ago. sip is the same tape live and needs a subscription. iex is one exchange's prints and its daily close is not the closing price of anything — it is here only so an investor who knowingly wants it can have it."
+    },
+    "volatilityWindowDays": {
+      "type": "integer",
+      "minimum": 20,
+      "maximum": 252,
+      "default": 63,
+      "description": "Trading sessions of daily returns used for realised volatility and for the correlations behind the portfolio volatility estimate. Roughly three months: short enough to notice a regime change, long enough that one bad day does not resize the book."
+    },
+    "targetVolatility": {
+      "type": "number",
+      "minimum": 0.02,
+      "maximum": 0.4,
+      "default": 0.1,
+      "description": "Annualised volatility the risk sleeve is scaled toward. It is a ceiling in practice: the sleeve is scaled down when the estimate exceeds it and never levered up beyond fully invested."
+    },
+    "maxAssetWeight": {
+      "type": "number",
+      "minimum": 0.05,
+      "maximum": 1,
+      "default": 0.3,
+      "description": "The most any single ETF may be proposed at, before the Mandate's own cap is applied on top. Inverse-volatility weighting concentrates in whatever is quiet, and quiet is not the same as safe."
+    },
+    "rebalanceBand": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.2,
+      "default": 0.03,
+      "description": "The no-trade band. If no asset's target differs from its current weight by more than this, the answer is WAIT rather than a rebalance. This is the single largest determinant of how much this methodology costs to run."
+    },
+    "includeRealEstate": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether VNQ is in the universe. Off by default because listed real estate is substantially an equity exposure with a rate sensitivity attached, so switching it on adds a name faster than it adds a diversifier."
+    },
+    "cashProxy": {
+      "type": "string",
+      "enum": ["BIL", "SGOV", "SHV"],
+      "default": "BIL",
+      "description": "The instrument the unallocated fraction is held in. All three are short Treasury bills; they differ in expense and in how much they are traded, not in what they are exposed to."
+    }
+  }
+}
