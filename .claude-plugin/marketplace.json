@@ -53,6 +53,49 @@
       }
     },
     {
+      "name": "atlas-trend-us",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/untilled/aumos-catalogue",
+        "path": "agents/atlas-trend-us",
+        "ref": "main",
+        "sha": "21530410089e294fa62b9864b3db31732b9ba171"
+      },
+      "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
+      "version": "0.1.0",
+      "metadata": {
+        "name": "Atlas Trend US",
+        "publisher": "aumos",
+        "methodology": "Scores each ETF in a fixed multi-asset basket on an ensemble of 1, 3, 6 and 12-month total returns, holds only the positive ones at inverse-volatility weights under a portfolio volatility target, and puts everything else in short Treasuries. Returns one REBALANCE carrying the whole basket, or WAIT.",
+        "assetClasses": [
+          "etf",
+          "cash"
+        ],
+        "markets": [
+          "XNAS",
+          "ARCX",
+          "BATS"
+        ],
+        "tasks": [
+          "PORTFOLIO_REVIEW"
+        ],
+        "capabilities": [
+          "source:passthrough",
+          "portfolio:read",
+          "brief:read",
+          "brief:write"
+        ],
+        "requiresSkills": [
+          "source_request"
+        ],
+        "enginesAumos": ">=0.2.6",
+        "provenance": null,
+        "homepage": null,
+        "publishedAt": "2026-08-23T00:00:00.000Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBdGxhcyBUcmVuZCBVUyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxMjUwN0YiLz48cGF0aCBkPSJNMTAgNDRsMTEtOSA4IDYgOS0xNCA3IDUgOS0xNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjU0IiBjeT0iMTYiIHI9IjQiIGZpbGw9IiM3RkQxRkYiLz48L3N2Zz4K"
+      }
+    },
+    {
       "name": "basic-investor",
       "source": {
         "source": "git-subdir",
