@@ -37,11 +37,19 @@
     {
       "kind": "thesis:read",
       "reason": "The invalidation conditions already written down, so a position is judged against the reason it was taken."
+    },
+    {
+      "kind": "brief:read",
+      "reason": "What this portfolio has already concluded that is not about one asset — a regime read, a sector call, a hold. Written by this agent's earlier runs and by the other agents on this book."
+    },
+    {
+      "kind": "brief:write",
+      "reason": "To record such a conclusion when this agent reaches one. A judgement about the book that has no asset to attach to has nowhere else to live, and would otherwise be lost when the run ends."
     }
   ],
   "requires": {
     "skills": ["source_request"],
-    "optionalSkills": ["portfolio_read", "thesis_read"]
+    "optionalSkills": ["portfolio_read", "thesis_read", "brief_read", "brief_write"]
   },
   "network": {
     "mode": "deny"
