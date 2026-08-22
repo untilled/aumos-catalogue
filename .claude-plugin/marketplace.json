@@ -4,6 +4,7 @@
     "name": "Aumos",
     "url": "https://aumos.app"
   },
+  "description": "Investment methodologies you install and run as AI fund managers, under your own approval. Each plugin is an Aumos AgentPackage: it proposes decisions and never sends an order — a person approves every one.",
   "plugins": [
     {
       "name": "ai-hedge-fund-value",
