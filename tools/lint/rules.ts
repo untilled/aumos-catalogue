@@ -90,7 +90,7 @@ export interface Problem {
  * this repository has a rule about indicative comments that no longer hold.
  *
  * Removing it rather than leaving it empty is what makes the vendored copy
- * honest too — `submissions/tools/lint/` no longer needs
+ * honest too — `catalogue-tools/lint/` no longer needs
  * `decision-proposal.schema.json` to recover an enum nobody compares against.
  */
 
