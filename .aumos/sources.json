@@ -12,7 +12,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/alpaca",
         "ref": "main",
-        "sha": "f4230108cbb6cea71379f16740d179733a6cfdbf"
+        "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
       "version": "0.2.3",
       "metadata": {
@@ -82,7 +82,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/openbb-fmp",
         "ref": "main",
-        "sha": "f4230108cbb6cea71379f16740d179733a6cfdbf"
+        "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
       "version": "0.3.2",
       "metadata": {
@@ -119,7 +119,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/sec-edgar",
         "ref": "main",
-        "sha": "f4230108cbb6cea71379f16740d179733a6cfdbf"
+        "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
       "version": "0.3.2",
       "metadata": {
@@ -160,7 +160,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/toss",
         "ref": "main",
-        "sha": "f4230108cbb6cea71379f16740d179733a6cfdbf"
+        "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
       "version": "0.1.1",
       "metadata": {
