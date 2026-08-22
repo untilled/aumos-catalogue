@@ -140,7 +140,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "first-party/prudent-allocator",
         "ref": "main",
-        "sha": "d45a8c2fd1f8b23de1ae06eb15391934bd8fe3f0"
+        "sha": "669c5acbcfbfb7b32e269f3e0a6c7f6dd830626f"
       },
       "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong.",
       "version": "0.2.0",
@@ -164,7 +164,9 @@
         "capabilities": [
           "source:passthrough",
           "portfolio:read",
-          "thesis:read"
+          "thesis:read",
+          "brief:read",
+          "brief:write"
         ],
         "requiresSkills": [
           "source_request"
