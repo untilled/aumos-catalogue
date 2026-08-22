@@ -1,0 +1,43 @@
+{
+  "spec": "SourceSpec/1",
+  "id": "toss",
+  "version": "0.1.1",
+  "vendor": "toss",
+  "caveat": "토스증권's own endpoints, relayed unread. The vendor issues one live session per client id and Aumos runs that flow; the paths below are a subset of the read-only list Aumos signs for this broker, because at 토스 the credential that reads is the credential that trades. Nothing is bounded by asOf, no date is checked, and the shape — including the KRW/USD leg of a two-currency book — is the vendor's to change.",
+  "hosts": ["openapi.tossinvest.com"],
+  "headers": {
+    "accept": "application/json"
+  },
+  "credentials": [
+    { "name": "client-id", "header": "x-client-id" },
+    { "name": "client-secret", "header": "x-client-secret" }
+  ],
+  "auth": {
+    "kind": "oauth2-client-credentials",
+    "tokenUrl": "https://openapi.tossinvest.com/oauth2/token",
+    "clientId": "client-id",
+    "clientSecret": "client-secret"
+  },
+  "endpoints": [
+    {
+      "host": "openapi.tossinvest.com",
+      "path": "/api/v1/candles",
+      "query": ["symbol", "interval", "count", "before", "adjusted"]
+    },
+    {
+      "host": "openapi.tossinvest.com",
+      "path": "/api/v1/stocks/{symbol}/investor-trading",
+      "query": ["count", "until"]
+    },
+    {
+      "host": "openapi.tossinvest.com",
+      "path": "/api/v1/stocks/{symbol}/short-selling",
+      "query": ["count", "until"]
+    },
+    {
+      "host": "openapi.tossinvest.com",
+      "path": "/api/v1/exchange-rate",
+      "query": ["baseCurrency", "quoteCurrency", "dateTime"]
+    }
+  ]
+}

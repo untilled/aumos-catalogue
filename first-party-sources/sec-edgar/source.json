@@ -1,0 +1,31 @@
+{
+  "spec": "SourceSpec/1",
+  "id": "sec-edgar",
+  "version": "0.3.2",
+  "vendor": "sec-edgar",
+  "caveat": "SEC EDGAR's own endpoints, relayed unread. `companyfacts` is the whole XBRL history of a filer — every us-gaap tag it has ever reported, each with its own filing dates in the vendor's fields. Nothing here is bounded by asOf and nothing is dated by Aumos: reading the dates out of the document is the caller's work. SEC requires a contactable caller, which is what the credential is.",
+  "hosts": ["www.sec.gov", "data.sec.gov"],
+  "headers": {
+    "accept": "application/json"
+  },
+  "credentials": [
+    {
+      "name": "user-agent",
+      "header": "user-agent",
+      "default": "Aumos/0.2 (ops@aumos.app)",
+      "required": true
+    }
+  ],
+  "endpoints": [
+    {
+      "host": "www.sec.gov",
+      "path": "/files/company_tickers.json",
+      "query": []
+    },
+    {
+      "host": "data.sec.gov",
+      "path": "/api/xbrl/companyfacts/{symbol}",
+      "query": []
+    }
+  ]
+}

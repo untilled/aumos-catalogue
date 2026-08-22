@@ -1,0 +1,48 @@
+{
+  "spec": "SourceSpec/1",
+  "id": "alpaca",
+  "version": "0.2.3",
+  "vendor": "alpaca",
+  "caveat": "Alpaca's own Market Data API, relayed unread — bars, snapshots and news. No dates are checked, nothing is bounded by asOf, and the shape is Alpaca's to change. Whether a bar series is adjusted is the `adjustment` parameter's answer, not this document's.",
+  "hosts": ["data.alpaca.markets"],
+  "headers": {
+    "accept": "application/json"
+  },
+  "credentials": [
+    {
+      "name": "api-key-id",
+      "header": "APCA-API-KEY-ID"
+    },
+    {
+      "name": "api-secret-key",
+      "header": "APCA-API-SECRET-KEY"
+    }
+  ],
+  "endpoints": [
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/bars",
+      "query": [
+        "symbols",
+        "timeframe",
+        "start",
+        "end",
+        "limit",
+        "feed",
+        "adjustment",
+        "sort",
+        "page_token"
+      ]
+    },
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v2/stocks/snapshots",
+      "query": ["symbols", "feed"]
+    },
+    {
+      "host": "data.alpaca.markets",
+      "path": "/v1beta1/news",
+      "query": ["symbols", "start", "end", "limit", "sort", "include_content", "page_token"]
+    }
+  ]
+}

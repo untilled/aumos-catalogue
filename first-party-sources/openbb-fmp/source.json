@@ -1,0 +1,20 @@
+{
+  "spec": "SourceSpec/1",
+  "id": "openbb-fmp",
+  "version": "0.3.2",
+  "vendor": "openbb",
+  "caveat": "Reads an OpenBB Platform you run yourself, asking FMP for unadjusted bars. The provider is a query parameter here rather than a pinned value, because nothing maps the answer any more — which provider answered is visible in the response, and it is the caller who decides whether that is the one they wanted. Nothing is bounded by asOf.",
+  "local": true,
+  "hosts": ["127.0.0.1"],
+  "headers": {
+    "accept": "application/json"
+  },
+  "endpoints": [
+    {
+      "host": "127.0.0.1",
+      "port": 6900,
+      "path": "/api/v1/equity/price/historical",
+      "query": ["symbol", "provider", "interval", "start_date", "end_date", "adjustment"]
+    }
+  ]
+}
