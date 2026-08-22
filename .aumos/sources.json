@@ -11,8 +11,8 @@
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "first-party-sources/alpaca",
-        "ref": "main",
-        "sha": "d45a8c2fd1f8b23de1ae06eb15391934bd8fe3f0"
+        "ref": "marketplace-document",
+        "sha": "1a8748320a8b5c4c9ba55c2a9d4d8f1652b3705e"
       },
       "version": "0.2.3",
       "metadata": {
@@ -81,8 +81,8 @@
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "first-party-sources/openbb-fmp",
-        "ref": "main",
-        "sha": "d45a8c2fd1f8b23de1ae06eb15391934bd8fe3f0"
+        "ref": "marketplace-document",
+        "sha": "1a8748320a8b5c4c9ba55c2a9d4d8f1652b3705e"
       },
       "version": "0.3.2",
       "metadata": {
@@ -118,8 +118,8 @@
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "first-party-sources/sec-edgar",
-        "ref": "main",
-        "sha": "d45a8c2fd1f8b23de1ae06eb15391934bd8fe3f0"
+        "ref": "marketplace-document",
+        "sha": "1a8748320a8b5c4c9ba55c2a9d4d8f1652b3705e"
       },
       "version": "0.3.2",
       "metadata": {
@@ -159,8 +159,8 @@
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "first-party-sources/toss",
-        "ref": "main",
-        "sha": "d45a8c2fd1f8b23de1ae06eb15391934bd8fe3f0"
+        "ref": "marketplace-document",
+        "sha": "1a8748320a8b5c4c9ba55c2a9d4d8f1652b3705e"
       },
       "version": "0.1.1",
       "metadata": {
