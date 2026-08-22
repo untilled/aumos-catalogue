@@ -1,0 +1,216 @@
+{
+  "name": "aumos",
+  "owner": {
+    "name": "Aumos",
+    "url": "https://aumos.app"
+  },
+  "plugins": [
+    {
+      "name": "ai-hedge-fund-value",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/untilled/aumos-catalogue",
+        "path": "first-party/ai-hedge-fund-value",
+        "ref": "main",
+        "sha": "d45a8c2fd1f8b23de1ae06eb15391934bd8fe3f0"
+      },
+      "description": "A port of ai-hedge-fund's deep-value pod: Graham, Buffett and Munger read the same point-in-time fundamentals independently, and one reconciliation weighs their convictions. Graham's view counts double, as the source's own strategy file specifies.",
+      "version": "0.2.0",
+      "metadata": {
+        "name": "AI Hedge Fund — Deep Value",
+        "publisher": "aumos",
+        "methodology": "Three value analysts judge the same filed figures without seeing each other's answers, and their convictions are weighed into one judgement. Reasons from fundamentals and price alone — it is given no news and no thesis, because the harness it was ported from reads neither.",
+        "assetClasses": [
+          "equity",
+          "etf"
+        ],
+        "markets": [
+          "XNAS",
+          "XNYS"
+        ],
+        "tasks": [
+          "ASSET_REVIEW",
+          "EVENT_REVIEW"
+        ],
+        "capabilities": [
+          "source:passthrough",
+          "portfolio:read"
+        ],
+        "requiresSkills": [
+          "source_request"
+        ],
+        "enginesAumos": ">=0.2.6",
+        "provenance": {
+          "sourceRepo": "https://github.com/virattt/ai-hedge-fund",
+          "commit": "69e5946dcb7b5fbe739b516455d1b5392cb5f7ac",
+          "license": "MIT",
+          "licenseHolder": "Virat Singh"
+        },
+        "homepage": null,
+        "publishedAt": "2026-08-21T11:35:08.441Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBSSBIZWRnZSBGdW5kIOKAlCBEZWVwIFZhbHVlIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0iI0UwOUEzNCIvPjxjaXJjbGUgY3g9IjI5IiBjeT0iMjkiIHI9IjEyIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIvPjxwYXRoIGQ9Ik0zOCAzOGw5IDkiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNMjQgMzJsNC02IDQgNCA0LTciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4K"
+      }
+    },
+    {
+      "name": "basic-investor",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/untilled/aumos-catalogue",
+        "path": "first-party/basic-investor",
+        "ref": "main",
+        "sha": "d45a8c2fd1f8b23de1ae06eb15391934bd8fe3f0"
+      },
+      "description": "FinRobot's Data-CoT → Concept-CoT → Thesis-CoT, extended with Portfolio Context and a Decision stage. The reference AgentPackage.",
+      "version": "0.2.0",
+      "metadata": {
+        "name": "Basic Investor",
+        "publisher": "aumos",
+        "methodology": "Reads what the Skill Gateway will serve at asOf, reasons in three stages, and returns one DecisionProposal.",
+        "assetClasses": [
+          "equity",
+          "etf"
+        ],
+        "markets": [
+          "XNAS",
+          "XNYS"
+        ],
+        "tasks": [
+          "ASSET_REVIEW",
+          "EVENT_REVIEW",
+          "THESIS_REVIEW"
+        ],
+        "capabilities": [
+          "source:passthrough",
+          "portfolio:read"
+        ],
+        "requiresSkills": [
+          "source_request"
+        ],
+        "enginesAumos": ">=0.2.6",
+        "provenance": null,
+        "homepage": null,
+        "publishedAt": "2026-08-21T11:35:08.439Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJCYXNpYyBJbnZlc3RvciI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiM0RjZCRkYiLz48ZyBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNMjAgNDRWMjgiLz48cGF0aCBkPSJNMzIgNDRWMjAiLz48cGF0aCBkPSJNNDQgNDRWMzQiLz48L2c+PHBhdGggZD0iTTE2IDQ4aDMyIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuNTUiLz48L3N2Zz4K"
+      }
+    },
+    {
+      "name": "earnings-drift-watcher",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/untilled/aumos-catalogue",
+        "path": "agents/earnings-drift-watcher",
+        "ref": "main",
+        "sha": "d45a8c2fd1f8b23de1ae06eb15391934bd8fe3f0"
+      },
+      "description": "Judges one thing only: whether the market has finished reacting to a reported surprise. Compares the reported figure against what was expected, then against how far the price has already travelled, and mostly concludes that it is too late.",
+      "version": "0.2.0",
+      "metadata": {
+        "name": "Earnings Drift Watcher",
+        "publisher": "aumos",
+        "methodology": "Post-announcement drift, as a single question. Reads the reported figure against expectation, measures how much of the resulting move has already happened, and returns WATCH far more often than it returns anything else — because the answer to 'has the market finished reacting' is usually 'ask again later'.",
+        "assetClasses": [
+          "equity"
+        ],
+        "markets": [
+          "XNAS",
+          "XNYS"
+        ],
+        "tasks": [
+          "EVENT_REVIEW",
+          "ASSET_REVIEW"
+        ],
+        "capabilities": [
+          "source:passthrough",
+          "portfolio:read"
+        ],
+        "requiresSkills": [
+          "source_request"
+        ],
+        "enginesAumos": ">=0.2.4",
+        "provenance": null,
+        "homepage": null,
+        "publishedAt": "2026-08-21T11:36:50.670Z"
+      }
+    },
+    {
+      "name": "prudent-allocator",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/untilled/aumos-catalogue",
+        "path": "first-party/prudent-allocator",
+        "ref": "main",
+        "sha": "d45a8c2fd1f8b23de1ae06eb15391934bd8fe3f0"
+      },
+      "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong.",
+      "version": "0.2.0",
+      "metadata": {
+        "name": "Prudent Allocator",
+        "publisher": "aumos",
+        "methodology": "Reads the book and the mandate first and the event second. Judges an event by what it does to the portfolio's downside, not by what it says about the asset, and returns one DecisionProposal.",
+        "assetClasses": [
+          "equity",
+          "etf"
+        ],
+        "markets": [
+          "XNAS",
+          "XNYS"
+        ],
+        "tasks": [
+          "ASSET_REVIEW",
+          "EVENT_REVIEW",
+          "THESIS_REVIEW"
+        ],
+        "capabilities": [
+          "source:passthrough",
+          "portfolio:read",
+          "thesis:read"
+        ],
+        "requiresSkills": [
+          "source_request"
+        ],
+        "enginesAumos": ">=0.2.6",
+        "provenance": null,
+        "homepage": null,
+        "publishedAt": "2026-08-21T11:35:08.440Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJQcnVkZW50IEFsbG9jYXRvciI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxRkE5N0EiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjYiIG9wYWNpdHk9Ii40NSIvPjxwYXRoIGQ9Ik0zMiAxOGExNCAxNCAwIDAgMSAxNCAxNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMiIGZpbGw9IiNmZmYiLz48L3N2Zz4K"
+      }
+    },
+    {
+      "name": "undervalued-now",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/untilled/aumos-catalogue",
+        "path": "first-party/undervalued-now",
+        "ref": "main",
+        "sha": "d45a8c2fd1f8b23de1ae06eb15391934bd8fe3f0"
+      },
+      "description": "One paragraph, no capabilities, and its own web and shell. A benchmark of the model rather than of a methodology — the prompt is the question, and the forward return is the answer.",
+      "version": "0.2.0",
+      "metadata": {
+        "name": "Undervalued Now",
+        "publisher": "aumos",
+        "methodology": "Asked to find one undervalued listed equity and propose a position in it, by whatever means it likes.",
+        "assetClasses": [
+          "equity",
+          "etf"
+        ],
+        "markets": [
+          "XNAS",
+          "XNYS"
+        ],
+        "tasks": [
+          "PORTFOLIO_REVIEW",
+          "ASSET_REVIEW",
+          "EVENT_REVIEW"
+        ],
+        "capabilities": [],
+        "requiresSkills": [],
+        "enginesAumos": ">=0.2.6",
+        "provenance": null,
+        "homepage": null,
+        "publishedAt": "2026-08-21T11:35:08.441Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJVbmRlcnZhbHVlZCBOb3ciPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjN0M1Q0Y2Ii8+PHBhdGggZD0iTTMyIDE2djI0IiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHBhdGggZD0iTTIyIDMybDEwIDEwIDEwLTEwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTE4IDQ4aDI4IiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuNTUiLz48L3N2Zz4K"
+      }
+    }
+  ]
+}
