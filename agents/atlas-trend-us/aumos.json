@@ -1,0 +1,62 @@
+{
+  "manifestVersion": 1,
+  "id": "atlas-trend-us",
+  "publisher": "aumos",
+  "name": "Atlas Trend US",
+  "version": "0.1.0",
+  "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
+  "readme": "./README.md",
+  "prompt": "./PROMPT.md",
+  "runtimes": ["claude"],
+  "license": "MIT",
+  "engines": {
+    "aumos": ">=0.2.6"
+  },
+  "aapVersion": 1,
+  "cadence": {
+    "days": 30
+  },
+  "contributes": {
+    "agents": [
+      {
+        "id": "atlas-trend-us",
+        "name": "Atlas Trend US",
+        "description": "Scores each ETF in a fixed multi-asset basket on an ensemble of 1, 3, 6 and 12-month total returns, holds only the positive ones at inverse-volatility weights under a portfolio volatility target, and puts everything else in short Treasuries. Returns one REBALANCE carrying the whole basket, or WAIT.",
+        "tasks": ["PORTFOLIO_REVIEW"],
+        "assetClasses": ["etf", "cash"],
+        "markets": ["XNAS", "ARCX", "BATS"]
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "source:passthrough",
+      "reason": "Daily total-return bars for a fixed basket of ETFs, and the corporate actions over the same window — the second is what lets this agent check the dividend adjustment the first one claims rather than trust it. Both are the vendor's answer, unread by Aumos."
+    },
+    {
+      "kind": "portfolio:read",
+      "reason": "The proposal is a set of weights for the whole book, so the book as it stands is the only thing that says whether those weights are already held. Without it every run would propose a trade."
+    },
+    {
+      "kind": "brief:read",
+      "reason": "Whether this book is currently in the all-cash state, and since when. A trend system's behaviour depends on where it already is, and that is a fact about the book rather than about any one asset."
+    },
+    {
+      "kind": "brief:write",
+      "reason": "To record entering or leaving that state, once, when it changes — so the next run and the other agents on this book can read it instead of inferring it from weights."
+    }
+  ],
+  "requires": {
+    "skills": ["source_request"],
+    "optionalSkills": ["portfolio_read", "brief_read", "brief_write"]
+  },
+  "network": {
+    "mode": "deny"
+  },
+  "config": {
+    "schema": "config.schema.json"
+  },
+  "memory": {
+    "persistent": false
+  }
+}

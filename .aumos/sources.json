@@ -12,9 +12,9 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/alpaca",
         "ref": "main",
-        "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
+        "sha": "e0b8d9bb9df993eb4f98eed05c954062e872737e"
       },
-      "version": "0.2.3",
+      "version": "0.3.0",
       "metadata": {
         "publisher": "aumos",
         "vendor": "alpaca",
@@ -46,7 +46,8 @@
               "feed",
               "adjustment",
               "sort",
-              "page_token"
+              "page_token",
+              "asof"
             ]
           },
           {
@@ -55,6 +56,21 @@
             "query": [
               "symbols",
               "feed"
+            ]
+          },
+          {
+            "host": "data.alpaca.markets",
+            "path": "/v1/corporate-actions",
+            "query": [
+              "symbols",
+              "types",
+              "start",
+              "end",
+              "limit",
+              "sort",
+              "page_token",
+              "region",
+              "data_quality"
             ]
           },
           {
