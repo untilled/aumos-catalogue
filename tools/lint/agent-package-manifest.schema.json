@@ -223,6 +223,8 @@
               "skill:invoke",
               "agent-memory:read",
               "agent-memory:write",
+              "brief:read",
+              "brief:write",
               "source:passthrough"
             ]
           },
