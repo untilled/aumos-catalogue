@@ -5,13 +5,13 @@
 The submission path for the [Aumos](https://aumos.app) catalogue. Two kinds of thing
 are published from here, and neither contains code.
 
-An **AgentPackage** is an investment methodology written as prose: a manifest that
+An **ManagerPackage** is an investment methodology written as prose: a manifest that
 declares what data it may read, and a prompt bundle that says how it reasons. The
 published form is a JSON document of file paths to text, so there is no field an
 executable could live in.
 
 ```
-agents/
+managers/
   your-package-id/
     manifest.json          what it may read, and the author's reason for each
     prompt/                the methodology, in numbered Markdown stages
@@ -25,7 +25,7 @@ agents/
 
 A **data source** is a vendor Aumos holds a credential for and will make requests to:
 one document naming the hosts it reaches, what the investor has to supply, and the
-endpoints an agent may ask for. Aumos keeps the key, signs the request, refuses any
+endpoints a manager may ask for. Aumos keeps the key, signs the request, refuses any
 path the document did not declare, and hands back exactly what the vendor sent —
 unread. Every field is a literal, a number or a member of a closed enum, so a document
 cannot express an executable any more than a package can.
@@ -52,7 +52,7 @@ Aumos publishes two faces of each catalogue from one generator, in one pass:
 | | |
 |---|---|
 | `releases.aumos.app/agents/registry.json` | the machine index of packages, with a SHA-256 of each published artifact |
-| `aumos.app/agents` | the page a person reads before installing one |
+| `aumos.app/managers` | the page a person reads before installing one |
 | `releases.aumos.app/sources/sources.json` | the machine index of data sources, the same way |
 | `aumos.app/sources` | and its page |
 
@@ -65,11 +65,11 @@ thing, and a source may not be called what a package is called.
 ## What this repository is not
 
 - **Not a place for code.** There is no runtime here, no build, no dependency you can
-  add. If your methodology needs to execute something, it is not an AgentPackage yet;
+  add. If your methodology needs to execute something, it is not an ManagerPackage yet;
   if your data source needs to reshape a response, that is not a document's job —
   say so in an issue rather than working around the format.
 - **Not a leaderboard, and not a claim about returns.** Nothing here records how a
-  package performed. Aumos measures every installed agent forward on the investor's
+  package performed. Aumos measures every installed manager forward on the investor's
   own book, and the catalogue carries no performance figure at all — so there is
   nothing on these pages anything could be ranked by.
 

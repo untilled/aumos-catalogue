@@ -84,7 +84,7 @@ for (const name of directories) {
       // The one rule that is about this repository rather than about a
       // document. Two sources merge into one `sources.json`, and an id that
       // does not match the directory it arrived in makes that merge
-      // unreviewable — the same reason the agent lint checks it.
+      // unreviewable — the same reason the manager lint checks it.
       if (spec.id !== name) {
         problems.push(
           'the directory is sources/' + name + ' but the document says id ' + String(spec.id) +

@@ -1,10 +1,10 @@
 /**
- * The rules an AgentPackage has to keep, as a function rather than as a test.
+ * The rules an ManagerPackage has to keep, as a function rather than as a test.
  * (#183)
  *
  * ── Why this stopped being a `describe` and became a package ───────────────
  *
- * Every rule below was written in `packages/agent-runtime/src/package.test.ts`,
+ * Every rule below was written in `packages/manager-runtime/src/package.test.ts`,
  * where #173 first established that it held rules rather than a description of
  * `basic-investor`. It is moved here for one reason: **the repository these
  * rules live in is private, and the repository third-party packages arrive in
@@ -25,7 +25,7 @@
  *   the *published form* of the package rather than a working copy of it. A
  *   directory reduces to it through `readPackageFiles`; so does a downloaded
  *   artifact, with no second reader.
- * - **dependency-free** — no zod, no `@aumos/aap`, no `node:fs`. The whole file
+ * - **dependency-free** — no zod, no `@aumos/amp`, no `node:fs`. The whole file
  *   is copied verbatim into the submissions repository by
  *   `scripts/vendor.ts`, and a copy that needed this workspace to run would not
  *   be a copy of anything useful.
@@ -33,10 +33,10 @@
  * ── What is deliberately **not** here ──────────────────────────────────────
  *
  * The manifest schema. §37 makes the manifest the permission document and
- * `agentPackageManifestSchema` is its only definition; restating it in this file
+ * `managerPackageManifestSchema` is its only definition; restating it in this file
  * would be the exact fork the file exists to avoid. Both sides read the *same*
  * schema instead — this workspace through zod, the submissions repository
- * through `ajv` over the generated `agent-package-manifest.schema.json`, which
+ * through `ajv` over the generated `manager-package-manifest.schema.json`, which
  * is a stock validator reading our document rather than a second opinion about
  * it. Everything below assumes that check has already passed and reads the
  * manifest defensively anyway, because a linter that throws on the input it was
@@ -95,7 +95,7 @@ export interface Problem {
  */
 
 /**
- * The one file in a package Aumos parses. Mirrors `agent-runtime`. (#286)
+ * The one file in a package Aumos parses. Mirrors `manager-runtime`. (#286)
  *
  * A second copy of the name for `LOCALE_TAG`'s reason below — this file is
  * vendored verbatim into a public repository and may not import from the
@@ -103,13 +103,13 @@ export interface Problem {
  */
 export const MANIFEST_FILENAME = 'aumos.json'
 
-/** The prompt a package ships when its manifest names none. Mirrors `agent-runtime`. */
+/** The prompt a package ships when its manifest names none. Mirrors `manager-runtime`. */
 export const DEFAULT_PROMPT_PATH = 'PROMPT.md'
 
 /**
  * A locale tag a translation may be keyed by. (#233)
  *
- * A second implementation of `@aumos/aap`'s `LOCALE_TAG`, and it is here because
+ * A second implementation of `@aumos/amp`'s `LOCALE_TAG`, and it is here because
  * this file is copied verbatim into a public repository, so it may not import
  * the schema that owns the pattern. What keeps the copy honest is that the rule
  * is one regex, and `rules.test.ts` asserts both directions of it.
@@ -126,8 +126,8 @@ interface ManifestView {
   readonly runtimes: readonly string[] | undefined
   /** The package id, so a credential rule can say whether it is spellable. (#286) */
   readonly id: string | undefined
-  /** Contributed agent ids, so a translation cannot name one that is not here. */
-  readonly agentIds: readonly string[]
+  /** Contributed manager ids, so a translation cannot name one that is not here. */
+  readonly managerIds: readonly string[]
   readonly provenance:
     | { readonly notice: string; readonly licenseHolder: string; readonly commit: string }
     | undefined
@@ -167,9 +167,9 @@ function readManifest(raw: unknown): ManifestView {
           (runtime): runtime is string => typeof runtime === 'string',
         )
       : undefined,
-    agentIds: Array.isArray(field(field(raw, 'contributes'), 'agents'))
-      ? (field(field(raw, 'contributes'), 'agents') as unknown[])
-          .map((agent) => text(field(agent, 'id')))
+    managerIds: Array.isArray(field(field(raw, 'contributes'), 'managers'))
+      ? (field(field(raw, 'contributes'), 'managers') as unknown[])
+          .map((manager) => text(field(manager, 'id')))
           .filter((id): id is string => id !== undefined)
       : [],
     provenance:
@@ -180,7 +180,7 @@ function readManifest(raw: unknown): ManifestView {
 }
 
 /**
- * A path a manifest names, resolved the way `loadAgentPackage` resolves one.
+ * A path a manifest names, resolved the way `loadManagerPackage` resolves one.
  *
  * The map has no directories and no `..` to walk, so the check is a string
  * check — which is the same posture `bundlePathSchema` takes and for the same
@@ -191,7 +191,7 @@ function normalise(path: string): string {
   return path.replace(/^\.\//, '')
 }
 
-export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
+export function lintManagerPackage(files: PackageFiles): readonly Problem[] {
   const problems: Problem[] = []
   const problem = (rule: string, message: string): void => {
     problems.push({ rule, message })
@@ -221,7 +221,7 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
    * ⚠️ **`prompt-bundle` is retired and this replaced it (#286).** The rule was
    * *there is a `prompt/` directory with `.md` sections in it*, and the
    * directory no longer exists: a package's prompt is one file, and everything
-   * an agent should read *conditionally* is a skill the CLI loads and Aumos
+   * a manager should read *conditionally* is a skill the CLI loads and Aumos
    * never sees. The check that survives is the one the bundle rule was really
    * making — **a package must ship the file it will be run from** — because a
    * package whose prompt path is dead fails on its first run rather than at
@@ -238,7 +238,7 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
 
   // ── the paths the manifest names lead somewhere ──────────────────────────
   //
-  // `loadAgentPackage` refuses a dead path at load, and refuses one that escapes
+  // `loadManagerPackage` refuses a dead path at load, and refuses one that escapes
   // the package directory. Here the escape is not expressible — a bundle has no
   // path outside itself — so what is left is the failure a path field actually
   // has, which is pointing at nothing.
@@ -301,26 +301,26 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
         unknown
       >,
     )) {
-      if (key !== 'description' && key !== 'agents') {
+      if (key !== 'description' && key !== 'managers') {
         problem(
           'translation-is-a-document',
-          `${path} has a key called ${key}, and a translation carries two: description, and agents[] matched by id`,
+          `${path} has a key called ${key}, and a translation carries two: description, and managers[] matched by id`,
         )
       }
     }
 
-    // (3) A methodology filed against an agent this package does not
+    // (3) A methodology filed against a manager this package does not
     //     contribute. The entries are matched by id precisely so a reordered
-    //     `contributes.agents` cannot reattach a paragraph to the wrong agent;
+    //     `contributes.managers` cannot reattach a paragraph to the wrong manager;
     //     an id matching nothing is that same defect arriving as a typo.
-    const agents = field(translation, 'agents')
-    if (Array.isArray(agents)) {
-      for (const entry of agents) {
+    const managers = field(translation, 'managers')
+    if (Array.isArray(managers)) {
+      for (const entry of managers) {
         const id = text(field(entry, 'id'))
-        if (id !== undefined && !manifest.agentIds.includes(id)) {
+        if (id !== undefined && !manifest.managerIds.includes(id)) {
           problem(
-            'translation-names-an-agent',
-            `${path} names the agent ${id}, which this package does not contribute — so that paragraph is drawn for nobody`,
+            'translation-names-an-manager',
+            `${path} names the manager ${id}, which this package does not contribute — so that paragraph is drawn for nobody`,
           )
         }
       }
@@ -374,7 +374,7 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   // ⚠️ **`closed-lane-sees-the-book` stood here and #258 deleted it.**
   //
   // It required `portfolio:read` of a package that declared no CLI tools, on the
-  // argument that such an agent could see nothing at all, so a bundle reasoning
+  // argument that such a manager could see nothing at all, so a bundle reasoning
   // about a book without it was describing a book it was never shown. There is
   // no such package: every session reaches the web and a shell whatever the
   // manifest says, and a package may legitimately ask for zero capabilities.
@@ -383,8 +383,8 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   //
   // The rule required exactly one `{{INVOCATION}}` in the bundle, #270 relaxed
   // it to *at most* one, and #286 deleted the substitution itself. There is no
-  // templating in a prompt file: `invocation_read` is the only way an agent gets
-  // the AAP document, which is the trade #270 made deliberately — a prompt that
+  // templating in a prompt file: `invocation_read` is the only way a manager gets
+  // the AMP document, which is the trade #270 made deliberately — a prompt that
   // was interpolated leaves no row, and a tool call does.
   //
   // Nothing replaces it. A rule about a marker no reader substitutes would be
@@ -460,13 +460,13 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   // (2026-08-21)
   //
   // It required the bundle to mention `evidenceIds` and `asOf` by name. The two
-  // failures it guarded are real and both are silent — filing Evidence the agent
+  // failures it guarded are real and both are silent — filing Evidence the manager
   // did not receive, and treating `asOf` as decoration — and the rule was the
   // only thing saying so, because the bundle was the only channel to the model.
   //
   // It is not any more. The Aumos MCP server returns `instructions` from
   // `initialize` (MCP's own slot for *"how to use this server"*), and
-  // `AAP_AGENT_INSTRUCTIONS` states both, once per session, before any tool
+  // `AMP_MANAGER_INSTRUCTIONS` states both, once per session, before any tool
   // call. ✅ Measured on claude 2.1.238: a probe server's instructions came back
   // quoted verbatim by the model without any tool call. So the rule became a
   // demand that every package restate what the host now says — #269's shape
@@ -606,7 +606,7 @@ export function lintAgentPackage(files: PackageFiles): readonly Problem[] {
   /**
    * A credential a package asks for has to be spellable as a variable. (#286 3)
    *
-   * The host composes `AUMOS_AGENT_CREDENTIAL_<ID>__<NAME>` and **refuses**
+   * The host composes `AUMOS_MANAGER_CREDENTIAL_<ID>__<NAME>` and **refuses**
    * rather than composing a name two ids could share — so a package declaring a
    * credential it can never be given would install, and fail at the first run
    * with a message about environment variables. This is where the author hears

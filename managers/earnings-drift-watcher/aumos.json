@@ -14,9 +14,9 @@
   "engines": {
     "aumos": ">=0.2.4"
   },
-  "aapVersion": 1,
+  "ampVersion": 1,
   "contributes": {
-    "agents": [
+    "managers": [
       {
         "id": "earnings-drift-watcher",
         "name": "Earnings Drift Watcher",

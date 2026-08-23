@@ -11,7 +11,7 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
-        "path": "agents/ai-hedge-fund-value",
+        "path": "managers/ai-hedge-fund-value",
         "ref": "main",
         "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
@@ -57,7 +57,7 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
-        "path": "agents/basic-investor",
+        "path": "managers/basic-investor",
         "ref": "main",
         "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
@@ -99,7 +99,7 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
-        "path": "agents/earnings-drift-watcher",
+        "path": "managers/earnings-drift-watcher",
         "ref": "main",
         "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
@@ -138,7 +138,7 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
-        "path": "agents/prudent-allocator",
+        "path": "managers/prudent-allocator",
         "ref": "main",
         "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
@@ -183,7 +183,7 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
-        "path": "agents/undervalued-now",
+        "path": "managers/undervalued-now",
         "ref": "main",
         "sha": "2d1e4c3fff13c7b6f5e05d9d0294d6aed6c60f5e"
       },
