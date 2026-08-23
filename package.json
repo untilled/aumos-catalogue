@@ -12,7 +12,8 @@
     "lint": "node --experimental-strip-types tools/lint/main.ts",
     "lint:sources": "node --experimental-strip-types tools/lint-sources/main.ts",
     "check:docs": "node tools/check-docs.mjs",
-    "check:index": "node tools/check-index.mjs"
+    "check:index": "node tools/check-index.mjs",
+    "check:pins": "node tools/check-pins.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1",

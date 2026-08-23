@@ -49,9 +49,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # `check:index` resolves each entry's pinned commit inside this clone,
-          # and a shallow one does not have the older ones. The alternative is a
-          # check that reports a pass it did not establish.
+          # Both `check:index` and `check:pins` resolve commits that entries
+          # are pinned to, and a depth-1 clone does not have them. The history
+          # is small and the alternative is a check that passes for the wrong
+          # reason — one that reports what it could not establish.
+          #
+          # ⚠️ One `fetch-depth` for both, deliberately. Two checks needing the
+          # same clone is not two reasons to set it, and a second copy of this
+          # comment is the thing that goes stale when one of them stops caring.
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -71,6 +76,13 @@ jobs:
       # from every machine's catalogue in silence. `tools/check-index.mjs` says
       # more, including why this is not the Aumos schema copied a third time.
       - run: npm run check:index
+
+      # The pair to it, and a different question: `check:index` asks whether an
+      # entry **resolves**, this asks whether what it resolves to is what is
+      # committed beside it. A pin names a commit that already exists, so the
+      # commit that fixes a package cannot pin itself — the repin is a separate
+      # step, and a step that lives in somebody's memory is one that is skipped.
+      - run: npm run check:pins
 
       # The English and Korean documents are the same document twice, and a
       # section on one side and not the other is a rule a contributor is never
