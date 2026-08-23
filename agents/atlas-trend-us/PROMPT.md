@@ -74,54 +74,28 @@ weight before you hold any of it separately.
 ## Stage 1 — One window, and whether the instruments are still themselves
 
 Everything downstream is computed from **one** request. This is not an efficiency; it is a
-correctness rule, and it is the one an agent is most likely to break by being helpful.
+correctness rule, and it is the one an agent is most likely to break by being helpful. Every
+return in Stage 2 — the one-month and the twelve-month alike — comes out of that single
+response, because this vendor back-adjusts a series from the window you asked for and two
+windows are therefore two different series.
 
-Ask `source_request` for daily bars over `config.historyDays` calendar days ending at
-`asOf`, for every universe member at once:
+**Invoke the `atlas-alpaca-window` skill before you make the call.** It carries the exact
+shape of both requests and the four vendor behaviours that have a wrong answer looking like a
+right one — which `feed` to name, what the adjustment is measured from, what `limit` counts,
+and why `/v2/stocks/snapshots` is not available to you at a past `asOf`. Those are facts about
+Alpaca. What follows here is what this methodology does with the answer, and it governs.
 
-```
-/v2/stocks/bars ?symbols=VTI,VEA,VWO,IEF,GLD,DBC,BIL
-                &timeframe=1Day
-                &start=<asOf minus config.historyDays>
-                &end=<asOf>
-                &adjustment=split,dividend
-                &feed=<config.feed>
-                &limit=10000
-```
+Ask for daily bars over `config.historyDays` calendar days ending at `asOf`, for every
+universe member at once, adjusted for splits **and dividends** — the dividend leg is not
+optional, because total return is the premise of the whole ensemble.
 
-The tool's description carries an **`Allowed:` list** of every `source path ?parameters` on
-this machine — read it and work from it, because a guessed path is refused and a refusal
-looks like the vendor being down.
+⚠️ **Discard every row whose timestamp is after `asOf`, and say in this stage that you did.**
+Aumos signs the request and refuses undeclared paths; it does not read, date or clamp the
+answer. Where the endpoint takes the dates you pass them; the discard is still yours, because
+a vendor is free to hand back a bar you did not ask for.
 
-Five things about that request, each of which has a wrong answer that looks right:
-
-- **`adjustment=split,dividend` is not optional.** Without the dividend leg you are ranking a
-  4%-yielding bond fund against a 1%-yielding equity fund on price alone, and over twelve
-  months that reverses orderings. Total return is the whole premise.
-- **The adjustment is applied from the request's own `start`.** Two windows over the same
-  symbol are two different series. This is why there is one request and why the one-month
-  and twelve-month numbers must both come out of it — asking separately for a short window
-  produces two numbers that were never comparable.
-- **Name the `feed`.** The vendor's default is the paid consolidated tape and will simply
-  fail on a free account. `config.feed` exists so that failure is a setting rather than a
-  mystery.
-- **`limit` counts rows across all symbols, not per symbol.** If the response carries a
-  `next_page_token`, follow it until it does not. A basket silently truncated mid-symbol
-  gives one ETF a twelve-month return computed over four months, and nothing about the
-  number looks wrong.
-- ⚠️ **Discard every row whose timestamp is after `asOf`, and say in this stage that you
-  did.** Aumos signs the request and refuses undeclared paths; it does not read, date or
-  clamp the answer. Where the endpoint takes the dates you pass them; the discard is still
-  yours, because a vendor is free to hand back a bar you did not ask for.
-
-Then ask for the corporate actions over the same window:
-
-```
-/v1/corporate-actions ?symbols=<the same list>
-                      &types=cash_dividend,forward_split,reverse_split,name_change,redemption,worthless_removal
-                      &start=<the same start> &end=<asOf>
-                      &limit=1000
-```
+Then ask for the corporate actions over the same window — `cash_dividend`, the splits,
+`name_change`, `redemption` and `worthless_removal`.
 
 This endpoint takes a date range, which is why it is the one you may ask about the past.
 Three checks, and each one can disqualify an instrument for this run:
@@ -304,160 +278,21 @@ invent is worse than no citation, because it looks like provenance.
 ## What this package asks of the answer
 
 **The protocol is not here.** How to answer in AAP/1 — call `invocation_read` first, submit
-once through `decision_submit`, what each action means, which action takes which target —
-is stated by the Aumos MCP server itself, once per session, and the shape is published as
-`decision_submit`'s own input schema. **Read that schema and follow it where it differs from
-the sketches below.** The examples here show what this methodology puts in the fields; the
-server says what the fields are.
+once through `decision_submit`, what each action means, which action takes which target — is
+stated by the Aumos MCP server itself, once per session, and the shape is published as
+`decision_submit`'s own input schema. Read that schema and follow it wherever anything else
+disagrees with it.
 
-### The answer this methodology reaches most often
+**Invoke the `atlas-proposal-shapes` skill before you submit.** It carries the three worked
+examples this methodology reaches — a `WAIT` inside the band, a `REBALANCE` carrying the whole
+basket, and the all-cash decision — written out as JSON rather than described in prose, which
+is the difference between a specification and a paragraph about one. The rules in Stage 4
+above are not in that skill and are not replaced by it: the two lists, the `exit` for every
+departure, and the self-check are stated here because a decision that loses them validates
+cleanly and moves nothing.
 
-Nothing to do: the rule and the book agree, and the level at which that stops being true is
-recorded rather than acted on.
-
-```json
-{
-  "action": "WAIT",
-  "confidence": 0.74,
-  "rationale": {
-    "conclusion": "Five of six risk assets remain in positive trends and the computed weights differ from the book by at most 1.8 points, so the allocation stands with cash at 22%.",
-    "keyReasons": [
-      "VWO is the only member below its threshold, at score 0.0 and held, which keeps it eligible.",
-      "Largest drift is GLD at 1.8 points against a 3.0-point band."
-    ],
-    "risks": [
-      "VWO and DBC are both within half a horizon of flipping negative, so a single weak month turns this into a two-name exit and a BIL weight near 40%."
-    ],
-    "counterArguments": [
-      "The 1-month return is negative on four of six members, which a faster system would already be acting on."
-    ],
-    "uncertainty": [
-      "DBC's 12-month horizon spans a distribution whose adjustment could not be confirmed against the corporate action record."
-    ]
-  },
-  "watches": [
-    {
-      "intent": "Re-score the basket and exit VWO if it closes a month with a majority-negative ensemble.",
-      "subject": { "class": "etf", "symbol": "VWO", "market": "ARCX", "currency": "USD" },
-      "trigger": {
-        "kind": "price-below",
-        "asset": { "class": "etf", "symbol": "VWO", "market": "ARCX", "currency": "USD" },
-        "price": { "currency": "USD", "minorUnits": 4180 }
-      }
-    }
-  ],
-  "evidenceIds": ["ev_…"]
-}
-```
-
-### The whole basket, in one judgement
-
-Every target moves together, `config.cashProxy` is a holding among them rather than a
-leftover, and the two names leaving the basket are each said out loud. `targetWeight` is a
-fraction — `0.18` is 18% — and it is the weight you want **after** the change, not the
-change itself.
-
-```json
-{
-  "action": "REBALANCE",
-  "confidence": 0.68,
-  "targets": [
-    {
-      "type": "position-weight",
-      "asset": { "class": "etf", "symbol": "VTI", "market": "ARCX", "currency": "USD" },
-      "targetWeight": 0.24
-    },
-    {
-      "type": "position-weight",
-      "asset": { "class": "etf", "symbol": "VEA", "market": "ARCX", "currency": "USD" },
-      "targetWeight": 0.18
-    },
-    {
-      "type": "position-weight",
-      "asset": { "class": "etf", "symbol": "IEF", "market": "XNAS", "currency": "USD" },
-      "targetWeight": 0.3
-    },
-    {
-      "type": "position-weight",
-      "asset": { "class": "etf", "symbol": "GLD", "market": "ARCX", "currency": "USD" },
-      "targetWeight": 0.16
-    },
-    {
-      "type": "position-weight",
-      "asset": { "class": "etf", "symbol": "BIL", "market": "ARCX", "currency": "USD" },
-      "targetWeight": 0.12
-    },
-    { "type": "exit", "asset": { "class": "etf", "symbol": "VWO", "market": "ARCX", "currency": "USD" } },
-    { "type": "exit", "asset": { "class": "etf", "symbol": "DBC", "market": "ARCX", "currency": "USD" } }
-  ],
-  "rationale": {
-    "conclusion": "VWO and DBC turned majority-negative and leave the basket; the four surviving members are re-weighted by inverse volatility and scaled to the 10% volatility target, leaving BIL at the residual 12%.",
-    "keyReasons": [
-      "VWO scored −0.5 and DBC −1.0 on the four-horizon ensemble, both below the 0.0 hold threshold.",
-      "IEF is the largest weight at 30% because it is the least volatile eligible asset, not because it is the most attractive one.",
-      "VWO and DBC are named as exits rather than left out of the targets, because a position no target mentions is a position nobody sells."
-    ],
-    "risks": [
-      "Exiting two members after a single negative month is the whipsaw case: if commodities and emerging markets turn back up in the next four weeks, this rebalance pays the spread twice and misses the recovery."
-    ],
-    "counterArguments": [
-      "DBC's 12-month return is still positive, so the exit rests entirely on the three shorter horizons."
-    ],
-    "uncertainty": [
-      "VWO's bars were re-requested with asof=2026-08-21 after a name_change appeared in the corporate action record; the pre-change segment is the vendor's mapping and not independently checked."
-    ]
-  },
-  "evidenceIds": ["ev_…"]
-}
-```
-
-### The all-cash state, which is a decision and not a gap
-
-**This is the example to copy the shape of, and the one where getting it wrong costs the
-most.** Six risk assets leave the book, so there are six `exit` entries and then the cash
-proxy at 1.0. A version of this decision carrying only the `BIL` target validates, is
-accepted, and sells nothing: the book would still hold every one of the six.
-
-With `"language": "ko-KR"`, only the right-hand side of the prose fields changes. Every JSON
-key and every enum value stays exactly as it is spelled here.
-
-```json
-{
-  "action": "REBALANCE",
-  "confidence": 0.81,
-  "targets": [
-    { "type": "exit", "asset": { "class": "etf", "symbol": "VTI", "market": "ARCX", "currency": "USD" } },
-    { "type": "exit", "asset": { "class": "etf", "symbol": "VEA", "market": "ARCX", "currency": "USD" } },
-    { "type": "exit", "asset": { "class": "etf", "symbol": "VWO", "market": "ARCX", "currency": "USD" } },
-    { "type": "exit", "asset": { "class": "etf", "symbol": "IEF", "market": "XNAS", "currency": "USD" } },
-    { "type": "exit", "asset": { "class": "etf", "symbol": "GLD", "market": "ARCX", "currency": "USD" } },
-    { "type": "exit", "asset": { "class": "etf", "symbol": "DBC", "market": "ARCX", "currency": "USD" } },
-    {
-      "type": "position-weight",
-      "asset": { "class": "etf", "symbol": "BIL", "market": "ARCX", "currency": "USD" },
-      "targetWeight": 1.0
-    }
-  ],
-  "rationale": {
-    "conclusion": "유니버스의 여섯 위험자산이 모두 음의 앙상블 점수를 기록해, 전량을 단기 국채 BIL로 옮긴다.",
-    "keyReasons": [
-      "여섯 종목의 점수가 각각 -1.0, -1.0, -0.5, -0.5, -1.0, -0.5로 보유 기준선 0.0을 모두 밑돈다.",
-      "직전 배분의 위험자산 비중 78%가 0%가 되고, BIL 비중은 100%가 된다.",
-      "떠나는 여섯 종목을 targets에서 빼는 것이 아니라 각각 exit으로 명시한다. 아무 target도 언급하지 않은 보유분은 아무도 팔지 않는다."
-    ],
-    "risks": [
-      "이 상태의 실패 방식은 정해져 있다. 바닥에서 전량 현금이 되는 것이며, 반등의 첫 달을 통째로 놓친 뒤 한 달 늦게 재진입한다."
-    ],
-    "counterArguments": [
-      "12개월 수익률만 보면 IEF와 GLD는 아직 양수이고, 더 느린 시스템이라면 두 종목을 유지했을 것이다."
-    ],
-    "uncertainty": [
-      "DBC는 2026-07-31 이후 거래일 봉이 없어 대체 종목 PDBC로 점수를 계산했다."
-    ]
-  },
-  "evidenceIds": ["ev_…"]
-}
-```
+With `"language": "ko-KR"`, only the prose fields change. **Field names and enum values stay
+exactly as the schema spells them, in English**, and a ticker is a ticker in every language.
 
 ### What this desk does not do
 
