@@ -3,7 +3,7 @@
  *
  * Moved here from `apps/web/registry/generate.ts`, where it was `collectFiles`
  * and was the publisher's private business. It stops being private the moment a
- * package can arrive from somebody else: *"an AgentPackage is text"* is the load
+ * package can arrive from somebody else: *"an ManagerPackage is text"* is the load
  * -bearing claim of the whole distribution format (`@aumos/registry`'s
  * `bundle.ts` — a JSON string is not a binary, so there is no field an
  * executable could live in), and a claim that is only checked at publish time is
@@ -80,7 +80,7 @@ export function readPackageFiles(directory: string): PackageFiles {
       }
       if (!entry.isFile()) {
         throw new Error(
-          `${relative(directory, full)} is not a regular file. An agent package is text; a symlink or a device node has no published form.`,
+          `${relative(directory, full)} is not a regular file. A manager package is text; a symlink or a device node has no published form.`,
         )
       }
       const bytes = readFileSync(full)
@@ -99,7 +99,7 @@ export function readPackageFiles(directory: string): PackageFiles {
 }
 
 /**
- * The directories under a root that are AgentPackages.
+ * The directories under a root that are ManagerPackages.
  *
  * A submissions repository is a directory of them and the generator has to
  * enumerate it without being told what is there — which is the difference

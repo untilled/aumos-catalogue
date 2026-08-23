@@ -2,19 +2,19 @@
 
 <sub><a href="docs/contributing/CONTRIBUTING.ko.md">한국어</a></sub>
 
-Two kinds of thing arrive here and they are not alike. An **AgentPackage** is an
+Two kinds of thing arrive here and they are not alike. An **ManagerPackage** is an
 investment methodology written as prose. A **data source** is one JSON document naming
 a vendor, its endpoints, and what you have to supply to reach it. The first half of
 this page is the package; [the second](#submitting-a-data-source) is the source.
 
 ## The shape
 
-One directory under `agents/`, named exactly what your `manifest.json` says its `id`
+One directory under `managers/`, named exactly what your `manifest.json` says its `id`
 is. The directory name **is** the package id, so that a reviewer reading the tree is
 reading the catalogue.
 
 ```
-agents/your-package-id/
+managers/your-package-id/
   manifest.json
   prompt/00-….md … 90-….md
   README.md
@@ -38,8 +38,8 @@ broke.
 
 ### Your manifest is the permission document
 
-Aumos never reads your prompts to work out what your agent might do. The inside of an
-agent is treated as opaque, so what a package may do comes from `capabilities` and
+Aumos never reads your prompts to work out what your manager might do. The inside of an
+manager is treated as opaque, so what a package may do comes from `capabilities` and
 from nowhere else — and that list is shown to the investor, with **your** reason
 beside each entry, on the screen where they decide.
 
@@ -51,7 +51,7 @@ it, and a capability whose name reads like a way to trade is refused.
 ⚠️ **There was a `lane` field and there is not one any more.** A manifest used to declare
 `tools` — `web`, `shell`, `files`, `fanout` — and a `closed` package was one that declared
 none: no shell, no web, everything through the Aumos Skill Gateway. **Aumos withholds none
-of that any longer.** Whatever the coding CLI your agent is launched on happens to ship, the
+of that any longer.** Whatever the coding CLI your manager is launched on happens to ship, the
 session holds; there is no field that takes a tool away, and no screen says there is.
 
 That is not a relaxation Aumos made lightly. What it replaced was a hand-written list of
@@ -64,7 +64,7 @@ So every bundle has to say out loud what its reach costs — it must name `evide
 `asOf`. The two mistakes a model makes when nothing stops it are filing evidence it never
 received and treating `asOf` as decoration, and both failures are silent.
 
-**Do not write that your agent has no shell, no web, or no filesystem.** It has whatever
+**Do not write that your manager has no shell, no web, or no filesystem.** It has whatever
 its CLI ships. What actually contains it is the OS account Aumos launches that CLI as, and
 that is a property of the investor's machine rather than of your package.
 
@@ -131,7 +131,7 @@ machine — not "installs with a warning", unreadable, a catalogue row nobody ca
 Files are free: nothing validates the set of files a package contains.
 
 ```
-agents/your-package-id/
+managers/your-package-id/
   README.md
   README.ko.md            ← the declared `readme` path with the locale before the extension
   translations/ko.json    ← the short strings
@@ -141,17 +141,17 @@ agents/your-package-id/
 // translations/ko.json
 {
   "description": "카탈로그 격자에 실리는 한 줄.",
-  "agents": [{ "id": "your-package-id", "description": "방법론 문단." }]
+  "managers": [{ "id": "your-package-id", "description": "방법론 문단." }]
 }
 ```
 
 - The **filename** is a language and optionally a region: `ko.json`, `pt-BR.json`. A
   name that is not one is refused, because nothing can draw a translation it cannot
   find.
-- A document carries **two keys** and no others — `description` and `agents` — so a
+- A document carries **two keys** and no others — `description` and `managers` — so a
   `summary` you wrote is refused here rather than silently never drawn.
-- Each entry in `agents` is matched **by `id`**, so reordering `contributes.agents`
-  never reattaches a paragraph to the wrong agent. An id your package does not
+- Each entry in `managers` is matched **by `id`**, so reordering `contributes.managers`
+  never reattaches a paragraph to the wrong manager. An id your package does not
   contribute is refused for the same reason: that paragraph would be drawn for nobody.
 - The translated README's path is **derived, not declared** — `README.md` becomes
   `README.ko.md`, and a manifest declaring `docs/METHOD.md` translates it at
@@ -169,7 +169,7 @@ summary over an English README is an ordinary state and the page says so.
 A data source is a vendor Aumos holds a credential for and will make requests to. It is
 **one document**, not a directory of prose, and what it can say is deliberately small:
 an id, the hosts it reaches, what the investor has to supply, and the endpoints an
-agent may ask for.
+manager may ask for.
 
 ```
 sources/your-source-id/
@@ -182,7 +182,7 @@ npm install
 npm run lint:sources
 ```
 
-⚠️ That command is **not** the AgentPackage lint's counterpart, and the difference is
+⚠️ That command is **not** the ManagerPackage lint's counterpart, and the difference is
 in your favour. The package lint is fast feedback and the real rules run again at the
 merge. This one runs both halves of the real check — a schema generated from the same
 zod source Aumos parses with, and `coherence.ts`, which is the same file Aumos runs.
@@ -198,7 +198,7 @@ variable: Aumos composes the variable your credential arrives in, because the pr
 that reads it is the one holding broker keys.
 
 What a document also cannot say is **what shape the answer should be**. Aumos does not
-map, rename, date or trim a vendor's response; the agent receives what the vendor sent
+map, rename, date or trim a vendor's response; the manager receives what the vendor sent
 and makes whatever it needs out of it, with its own code.
 
 ### It reaches only where it declared
@@ -238,7 +238,7 @@ name.
 
 It is required, and nothing checks what is in it. It is the page an investor reads
 before they type a credential into their keychain — so say what the vendor is, what an
-agent gets from it, what a key costs and where to get one, and what the data does not
+manager gets from it, what a key costs and where to get one, and what the data does not
 cover.
 
 ### And a source may be read in two languages too

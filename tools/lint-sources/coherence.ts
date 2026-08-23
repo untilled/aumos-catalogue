@@ -20,7 +20,7 @@ import {
  * Splitting them is what lets the **catalogue repository's CI be equal to the
  * merge** rather than weaker than it. That repository is public and this one is
  * private, so a fork's pull request can import nothing from this workspace; the
- * agent half solved it by vendoring readable source, and paid a stated price —
+ * manager half solved it by vendoring readable source, and paid a stated price —
  * *a stale copy can pass a submission the merge will refuse*. Here the price is
  * smaller than it looks, because the schema half travels as a **generated JSON
  * Schema** read by stock ajv, and this half has no dependency to strand: it
@@ -121,7 +121,7 @@ export function assertCoherent(spec: CoherentDocument): void {
       // Every other URL in this document may interpolate a machine value the
       // gateway composed. This one may not, and the reason is that it has no
       // call to be composed *from*: a token is issued for the document, once per
-      // process, before any agent has asked anything. A placeholder here would be
+      // process, before any manager has asked anything. A placeholder here would be
       // a session whose identity depends on which question happened to be first.
       throw new SourceSpecError(
         'templated-authority',
@@ -174,14 +174,14 @@ export function assertCoherent(spec: CoherentDocument): void {
       )
     }
     assertDeclarableHost(route.host, `relay[${route.path}] of ${spec.id}`, local)
-    // One path is one host, because the agent names only the path. Two hosts
+    // One path is one host, because the manager names only the path. Two hosts
     // for one path would make *which vendor answered* a fact about the order of
     // this array — which is the defect `loadSourceSpecsFromEnv` refuses one
     // element up, at the same granularity the Evidence records.
     if (relayPaths.has(route.path)) {
       throw new SourceSpecError(
         'unresolved-reference',
-        `relay[] of ${spec.id} declares "${route.path}" twice. An agent names a path, so a path names one host.`,
+        `relay[] of ${spec.id} declares "${route.path}" twice. A manager names a path, so a path names one host.`,
         { id: spec.id, path: route.path },
       )
     }

@@ -1,7 +1,7 @@
 /**
- * Lints every submitted AgentPackage. Run by CI on every pull request.
+ * Lints every submitted ManagerPackage. Run by CI on every pull request.
  *
- *   node --experimental-strip-types tools/lint/main.ts [agents-directory]
+ *   node --experimental-strip-types tools/lint/main.ts [managers-directory]
  *
  * VENDORED — see VENDORED.md. Do not edit `rules.ts` or `read.ts` here.
  */
@@ -20,15 +20,15 @@ import { Ajv2020 } from 'ajv/dist/2020.js'
 // is not running is still a check that is not running.
 import addFormats from 'ajv-formats'
 import { findPackageDirectories, readPackageFiles } from './read.ts'
-import { lintAgentPackage } from './rules.ts'
+import { lintManagerPackage } from './rules.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const ROOT = resolve(process.argv[2] ?? join(HERE, '../../agents'))
+const ROOT = resolve(process.argv[2] ?? join(HERE, '../../managers'))
 
 const schema = (name: string): Record<string, unknown> =>
   JSON.parse(readFileSync(join(HERE, name), 'utf8')) as Record<string, unknown>
 
-const manifestSchema = schema('agent-package-manifest.schema.json')
+const manifestSchema = schema('manager-package-manifest.schema.json')
 
 // `strict: false`: the schemas are generated from zod and carry annotations ajv
 // does not recognise. Refusing to *read* our own published schema would be the
@@ -76,13 +76,13 @@ for (const name of packages) {
       const id = (manifest as { id?: unknown }).id
       if (id !== name) {
         problems.push(
-          'the directory is agents/' + name + ' but the manifest says id ' + String(id) +
+          'the directory is managers/' + name + ' but the manifest says id ' + String(id) +
             '. The directory name is the package id, so that a reviewer reading the tree is reading the catalogue.',
         )
       }
     }
 
-    for (const problem of lintAgentPackage(files)) {
+    for (const problem of lintManagerPackage(files)) {
       problems.push(problem.rule + ': ' + problem.message)
     }
   }

@@ -1,12 +1,12 @@
 # The submission rules, on every pull request. Two kinds of thing arrive here —
-# an AgentPackage under `agents/` and a data source under `sources/` — and each
+# an ManagerPackage under `managers/` and a data source under `sources/` — and each
 # has its own checker, both copied out of the Aumos repository, both guarded by
 # a test there that fails Aumos's own build the moment a copy differs from its
 # source. See `tools/lint/VENDORED.md` and `tools/lint-sources/VENDORED.md`.
 #
 # ── The two are not equally strong, and the difference is written down ──────
 #
-# The AgentPackage lint is your **fast feedback**: the real rules run again in
+# The ManagerPackage lint is your **fast feedback**: the real rules run again in
 # the Aumos repository at merge, so a stale copy here can pass something the
 # merge refuses. The source lint runs **both halves of the real check** — a
 # schema generated from the same zod source Aumos parses with, and

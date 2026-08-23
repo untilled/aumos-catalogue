@@ -6,15 +6,15 @@ prompt bundle through a real Skill Gateway.
 Reproduce with:
 
 ```bash
-pnpm --filter @aumos/agent-runtime conformance
-pnpm --filter @aumos/agent-runtime conformance examples/agents/basic-investor   # or any package
+pnpm --filter @aumos/manager-runtime conformance
+pnpm --filter @aumos/manager-runtime conformance examples/managers/basic-investor   # or any package
 ```
 
 ## Why this run matters more than the verdict
 
 `runConformance` was built in #145 to judge *an arbitrary implementation from a manifest plus one
 response per canonical invocation, never from its code* (§5). Between #145 and this run, **the only
-thing it had ever judged was `referenceAgent`** — a function in the same package, written to pass
+thing it had ever judged was `referenceManager`** — a function in the same package, written to pass
 it. That is the position `package.test.ts` was in before #173: a check that has only run against
 the thing it was derived from cannot have failed, so it cannot have been right.
 
@@ -51,8 +51,8 @@ its manifest plus its bundle plus the tools that manifest entitles it to — tha
 `allowedToolsFor` means — and denying the third tests a configuration nobody ships. With the real
 gateway (fixture sources: no network, no credentials) all six cases completed and every check passed.
 
-Worth keeping as a note about prompt bundles generally: **a bundle that instructs an agent to call a
-tool produces an agent that will invent the tool rather than report its absence.** #265's rule that
+Worth keeping as a note about prompt bundles generally: **a bundle that instructs a manager to call a
+tool produces a manager that will invent the tool rather than report its absence.** #265's rule that
 prose beside a strict schema is not a specification, one layer out.
 
 ## The report
@@ -63,7 +63,7 @@ claude 2.1.223 — ready
 
 ## subject
 aumos/ai-hedge-fund-value@0.1.0
-/Users/min/orca/workspaces/aumous/bladderwrack/examples/agents/ai-hedge-fund-value
+/Users/min/orca/workspaces/aumous/bladderwrack/examples/managers/ai-hedge-fund-value
 tools granted by its manifest: mcp__aumos__fundamentals_latest, mcp__aumos__market_history, mcp__aumos__market_quote, mcp__aumos__portfolio_read
 
 ## running 6 case(s) against claude 2.1.223
@@ -93,7 +93,7 @@ AAP/1 CONFORMANT — aumos/ai-hedge-fund-value@0.1.0
     deny — all data access goes through the Skill Gateway, where the TimeGate can see it
 ✓ timegate-clean-context  No invocation carries context dated after its asOf
     6 invocation(s) clean; runtime enforcement is the Skill Gateway's (#147)
-✓ produces-decision-proposal  Every response is a schema-valid AgentResult carrying a DecisionProposal
+✓ produces-decision-proposal  Every response is a schema-valid ManagerResult carrying a DecisionProposal
     6/6 response(s) valid
 ✓ protocol-declared  Every response declares AAP/1
     all responses declare AAP/1
@@ -102,7 +102,7 @@ AAP/1 CONFORMANT — aumos/ai-hedge-fund-value@0.1.0
 ✓ no-direct-broker-execution  No response contains an execution instruction
     Proposals express portfolio intent only; orders are the Planner’s to construct
 ✓ language-costs-nothing-structural  A non-English `language` does not change the wire format
-    1 non-English case(s) returned the same wire format; the prose language itself is not judged here — §5 leaves no view inside an agent to settle a disagreement with a language detector
+    1 non-English case(s) returned the same wire format; the prose language itself is not judged here — §5 leaves no view inside a manager to settle a disagreement with a language detector
 ✓ supports-wait  Reaches a non-mutating judgement when nothing is available
     answered WAIT on the excluded symbol
 ✓ wait-is-reasoned  A do-nothing judgement is fully argued
@@ -122,7 +122,7 @@ contract and the permission surface: *can this thing be run at all, and does it 
 protocol when asked in Korean, when the mandate excludes the subject, and when it has nothing to say.*
 
 `skills-used-declared` is skipped rather than passed, because AAP's `diagnostics.skillsUsed` is
-self-report and no response volunteered it. What the agent actually reached for is enforced by the
+self-report and no response volunteered it. What the manager actually reached for is enforced by the
 gateway at runtime (#147) and drawn from what the gateway *observed* (#264), which is the half that
 cannot be lied about.
 

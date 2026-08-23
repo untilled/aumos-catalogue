@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://aumos.app/spec/aap/1/agent-package-manifest.schema.json",
-  "title": "agent-package-manifest",
+  "$id": "https://aumos.app/spec/amp/1/manager-package-manifest.schema.json",
+  "title": "manager-package-manifest",
   "type": "object",
   "properties": {
     "manifestVersion": {
@@ -58,7 +58,7 @@
           "description": {
             "type": "string"
           },
-          "agents": {
+          "managers": {
             "type": "array",
             "items": {
               "type": "object",
@@ -151,14 +151,14 @@
       "required": ["aumos"],
       "additionalProperties": false
     },
-    "aapVersion": {
+    "ampVersion": {
       "type": "number",
       "const": 1
     },
     "contributes": {
       "type": "object",
       "properties": {
-        "agents": {
+        "managers": {
           "minItems": 1,
           "type": "array",
           "items": {
@@ -206,7 +206,7 @@
           }
         }
       },
-      "required": ["agents"],
+      "required": ["managers"],
       "additionalProperties": false
     },
     "capabilities": {
@@ -221,8 +221,8 @@
               "thesis:read",
               "evidence:read",
               "skill:invoke",
-              "agent-memory:read",
-              "agent-memory:write",
+              "manager-memory:read",
+              "manager-memory:write",
               "brief:read",
               "brief:write",
               "source:passthrough"
@@ -323,7 +323,7 @@
     "name",
     "version",
     "engines",
-    "aapVersion",
+    "ampVersion",
     "contributes",
     "capabilities",
     "requires"

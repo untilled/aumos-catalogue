@@ -15,9 +15,9 @@
   "engines": {
     "aumos": ">=0.2.6"
   },
-  "aapVersion": 1,
+  "ampVersion": 1,
   "contributes": {
-    "agents": [
+    "managers": [
       {
         "id": "undervalued-now",
         "name": "Undervalued Now",

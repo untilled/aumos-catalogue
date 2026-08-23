@@ -18,7 +18,7 @@ prevent.
 | `main.ts` | written by `vendor.ts`; it is the only glue |
 
 **This lint runs both halves of the real check**, which is more than the
-AgentPackage lint beside it can say. A document is read by a schema — generated
+ManagerPackage lint beside it can say. A document is read by a schema — generated
 from the same zod source Aumos parses with — and then by `coherence.ts`, which
 is the same file Aumos runs. A green tick here means what the merge means.
 
@@ -48,7 +48,7 @@ to relay a broker.
 | `source-spec.schema.json` | `packages/source-spec/schema/` — zod에서 생성 |
 | `main.ts` | `vendor.ts`가 쓴다. 유일한 접착 코드 |
 
-**이 린트는 진짜 검사의 두 절반을 다 돈다** — 옆의 AgentPackage 린트가 못 하는
+**이 린트는 진짜 검사의 두 절반을 다 돈다** — 옆의 ManagerPackage 린트가 못 하는
 말이다. 문서는 스키마(Aumos가 파싱하는 것과 같은 zod 소스에서 생성됨)로 한 번,
 `coherence.ts`(Aumos가 돌리는 바로 그 파일)로 한 번 읽힌다. 여기의 초록 체크는
 머지가 뜻하는 것과 같은 것을 뜻한다.
