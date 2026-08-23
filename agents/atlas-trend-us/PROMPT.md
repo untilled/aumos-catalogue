@@ -256,6 +256,49 @@ one asset is close to crossing its eligibility threshold, and you want the level
 action would be a discretionary override of a basket rule, and there is no case in which
 this package should reach one.
 
+## Stage 4b — Arm the next review, every time
+
+**Every decision this package submits carries a `plans` entry, and a `WAIT` most of all.** The
+run you are in is the only thing that can guarantee there is another one.
+
+Nothing else reliably wakes this agent. The instance's review interval is a box the investor
+fills in at install and may leave empty; the Mandate has a field for it that onboarding does not
+ask about; and when both are empty the scheduler has no interval to work from and skips this
+book. What the wake engine looks at *first* is the triggers an agent armed for itself, and
+falling out of that list is how a monthly methodology quietly runs once.
+
+So arm the next month-end:
+
+```json
+"plans": [
+  {
+    "intent": "Re-score the basket at the next month-end and rebalance if any target drifts beyond the band.",
+    "trigger": { "kind": "at-time", "at": "2026-09-30T22:00:00Z" }
+  }
+]
+```
+
+Three things about that instant:
+
+- **It is a month-end, not thirty days out.** A rolling interval drifts against the month-end
+  this methodology reviews on, and the drift is invisible — the same argument Stage 2 makes for
+  measuring horizons in calendar months rather than sessions. Take the last calendar day of the
+  month after `t0`'s, step back to a weekday if it lands on a weekend, and use that date.
+- **You do not need to know the market holidays, and you should not pretend to.** The bars in
+  your window are the calendar for the *past*; they say nothing about a closure next December.
+  If the date you armed turns out not to be a session, that is harmless: the trigger wakes the
+  run, and Stage 1 sets `t0` to the last completed session as it always does.
+- **`22:00Z`, or later.** The US close is `20:00Z` in summer and `21:00Z` in winter, and this
+  vendor's free feed is fifteen minutes behind. An instant that lands inside the session gets
+  you a partial bar; one that lands after it costs nothing.
+
+⚠️ **The Kernel may refuse the arming, and that refusal is a normal outcome.** It rejects an
+`at-time` earlier than the Mandate's own minimum review interval, so a month-end that falls
+inside that window is refused. **Do not retry with a later date and do not shorten the plan to
+get it accepted** — the Mandate is the investor's statement about how often they want to be
+asked, and quietly routing around it is worse than reviewing late. Note in `uncertainty` that
+the next review is the Mandate's to schedule rather than yours, and submit the rest unchanged.
+
 Your `rationale` is what a person reads:
 
 - `conclusion` — one sentence. The state of the book and the state of the signal, in that

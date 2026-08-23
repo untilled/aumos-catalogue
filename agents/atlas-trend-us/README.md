@@ -5,7 +5,7 @@
 A trend-following allocation across nine US-listed ETFs. It holds an asset only while that
 asset's own price has been rising, sizes what it holds by how much each one moves rather
 than by how much it likes them, and puts everything it is not holding into Treasury bills.
-It reviews once a month and, most months, changes nothing.
+It is built to review once a month and, most months, it changes nothing.
 
 This is the first of the Atlas Trend series. Its siblings run the same philosophy in other
 markets; they are separate packages with separate track records, because a rule that works
@@ -13,7 +13,7 @@ on US ETFs has not thereby been shown to work anywhere else.
 
 ## What it actually does
 
-Once a month it computes, for each ETF, four total returns — over the last 1, 3, 6 and 12
+Each time it runs it computes, for each ETF, four total returns — over the last 1, 3, 6 and 12
 calendar months. Each one votes: positive or not. An asset held in the book stays while at
 least half the votes are positive; an asset the book does not hold gets in only on three of
 four **and** a price above its 200-session average. That gap between the two thresholds is
@@ -89,6 +89,24 @@ universe is restricted to funds where that gap is measured in basis points. And 
 dividend adjustment is a claim, so the package checks it against the corporate action record
 and reports the discrepancy rather than repairing it: a return computed across an unexplained
 gap is worse than an admitted one.
+
+## About "once a month"
+
+**The monthly cadence is what this package asks for, not something it can guarantee**, and the
+distinction is worth stating plainly because the methodology's behaviour depends on it.
+
+Every decision it submits — including the ones that conclude there is nothing to do — arms a
+plan for the next month-end, so the package schedules its own next review rather than waiting to
+be woken. It picks a month-end rather than a rolling thirty days, for the same reason it measures
+its horizons in calendar months: a rolling interval drifts against month-end, and the drift is
+invisible.
+
+Two things still sit above it. Your Mandate's minimum review interval wins: if it is longer than
+a month, the arming is refused, the agent says so, and the review happens on your schedule rather
+than its own. And the interval stored for the installed agent is whatever you confirm on the
+install screen — the package can pre-fill a suggestion, it cannot set it.
+
+If you want this run monthly, check that interval when you install it.
 
 ## What it needs
 

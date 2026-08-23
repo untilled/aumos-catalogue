@@ -11,6 +11,10 @@ the Aumos MCP server itself, once per session, and the shape is published as `de
 own input schema. **Read that schema and follow it where it differs from anything below.** These
 examples show what this methodology puts in the fields; the server says what the fields are.
 
+**Every example below carries a `plans` entry, and that is not decoration.** Stage 4b explains
+why: the next run is not guaranteed by anything outside this decision, so each one arms the
+month-end that follows it. A worked example without it would teach the omission.
+
 ⚠️ **Stage 4 of `PROMPT.md` governs this document.** The two lists, the `exit` named for every
 departure, and the self-check before submitting are stated there, and these examples illustrate
 that rule rather than replace it. A decision that drops it validates cleanly and moves nothing.
@@ -40,6 +44,12 @@ recorded rather than acted on.
       "DBC's 12-month horizon spans a distribution whose adjustment could not be confirmed against the corporate action record."
     ]
   },
+  "plans": [
+    {
+      "intent": "Re-score the basket at the next month-end and rebalance if any target drifts beyond the band.",
+      "trigger": { "kind": "at-time", "at": "2026-09-30T22:00:00Z" }
+    }
+  ],
   "watches": [
     {
       "intent": "Re-score the basket and exit VWO if it closes a month with a majority-negative ensemble.",
@@ -112,6 +122,12 @@ change itself.
       "VWO's bars were re-requested with asof=2026-08-21 after a name_change appeared in the corporate action record; the pre-change segment is the vendor's mapping and not independently checked."
     ]
   },
+  "plans": [
+    {
+      "intent": "Re-score the basket at the next month-end and rebalance if any target drifts beyond the band.",
+      "trigger": { "kind": "at-time", "at": "2026-09-30T22:00:00Z" }
+    }
+  ],
   "evidenceIds": ["ev_…"]
 }
 ```
@@ -160,6 +176,12 @@ key and every enum value stays exactly as it is spelled here.
       "DBC는 2026-07-31 이후 거래일 봉이 없어 대체 종목 PDBC로 점수를 계산했다."
     ]
   },
+  "plans": [
+    {
+      "intent": "다음 월말에 바스켓을 다시 채점하고, 자격을 얻은 자산이 생기면 위험자산 비중을 복원한다.",
+      "trigger": { "kind": "at-time", "at": "2026-09-30T22:00:00Z" }
+    }
+  ],
   "evidenceIds": ["ev_…"]
 }
 ```
