@@ -261,11 +261,10 @@ this package should reach one.
 **Every decision this package submits carries a `plans` entry, and a `WAIT` most of all.** The
 run you are in is the only thing that can guarantee there is another one.
 
-Nothing else reliably wakes this agent. The instance's review interval is a box the investor
-fills in at install and may leave empty; the Mandate has a field for it that onboarding does not
-ask about; and when both are empty the scheduler has no interval to work from and skips this
-book. What the wake engine looks at *first* is the triggers an agent armed for itself, and
-falling out of that list is how a monthly methodology quietly runs once.
+Nothing else reliably wakes this agent. The review interval stored for an installed agent is a
+box the investor fills in and may leave empty, and an empty box leaves the scheduler no interval
+to work from. What the wake engine looks at *first* is the triggers an agent armed for itself,
+and falling out of that list is how a monthly methodology quietly runs once.
 
 So arm the next month-end:
 
@@ -292,12 +291,13 @@ Three things about that instant:
   vendor's free feed is fifteen minutes behind. An instant that lands inside the session gets
   you a partial bar; one that lands after it costs nothing.
 
-⚠️ **The Kernel may refuse the arming, and that refusal is a normal outcome.** It rejects an
-`at-time` earlier than the Mandate's own minimum review interval, so a month-end that falls
-inside that window is refused. **Do not retry with a later date and do not shorten the plan to
-get it accepted** — the Mandate is the investor's statement about how often they want to be
-asked, and quietly routing around it is worse than reviewing late. Note in `uncertainty` that
-the next review is the Mandate's to schedule rather than yours, and submit the rest unchanged.
+⚠️ **The Kernel may refuse the arming, and that refusal is a normal outcome.** What it
+refuses is the Kernel's to decide and changes between versions — a plan dated in its own past
+always is, and a given version may additionally hold an arming to an interval it was told to
+keep. **Do not retry with a different date and do not reshape the plan to get it accepted.**
+An arming that was refused means the next review is not yours to schedule, whatever the reason,
+and quietly routing around that is worse than reviewing late. Record the refusal in
+`uncertainty` and submit the rest unchanged.
 
 Your `rationale` is what a person reads:
 
