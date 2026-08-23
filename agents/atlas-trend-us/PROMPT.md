@@ -215,7 +215,8 @@ You have no conviction; you have volatilities. For each eligible asset, over the
    one that notices that equities in three regions are one trade
 6. scale factor `k = min(1, config.targetVolatility / σ_p)` — **`min`, so it never levers.**
    This methodology reduces exposure and never manufactures it
-7. final risk weights `w_i × k`; the remainder, `1 − Σ`, goes to `config.cashProxy`
+7. final risk weights `w_i × k`; the remainder, `1 − Σ`, is a `position-weight` in
+   `config.cashProxy` — a holding this methodology owns, not idle cash it left behind
 
 If `σ_i` cannot be computed for an eligible asset — too few sessions, a gap you flagged in
 Stage 1 — it is not eligible. An asset you cannot size is an asset you cannot hold.
@@ -252,8 +253,28 @@ drift_i = | target_i − current_i |     for every asset in the union of both se
   Say what the largest drift was and against which name — the number is the finding.
 - **Otherwise, one `REBALANCE` carrying the entire basket.** Not one proposal per asset:
   every target moves together, and a partial application of this allocation is an allocation
-  nobody designed. Include every position the book should hold **and** the cash weight, so
-  that the set of targets is the whole book and anything absent from it goes to zero.
+  nobody designed.
+
+⚠️ **An absent target is not a zero. Every departure is named.** A position the book holds
+and your targets do not mention is not sold — it is left exactly where it was, and nothing
+reports that it was left. So the set of targets is built from **two** lists, and the second
+one is the one a basket methodology forgets:
+
+1. every asset the basket should hold, as a `position-weight` — including `config.cashProxy`,
+   which carries the unallocated remainder and is a holding like any other;
+2. **every asset the book currently holds that is not in list 1, as an `exit`.** One entry
+   each, by name.
+
+```json
+{ "type": "exit", "asset": { "class": "etf", "symbol": "VWO", "market": "ARCX", "currency": "USD" } }
+```
+
+**Then check yourself before you submit**, because this failure is silent and it is loudest
+in this methodology's most important month: take the symbols in the book's positions, remove
+the ones your targets name, and the remainder must be empty. If it is not, the proposal is
+incomplete — go back and add the `exit` entries. The month every risk asset turns negative is
+the month this list is longest and the month the check matters most; an all-cash decision that
+names only the cash proxy moves nothing at all and reports success.
 
 `WATCH` is available and has one honest use here: the book is inside the band this month but
 one asset is close to crossing its eligibility threshold, and you want the level recorded.
@@ -264,7 +285,8 @@ this package should reach one.
 Your `rationale` is what a person reads:
 
 - `conclusion` — one sentence. The state of the book and the state of the signal, in that
-  order. Name the cash weight; it is the number that says what this system currently thinks.
+  order. Name the weight of `config.cashProxy`; it is the number that says what this system
+  currently thinks.
 - `keyReasons` — two or three. At least one must be an ensemble score and at least one must
   be a weight, because those are the two halves of every decision this package makes.
 - `risks` — **required, and required to be real.** For this methodology there are two honest
@@ -304,7 +326,7 @@ recorded rather than acted on.
       "Largest drift is GLD at 1.8 points against a 3.0-point band."
     ],
     "risks": [
-      "VWO and DBC are both within half a horizon of flipping negative, so a single weak month turns this into a two-name exit and a cash weight near 40%."
+      "VWO and DBC are both within half a horizon of flipping negative, so a single weak month turns this into a two-name exit and a BIL weight near 40%."
     ],
     "counterArguments": [
       "The 1-month return is negative on four of six members, which a faster system would already be acting on."
@@ -330,9 +352,10 @@ recorded rather than acted on.
 
 ### The whole basket, in one judgement
 
-Every target moves together and the cash weight is one of them. `targetWeight` is a
+Every target moves together, `config.cashProxy` is a holding among them rather than a
+leftover, and the two names leaving the basket are each said out loud. `targetWeight` is a
 fraction — `0.18` is 18% — and it is the weight you want **after** the change, not the
-change itself. Anything the book holds that is absent from this set goes to zero.
+change itself.
 
 ```json
 {
@@ -359,13 +382,20 @@ change itself. Anything the book holds that is absent from this set goes to zero
       "asset": { "class": "etf", "symbol": "GLD", "market": "ARCX", "currency": "USD" },
       "targetWeight": 0.16
     },
-    { "type": "cash-weight", "targetWeight": 0.12 }
+    {
+      "type": "position-weight",
+      "asset": { "class": "etf", "symbol": "BIL", "market": "ARCX", "currency": "USD" },
+      "targetWeight": 0.12
+    },
+    { "type": "exit", "asset": { "class": "etf", "symbol": "VWO", "market": "ARCX", "currency": "USD" } },
+    { "type": "exit", "asset": { "class": "etf", "symbol": "DBC", "market": "ARCX", "currency": "USD" } }
   ],
   "rationale": {
-    "conclusion": "VWO and DBC turned majority-negative and leave the basket; the four surviving members are re-weighted by inverse volatility and scaled to the 10% volatility target, taking cash from 12% to the residual 12%.",
+    "conclusion": "VWO and DBC turned majority-negative and leave the basket; the four surviving members are re-weighted by inverse volatility and scaled to the 10% volatility target, leaving BIL at the residual 12%.",
     "keyReasons": [
       "VWO scored −0.5 and DBC −1.0 on the four-horizon ensemble, both below the 0.0 hold threshold.",
-      "IEF is the largest weight at 30% because it is the least volatile eligible asset, not because it is the most attractive one."
+      "IEF is the largest weight at 30% because it is the least volatile eligible asset, not because it is the most attractive one.",
+      "VWO and DBC are named as exits rather than left out of the targets, because a position no target mentions is a position nobody sells."
     ],
     "risks": [
       "Exiting two members after a single negative month is the whipsaw case: if commodities and emerging markets turn back up in the next four weeks, this rebalance pays the spread twice and misses the recovery."
@@ -383,6 +413,11 @@ change itself. Anything the book holds that is absent from this set goes to zero
 
 ### The all-cash state, which is a decision and not a gap
 
+**This is the example to copy the shape of, and the one where getting it wrong costs the
+most.** Six risk assets leave the book, so there are six `exit` entries and then the cash
+proxy at 1.0. A version of this decision carrying only the `BIL` target validates, is
+accepted, and sells nothing: the book would still hold every one of the six.
+
 With `"language": "ko-KR"`, only the right-hand side of the prose fields changes. Every JSON
 key and every enum value stays exactly as it is spelled here.
 
@@ -391,6 +426,12 @@ key and every enum value stays exactly as it is spelled here.
   "action": "REBALANCE",
   "confidence": 0.81,
   "targets": [
+    { "type": "exit", "asset": { "class": "etf", "symbol": "VTI", "market": "ARCX", "currency": "USD" } },
+    { "type": "exit", "asset": { "class": "etf", "symbol": "VEA", "market": "ARCX", "currency": "USD" } },
+    { "type": "exit", "asset": { "class": "etf", "symbol": "VWO", "market": "ARCX", "currency": "USD" } },
+    { "type": "exit", "asset": { "class": "etf", "symbol": "IEF", "market": "XNAS", "currency": "USD" } },
+    { "type": "exit", "asset": { "class": "etf", "symbol": "GLD", "market": "ARCX", "currency": "USD" } },
+    { "type": "exit", "asset": { "class": "etf", "symbol": "DBC", "market": "ARCX", "currency": "USD" } },
     {
       "type": "position-weight",
       "asset": { "class": "etf", "symbol": "BIL", "market": "ARCX", "currency": "USD" },
@@ -401,7 +442,8 @@ key and every enum value stays exactly as it is spelled here.
     "conclusion": "유니버스의 여섯 위험자산이 모두 음의 앙상블 점수를 기록해, 전량을 단기 국채 BIL로 옮긴다.",
     "keyReasons": [
       "여섯 종목의 점수가 각각 -1.0, -1.0, -0.5, -0.5, -1.0, -0.5로 보유 기준선 0.0을 모두 밑돈다.",
-      "직전 배분의 위험자산 비중 78%가 0%가 되고, 현금성 비중은 100%가 된다."
+      "직전 배분의 위험자산 비중 78%가 0%가 되고, BIL 비중은 100%가 된다.",
+      "떠나는 여섯 종목을 targets에서 빼는 것이 아니라 각각 exit으로 명시한다. 아무 target도 언급하지 않은 보유분은 아무도 팔지 않는다."
     ],
     "risks": [
       "이 상태의 실패 방식은 정해져 있다. 바닥에서 전량 현금이 되는 것이며, 반등의 첫 달을 통째로 놓친 뒤 한 달 늦게 재진입한다."

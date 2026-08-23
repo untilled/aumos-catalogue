@@ -10,7 +10,7 @@
       "minimum": 400,
       "maximum": 1500,
       "default": 420,
-      "description": "Calendar days of daily bars to request in the single window, counting back from asOf. The floor is 400 because the longest horizon is twelve months and the 200-session moving average needs roughly ten more; a shorter window silently produces a 12-month return measured over less than twelve months."
+      "description": "Calendar days of daily bars to request in the single window, counting back from asOf. The floor is 400 rather than 365 because the twelve-month horizon needs a bar on or before t0 minus twelve months, so the window has to reach past that date with enough margin for a holiday, a closure or a gap in the vendor's own history; a window of exactly 365 silently produces a 12-month return measured over less than twelve months. The 200-session moving average is not what sets the floor — 200 sessions is roughly 290 calendar days, comfortably inside twelve months."
     },
     "feed": {
       "type": "string",
