@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evidence-Gated Allocator instance configuration",
+  "description": "Safety-bounded operating thresholds. Configuration may make the manager stricter, but cannot waive missing evidence, freshness, mandate or thesis-challenge gates.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "minimumExpectedActiveReturn": {
+      "type": "number",
+      "minimum": 0.02,
+      "maximum": 0.25,
+      "default": 0.05,
+      "description": "Minimum probability-weighted expected return above the named benchmark for a single-name BUY. Missing inputs do not become zero; they make the gate unresolved."
+    },
+    "concentration": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "position": { "type": "number", "minimum": 0.02, "maximum": 0.25, "default": 0.1 },
+        "sector": { "type": "number", "minimum": 0.05, "maximum": 0.4, "default": 0.2 },
+        "theme": { "type": "number", "minimum": 0.05, "maximum": 0.3, "default": 0.15 }
+      }
+    },
+    "minimumLensSamples": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 100,
+      "default": 10
+    },
+    "minimumIndependentDateClusters": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 20,
+      "default": 4
+    },
+    "watchExpiryDays": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 180,
+      "default": 30
+    },
+    "freshnessHours": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "marketPrice": { "type": "number", "minimum": 0.1, "maximum": 72, "default": 24 },
+        "filing": { "type": "number", "minimum": 1, "maximum": 8760, "default": 2160 },
+        "news": { "type": "number", "minimum": 1, "maximum": 336, "default": 72 },
+        "corporateAction": { "type": "number", "minimum": 1, "maximum": 720, "default": 168 }
+      }
+    },
+    "experimentalPositionCeiling": {
+      "type": "number",
+      "minimum": 0.001,
+      "maximum": 0.05,
+      "default": 0.01,
+      "description": "Maximum target weight while a lens is insufficient or observing. The Mandate and concentration limits may impose a lower ceiling."
+    }
+  }
+}

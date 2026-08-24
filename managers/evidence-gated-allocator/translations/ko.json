@@ -1,0 +1,9 @@
+{
+  "description": "평균회귀와 추세 눌림을 분리하고, 반증 가능한 논지와 독립 근거를 요구하며, private memory를 포트폴리오 기록과 섞지 않고 실행 간 보정 상태를 유지하는 학습형 포트폴리오 매니저입니다.",
+  "managers": [
+    {
+      "id": "evidence-gated-allocator",
+      "description": "제안된 배분에 반증 가능한 thesis가 있는지, 해당 lens가 독립 evidence를 충분히 축적했는지 묻습니다. 근거가 약하면 빌린 확신 대신 통제된 실험이나 기계 추적 가능한 WATCH를 냅니다."
+    }
+  ]
+}

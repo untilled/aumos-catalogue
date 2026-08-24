@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-08-20T12:00:00Z",
+  "freshnessHours": 24,
+  "rows": [
+    { "id": "past", "availableAt": "2026-08-19T18:00:00Z", "value": 101 },
+    { "id": "boundary", "availableAt": "2026-08-20T12:00:00Z", "value": 102 },
+    { "id": "future", "availableAt": "2026-08-20T12:00:01Z", "value": 999 }
+  ],
+  "expectedRetainedIds": ["past", "boundary"],
+  "expectedDroppedIds": ["future"],
+  "staleCase": {
+    "asOf": "2026-08-20T12:00:00Z",
+    "freshnessHours": 6,
+    "newestAvailableAt": "2026-08-20T05:59:59Z",
+    "expectedFresh": false
+  },
+  "conflictCase": {
+    "claim": "split ratio",
+    "sources": [
+      { "id": "alpaca-action", "value": "2:1", "primaryForClaim": true },
+      { "id": "price-inference", "value": "3:1", "primaryForClaim": false }
+    ],
+    "expectedResolution": "alpaca-action",
+    "mustNotAverage": true
+  },
+  "adjustmentCase": {
+    "series": [
+      { "id": "entry-bars", "adjustment": "raw" },
+      { "id": "outcome-bars", "adjustment": "all" }
+    ],
+    "corporateActionReconciled": false,
+    "expectedBlocked": true
+  },
+  "degradationCases": [
+    { "missing": "open-dart", "lane": "kr-single-name-new-fundamental-buy", "expectedAction": "WAIT", "expectedJudgement": "unable" },
+    { "missing": "sec-edgar", "lane": "us-single-name-new-fundamental-buy", "expectedAction": "WAIT", "expectedJudgement": "unable" },
+    { "missing": "alpaca", "lane": "us-news-required", "expectedAction": "WAIT", "expectedJudgement": "unable" },
+    { "missing": "cli-web", "lane": "portfolio-weight-review", "expectedAction": "CONTINUE", "expectedJudgement": "available" }
+  ]
+}
