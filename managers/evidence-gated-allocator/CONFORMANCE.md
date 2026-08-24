@@ -47,9 +47,10 @@ The current Aumos checkout was exercised with Claude Code 2.1.241 and Node 22.22
   submitted one schema-valid `WATCH`. The temporary launcher timed out after submission because it
   did not install the lifecycle's decision-completion hook; the Decision itself was present after
   285 seconds and parsed successfully.
-- The stdio metrics MCP server passed initialize/list/call protocol checks directly. A real Claude
-  session then called `mcp__evidence-gated-metrics__calculate` once through an MCP config pinned to
-  the working Node 22 executable and received `status: ok` with two independent date clusters.
+- The stdio metrics MCP server passed initialize/list/call protocol checks directly. After repairing
+  this host's Homebrew Node and using Aumos's exported `${AUMOS_MANAGER_PACKAGE}` path in the shipped
+  MCP config, a real Claude session called `mcp__evidence-gated-metrics__calculate` once and received
+  `status: ok` with two independent date clusters.
 
 These smokes establish non-interactive submission, role fail-closed behavior, role-selected source
 degradation, Brief writing and actual model-to-MCP calculation. They are not the consecutive
@@ -61,10 +62,11 @@ Two host/core defects were deliberately not counted as package failures:
   invocation to `paths.invocationPath`, so its first `invocation_read` is refused as
   `invocation-unavailable`. The package therefore cannot obtain a meaningful six-case report from
   that script until the runner is updated to the current invocation-file contract.
-- This machine's default Homebrew `node` cannot start because one of its dynamic libraries is
-  missing. Package MCP configs use the portable `node` command; the server worked when the same
-  Claude session used the installed Node 22. This is a local runtime repair item, not a reason to
-  hard-code a personal Node path into a catalogue artifact.
+
+The first MCP smoke also exposed that `${CLAUDE_PLUGIN_ROOT}` is not expanded after Aumos merges a
+package-owned `.mcp.json` into its strict run config. The shipped config now uses
+`${AUMOS_MANAGER_PACKAGE}`, which the Aumos isolation grant exports to every manager run. No personal
+or absolute package path is embedded in the artifact.
 
 ## Release-gating checks that are not complete
 

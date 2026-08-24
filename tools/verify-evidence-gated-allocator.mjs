@@ -289,7 +289,7 @@ assert.deepEqual(
 assert.deepEqual(configSchema.properties.reserveLiquiditySymbols.default, [], 'reserve liquidity is opt-in')
 assert.equal(
   mcpConfig.mcpServers['evidence-gated-metrics'].args[0],
-  '${CLAUDE_PLUGIN_ROOT}/bin/evidence-gated-metrics-mcp',
+  '${AUMOS_MANAGER_PACKAGE}/bin/evidence-gated-metrics-mcp',
   'runtime calculations use the shipped MCP wrapper',
 )
 

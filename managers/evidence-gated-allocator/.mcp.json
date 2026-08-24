@@ -2,7 +2,7 @@
   "mcpServers": {
     "evidence-gated-metrics": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/evidence-gated-metrics-mcp"]
+      "args": ["${AUMOS_MANAGER_PACKAGE}/bin/evidence-gated-metrics-mcp"]
     }
   }
 }
