@@ -48,6 +48,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # `check:index` resolves each entry's pinned commit inside this clone,
+          # and a shallow one does not have the older ones. The alternative is a
+          # check that reports a pass it did not establish.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -59,6 +64,13 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run lint
       - run: npm run lint:sources
+
+      # The two documents an installed Aumos actually fetches. The two lints
+      # above judge the submitted directories; until this step nothing judged
+      # the indexes that *name* them, and a malformed entry there is dropped
+      # from every machine's catalogue in silence. `tools/check-index.mjs` says
+      # more, including why this is not the Aumos schema copied a third time.
+      - run: npm run check:index
 
       # The English and Korean documents are the same document twice, and a
       # section on one side and not the other is a rule a contributor is never
