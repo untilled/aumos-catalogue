@@ -18,9 +18,15 @@ document to stdout. Exit code `2` means the result contains a blocking diagnosti
 the canonical explanation.
 
 Supported operations are published in an `operation_unknown` diagnostic and include indicators,
-scan, relative strength, sleeve NAV, target sizing, concentration, coverage, WATCH validation,
-consensus/research validation, calibration/clusters/Brier/BH-FDR, attribution/TWR/MWR/MDD/turnover,
-point-in-time filtering, SEC/OpenDART parsing, adjustment validation and market/earnings scheduling.
+both candidate lenses, opportunity/sector/trend scanners, sleeve NAV and specialist/global budgets,
+target sizing/concentration, coverage, WATCH validation, consensus/research validation,
+calibration/clusters/Brier/BH-FDR/quintiles/bootstrap/promotion, attribution/TWR/MWR/MDD/turnover,
+fill-based net outcome and forward MFE/MAE, mechanical backtests, point-in-time SEC/OpenDART parsing,
+adjustment validation, and market/earnings/retry/dedupe/theme-radar scheduling.
+
+Bootstrap output uses the package-owned `mulberry32-v1` PRNG when `seed` is supplied. This is an
+explicit Node-port reproducibility rule: changing the PRNG is a methodology-version change, not a
+formatting refactor.
 
 Every output carries `spec`, `ruleVersion`, `operation`, `asOf`, status, structured data and
 diagnostics. Preserve `missing` and `unevaluated`; never coerce them to zero or false. Cite the

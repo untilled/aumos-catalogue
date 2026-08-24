@@ -94,6 +94,11 @@ stdin JSON 하나를 받아 stdout JSON 하나만 내며 filesystem ledger, cred
 order에 접근하지 않는다. `MIGRATION.md`에 legacy 실행 파일 65개/helper의 disposition을,
 `fixtures/legacy-golden`에 parity 사례를 기록한다.
 
+promotion gate의 cluster bootstrap/walk-forward/FDR, 실체결 비용 outcome과 MFE/MAE, 기계적
+trend/DCA/oversold backtest, specialist sleeve 제한, Global 단일 예산 분모, 일정 변경·late-fire·
+dedupe도 같은 실행 코드가 맡는다. 시장별 실패가 package 공통 happy path에 가려지지 않도록
+fixture는 `kr`, `us`, `global`로 나뉜다.
+
 ## Migration과 provenance
 
 개인 authored instance만 한 번 bootstrap할 수 있다. 자산 논지는 Thesis, 공통 결론은 Brief,
@@ -105,6 +110,8 @@ order에 접근하지 않는다. `MIGRATION.md`에 legacy 실행 파일 65개/he
 `data/*.jsonl`, SQLite, cache, backup, `_workspace`, 개인 thesis, 주문 코드, 과거 성과는 포함하지
 않으며 원본 기록을 Aumos Forward Track Record로 주장하지 않는다.
 
-OpenDART 부재, vendor 응답 shape 변화, CLI web의 비정본성, 설치된 runtime/credential이 필요한
+OpenDART는 API key를 query의 `crtfc_key`로만 받지만 현재 공개된 `SourceSpec/1` secret 주입은
+header만 지원한다. manager에게 key를 노출하지 않는 query-secret 주입이 Aumos에 생기기 전에는
+실행 가능한 source라고 주장하지 않는다. OpenDART 부재, vendor 응답 shape 변화, CLI web의 비정본성, 설치된 runtime/credential이 필요한
 실계좌 paper 검증은 현재 한계다. Private memory는 스스로 방법론을 바꾸거나 lens를 승격할 수
 없다.

@@ -8,6 +8,12 @@ const source = JSON.parse(await readFile(new URL('source-contract.json', fixture
 const golden = JSON.parse(await readFile(new URL('legacy-golden/core.json', fixtureRoot), 'utf8'))
 const scannerGolden = JSON.parse(await readFile(new URL('legacy-golden/scanner.json', fixtureRoot), 'utf8'))
 const topology = JSON.parse(await readFile(new URL('topology.json', fixtureRoot), 'utf8'))
+const promotion = JSON.parse(await readFile(new URL('legacy-golden/promotion.json', fixtureRoot), 'utf8'))
+const outcomes = JSON.parse(await readFile(new URL('legacy-golden/outcomes.json', fixtureRoot), 'utf8'))
+const backtest = JSON.parse(await readFile(new URL('legacy-golden/backtest.json', fixtureRoot), 'utf8'))
+const krSource = JSON.parse(await readFile(new URL('kr/source.json', fixtureRoot), 'utf8'))
+const usSchedule = JSON.parse(await readFile(new URL('us/schedule.json', fixtureRoot), 'utf8'))
+const globalIntegration = JSON.parse(await readFile(new URL('global/integration.json', fixtureRoot), 'utf8'))
 
 function assertSubset(actual, expected, path = 'data') {
   for (const [key, value] of Object.entries(expected)) {
@@ -132,5 +138,90 @@ assert.equal(
   topology.simultaneousCandidates.krBriefBudgetRemaining + topology.simultaneousCandidates.usBriefBudgetRemaining,
   'specialists cannot double-spend global cash beyond sleeve budgets',
 )
+
+const promotionRows = []
+const promotionStart = Date.parse('2026-01-01T00:00:00Z')
+for (let cluster = 0; cluster < promotion.generator.clusterCount; cluster += 1) {
+  for (let index = 0; index < promotion.generator.rowsPerCluster; index += 1) {
+    promotionRows.push({
+      cohort: 'promote',
+      signalDate: new Date(promotionStart + cluster * promotion.generator.clusterGapDays * 86_400_000).toISOString().slice(0, 10),
+      market: promotion.generator.markets[(cluster + index) % promotion.generator.markets.length],
+      regime: promotion.generator.regimes[(cluster + index) % promotion.generator.regimes.length],
+      ruleVersion: 'lens-v1',
+      forward: { d20: { returnPct: promotion.generator.returnsPct[index] } },
+    })
+  }
+}
+const promotionOutput = execute({ ...promotion.request, input: { ...promotion.request.input, rows: promotionRows } })
+assert.equal(promotionOutput.status, 'ok', 'promotion gate executes without prose or I/O')
+assert.equal(promotionOutput.data.totalMaturePromote, promotion.expected.totalMaturePromote)
+assert.equal(promotionOutput.data.versions[0].sampleCount, promotion.expected.sampleCount)
+assert.equal(promotionOutput.data.versions[0].independentClusterCount, promotion.expected.independentClusterCount)
+assert.equal(promotionOutput.data.versions[0].regimeCount, promotion.expected.regimeCount)
+assert.equal(promotionOutput.data.versions[0].gate.reviewReady, promotion.expected.reviewReady)
+assert.deepEqual(promotionOutput.data.costModelPct, promotion.expected.costModelPct)
+assert.ok(promotionOutput.data.versions[0].bootstrapClusterCiCostAdjusted, 'cluster bootstrap CI is present')
+
+for (const fixture of outcomes.cases) {
+  const output = execute(fixture.request)
+  if (fixture.expected.status) {
+    assert.equal(output.status, fixture.expected.status, fixture.name)
+    assert.deepEqual(output.data.missingCostFields, fixture.expected.missing, fixture.name)
+  } else assertSubset(output.data, fixture.expected, fixture.name)
+}
+
+const dartOutput = execute({ operation: 'normalizeDartFilings', asOf: krSource.asOf, input: krSource.dart })
+assert.deepEqual(dartOutput.data.rows.map((row) => row.receiptNumber), krSource.expected.retainedReceiptNumbers, 'future DART filing is excluded')
+assert.equal(dartOutput.data.rows.filter((row) => row.isPreliminaryEarnings).length, krSource.expected.preliminaryCount)
+assert.equal(dartOutput.data.rows.filter((row) => row.isPeriodicReport).length, krSource.expected.periodicCount)
+assert.equal(dartOutput.data.rows.filter((row) => row.isCorrection).length, krSource.expected.correctionCount)
+
+for (const fixture of usSchedule.cases) {
+  const output = execute({ operation: 'earningsCheckpoint', asOf: fixture.observation.capturedAt, input: { observation: fixture.observation, marketSession: fixture.session, config: fixture.config } })
+  assert.equal(output.data.at, fixture.expectedAt, fixture.name)
+}
+const holidayReview = execute({
+  operation: 'nextMarketReview',
+  asOf: '2026-12-24T22:00:00Z',
+  input: { sessions: [usSchedule.closedSession, usSchedule.nextOpenSession], bufferMinutes: 45 },
+})
+assert.equal(holidayReview.data.next.reviewAt, usSchedule.expectedNextReviewAt, 'closed session is skipped')
+
+for (const [name, fixture] of Object.entries(globalIntegration.wakes)) {
+  const output = execute({ operation: 'classifyScheduledWake', asOf: globalIntegration.asOf, input: { ...fixture, asOf: globalIntegration.asOf } })
+  if (name === 'duplicate') assert.equal(output.data.submitDecision, false, 'duplicate wake cannot submit')
+  else assert.equal(output.data.submitDecision, true, `${name} wake remains observable through one Decision`)
+}
+for (const fixture of Object.values(globalIntegration.themeRadar)) {
+  const output = execute({ operation: 'themeRadarDue', asOf: globalIntegration.asOf, input: fixture })
+  assert.equal(output.data.due, fixture.expectedDue)
+}
+const dedupe = execute({ operation: 'deduplicateObservations', asOf: globalIntegration.asOf, input: { rows: globalIntegration.dedupe } })
+assert.equal(dedupe.data.duplicateCount, 1, 'duplicate articles/filings are collapsed')
+assert.equal(dedupe.data.retained.length, 2, 'unique observations remain')
+
+const backtestRows = Array.from({ length: backtest.generator.count }, (_, index) => ({
+  date: new Date(Date.parse(backtest.generator.start) + index * 86_400_000).toISOString().slice(0, 10),
+  close: backtest.generator.baseClose * (1 + backtest.generator.dailyReturn) ** index,
+}))
+const gateBacktest = execute({ operation: 'trendGateForward', asOf: '2026-12-31T00:00:00Z', input: { series: backtestRows } })
+assert.equal(gateBacktest.data.classifiableDays, backtest.expected.classifiableDays)
+assert.equal(Object.keys(gateBacktest.data.stats).some((key) => key.endsWith(':d20')), backtest.expected.hasD20Bucket)
+const dcaBacktest = execute({ operation: 'dcaMultiplierBacktest', asOf: '2026-12-31T00:00:00Z', input: { series: backtestRows } })
+assert.equal(dcaBacktest.data.months > 0, backtest.expected.dcaHasMonths)
+const benchmarkRows = backtestRows.map((row, index) => ({ ...row, close: 100 * 1.0005 ** index }))
+const strata = execute({ operation: 'oversoldStrata', asOf: '2026-12-31T00:00:00Z', input: { assets: [{ market: 'us', bars: backtestRows }], benchmarks: { us: benchmarkRows } } })
+assert.equal(strata.data.symbolsUsed, backtest.expected.symbolsUsed)
+
+const krBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-kr', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.4 } })
+assert.equal(krBudget.status, 'blocked', 'specialist cannot spend beyond its Brief sleeve')
+const urgentExit = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-us', market: 'XNAS', currentSleeveWeight: 0.4, sleeveBudgetWeight: 0.4, requestedTargetWeight: 0.2, emergencyExit: true } })
+assert.equal(urgentExit.data.allowed, true, 'urgent exit does not wait for Global')
+const globalBudget = execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'kr-sleeve', weight: 0.4 }, { key: 'us-sleeve', weight: 0.5 }, { key: 'cash', weight: 0.1 }] } })
+assert.equal(globalBudget.status, 'ok')
+assert.equal(globalBudget.data.residualCashWeight, 0)
+const doubleSpend = execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'kr-sleeve', weight: 0.6 }, { key: 'us-sleeve', weight: 0.6 }] } })
+assert.equal(doubleSpend.status, 'blocked', 'one global denominator prevents cash double spend')
 
 console.log('evidence-gated-allocator contract fixtures passed')

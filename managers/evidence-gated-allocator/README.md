@@ -122,6 +122,12 @@ The executable has no filesystem-ledger, credential, network, database or order 
 `MIGRATION.md` for all 65 legacy executables/helpers and their disposition, and `fixtures/legacy-golden`
 for parity cases.
 
+The executable also owns promotion-gate cluster bootstrap/walk-forward/FDR, fill-cost outcome and
+forward MFE/MAE calculations, mechanical trend/DCA/oversold backtests, specialist sleeve enforcement,
+the single Global allocation denominator, and schedule drift/late-fire/dedupe diagnostics. Fixtures
+are split into `kr`, `us`, and `global` so market-specific failures cannot be hidden by a package-wide
+happy path.
+
 The compact examples in `sizing-and-concentration` cover WAIT, WATCH, BUY, SELL, RESIZE and
 REBALANCE. Wire keys and enum values remain English even when invocation `language` is Korean; only
 investor-facing prose is translated.
@@ -152,6 +158,9 @@ are not Aumos Forward Track Record. See `NOTICE.md` for attribution.
 
 - OpenDART absence ([#51](https://github.com/untilled/aumos-catalogue/issues/51)) blocks the Korean
   single-name fundamental entry/promotion lane.
+- OpenDART accepts its API key only as query parameter `crtfc_key`, while the currently published
+  `SourceSpec/1` secret injector supports headers. A source is not claimed executable until Aumos can
+  inject this query secret without exposing it to the manager.
 - Source vendors relay their own response shapes; this manager, not Aumos, checks dates and freshness.
 - CLI web observations are not replay-canonical Evidence.
 - Calibration cannot promote or rewrite a methodology without a reviewed package/config change.

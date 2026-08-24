@@ -1,13 +1,15 @@
 import { result, diagnostic } from './diagnostics.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
-import { scanSymbol, relativeStrength } from './scanners.mjs'
-import { sleeveNav, targetWeight, legacySizeSuggestion, concentration } from './sizing.mjs'
+import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength } from './scanners.mjs'
+import { sleeveNav, targetWeight, legacySizeSuggestion, concentration, specialistBudget, globalAllocation } from './sizing.mjs'
 import { coverageState, validateWatch } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice } from './evidence.mjs'
-import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochberg } from './calibration.mjs'
+import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
 import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
-import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, validateAdjustment } from './source-parsers.mjs'
-import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry } from './schedule.mjs'
+import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
+import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
+import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
+import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence } from './schedule.mjs'
 
 const operations = {
   indicators(input, asOf) {
@@ -20,10 +22,16 @@ const operations = {
     return { data: scanned.candidate, diagnostics: [...normalized.diagnostics, ...scanned.diagnostics] }
   },
   relativeStrength(input) { return { data: relativeStrength(input?.assetBars ?? [], input?.benchmarkBars ?? [], input?.periods), diagnostics: [] } },
+  opportunityMetrics,
+  opportunityUniverse,
+  trendState,
+  blendedSectorStrength: (input) => blendedSectorStrength(input?.assetBars ?? [], input?.benchmarkBars ?? [], input?.weights),
   sleeveNav,
   targetWeight,
   legacySizeSuggestion,
   concentration,
+  specialistBudget,
+  globalAllocation,
   coverage: coverageState,
   validateWatch: (input, asOf) => validateWatch(input?.watch, input?.current, asOf),
   validateConsensus: (input, asOf) => validateConsensus(input, asOf),
@@ -33,18 +41,37 @@ const operations = {
   clusters: (input) => ({ data: { clusters: independentDateClusters(input?.dates, input?.gapDays) }, diagnostics: [] }),
   brier: (input) => ({ data: { score: brierScore(input?.probabilities, input?.outcomeIndex) }, diagnostics: [] }),
   bhFdr: (input) => ({ data: { rows: benjaminiHochberg(input?.rows ?? [], input?.alpha) }, diagnostics: [] }),
+  quintileSpread: (input) => ({ data: { summary: quintileSpread(input?.values) }, diagnostics: [] }),
+  bootstrapClusterCi: (input) => ({ data: { interval: bootstrapClusterCi(input?.clusterValues, input?.options) }, diagnostics: [] }),
+  promotionGate,
   attribution: decomposition,
   twr: (input) => ({ data: { return: timeWeightedReturn(input?.dailyValues, input?.flows) }, diagnostics: [] }),
   mwr: (input) => ({ data: { return: moneyWeightedReturn(input?.datedCashflows, input?.endingValue, input?.endingDate, input?.options) }, diagnostics: [] }),
   portfolioMetrics,
+  netReturnBreakdown,
+  outcomeClassification,
+  forwardOutcome,
+  earningsActual,
+  trendGateForward,
+  dcaMultiplierBacktest,
+  oversoldStrata,
   filterPointInTime: (input, asOf) => filterPointInTime(input?.rows, { ...input, asOf }),
   normalizeSecFacts: (input, asOf) => normalizeSecFacts(input, asOf),
   normalizeDartFilings: (input, asOf) => normalizeDartFilings(input, asOf),
+  parseDartCorpCodes: (input) => parseDartCorpCodes(input?.xml),
+  normalizeDartFinancials: (input, asOf) => normalizeDartFinancials(input, asOf),
+  normalizeSecSubmissions: (input, asOf) => normalizeSecSubmissions(input, asOf),
+  laneCoverage,
   validateAdjustment,
   zonedDateTimeToUtc: (input) => ({ data: { instant: zonedDateTimeToUtc(input?.date, input?.time, input?.timeZone) }, diagnostics: [] }),
   nextMarketReview: (input, asOf) => nextMarketReview({ ...input, asOf }),
-  earningsCheckpoint,
+  earningsCheckpoint: (input) => earningsCheckpoint(input?.observation, input?.marketSession, input?.config),
   boundedRetry: (input, asOf) => boundedRetry({ ...input, asOf }, input?.config),
+  classifyScheduledWake,
+  scheduleDrift: (input, asOf) => scheduleDrift({ ...input, asOf }),
+  deduplicateObservations,
+  themeRadarDue: (input, asOf) => themeRadarDue({ ...input, asOf }),
+  nextReviewSequence: (input, asOf) => nextReviewSequence({ ...input, asOf }),
 }
 
 export function execute(request) {

@@ -97,3 +97,97 @@ export function boundedRetry({ checkpointAt, asOf, attempt = 0, announcedReplace
   const anchor = Math.max(Date.parse(checkpointAt), Date.parse(asOf))
   return { data: { at: new Date(anchor + retryMinutes * 60_000).toISOString(), reason: 'release-not-yet-published', attempt: attempt + 1 }, diagnostics }
 }
+
+export function classifyScheduledWake({ watchId, scheduledAt, asOf, consumedWatchIds = [], sourceStatus = 'available', releaseFound = false }, { lateToleranceMinutes = 5 } = {}) {
+  const diagnostics = []
+  if (!watchId || !Number.isFinite(Date.parse(scheduledAt)) || !Number.isFinite(Date.parse(asOf))) {
+    diagnostics.push(diagnostic('scheduled_wake_invalid', 'blocked', 'watchId, scheduledAt and asOf are required', 'input'))
+    return { data: null, diagnostics }
+  }
+  if (consumedWatchIds.includes(watchId)) {
+    diagnostics.push(diagnostic('scheduled_wake_duplicate', 'blocked', 'A consumed WATCH cannot create a duplicate Decision', 'watchId'))
+    return { data: { disposition: 'deduplicated', submitDecision: false }, diagnostics }
+  }
+  const delayMinutes = (Date.parse(asOf) - Date.parse(scheduledAt)) / 60_000
+  if (delayMinutes < 0) {
+    diagnostics.push(diagnostic('scheduled_wake_early', 'blocked', 'An at-time WATCH is not due yet', 'asOf', { delayMinutes }))
+    return { data: { disposition: 'not-due', submitDecision: false, delayMinutes }, diagnostics }
+  }
+  if (delayMinutes > lateToleranceMinutes) diagnostics.push(diagnostic('scheduled_wake_late_fire', 'info', 'Wake fired after its scheduled instant', 'asOf', { delayMinutes }))
+  if (sourceStatus !== 'available') diagnostics.push(diagnostic('release_source_unavailable', 'unevaluated', 'Source outage is distinct from an unpublished release', 'sourceStatus', { sourceStatus }))
+  return {
+    data: {
+      disposition: sourceStatus !== 'available' ? 'source-degraded' : releaseFound ? 'actual-found' : 'release-missing',
+      submitDecision: true,
+      delayMinutes,
+      lateFire: delayMinutes > lateToleranceMinutes,
+      requiresRetry: sourceStatus === 'available' && !releaseFound,
+    },
+    diagnostics,
+  }
+}
+
+export function scheduleDrift({ previous = {}, current = {}, asOf }) {
+  const diagnostics = []
+  for (const [name, observation] of [['previous', previous], ['current', current]]) {
+    if (!observation.at || !observation.sourceUrl || !observation.capturedAt) diagnostics.push(diagnostic('schedule_observation_incomplete', 'blocked', `${name} schedule needs at, sourceUrl and capturedAt`, name))
+    if (observation.capturedAt && Date.parse(observation.capturedAt) > Date.parse(asOf)) diagnostics.push(diagnostic('schedule_observation_future', 'blocked', `${name} schedule was captured after asOf`, `${name}.capturedAt`))
+  }
+  const changed = Number.isFinite(Date.parse(previous.at)) && Number.isFinite(Date.parse(current.at)) && previous.at !== current.at
+  return {
+    data: {
+      changed,
+      staleWatchAt: changed ? previous.at : null,
+      replacementWatchAt: changed ? current.at : null,
+      preserveBothEvidence: changed,
+      staleWakeDisposition: changed ? 'verify-stale-then-rearm-without-trade' : 'not-stale',
+    },
+    diagnostics,
+  }
+}
+
+export function deduplicateObservations({ rows = [] }) {
+  const diagnostics = []
+  const seen = new Set()
+  const retained = []
+  const duplicates = []
+  for (const [index, row] of rows.entries()) {
+    const key = row?.vendorId ?? row?.accession ?? row?.receiptNumber ?? (row?.sourceUrl && row?.publishedAt ? `${row.sourceUrl}|${row.publishedAt}` : null)
+    if (!key) {
+      diagnostics.push(diagnostic('observation_dedupe_key_missing', 'unevaluated', 'Observation needs a stable vendor id, accession, receipt number or URL+publishedAt', `rows[${index}]`))
+      continue
+    }
+    if (seen.has(key)) duplicates.push(row)
+    else { seen.add(key); retained.push(row) }
+  }
+  return { data: { retained, duplicateCount: duplicates.length, duplicateKeys: duplicates.map((row) => row.vendorId ?? row.accession ?? row.receiptNumber ?? `${row.sourceUrl}|${row.publishedAt}`) }, diagnostics }
+}
+
+export function themeRadarDue({ lastRunAt = null, asOf, intervalDays = 3, dislocation = false }) {
+  const diagnostics = []
+  if (dislocation) return { data: { due: true, reason: 'dislocation-override', ageDays: lastRunAt ? (Date.parse(asOf) - Date.parse(lastRunAt)) / 86_400_000 : null }, diagnostics }
+  if (!lastRunAt) return { data: { due: true, reason: 'never-run', ageDays: null }, diagnostics }
+  if (!Number.isFinite(Date.parse(lastRunAt)) || Date.parse(lastRunAt) > Date.parse(asOf)) {
+    diagnostics.push(diagnostic('theme_radar_memory_invalid', 'unevaluated', 'Future or malformed last-run memory is ignored', 'lastRunAt'))
+    return { data: { due: true, reason: 'invalid-memory-ignored', ageDays: null }, diagnostics }
+  }
+  const ageDays = (Date.parse(asOf) - Date.parse(lastRunAt)) / 86_400_000
+  return { data: { due: ageDays >= intervalDays, reason: ageDays >= intervalDays ? 'interval-elapsed' : 'not-due', ageDays }, diagnostics }
+}
+
+export function nextReviewSequence({ krSessions = [], usSessions = [], globalReview = {}, asOf, buffers = {} }) {
+  const diagnostics = []
+  const kr = nextMarketReview({ sessions: krSessions, asOf, bufferMinutes: buffers.kr ?? 30 })
+  const us = nextMarketReview({ sessions: usSessions, asOf, bufferMinutes: buffers.us ?? 45 })
+  diagnostics.push(...kr.diagnostics, ...us.diagnostics)
+  const globalAt = globalReview.date && globalReview.time && globalReview.timeZone
+    ? zonedDateTimeToUtc(globalReview.date, globalReview.time, globalReview.timeZone)
+    : null
+  if (!globalAt || Date.parse(globalAt) <= Date.parse(asOf)) diagnostics.push(diagnostic('global_review_invalid', 'unevaluated', 'Future Global review date/time/timezone is required', 'globalReview'))
+  const sequence = [
+    kr.data.next && { owner: 'evidence-gated-kr', task: 'PORTFOLIO_REVIEW', at: kr.data.next.reviewAt, session: kr.data.next },
+    us.data.next && { owner: 'evidence-gated-us', task: 'PORTFOLIO_REVIEW', at: us.data.next.reviewAt, session: us.data.next },
+    globalAt && Date.parse(globalAt) > Date.parse(asOf) && { owner: 'evidence-gated-global', task: 'PORTFOLIO_REVIEW', at: globalAt },
+  ].filter(Boolean).sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+  return { data: { sequence }, diagnostics }
+}

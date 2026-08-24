@@ -1,0 +1,29 @@
+{
+  "spec": "EvidenceGatedUsScheduleFixture/1",
+  "cases": [
+    {
+      "name": "exact-dst",
+      "observation": { "asset": "SYNTH", "fiscalPeriod": "2026Q1", "announcedDate": "2026-03-09", "announcedTime": "16:05", "sourceTimeZone": "America/New_York", "sourceUrl": "https://ir.example.test/event", "capturedAt": "2026-03-01T00:00:00Z", "confidence": "official" },
+      "session": { "date": "2026-03-09", "openLocal": "09:30", "closeLocal": "16:00", "timeZone": "America/New_York", "isOpen": true },
+      "config": { "releaseBufferMinutes": 30 },
+      "expectedAt": "2026-03-09T20:35:00.000Z"
+    },
+    {
+      "name": "bmo-standard-time",
+      "observation": { "asset": "SYNTH", "fiscalPeriod": "2026Q4", "announcedDate": "2026-01-15", "timing": "BMO", "sourceTimeZone": "America/New_York", "sourceUrl": "https://ir.example.test/event", "capturedAt": "2026-01-01T00:00:00Z", "confidence": "official" },
+      "session": { "date": "2026-01-15", "openLocal": "09:30", "closeLocal": "16:00", "timeZone": "America/New_York", "isOpen": true },
+      "config": { "bmoMinutesBeforeOpen": 30, "releaseBufferMinutes": 30 },
+      "expectedAt": "2026-01-15T14:30:00.000Z"
+    },
+    {
+      "name": "amc-early-close",
+      "observation": { "asset": "SYNTH", "fiscalPeriod": "2026Q2", "announcedDate": "2026-11-27", "timing": "AMC", "sourceTimeZone": "America/New_York", "sourceUrl": "https://ir.example.test/event", "capturedAt": "2026-11-01T00:00:00Z", "confidence": "official" },
+      "session": { "date": "2026-11-27", "openLocal": "09:30", "closeLocal": "13:00", "timeZone": "America/New_York", "isOpen": true, "earlyClose": true },
+      "config": { "releaseBufferMinutes": 30 },
+      "expectedAt": "2026-11-27T18:30:00.000Z"
+    }
+  ],
+  "closedSession": { "date": "2026-12-25", "openLocal": "09:30", "closeLocal": "16:00", "timeZone": "America/New_York", "isOpen": false },
+  "nextOpenSession": { "date": "2026-12-28", "openLocal": "09:30", "closeLocal": "16:00", "timeZone": "America/New_York", "isOpen": true },
+  "expectedNextReviewAt": "2026-12-28T21:45:00.000Z"
+}

@@ -149,3 +149,31 @@ export function concentration({ positions = [], proposed = [], caps = {} }) {
   if (breaches.length) diagnostics.push(diagnostic('concentration_breach', 'blocked', 'Proposed portfolio breaches concentration', 'proposed', { breaches }))
   return { data: { breaches, exposures: Object.fromEntries(Object.entries(totals).map(([kind, map]) => [kind, Object.fromEntries(map)])) }, diagnostics }
 }
+
+export function specialistBudget({ managerId, market, currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight, emergencyExit = false }) {
+  const diagnostics = []
+  const owners = { 'evidence-gated-kr': ['XKRX'], 'evidence-gated-us': ['XNAS', 'XNYS'] }
+  if (!owners[managerId]?.includes(market)) diagnostics.push(diagnostic('specialist_market_not_owned', 'blocked', 'Specialist cannot allocate outside its market lane', 'market', { managerId, market }))
+  if (![currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight].every(finite)) diagnostics.push(diagnostic('sleeve_budget_missing', 'unevaluated', 'Current sleeve, Brief budget and requested target are required', 'input'))
+  if ([currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight].filter(finite).some((value) => value < 0)) diagnostics.push(diagnostic('sleeve_weight_negative', 'blocked', 'Sleeve weights cannot be negative', 'input'))
+  const increase = finite(requestedTargetWeight) && finite(currentSleeveWeight) ? requestedTargetWeight - currentSleeveWeight : null
+  if (!emergencyExit && finite(requestedTargetWeight) && finite(sleeveBudgetWeight) && requestedTargetWeight > sleeveBudgetWeight) diagnostics.push(diagnostic('specialist_sleeve_budget_exceeded', 'blocked', 'Specialist must ask Global for cross-market budget', 'requestedTargetWeight', { sleeveBudgetWeight }))
+  if (emergencyExit && finite(increase) && increase > 0) diagnostics.push(diagnostic('emergency_exit_cannot_increase', 'blocked', 'Emergency invalidation bypass only permits SELL/RESIZE down', 'requestedTargetWeight'))
+  return { data: { managerId, market, allowed: !diagnostics.some((row) => row.severity === 'blocked'), increaseWeight: round(increase), withinBriefBudget: finite(requestedTargetWeight) && finite(sleeveBudgetWeight) ? requestedTargetWeight <= sleeveBudgetWeight : null, emergencyExit }, diagnostics }
+}
+
+export function globalAllocation({ targets = [], availableWeight = 1, currentWeights = {} }) {
+  const diagnostics = []
+  if (!finite(availableWeight) || availableWeight < 0 || availableWeight > 1) diagnostics.push(diagnostic('global_available_weight_invalid', 'blocked', 'availableWeight must be in [0,1]', 'availableWeight'))
+  const keys = new Set()
+  let allocated = 0
+  for (const [index, target] of targets.entries()) {
+    if (!target?.key || keys.has(target.key)) diagnostics.push(diagnostic('global_target_duplicate', 'blocked', 'Each sleeve/cash target must be unique', `targets[${index}].key`))
+    else keys.add(target.key)
+    if (!finite(target?.weight) || target.weight < 0) diagnostics.push(diagnostic('global_target_invalid', 'blocked', 'Target weight must be non-negative', `targets[${index}].weight`))
+    else allocated += target.weight
+  }
+  if (allocated > availableWeight + 1e-9) diagnostics.push(diagnostic('global_cash_double_spend', 'blocked', 'Combined targets exceed the one global budget denominator', 'targets', { allocated, availableWeight }))
+  const deltas = Object.fromEntries(targets.map((target) => [target.key, finite(target.weight) ? round(target.weight - (currentWeights[target.key] ?? 0)) : null]))
+  return { data: { targets, allocatedWeight: round(allocated), residualCashWeight: finite(availableWeight) ? round(availableWeight - allocated) : null, deltas, owner: 'evidence-gated-global', proposalAction: 'REBALANCE' }, diagnostics }
+}
