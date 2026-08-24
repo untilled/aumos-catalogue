@@ -57,7 +57,7 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
-        "path": "agents/atlas-trend-us",
+        "path": "managers/atlas-trend-us",
         "ref": "main",
         "sha": "2df84c8a6169479277b5ac8ba3be6cd3a359923e"
       },
