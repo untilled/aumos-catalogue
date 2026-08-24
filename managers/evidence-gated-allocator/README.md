@@ -25,6 +25,12 @@ Each is a separate manager instance with separate private memory. They collabora
 Thesis, Brief and WATCH. Specialists cannot borrow the other market's budget; they raise a shared
 Brief/WATCH agenda for Global. Urgent thesis invalidation exits do not wait for the next Global run.
 
+Each installation must set `config.managerId` to exactly one id in the table. AMP/1 exposes the
+installation's `managerInstanceId`, not a contributed manager id, so the package never guesses its
+role from a label, task or holdings. A missing/invalid selection yields a source-free `WAIT`.
+`reserveLiquiditySymbols` defaults to empty; SGOV counts as reserve liquidity only when the investor
+lists it there or the current shared Brief explicitly classifies it that way.
+
 ## What makes it different
 
 A scanner score is discovery, not edge. Mean reversion and trend pullback are evaluated as different
@@ -118,11 +124,13 @@ connections. The package stays unpublished while any release gate remains open.
 - `sizing-and-concentration`: target weights, caps and WATCH hygiene;
 - `outcome-calibration`: forward outcome metrics and failure taxonomy;
 - `memory-contract`: keys, revisions, isolation and migration.
-- `deterministic-metrics`: the versioned stdin-JSON/stdout-JSON calculation executable.
+- `deterministic-metrics`: the versioned deterministic calculation interface.
 
 Scanner, sizing, coverage, evidence admission, calibration, attribution, point-in-time parsing and
-scheduling calculations run through `bin/evidence-gated-metrics`; they do not depend on LLM prose.
-The executable has no filesystem-ledger, credential, network, database or order access. See
+scheduling calculations run through the package's `evidence-gated-metrics` MCP server; they do not
+depend on LLM prose or an interactive Bash approval. `bin/evidence-gated-metrics` exposes the same
+core as stdin-JSON/stdout-JSON for operators and CI. Neither interface has filesystem-ledger,
+credential, network, database or order access. See
 `MIGRATION.md` for all 65 legacy executables/helpers and their disposition, and `fixtures/legacy-golden`
 for parity cases.
 

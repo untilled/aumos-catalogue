@@ -4,7 +4,20 @@
   "description": "Safety-bounded operating thresholds. Configuration may make the manager stricter, but cannot waive missing evidence, freshness, mandate or thesis-challenge gates.",
   "type": "object",
   "additionalProperties": false,
+  "required": ["managerId"],
   "properties": {
+    "managerId": {
+      "type": "string",
+      "enum": ["evidence-gated-kr", "evidence-gated-us", "evidence-gated-global"],
+      "description": "Selects this installed instance's ownership boundary. AMP/1 exposes managerInstanceId, not the contributed manager id, so this value must never be inferred from the instance label or portfolio contents."
+    },
+    "reserveLiquiditySymbols": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Z0-9.-]{1,20}$" },
+      "uniqueItems": true,
+      "default": [],
+      "description": "Assets explicitly classified by the investor as reserve liquidity for the selected sleeve. SGOV is not reserve liquidity unless listed here or in the current shared Brief."
+    },
     "minimumExpectedActiveReturn": {
       "type": "number",
       "minimum": 0.02,

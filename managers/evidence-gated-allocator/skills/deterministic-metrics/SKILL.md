@@ -5,17 +5,20 @@ description: Run versioned scanner, sizing, coverage, evidence, calibration, att
 
 # Deterministic metrics
 
-Use the package executable whenever a supported quantitative result affects a Decision. Do not
-recalculate the same algorithm in prose.
+In an Aumos run, call `mcp__evidence-gated-metrics__calculate` whenever a supported quantitative
+result affects a Decision. It exposes the same deterministic core without interactive Bash approval.
+Do not recalculate the same algorithm in prose.
+
+The executable below is the equivalent operator/CI interface, not the in-run interface.
 
 ```sh
 printf '%s' "$INPUT_JSON" | node "${CLAUDE_PLUGIN_ROOT}/bin/evidence-gated-metrics"
 ```
 
-The input is one JSON object with `operation`, invocation `asOf`, and `input`. The executable reads no
-file, environment credential, network, database or package-external path. It writes exactly one JSON
-document to stdout. Exit code `2` means the result contains a blocking diagnostic; the JSON remains
-the canonical explanation.
+Both interfaces accept one object with `operation`, invocation `asOf`, and `input`. Neither reads a
+file, environment credential, network, database or package-external path. The executable writes
+exactly one JSON document to stdout. Exit code `2` means the result contains a blocking diagnostic;
+the JSON remains the canonical explanation.
 
 Supported operations are published in an `operation_unknown` diagnostic and include indicators,
 both candidate lenses, opportunity/sector/trend scanners, sleeve NAV and specialist/global budgets,

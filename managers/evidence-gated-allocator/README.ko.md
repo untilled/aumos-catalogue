@@ -23,6 +23,12 @@ broker connector와 Aumos Kernel/Planner의 책임이고 이 패키지에는 주
 다른 시장 예산을 임의로 쓰지 않고 Global 안건을 Brief/WATCH로 남긴다. 긴급 thesis invalidation
 exit은 다음 Global 실행까지 미루지 않는다.
 
+각 설치 instance는 `config.managerId`를 위 세 id 중 하나로 반드시 지정한다. AMP/1의
+`managerInstanceId`는 설치 id일 뿐 contributed manager id가 아니므로 label, task, 보유 종목으로
+역할을 추측하지 않는다. 값이 없거나 잘못되면 source를 호출하지 않고 `WAIT`한다.
+`reserveLiquiditySymbols` 기본값은 빈 배열이며 SGOV도 투자자 config 또는 현재 shared Brief가
+명시한 경우에만 reserve liquidity로 계산한다.
+
 ## 상태의 정본
 
 | 내용 | 정본 |
@@ -93,9 +99,10 @@ node tools/verify-evidence-gated-allocator.mjs
 release gate가 남아 있는 동안 package는 publish하지 않는다.
 
 Scanner, sizing, coverage, evidence admission, calibration, attribution, point-in-time parsing과
-scheduling 계산은 LLM 산문이 아니라 `bin/evidence-gated-metrics`가 수행한다. 실행 파일은
-stdin JSON 하나를 받아 stdout JSON 하나만 내며 filesystem ledger, credential, network, DB,
-order에 접근하지 않는다. `MIGRATION.md`에 legacy 실행 파일 65개/helper의 disposition을,
+scheduling 계산은 LLM 산문이나 대화형 Bash 승인이 아니라 package의
+`evidence-gated-metrics` MCP server가 수행한다. `bin/evidence-gated-metrics`는 같은 코어를
+operator/CI용 stdin JSON → stdout JSON으로 제공한다. 두 인터페이스 모두 filesystem ledger,
+credential, network, DB, order에 접근하지 않는다. `MIGRATION.md`에 legacy 실행 파일 65개/helper의 disposition을,
 `fixtures/legacy-golden`에 parity 사례를 기록한다.
 
 promotion gate의 cluster bootstrap/walk-forward/FDR, 실체결 비용 outcome과 MFE/MAE, 기계적

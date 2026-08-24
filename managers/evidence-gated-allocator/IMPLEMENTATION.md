@@ -18,6 +18,8 @@ deterministic contract is complete.
 
 - [x] 65 Python entry points/helpers inventoried with disposition and owners
 - [x] Deterministic executable with no file/network/credential/database/order access
+- [x] Non-interactive stdio MCP wrapper over the same deterministic core
+- [x] Explicit per-instance `config.managerId`; no role inference from AMP instance ids
 - [x] Evidence gate, two lenses, research/challenge, thesis metadata/sentinel and WATCH hygiene
 - [x] Scanner, sizing, coverage, calibration, promotion, outcome, attribution and backtest core
 - [x] Memory value/replay/isolation contract and canonical-owner migration mapper

@@ -28,7 +28,11 @@ edge.
 
 ## Manager ownership
 
-Read the contributed manager id from the invocation and stay inside its ownership boundary.
+Read the contributed manager id from `invocation.config.managerId` and stay inside its ownership
+boundary. AMP/1's `managerInstanceId` identifies an installation, not one of this package's
+contributed managers; never infer the role from that id, the instance label, holdings or task. If
+`config.managerId` is absent or not one of the three ids below, submit `WAIT` with
+`manager_identity_missing` in `uncertainty` and do not request market sources.
 
 - `evidence-gated-kr` owns XKRX research and the Korean sleeve. It may BUY/SELL/RESIZE inside the
   current KR sleeve budget recorded in Brief. A thesis invalidation may trigger an urgent exit without
@@ -49,7 +53,8 @@ manager-to-manager message bus.
 
 ### 1. Establish scope and state
 
-Read manager id, `task`, `portfolio`, `mandate`, `events`, `asOf`, `language` and config from the invocation.
+Read manager id from config plus `task`, `portfolio`, `mandate`, `events`, `asOf`, `language` and the
+rest of config from the invocation.
 Use `portfolio_read`, `thesis_read`, `brief_read`, `evidence_read` and `manager_memory_read` when
 available. Private memory is isolated by package instance/model and time: never request or infer a
 revision written after `asOf`, and never copy another manager's Brief into private memory.
@@ -95,9 +100,11 @@ risk. Load `skills/thesis-challenge/SKILL.md` before any new single-name BUY or 
 
 ### 4. Size and schedule
 
-Load `skills/deterministic-metrics/SKILL.md` and run the package executable for every supported
-scanner, sizing, coverage, evidence, calibration, attribution, parser or scheduling calculation.
-Do not replace its structured output with free-form arithmetic. Then load
+Load `skills/deterministic-metrics/SKILL.md` and call the package MCP tool
+`mcp__evidence-gated-metrics__calculate` for every supported scanner, sizing, coverage, evidence,
+calibration, attribution, parser or scheduling calculation. The stdio executable
+`bin/evidence-gated-metrics` is the equivalent operator/CI interface; do not invoke it with Bash in
+an Aumos run. Do not replace either interface's structured output with free-form arithmetic. Then load
 `skills/sizing-and-concentration/SKILL.md`. Apply the Mandate first, then the stricter configured
 position/sector/theme thresholds. `targetWeight` is never negative. An `insufficient` or `observing`
 lens can only support a controlled experiment at or below `experimentalPositionCeiling`; it never

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated-allocator/lib/index.mjs'
+import { handleMcpRequest } from '../managers/evidence-gated-allocator/lib/mcp-server.mjs'
 
 const fixtureRoot = new URL('../managers/evidence-gated-allocator/fixtures/', import.meta.url)
 const memory = JSON.parse(await readFile(new URL('memory-contract.json', fixtureRoot), 'utf8'))
@@ -15,6 +16,8 @@ const methodology = JSON.parse(await readFile(new URL('legacy-golden/methodology
 const groupCoverage = JSON.parse(await readFile(new URL('legacy-golden/group-coverage.json', fixtureRoot), 'utf8'))
 const migrationText = await readFile(new URL('../MIGRATION.md', fixtureRoot), 'utf8')
 const manifest = JSON.parse(await readFile(new URL('../aumos.json', fixtureRoot), 'utf8'))
+const configSchema = JSON.parse(await readFile(new URL('../config.schema.json', fixtureRoot), 'utf8'))
+const mcpConfig = JSON.parse(await readFile(new URL('../.mcp.json', fixtureRoot), 'utf8'))
 const ampProposals = JSON.parse(await readFile(new URL('amp-decision-proposals.json', fixtureRoot), 'utf8'))
 const krSource = JSON.parse(await readFile(new URL('kr/source.json', fixtureRoot), 'utf8'))
 const usSchedule = JSON.parse(await readFile(new URL('us/schedule.json', fixtureRoot), 'utf8'))
@@ -275,7 +278,42 @@ const migrationGroups = new Set(migrationRows.map((line) => line.split('|').at(-
 assert.deepEqual([...migrationGroups].sort(), Object.keys(groupCoverage.groups).sort(), 'every migration fixture group is registered')
 for (const [group, checks] of Object.entries(groupCoverage.groups)) assert.ok(checks.length, `${group} has a concrete verification basis`)
 assert.equal(manifest.network.mode, 'deny', 'manager package cannot access the network directly')
+assert.equal(manifest.engines.aumos, '>=0.3.0', 'runtime requires the current invocation and package-MCP contracts')
 assert.equal(manifest.capabilities.some((row) => /order|broker|database/i.test(row.kind)), false, 'manager package declares no order/broker/database capability')
+assert.deepEqual(configSchema.required, ['managerId'], 'every installed instance must select one manager role')
+assert.deepEqual(
+  configSchema.properties.managerId.enum,
+  manifest.contributes.managers.map((row) => row.id),
+  'config manager ids match contributed managers in manifest order',
+)
+assert.deepEqual(configSchema.properties.reserveLiquiditySymbols.default, [], 'reserve liquidity is opt-in')
+assert.equal(
+  mcpConfig.mcpServers['evidence-gated-metrics'].args[0],
+  '${CLAUDE_PLUGIN_ROOT}/bin/evidence-gated-metrics-mcp',
+  'runtime calculations use the shipped MCP wrapper',
+)
+
+const mcpList = handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })
+assert.deepEqual(mcpList.result.tools.map((tool) => tool.name), ['calculate'])
+const mcpCalculation = handleMcpRequest({
+  jsonrpc: '2.0',
+  id: 2,
+  method: 'tools/call',
+  params: {
+    name: 'calculate',
+    arguments: {
+      operation: 'clusters',
+      asOf: methodology.asOf,
+      input: { dates: ['2026-01-01', '2026-01-10'] },
+    },
+  },
+})
+assert.equal(mcpCalculation.result.structuredContent.status, 'ok', 'MCP wrapper executes the core')
+assert.deepEqual(
+  JSON.parse(mcpCalculation.result.content[0].text),
+  mcpCalculation.result.structuredContent,
+  'MCP text and structured outputs are identical',
+)
 
 const completeCoverage = execute({ operation: 'coverage', asOf: methodology.asOf, input: { scannerUniverses: [['A', 'B'], ['A', 'B']], extensions: ['C'], holdings: ['A'], dispositions: [{ symbol: 'B' }, { symbol: 'C' }], asOf: methodology.asOf } })
 assert.equal(completeCoverage.data.complete, true)

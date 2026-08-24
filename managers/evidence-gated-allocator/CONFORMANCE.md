@@ -34,6 +34,38 @@ On 2026-08-25 all six proposal fixtures were also parsed directly by
 SELL uses the current `exit` target shape; the multi-asset REBALANCE is one Decision with three
 targets.
 
+## Runtime smoke evidence — 2026-08-25
+
+The current Aumos checkout was exercised with Claude Code 2.1.241 and Node 22.22.2.
+
+- The official `run-basic-investor` lifecycle completed in 76.8 seconds with `outcome: decided`,
+  `driver status: completed`, a sealed schema-valid `WAIT` and a valid Decision hash chain. The
+  invocation intentionally lacked `config.managerId`; the package correctly refused to infer a role,
+  called no market source and named `manager_identity_missing` as uncertainty.
+- A role-selected fixture invocation with `managerId: evidence-gated-us` read invocation, portfolio,
+  Brief and private memory, made three point-in-time source calls, wrote one shared Brief revision and
+  submitted one schema-valid `WATCH`. The temporary launcher timed out after submission because it
+  did not install the lifecycle's decision-completion hook; the Decision itself was present after
+  285 seconds and parsed successfully.
+- The stdio metrics MCP server passed initialize/list/call protocol checks directly. A real Claude
+  session then called `mcp__evidence-gated-metrics__calculate` once through an MCP config pinned to
+  the working Node 22 executable and received `status: ok` with two independent date clusters.
+
+These smokes establish non-interactive submission, role fail-closed behavior, role-selected source
+degradation, Brief writing and actual model-to-MCP calculation. They are not the consecutive
+Toss-connected KR/US/Global shadow evidence required for release.
+
+Two host/core defects were deliberately not counted as package failures:
+
+- The current `packages/manager-runtime/scripts/conformance.ts` does not write each canonical
+  invocation to `paths.invocationPath`, so its first `invocation_read` is refused as
+  `invocation-unavailable`. The package therefore cannot obtain a meaningful six-case report from
+  that script until the runner is updated to the current invocation-file contract.
+- This machine's default Homebrew `node` cannot start because one of its dynamic libraries is
+  missing. Package MCP configs use the portable `node` command; the server worked when the same
+  Claude session used the installed Node 22. This is a local runtime repair item, not a reason to
+  hard-code a personal Node path into a catalogue artifact.
+
 ## Release-gating checks that are not complete
 
 - Aumos does not yet have a secure SourceSpec query-secret injector for OpenDART's mandatory
