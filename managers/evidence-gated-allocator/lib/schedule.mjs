@@ -69,6 +69,7 @@ export function earningsCheckpoint(observation, marketSession, config = {}) {
   }
   if (!base) diagnostics.push(diagnostic('earnings_checkpoint_unevaluated', 'blocked', 'Cannot normalize checkpoint without valid time and market session timezone', 'announcedTime'))
   const at = base ? addMinutes(base, buffer) : null
+  if (at && config.asOf && Date.parse(at) <= Date.parse(config.asOf)) diagnostics.push(diagnostic('earnings_checkpoint_not_future', 'blocked', 'Earnings WATCH checkpoint must be later than invocation asOf', 'announcedDate', { at, asOf: config.asOf }))
   return {
     data: {
       at,
@@ -93,6 +94,10 @@ export function boundedRetry({ checkpointAt, asOf, attempt = 0, announcedReplace
   if (attempt >= maxRetries) {
     diagnostics.push(diagnostic('earnings_retry_exhausted', 'unevaluated', 'Bounded retry limit reached; move to next sourced checkpoint', 'attempt', { maxRetries }))
     return { data: { at: null, reason: 'retry-exhausted', attempt }, diagnostics }
+  }
+  if (!Number.isFinite(Date.parse(checkpointAt)) || !Number.isFinite(Date.parse(asOf))) {
+    diagnostics.push(diagnostic('earnings_retry_time_invalid', 'blocked', 'checkpointAt and asOf are required', 'checkpointAt'))
+    return { data: { at: null, reason: 'invalid-time', attempt }, diagnostics }
   }
   const anchor = Math.max(Date.parse(checkpointAt), Date.parse(asOf))
   return { data: { at: new Date(anchor + retryMinutes * 60_000).toISOString(), reason: 'release-not-yet-published', attempt: attempt + 1 }, diagnostics }

@@ -21,9 +21,28 @@
       "session": { "date": "2026-11-27", "openLocal": "09:30", "closeLocal": "13:00", "timeZone": "America/New_York", "isOpen": true, "earlyClose": true },
       "config": { "releaseBufferMinutes": 30 },
       "expectedAt": "2026-11-27T18:30:00.000Z"
+    },
+    {
+      "name": "date-only-unknown",
+      "observation": { "asset": "SYNTH", "fiscalPeriod": "2026Q3", "announcedDate": "2026-10-22", "sourceTimeZone": "America/New_York", "sourceUrl": "https://ir.example.test/event", "capturedAt": "2026-10-01T00:00:00Z", "confidence": "aggregator-cross-check-pending" },
+      "session": { "date": "2026-10-22", "openLocal": "09:30", "closeLocal": "16:00", "timeZone": "America/New_York", "isOpen": true },
+      "config": { "releaseBufferMinutes": 30 },
+      "expectedAt": "2026-10-22T20:30:00.000Z"
     }
   ],
   "closedSession": { "date": "2026-12-25", "openLocal": "09:30", "closeLocal": "16:00", "timeZone": "America/New_York", "isOpen": false },
   "nextOpenSession": { "date": "2026-12-28", "openLocal": "09:30", "closeLocal": "16:00", "timeZone": "America/New_York", "isOpen": true },
-  "expectedNextReviewAt": "2026-12-28T21:45:00.000Z"
+  "expectedNextReviewAt": "2026-12-28T21:45:00.000Z",
+  "secSubmissions": {
+    "filings": {
+      "recent": {
+        "accessionNumber": ["0000000000-26-000001", "0000000000-26-000002"],
+        "filingDate": ["2026-08-19", "2026-08-21"],
+        "acceptanceDateTime": ["20260819200500", "20260821120000"],
+        "form": ["8-K", "10-Q"],
+        "reportDate": ["2026-06-30", "2026-06-30"],
+        "primaryDocument": ["earnings.htm", "quarterly.htm"]
+      }
+    }
+  }
 }

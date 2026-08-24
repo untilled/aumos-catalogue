@@ -8,6 +8,7 @@ import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochb
 import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
+import { validateThesis, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence } from './schedule.mjs'
 
@@ -55,6 +56,12 @@ const operations = {
   trendGateForward,
   dcaMultiplierBacktest,
   oversoldStrata,
+  validateThesis,
+  thesisSentinel,
+  upsideRadar: (input, asOf) => upsideRadar({ ...input, asOf }),
+  validateMemory: (input, asOf) => validateMemory({ ...input, asOf }),
+  visibleMemoryRevision: (input, asOf) => visibleMemoryRevision({ ...input, asOf }),
+  migrationMap,
   filterPointInTime: (input, asOf) => filterPointInTime(input?.rows, { ...input, asOf }),
   normalizeSecFacts: (input, asOf) => normalizeSecFacts(input, asOf),
   normalizeDartFilings: (input, asOf) => normalizeDartFilings(input, asOf),
@@ -65,7 +72,7 @@ const operations = {
   validateAdjustment,
   zonedDateTimeToUtc: (input) => ({ data: { instant: zonedDateTimeToUtc(input?.date, input?.time, input?.timeZone) }, diagnostics: [] }),
   nextMarketReview: (input, asOf) => nextMarketReview({ ...input, asOf }),
-  earningsCheckpoint: (input) => earningsCheckpoint(input?.observation, input?.marketSession, input?.config),
+  earningsCheckpoint: (input, asOf) => earningsCheckpoint(input?.observation, input?.marketSession, { ...input?.config, asOf }),
   boundedRetry: (input, asOf) => boundedRetry({ ...input, asOf }, input?.config),
   classifyScheduledWake,
   scheduleDrift: (input, asOf) => scheduleDrift({ ...input, asOf }),

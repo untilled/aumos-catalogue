@@ -14,5 +14,13 @@
     "preliminaryCount": 2,
     "periodicCount": 0,
     "correctionCount": 1
+  },
+  "corpCodeXml": "<result><list><corp_code>00126380</corp_code><corp_name>합성전자</corp_name><stock_code>005930</stock_code><modify_date>20260801</modify_date></list></result>",
+  "financials": {
+    "status": "000",
+    "list": [
+      { "rcept_no": "20260730000123", "corp_code": "00126380", "bsns_year": "2026", "reprt_code": "11012", "fs_div": "CFS", "sj_div": "IS", "account_id": "ifrs-full_Revenue", "account_nm": "매출액", "thstrm_nm": "제 58 기 반기", "thstrm_amount": "123,456" },
+      { "rcept_no": "20260814000001", "corp_code": "00126380", "bsns_year": "2026", "reprt_code": "11012", "fs_div": "CFS", "sj_div": "IS", "account_id": "ifrs-full_ProfitLossFromOperatingActivities", "account_nm": "영업이익", "thstrm_nm": "제 58 기 반기", "thstrm_amount": "-" }
+    ]
   }
 }

@@ -124,7 +124,7 @@ export function earningsActual({ preview = {}, actual = {}, filing = {} }) {
     comparisons[metric] = {
       actual: finite(value) ? value : null,
       consensus: finite(expected) ? expected : null,
-      consensusSurprisePct: finite(value) && finite(expected) && expected !== 0 ? round((value / Math.abs(expected) - Math.sign(expected)) * 100, 3) : null,
+      consensusSurprisePct: finite(value) && finite(expected) && expected !== 0 ? round((value - expected) / Math.abs(expected) * 100, 3) : null,
       guidanceMid: finite(guidance?.low) && finite(guidance?.high) ? (guidance.low + guidance.high) / 2 : finite(guidance?.value) ? guidance.value : null,
     }
     const midpoint = comparisons[metric].guidanceMid

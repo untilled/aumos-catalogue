@@ -27,7 +27,7 @@ investment conclusion. Recalculate and explain the target that you actually endo
 ## Action mapping
 
 - `BUY`: one not-held or zero-weight asset passes every entry gate; include one `target`.
-- `SELL`: the thesis is invalidated and the desired weight is zero; include one `target`.
+- `SELL`: the thesis is invalidated; include one `target` of type `exit`.
 - `RESIZE`: the thesis remains but current weight is wrong; include one `target`, up or down.
 - `REBALANCE`: at least two target weights are needed to repair portfolio shape; use `targets`.
 - `WAIT`: evidence supports no current change, or required evidence makes the judgement unavailable.
@@ -51,7 +51,7 @@ precommitment to reconsider, not permission to trade.
 | Fresh evidence, intact thesis, correct 6% weight | `WAIT`, no target; explain positive no-change judgement |
 | Mean-reversion candidate still falling; three-day basing not yet observed | `WATCH` for basing with expiry; no target |
 | Cleared US thesis, promoted lens, 5% desired weight under all caps | `BUY` with single `target.targetWeight = 0.05` |
-| Thesis invalidation met in a held name | `SELL` with single target weight `0` and Thesis update |
+| Thesis invalidation met in a held name | `SELL` with one `exit` target and Thesis update |
 | Intact thesis but drifted from desired 7% to 12% | `RESIZE` with single target weight `0.07` |
 | Two correlated holdings breach theme cap and cash must rise | `REBALANCE` with multiple non-negative `targets` |
 

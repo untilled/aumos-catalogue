@@ -8,7 +8,7 @@ manager를 한 package에 담는다. `morethanmin/trading-harness`의 개인 데
 2. 이 판단 lens가 독립 forward evidence를 충분히 쌓아 그 크기를 정당화하는가?
 
 `PORTFOLIO_REVIEW`, `ASSET_REVIEW`, `THESIS_REVIEW`, `EVENT_REVIEW`를 지원하며 manager 실행마다
-정확히 하나의 AAP/1 `DecisionProposal`을 낸다. 주문 수량·유형·지정가·승인·체결은 Toss
+정확히 하나의 AMP/1 `DecisionProposal`을 낸다. 주문 수량·유형·지정가·승인·체결은 Toss
 broker connector와 Aumos Kernel/Planner의 책임이고 이 패키지에는 주문 코드가 없다.
 
 ## 세 manager topology
@@ -87,6 +87,10 @@ node tools/verify-evidence-gated-allocator.mjs
 
 이는 결정론적 contract model이다. 배포 전에는 설치된 Aumos와 Toss paper portfolio에서 2회
 연속 실행, 별도 instance 격리, broker-connected shadow run도 반복해야 한다.
+
+`IMPLEMENTATION.md`는 이슈 #50의 Phase 0–7 체크리스트를 추적하고 `CONFORMANCE.md`는 이
+저장소에서 재현 가능한 검증과 설치 runtime/사용자 연결이 필요한 release gate를 분리한다.
+release gate가 남아 있는 동안 package는 publish하지 않는다.
 
 Scanner, sizing, coverage, evidence admission, calibration, attribution, point-in-time parsing과
 scheduling 계산은 LLM 산문이 아니라 `bin/evidence-gated-metrics`가 수행한다. 실행 파일은

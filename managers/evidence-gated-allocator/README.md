@@ -9,7 +9,7 @@ state or execution stack. It asks two questions before changing a portfolio:
 2. Has this kind of judgement accumulated enough independent forward evidence to deserve its size?
 
 It handles `PORTFOLIO_REVIEW`, `ASSET_REVIEW`, `THESIS_REVIEW` and `EVENT_REVIEW`, and can propose a
-single-asset BUY/SELL/RESIZE or a multi-asset REBALANCE. It submits exactly one AAP/1
+single-asset BUY/SELL/RESIZE or a multi-asset REBALANCE. It submits exactly one AMP/1
 `DecisionProposal` per manager run. Toss broker integration, quantities, order type, limits, approval and
 execution remain entirely with Aumos Kernel and Planner; this package contains no order code.
 
@@ -102,6 +102,10 @@ empty-memory operation and malformed-memory degradation. It also checks future-r
 staleness, source conflict and adjusted/unadjusted mixing. The fixture is a deterministic contract
 model; a release candidate must additionally repeat the same cases in paper/shadow runs against its
 installed Aumos runtime and a Toss-connected paper portfolio.
+
+`IMPLEMENTATION.md` mirrors issue #50's Phase 0–7 checklist, and `CONFORMANCE.md` separates checks
+that run in this repository from release gates that require an installed runtime and investor-owned
+connections. The package stays unpublished while any release gate remains open.
 
 ## Skills and workflow
 
