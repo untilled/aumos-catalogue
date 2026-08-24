@@ -1,15 +1,27 @@
 # Evidence-Gated Allocator
 
-Evidence-Gated Allocator는 XKRX, XNAS, XNYS의 주식·ETF·현금을 다루는 long-only Aumos
-매니저다. `morethanmin/trading-harness`의 개인 데이터나 주문 스택이 아니라 방법론과 검증
+Evidence-Gated Allocator는 XKRX, XNAS, XNYS의 주식·ETF·현금을 다루는 세 long-only Aumos
+manager를 한 package에 담는다. `morethanmin/trading-harness`의 개인 데이터나 주문 스택이 아니라 방법론과 검증
 루프만 포팅한다. 포트폴리오를 바꾸기 전에 다음을 묻는다.
 
 1. 반증 가능한 thesis, 반대 evidence, benchmark 대안보다 나은 논리가 있는가?
 2. 이 판단 lens가 독립 forward evidence를 충분히 쌓아 그 크기를 정당화하는가?
 
-`PORTFOLIO_REVIEW`, `ASSET_REVIEW`, `THESIS_REVIEW`, `EVENT_REVIEW`를 지원하며 실행마다
+`PORTFOLIO_REVIEW`, `ASSET_REVIEW`, `THESIS_REVIEW`, `EVENT_REVIEW`를 지원하며 manager 실행마다
 정확히 하나의 AAP/1 `DecisionProposal`을 낸다. 주문 수량·유형·지정가·승인·체결은 Toss
 broker connector와 Aumos Kernel/Planner의 책임이고 이 패키지에는 주문 코드가 없다.
+
+## 세 manager topology
+
+| manager | 책임 |
+|---|---|
+| `evidence-gated-kr` | XKRX 조사와 Global Brief 한도 안의 KR sleeve BUY/SELL/RESIZE |
+| `evidence-gated-us` | XNAS/XNYS 조사와 정책상 SGOV 유동성을 포함한 US sleeve |
+| `evidence-gated-global` | KRW/USD sleeve, FX, 전체 현금·concentration과 cross-market REBALANCE |
+
+세 manager는 각자 private memory를 가지며 Evidence/Thesis/Brief/WATCH로 협업한다. Specialist는
+다른 시장 예산을 임의로 쓰지 않고 Global 안건을 Brief/WATCH로 남긴다. 긴급 thesis invalidation
+exit은 다음 Global 실행까지 미루지 않는다.
 
 ## 상태의 정본
 
@@ -75,6 +87,12 @@ node tools/verify-evidence-gated-allocator.mjs
 
 이는 결정론적 contract model이다. 배포 전에는 설치된 Aumos와 Toss paper portfolio에서 2회
 연속 실행, 별도 instance 격리, broker-connected shadow run도 반복해야 한다.
+
+Scanner, sizing, coverage, evidence admission, calibration, attribution, point-in-time parsing과
+scheduling 계산은 LLM 산문이 아니라 `bin/evidence-gated-metrics`가 수행한다. 실행 파일은
+stdin JSON 하나를 받아 stdout JSON 하나만 내며 filesystem ledger, credential, network, DB,
+order에 접근하지 않는다. `MIGRATION.md`에 legacy 실행 파일 65개/helper의 disposition을,
+`fixtures/legacy-golden`에 parity 사례를 기록한다.
 
 ## Migration과 provenance
 

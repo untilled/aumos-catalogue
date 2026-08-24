@@ -1,7 +1,8 @@
 # Evidence-Gated Allocator
 
-Evidence-Gated Allocator is a long-only Aumos manager for equities, ETFs and cash on XKRX, XNAS and
-XNYS. It ports the methodology and validation loop of `morethanmin/trading-harness`, not its personal
+Evidence-Gated Allocator is one package containing three long-only Aumos managers for equities, ETFs
+and cash on XKRX, XNAS and XNYS. It ports the methodology and validation loop of
+`morethanmin/trading-harness`, not its personal
 state or execution stack. It asks two questions before changing a portfolio:
 
 1. Is there a falsifiable thesis, opposing evidence and a better case than the benchmark alternative?
@@ -9,8 +10,20 @@ state or execution stack. It asks two questions before changing a portfolio:
 
 It handles `PORTFOLIO_REVIEW`, `ASSET_REVIEW`, `THESIS_REVIEW` and `EVENT_REVIEW`, and can propose a
 single-asset BUY/SELL/RESIZE or a multi-asset REBALANCE. It submits exactly one AAP/1
-`DecisionProposal` per run. Toss broker integration, quantities, order type, limits, approval and
+`DecisionProposal` per manager run. Toss broker integration, quantities, order type, limits, approval and
 execution remain entirely with Aumos Kernel and Planner; this package contains no order code.
+
+## Three-manager topology
+
+| manager | ownership |
+|---|---|
+| `evidence-gated-kr` | XKRX research and KR sleeve BUY/SELL/RESIZE inside the Global Brief budget |
+| `evidence-gated-us` | XNAS/XNYS research and US sleeve, including policy-designated SGOV liquidity |
+| `evidence-gated-global` | KRW/USD sleeve targets, FX, global cash/concentration and cross-market REBALANCE |
+
+Each is a separate manager instance with separate private memory. They collaborate through Evidence,
+Thesis, Brief and WATCH. Specialists cannot borrow the other market's budget; they raise a shared
+Brief/WATCH agenda for Global. Urgent thesis invalidation exits do not wait for the next Global run.
 
 ## What makes it different
 
@@ -101,6 +114,13 @@ installed Aumos runtime and a Toss-connected paper portfolio.
 - `sizing-and-concentration`: target weights, caps and WATCH hygiene;
 - `outcome-calibration`: forward outcome metrics and failure taxonomy;
 - `memory-contract`: keys, revisions, isolation and migration.
+- `deterministic-metrics`: the versioned stdin-JSON/stdout-JSON calculation executable.
+
+Scanner, sizing, coverage, evidence admission, calibration, attribution, point-in-time parsing and
+scheduling calculations run through `bin/evidence-gated-metrics`; they do not depend on LLM prose.
+The executable has no filesystem-ledger, credential, network, database or order access. See
+`MIGRATION.md` for all 65 legacy executables/helpers and their disposition, and `fixtures/legacy-golden`
+for parity cases.
 
 The compact examples in `sizing-and-concentration` cover WAIT, WATCH, BUY, SELL, RESIZE and
 REBALANCE. Wire keys and enum values remain English even when invocation `language` is Korean; only

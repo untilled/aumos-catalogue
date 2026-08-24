@@ -1,5 +1,5 @@
 {
   "name": "evidence-gated-allocator",
   "version": "0.1.0",
-  "description": "Evidence-gated portfolio allocation with persistent, instance-private calibration."
+  "description": "A three-manager KR/US/Global allocator with deterministic metrics and instance-private calibration."
 }

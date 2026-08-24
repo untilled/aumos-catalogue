@@ -1,9 +1,21 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { execute } from '../managers/evidence-gated-allocator/lib/index.mjs'
 
 const fixtureRoot = new URL('../managers/evidence-gated-allocator/fixtures/', import.meta.url)
 const memory = JSON.parse(await readFile(new URL('memory-contract.json', fixtureRoot), 'utf8'))
 const source = JSON.parse(await readFile(new URL('source-contract.json', fixtureRoot), 'utf8'))
+const golden = JSON.parse(await readFile(new URL('legacy-golden/core.json', fixtureRoot), 'utf8'))
+const scannerGolden = JSON.parse(await readFile(new URL('legacy-golden/scanner.json', fixtureRoot), 'utf8'))
+const topology = JSON.parse(await readFile(new URL('topology.json', fixtureRoot), 'utf8'))
+
+function assertSubset(actual, expected, path = 'data') {
+  for (const [key, value] of Object.entries(expected)) {
+    const next = `${path}.${key}`
+    if (value && typeof value === 'object' && !Array.isArray(value)) assertSubset(actual?.[key], value, next)
+    else assert.deepEqual(actual?.[key], value, next)
+  }
+}
 
 const visibleRevision = ({ instance, model, asOf }) =>
   memory.revisions
@@ -73,5 +85,52 @@ for (const row of source.degradationCases) {
   if (row.expectedJudgement === 'unable') assert.equal(row.expectedAction, 'WAIT')
   else assert.equal(row.expectedAction, 'CONTINUE')
 }
+
+for (const fixture of golden.cases) {
+  const output = execute(fixture.request)
+  assert.notEqual(output.status, 'blocked', `${fixture.name} is executable`)
+  assertSubset(output.data, fixture.expected, fixture.name)
+}
+
+const generator = scannerGolden.generator
+const start = Date.parse(generator.start)
+const bars = Array.from({ length: generator.count }, (_, index) => {
+  const close = index < generator.declineStartIndex
+    ? generator.baseClose
+    : generator.baseClose - (index - generator.declineStartIndex + 1) * generator.declinePerDay
+  return {
+    timestamp: new Date(start + index * 86_400_000).toISOString(),
+    open: close,
+    high: close + generator.highOffset,
+    low: close + generator.lowOffset,
+    close,
+    volume: generator.volume,
+  }
+})
+const scannerOutput = execute({
+  ...scannerGolden.request,
+  input: { ...scannerGolden.request.input, bars },
+})
+assert.equal(scannerOutput.status, 'ok', 'legacy scanner fixture executes')
+assert.deepEqual(scannerOutput.data.lenses, scannerGolden.expected.lenses)
+assert.equal(scannerOutput.data.indicators.close, scannerGolden.expected.close)
+assert.equal(scannerOutput.data.indicators.rsi14, scannerGolden.expected.rsi14)
+assert.equal(scannerOutput.data.indicators.offHigh200, scannerGolden.expected.offHigh200)
+assert.equal(scannerOutput.data.indicators.aboveLow200, scannerGolden.expected.aboveLow200)
+assert.equal(scannerOutput.data.indicators.ma200Distance, scannerGolden.expected.ma200Distance)
+assert.deepEqual(
+  Object.entries(scannerOutput.data.signals.meanReversion).filter(([, fired]) => fired).map(([name]) => name),
+  scannerGolden.expected.meanSignals,
+)
+
+assert.equal(topology.managers.length, 3, 'package has KR, US and Global managers')
+assert.equal(new Set(topology.managers.map((row) => row.privateMemoryScope)).size, 3, 'manager memory scopes are isolated')
+assert.deepEqual(topology.emptyMemoryDecisions.map((row) => row.valid), [true, true, true], 'all managers decide from empty memory')
+assert.equal(topology.managers.filter((row) => row.mayCrossMarketRebalance).length, 1, 'only Global may cross-market rebalance')
+assert.equal(
+  topology.simultaneousCandidates.specialistMaximumCombinedWeight,
+  topology.simultaneousCandidates.krBriefBudgetRemaining + topology.simultaneousCandidates.usBriefBudgetRemaining,
+  'specialists cannot double-spend global cash beyond sleeve budgets',
+)
 
 console.log('evidence-gated-allocator contract fixtures passed')

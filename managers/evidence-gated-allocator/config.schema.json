@@ -57,6 +57,50 @@
       "maximum": 0.05,
       "default": 0.01,
       "description": "Maximum target weight while a lens is insufficient or observing. The Mandate and concentration limits may impose a lower ceiling."
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "releaseBufferMinutes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 180,
+          "default": 30,
+          "description": "Delay after an exact release/checkpoint time before the at-time WATCH fires."
+        },
+        "bmoMinutesBeforeOpen": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 120,
+          "default": 30
+        },
+        "retryMinutes": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 60,
+          "default": 45
+        },
+        "maxRetries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4,
+          "default": 2
+        },
+        "krCloseBufferMinutes": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 180,
+          "default": 60
+        },
+        "usCloseBufferMinutes": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 240,
+          "default": 60
+        }
+      }
     }
   }
 }
