@@ -134,6 +134,62 @@
       }
     },
     {
+      "name": "evidence-gated-allocator",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/untilled/aumos-catalogue",
+        "path": "managers/evidence-gated-allocator",
+        "ref": "main",
+        "sha": "b1a7b18fc4c578e603ab16e7d24663beb82a2571"
+      },
+      "description": "A learning portfolio manager that separates mean reversion from trend pullbacks, requires falsifiable theses and independent evidence, and keeps calibration across runs without confusing private memory with portfolio records.",
+      "version": "0.1.0",
+      "metadata": {
+        "name": "Evidence-Gated Allocator",
+        "publisher": "aumos",
+        "methodology": "Asks whether a proposed allocation has a falsifiable thesis and whether its lens has earned enough independent evidence. Weak evidence produces a controlled experiment or a machine-trackable WATCH, never borrowed confidence.",
+        "assetClasses": [
+          "equity",
+          "etf",
+          "cash"
+        ],
+        "markets": [
+          "XKRX",
+          "XNAS",
+          "XNYS"
+        ],
+        "tasks": [
+          "PORTFOLIO_REVIEW",
+          "ASSET_REVIEW",
+          "THESIS_REVIEW",
+          "EVENT_REVIEW"
+        ],
+        "capabilities": [
+          "portfolio:read",
+          "thesis:read",
+          "evidence:read",
+          "brief:read",
+          "brief:write",
+          "manager-memory:read",
+          "manager-memory:write",
+          "source:passthrough"
+        ],
+        "requiresSkills": [
+          "source_request"
+        ],
+        "enginesAumos": ">=0.2.6",
+        "provenance": {
+          "sourceRepo": "https://github.com/morethanmin/trading-harness",
+          "commit": "7702b19a04678b833c90ba1f6323e74232795155",
+          "license": "MIT",
+          "licenseHolder": "Lee Sang Min"
+        },
+        "homepage": null,
+        "publishedAt": "2026-08-24T15:14:42.000Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJFdmlkZW5jZS1HYXRlZCBBbGxvY2F0b3IiPgogIDxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMzE1QzRBIi8+CiAgPHBhdGggZD0iTTE0IDE4aDM2djhIMTR6TTE5IDMwaDI2djhIMTl6TTI1IDQyaDE0djhIMjV6IiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuOTIiLz4KICA8Y2lyY2xlIGN4PSI0OCIgY3k9IjQ2IiByPSI3IiBmaWxsPSIjRTdCODRCIi8+CiAgPHBhdGggZD0ibTQ1IDQ2IDIgMiA0LTUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMxNUM0QSIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4K"
+      }
+    },
+    {
       "name": "prudent-allocator",
       "source": {
         "source": "git-subdir",
