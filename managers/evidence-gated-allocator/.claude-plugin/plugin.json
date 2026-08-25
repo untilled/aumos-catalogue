@@ -1,5 +1,0 @@
-{
-  "name": "evidence-gated-allocator",
-  "version": "0.1.0",
-  "description": "A three-manager KR/US/Global allocator with deterministic metrics and instance-private calibration."
-}

@@ -1,11 +1,26 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { execute } from '../managers/evidence-gated-allocator/lib/index.mjs'
-import { handleMcpRequest } from '../managers/evidence-gated-allocator/lib/mcp-server.mjs'
+import { execute } from '../managers/evidence-gated-global/lib/index.mjs'
+import { handleMcpRequest } from '../managers/evidence-gated-global/lib/mcp-server.mjs'
 import { loadParity, comparePort } from './legacy-parity.mjs'
 
-const fixtureRoot = new URL('../managers/evidence-gated-allocator/fixtures/', import.meta.url)
+/**
+ * ── One member, and `check:collection` is why that is enough (aumos #447) ───
+ *
+ * The methodology split into three packages — `evidence-gated-kr`,
+ * `evidence-gated-us`, `evidence-gated-global` — because one package is one
+ * manager and three market roles are three track records. The deterministic
+ * core is therefore shipped **three times**, and the failure that creates is a
+ * fix landing in one copy and not the others: three packages in one collection
+ * quietly computing different numbers.
+ *
+ * `check:collection` is the guard for exactly that — it compares the shared
+ * trees byte for byte — so this file runs the core **once**, against the member
+ * that owns the cross-market half. Running it three times over trees a sibling
+ * check has just proved identical would be three copies of one measurement.
+ */
+const fixtureRoot = new URL('../managers/evidence-gated-global/fixtures/', import.meta.url)
 const memory = JSON.parse(await readFile(new URL('memory-contract.json', fixtureRoot), 'utf8'))
 const source = JSON.parse(await readFile(new URL('source-contract.json', fixtureRoot), 'utf8'))
 const golden = JSON.parse(await readFile(new URL('legacy-golden/core.json', fixtureRoot), 'utf8'))
@@ -295,11 +310,39 @@ for (const [group, checks] of Object.entries(groupCoverage.groups)) assert.ok(ch
 assert.equal(manifest.network.mode, 'deny', 'manager package cannot access the network directly')
 assert.equal(manifest.engines.aumos, '>=0.3.0', 'runtime requires the current invocation and package-MCP contracts')
 assert.equal(manifest.capabilities.some((row) => /order|broker|database/i.test(row.kind)), false, 'manager package declares no order/broker/database capability')
-assert.deepEqual(configSchema.required, ['managerId'], 'every installed instance must select one manager role')
+/**
+ * ⚠️ **Two assertions stood here and the collection split retired them.**
+ * (aumos #447)
+ *
+ * They were `configSchema.required === ['managerId']` and *the selector's enum
+ * matches the contributed managers* — the shape where one package carried three
+ * managers and each installation chose its role in config. The owner reversed
+ * that reading (*"매니저가 여러 매니저를 가진다는 게 어색하다"*): **one package is
+ * one manager**, so there is no role to select and the enum has nothing to
+ * agree with.
+ *
+ * What replaces them is the property the split has to keep, stated so the
+ * selector cannot come back unnoticed: this package contributes exactly one
+ * manager, that manager is the package, and `config` has no way to say
+ * otherwise.
+ */
+assert.equal(manifest.contributes.managers.length, 1, 'one package is one manager')
+assert.equal(manifest.contributes.managers[0].id, manifest.id, 'the contributed manager is the package')
+assert.equal(configSchema.properties.managerId, undefined, 'no config field selects a role any more')
+assert.equal(
+  (configSchema.required ?? []).includes('managerId'),
+  false,
+  'nothing requires an instance to name a role',
+)
 assert.deepEqual(
-  configSchema.properties.managerId.enum,
-  manifest.contributes.managers.map((row) => row.id),
-  'config manager ids match contributed managers in manifest order',
+  manifest.collection,
+  {
+    id: 'evidence-gated',
+    name: 'Evidence-Gated Allocator',
+    description:
+      'One evidence-gated methodology, run as three market roles: a Korean sleeve, a US sleeve, and the Global allocator that sets their budgets and is the only one that may rebalance across markets.',
+  },
+  'the package says which collection it is one of, in the words every member uses',
 )
 assert.deepEqual(configSchema.properties.reserveLiquiditySymbols.default, [], 'reserve liquidity is opt-in')
 assert.equal(
@@ -506,4 +549,4 @@ for (const failure of parityFailures) console.error(`  FAIL ${failure}`)
 assert.equal(parityFailures.length, 0, 'the port still matches the frozen legacy numeric core')
 assert.ok(parity.cases.every((row) => row.legacyMeasured !== undefined), 'every parity case carries a measured legacy output')
 
-console.log(`evidence-gated-allocator contract fixtures passed (${parity.cases.length} legacy-parity cases)`)
+console.log(`evidence-gated collection contract fixtures passed (${parity.cases.length} legacy-parity cases)`)

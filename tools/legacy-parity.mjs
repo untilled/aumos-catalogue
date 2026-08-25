@@ -1,6 +1,8 @@
 /**
  * Field-by-field parity between the frozen Trading Harness numeric core and the
- * port in `managers/evidence-gated-allocator/lib/`. (issue #50, Phase 1C)
+ * port in each `managers/evidence-gated-<role>` package's `lib/`, read through the Global
+ * member —
+ * `verify-evidence-gated-allocator.mjs` argues why one copy. (issue #50, Phase 1C)
  *
  *   node tools/legacy-parity.mjs                       # compare against frozen numbers
  *   node tools/legacy-parity.mjs --freeze <legacy-root>  # re-measure, then write them
@@ -31,9 +33,9 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { execute } from '../managers/evidence-gated-allocator/lib/index.mjs'
+import { execute } from '../managers/evidence-gated-global/lib/index.mjs'
 
-const fixtureUrl = new URL('../managers/evidence-gated-allocator/fixtures/legacy-golden/parity.json', import.meta.url)
+const fixtureUrl = new URL('../managers/evidence-gated-global/fixtures/legacy-golden/parity.json', import.meta.url)
 const bridgeUrl = new URL('legacy-parity.py', import.meta.url)
 
 const read = (value, path) => {

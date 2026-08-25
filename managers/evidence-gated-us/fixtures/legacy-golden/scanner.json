@@ -1,0 +1,37 @@
+{
+  "spec": "EvidenceGatedGoldenScanner/1",
+  "legacyBaseline": "1fa18c595baa742f7323366a3c220fec5c6535a7",
+  "generator": {
+    "start": "2025-01-01T00:00:00Z",
+    "count": 200,
+    "baseClose": 100,
+    "declineStartIndex": 180,
+    "declinePerDay": 1.25,
+    "highOffset": 1,
+    "lowOffset": -1,
+    "volume": 100
+  },
+  "request": {
+    "operation": "scan",
+    "asOf": "2025-07-19T23:59:59Z",
+    "input": { "symbol": "SYN", "market": "XNAS" }
+  },
+  "expected": {
+    "lenses": ["mean-reversion"],
+    "close": 75,
+    "rsi14": 0,
+    "offHigh200": -0.25742574,
+    "aboveLow200": 0.01351351,
+    "ma200Distance": -0.24002533,
+    "meanSignals": ["rsiOversold", "nearLow", "ma200Discount", "ma60Discount"]
+  },
+  "legacyEquivalent": {
+    "setups": ["mean_reversion"],
+    "close": 75,
+    "rsi14": 0,
+    "off_high_pct": -25.7,
+    "low200_proximity_pct": 1.4,
+    "ma200_dev_pct": -24,
+    "mean_reversion_signals": ["rsi_oversold", "near_low", "ma200_discount", "ma60_discount"]
+  }
+}

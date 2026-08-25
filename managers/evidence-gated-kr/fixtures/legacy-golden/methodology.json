@@ -1,0 +1,50 @@
+{
+  "spec": "EvidenceGatedGolden/1",
+  "asOf": "2026-08-20T00:00:00Z",
+  "thesis": {
+    "thesisId": "synthetic-thesis-1",
+    "asset": "SYNTH",
+    "createdAt": "2026-08-01T00:00:00Z",
+    "coreClaim": "A falsifiable synthetic claim",
+    "horizonEnd": "2027-08-01",
+    "evidenceStatus": "complete",
+    "variantView": "Market expectation differs from observed KPI",
+    "consensusRefs": [{ "metric": "operatingIncome", "value": 100, "sourceUrl": "https://example.test/consensus", "publishedAt": "2026-07-31T00:00:00Z", "capturedAt": "2026-08-01T00:00:00Z" }],
+    "catalysts": [{ "event": "earnings", "windowStart": "2026-10-01", "windowEnd": "2026-10-31" }],
+    "invalidationTriggers": [{ "id": "inv-1", "kind": "metric", "operator": "below", "level": 90, "checkBy": "2026-11-15" }],
+    "expectedUpsidePct": 15,
+    "fairValueRange": { "low": 110, "high": 130 }
+  },
+  "memory": {
+    "valid": { "schemaVersion": 1, "updatedAsOf": "2026-08-19T00:00:00Z", "status": "observing", "sampleCount": 2, "decisionIds": ["decision-1"] },
+    "future": { "schemaVersion": 1, "updatedAsOf": "2026-08-21T00:00:00Z", "status": "observing", "sampleCount": 2, "decisionIds": ["decision-1"] }
+  },
+  "migration": [
+    { "legacyId": "claim-1", "kind": "asset-claim", "asset": "SYNTH" },
+    { "legacyId": "brief-1", "kind": "book-conclusion" },
+    { "legacyId": "gate-1", "kind": "live-gate", "owner": "evidence-gated-us" },
+    { "legacyId": "evidence-1", "kind": "raw-evidence" },
+    { "legacyId": "learning-1", "kind": "aggregate-learning", "owner": "evidence-gated-us" }
+  ],
+  "upside": [
+    {
+      "asset": "SYNTH-A",
+      "market": "us",
+      "filings": [
+        { "periodEnd": "2026-03-31", "availableAt": "2026-04-15T00:00:00Z", "operatingIncomeYoy": -5, "marginDeltaYoy": -1 },
+        { "periodEnd": "2026-06-30", "availableAt": "2026-07-20T00:00:00Z", "operatingIncomeYoy": 12, "marginDeltaYoy": 2 }
+      ],
+      "price": { "status": "confirmed", "close": 120, "rs20VsBenchmarkPct": 4 },
+      "catalysts": [{ "windowStart": "2026-08-25", "windowEnd": "2026-09-15" }],
+      "valuation": { "shares": 10, "equity": 1000, "debt": 200 }
+    },
+    {
+      "asset": "SYNTH-MISSING",
+      "market": "us",
+      "filings": [],
+      "price": { "status": "unknown" },
+      "catalysts": [],
+      "valuation": {}
+    }
+  ]
+}
