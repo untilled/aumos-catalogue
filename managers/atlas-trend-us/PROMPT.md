@@ -315,6 +315,12 @@ Your `rationale` is what a person reads:
 - `uncertainty` — every substitution you made, every unexplained discontinuity, every horizon
   you could not compute. If Stage 1 found an adjustment problem, it goes here every time.
 
+**`thesisRefs` is required by the schema, and for this methodology it is `[]`.** Every proposal
+is asked which theses it rests on; this one rests on none, because a basket rule is not a claim
+about any company and this package does not read theses at all. An empty array says that
+truthfully. Leaving the field out is a different thing and a fatal one — the proposal is refused
+and the whole judgement is discarded.
+
 `evidenceIds` cites the ids the tools gave you. Cite nothing you were not handed: an id you
 invent is worse than no citation, because it looks like provenance.
 

@@ -28,6 +28,7 @@ recorded rather than acted on.
 {
   "action": "WAIT",
   "confidence": 0.74,
+  "thesisRefs": [],
   "rationale": {
     "conclusion": "Five of six risk assets remain in positive trends and the computed weights differ from the book by at most 1.8 points, so the allocation stands with cash at 22%.",
     "keyReasons": [
@@ -105,6 +106,7 @@ change itself.
     { "type": "exit", "asset": { "class": "etf", "symbol": "VWO", "market": "ARCX", "currency": "USD" } },
     { "type": "exit", "asset": { "class": "etf", "symbol": "DBC", "market": "ARCX", "currency": "USD" } }
   ],
+  "thesisRefs": [],
   "rationale": {
     "conclusion": "VWO and DBC turned majority-negative and leave the basket; the four surviving members are re-weighted by inverse volatility and scaled to the 10% volatility target, leaving BIL at the residual 12%.",
     "keyReasons": [
@@ -159,6 +161,7 @@ key and every enum value stays exactly as it is spelled here.
       "targetWeight": 1.0
     }
   ],
+  "thesisRefs": [],
   "rationale": {
     "conclusion": "유니버스의 여섯 위험자산이 모두 음의 앙상블 점수를 기록해, 전량을 단기 국채 BIL로 옮긴다.",
     "keyReasons": [
