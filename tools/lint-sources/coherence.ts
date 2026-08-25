@@ -43,7 +43,12 @@ export interface CoherentDocument {
   readonly id: string
   readonly local?: boolean | undefined
   readonly hosts: readonly string[]
-  readonly credentials: readonly { readonly name: string; readonly required?: boolean }[]
+  readonly credentials: readonly {
+    readonly name: string
+    readonly required?: boolean
+    readonly header?: string
+    readonly inject?: { readonly location: 'header' | 'query'; readonly name: string }
+  }[]
   readonly auth?:
     | {
         readonly tokenUrl: string
@@ -51,11 +56,32 @@ export interface CoherentDocument {
         readonly clientSecret: string
       }
     | undefined
-  readonly endpoints: readonly { readonly host: string; readonly path: string }[]
+  readonly endpoints: readonly {
+    readonly host: string
+    readonly path: string
+    readonly query?: readonly string[]
+  }[]
 }
 
 export function assertCoherent(spec: CoherentDocument): void {
   const local = spec.local === true
+
+  // A query credential is not manager input. Keeping its name out of every
+  // endpoint allowlist means the public tool contract never advertises a slot
+  // in which a manager could place the secret (or a value that shadows it).
+  const protectedQueryNames = new Set<string>()
+  for (const credential of spec.credentials) {
+    if (credential.inject?.location !== 'query') continue
+    const parameter = credential.inject.name
+    if (protectedQueryNames.has(parameter)) {
+      throw new SourceSpecError(
+        'unresolved-reference',
+        `${spec.id} injects more than one credential into the protected query parameter "${parameter}". One outbound parameter can have one owner.`,
+        { id: spec.id, parameter },
+      )
+    }
+    protectedQueryNames.add(parameter)
+  }
 
   for (const host of spec.hosts) assertDeclarableHost(host, `hosts[] of ${spec.id}`, local)
 
@@ -174,6 +200,14 @@ export function assertCoherent(spec: CoherentDocument): void {
       )
     }
     assertDeclarableHost(route.host, `relay[${route.path}] of ${spec.id}`, local)
+    const exposed = (route.query ?? []).filter((name) => protectedQueryNames.has(name))
+    if (exposed.length > 0) {
+      throw new SourceSpecError(
+        'unresolved-reference',
+        `relay[${route.path}] of ${spec.id} exposes the protected query parameter ${exposed.join(', ')} to the manager. Credential query parameters are injected by the gateway and must not appear in endpoints[].query.`,
+        { id: spec.id, path: route.path, parameters: exposed },
+      )
+    }
     // One path is one host, because the manager names only the path. Two hosts
     // for one path would make *which vendor answered* a fact about the order of
     // this array — which is the defect `loadSourceSpecsFromEnv` refuses one

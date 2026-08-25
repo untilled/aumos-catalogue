@@ -1,0 +1,30 @@
+{
+  "spec": "EvidenceGatedGolden/1",
+  "legacyExecutable": "promotion-gate",
+  "ruleVersion": "issue-12-prereg",
+  "generator": {
+    "clusterCount": 10,
+    "rowsPerCluster": 3,
+    "clusterGapDays": 10,
+    "returnsPct": [1.2, 0.8, 1.6],
+    "markets": ["kr", "us"],
+    "regimes": ["risk-on", "neutral", "risk-off"]
+  },
+  "request": {
+    "operation": "promotionGate",
+    "asOf": "2026-08-20T00:00:00Z",
+    "input": {
+      "horizon": "d20",
+      "seed": 7,
+      "resamples": 2000
+    }
+  },
+  "expected": {
+    "totalMaturePromote": 30,
+    "sampleCount": 30,
+    "independentClusterCount": 10,
+    "regimeCount": 3,
+    "reviewReady": true,
+    "costModelPct": { "kr": 0.3, "us": 0.5 }
+  }
+}

@@ -89,3 +89,24 @@ jobs:
       # told about — and is then refused for. Structure only; nothing here
       # judges a translation, because a script cannot.
       - run: npm run check:docs
+
+      # A collection is several packages sold as one methodology, and this
+      # catalogue has no way for one package to share code with another — so the
+      # members ship copies, and the failure that creates is a fix landing in one
+      # of them. Byte-for-byte over the shared files, plus the one manifest field
+      # that makes them a set.
+      - run: npm run check:collection
+
+      # `evidence-gated-*` ships a deterministic core rather than asking
+      # a model to do arithmetic, and the two things that keeps honest are only
+      # true while somebody checks them: that the fixtures still describe what
+      # the code does, and that the port still produces the numbers the Python
+      # it was ported from produced.
+      #
+      # Both are plain Node over committed JSON — no install, no network, no
+      # private checkout. Re-measuring the legacy side needs that checkout and
+      # stays an operator step (`tools/legacy-parity.mjs --freeze`); what runs
+      # here is the comparison against what was measured — once, against the
+      # Global member, because `check:collection` has just proved the other two
+      # hold the same bytes.
+      - run: npm run check:allocator

@@ -1,0 +1,9 @@
+{
+  "description": "KRW/USD sleeve, 현금, 환율과 전체 sector/theme/factor concentration을 배분하며 cross-market REBALANCE를 전담합니다.",
+  "managers": [
+    {
+      "id": "evidence-gated-global",
+      "description": "KRW/USD sleeve, 현금, 환율과 전체 sector/theme/factor concentration을 배분하며 cross-market REBALANCE를 전담합니다."
+    }
+  ]
+}

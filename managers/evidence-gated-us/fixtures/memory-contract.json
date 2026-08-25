@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "runs": [
+    {
+      "id": "run-a",
+      "instance": "instance-a",
+      "model": "model-a",
+      "asOf": "2026-08-20T09:00:00Z",
+      "expectedReadRevision": null,
+      "decision": "decision-a",
+      "validWithoutPriorMemory": true
+    },
+    {
+      "id": "run-b",
+      "instance": "instance-a",
+      "model": "model-a",
+      "asOf": "2026-08-22T09:00:00Z",
+      "expectedReadRevision": 1,
+      "decision": "decision-b",
+      "validWithoutPriorMemory": false
+    }
+  ],
+  "revisions": [
+    {
+      "key": "calibration/mean-reversion",
+      "revision": 1,
+      "instance": "instance-a",
+      "model": "model-a",
+      "writtenAsOf": "2026-08-20T09:00:01Z",
+      "value": {
+        "schemaVersion": 1,
+        "updatedAsOf": "2026-08-20T09:00:00Z",
+        "decisionIds": ["decision-a"],
+        "evidenceIds": ["evidence-a"],
+        "sampleCount": 1,
+        "independentDateClusterCount": 1,
+        "metrics": {},
+        "missingFields": ["benchmarkReturn"],
+        "status": "insufficient"
+      },
+      "auditId": "audit-memory-write-a",
+      "evidenceId": "evidence-memory-write-a"
+    },
+    {
+      "key": "calibration/mean-reversion",
+      "revision": 2,
+      "instance": "instance-a",
+      "model": "model-a",
+      "writtenAsOf": "2026-08-22T09:00:01Z",
+      "value": {
+        "schemaVersion": 1,
+        "updatedAsOf": "2026-08-22T09:00:00Z",
+        "decisionIds": ["decision-a", "decision-b"],
+        "evidenceIds": ["evidence-a", "evidence-b"],
+        "sampleCount": 2,
+        "independentDateClusterCount": 1,
+        "metrics": { "positiveActiveReturnRate": 0.5 },
+        "missingFields": [],
+        "status": "insufficient"
+      },
+      "auditId": "audit-memory-write-b",
+      "evidenceId": "evidence-memory-write-b"
+    }
+  ],
+  "replay": {
+    "instance": "instance-a",
+    "model": "model-a",
+    "asOf": "2026-08-21T12:00:00Z",
+    "expectedRevision": 1
+  },
+  "isolation": {
+    "instance": "instance-b",
+    "model": "model-a",
+    "asOf": "2026-08-23T00:00:00Z",
+    "expectedRevision": null
+  },
+  "modelIsolation": {
+    "instance": "instance-a",
+    "model": "model-b",
+    "asOf": "2026-08-23T00:00:00Z",
+    "expectedRevision": null
+  },
+  "sharedBrief": {
+    "book": "book-a",
+    "authorManager": "evidence-gated-allocator",
+    "readerManager": "prudent-allocator",
+    "visible": true,
+    "privateMemoryVisible": false
+  },
+  "corruptValues": [
+    null,
+    { "schemaVersion": 99, "updatedAsOf": "2026-08-20T00:00:00Z" },
+    { "schemaVersion": 1, "updatedAsOf": "2026-09-01T00:00:00Z", "status": "insufficient" },
+    { "schemaVersion": 1, "updatedAsOf": "2026-08-20T00:00:00Z", "sampleCount": "two", "status": "insufficient" },
+    { "schemaVersion": 1, "updatedAsOf": "2026-08-20T00:00:00Z", "sampleCount": 0, "status": "confident" }
+  ]
+}

@@ -92,6 +92,84 @@
       }
     },
     {
+      "name": "open-dart",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/untilled/aumos-catalogue",
+        "path": "sources/open-dart",
+        "ref": "main",
+        "sha": "daf99188d9122357c6b400b4d4120ecd279e3b6c"
+      },
+      "version": "0.1.0",
+      "metadata": {
+        "publisher": "aumos",
+        "vendor": "open-dart",
+        "port": "library",
+        "fidelity": "none",
+        "hosts": [
+          "opendart.fss.or.kr"
+        ],
+        "credentials": [
+          {
+            "name": "api-key",
+            "required": true
+          }
+        ],
+        "endpoints": [
+          {
+            "host": "opendart.fss.or.kr",
+            "path": "/api/corpCode.xml",
+            "query": []
+          },
+          {
+            "host": "opendart.fss.or.kr",
+            "path": "/api/company.json",
+            "query": [
+              "corp_code"
+            ]
+          },
+          {
+            "host": "opendart.fss.or.kr",
+            "path": "/api/list.json",
+            "query": [
+              "corp_code",
+              "bgn_de",
+              "end_de",
+              "last_reprt_at",
+              "pblntf_ty",
+              "pblntf_detail_ty",
+              "corp_cls",
+              "sort",
+              "sort_mth",
+              "page_no",
+              "page_count"
+            ]
+          },
+          {
+            "host": "opendart.fss.or.kr",
+            "path": "/api/fnlttSinglAcntAll.json",
+            "query": [
+              "corp_code",
+              "bsns_year",
+              "reprt_code",
+              "fs_div"
+            ]
+          },
+          {
+            "host": "opendart.fss.or.kr",
+            "path": "/api/fnlttSinglAcnt.json",
+            "query": [
+              "corp_code",
+              "bsns_year",
+              "reprt_code"
+            ]
+          }
+        ],
+        "publishedAt": "2026-08-25T00:00:00.000Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJPcGVuREFSVCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxMzRFNEEiLz48dGV4dCB4PSIzMiIgeT0iNDEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EgTmV1ZSwgSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgbGV0dGVyLXNwYWNpbmc9IjEiPkRBUlQ8L3RleHQ+PC9zdmc+Cg=="
+      }
+    },
+    {
       "name": "openbb-fmp",
       "source": {
         "source": "git-subdir",
@@ -212,32 +290,48 @@
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/orderbook",
-            "query": ["symbol"]
+            "query": [
+              "symbol"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/prices",
-            "query": ["symbols"]
+            "query": [
+              "symbols"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/trades",
-            "query": ["symbol", "count"]
+            "query": [
+              "symbol",
+              "count"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/price-limits",
-            "query": ["symbol"]
+            "query": [
+              "symbol"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/stocks",
-            "query": ["symbols"]
+            "query": [
+              "symbols"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/stocks/all",
-            "query": ["market", "status", "securityType", "commonShare"]
+            "query": [
+              "market",
+              "status",
+              "securityType",
+              "commonShare"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
@@ -247,17 +341,26 @@
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/stocks/{symbol}/program-trades",
-            "query": ["count", "until"]
+            "query": [
+              "count",
+              "until"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/stocks/{symbol}/credit-trades",
-            "query": ["count", "until"]
+            "query": [
+              "count",
+              "until"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/stocks/{symbol}/securities-lending",
-            "query": ["count", "until"]
+            "query": [
+              "count",
+              "until"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
@@ -287,32 +390,52 @@
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/market-calendar/KR",
-            "query": ["date"]
+            "query": [
+              "date"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/market-calendar/US",
-            "query": ["date"]
+            "query": [
+              "date"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/rankings",
-            "query": ["type", "marketCountry", "duration", "excludeInvestmentCaution", "count"]
+            "query": [
+              "type",
+              "marketCountry",
+              "duration",
+              "excludeInvestmentCaution",
+              "count"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/market-indicators/prices",
-            "query": ["symbols"]
+            "query": [
+              "symbols"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/market-indicators/{symbol}/candles",
-            "query": ["interval", "count", "before"]
+            "query": [
+              "interval",
+              "count",
+              "before"
+            ]
           },
           {
             "host": "openapi.tossinvest.com",
             "path": "/api/v1/market-indicators/{symbol}/investor-trading",
-            "query": ["interval", "count", "until"]
+            "query": [
+              "interval",
+              "count",
+              "until"
+            ]
           }
         ],
         "publishedAt": "2026-08-22T16:19:52.000Z",

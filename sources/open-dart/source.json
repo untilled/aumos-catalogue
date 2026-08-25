@@ -1,0 +1,73 @@
+{
+  "spec": "SourceSpec/1",
+  "id": "open-dart",
+  "version": "0.1.0",
+  "vendor": "open-dart",
+  "caveat": "OpenDART's own endpoints, relayed unread. A filing becomes public at its receipt — `rcept_no` begins with the receipt date and `rcept_dt` repeats it — and nothing here is bounded by `asOf`: reading those fields and dropping later rows is the caller's work. A period end is not a disclosure date, and a preliminary announcement and the periodic report that restates it are two filings with two receipts; `report_nm` and `pblntf_ty` tell them apart. `corpCode.xml` answers with a ZIP. The investor's key is appended as `crtfc_key`, never shown to a manager. Errors arrive as `status` on a 200.",
+  "hosts": [
+    "opendart.fss.or.kr"
+  ],
+  "headers": {
+    "accept": "application/json"
+  },
+  "credentials": [
+    {
+      "name": "api-key",
+      "inject": {
+        "location": "query",
+        "name": "crtfc_key"
+      },
+      "required": true
+    }
+  ],
+  "endpoints": [
+    {
+      "host": "opendart.fss.or.kr",
+      "path": "/api/corpCode.xml",
+      "query": []
+    },
+    {
+      "host": "opendart.fss.or.kr",
+      "path": "/api/company.json",
+      "query": [
+        "corp_code"
+      ]
+    },
+    {
+      "host": "opendart.fss.or.kr",
+      "path": "/api/list.json",
+      "query": [
+        "corp_code",
+        "bgn_de",
+        "end_de",
+        "last_reprt_at",
+        "pblntf_ty",
+        "pblntf_detail_ty",
+        "corp_cls",
+        "sort",
+        "sort_mth",
+        "page_no",
+        "page_count"
+      ]
+    },
+    {
+      "host": "opendart.fss.or.kr",
+      "path": "/api/fnlttSinglAcntAll.json",
+      "query": [
+        "corp_code",
+        "bsns_year",
+        "reprt_code",
+        "fs_div"
+      ]
+    },
+    {
+      "host": "opendart.fss.or.kr",
+      "path": "/api/fnlttSinglAcnt.json",
+      "query": [
+        "corp_code",
+        "bsns_year",
+        "reprt_code"
+      ]
+    }
+  ]
+}

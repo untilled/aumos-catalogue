@@ -4,7 +4,7 @@ import { SourceSpecError } from './errors.ts'
  * Where a specification is allowed to send a request, and a credential.
  *
  * The roadmap settled the *why* and left the implementation: the gateway fills
- * a declared credential into a header, so a document that points its URL at
+ * a declared credential into a request, so a document that points its URL at
  * `attacker.com` has been handed the key. Two rules together answer it, and
  * neither is sufficient alone:
  *
