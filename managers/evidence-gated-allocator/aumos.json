@@ -80,8 +80,8 @@
     },
     {
       "kind": "source:passthrough",
-      "sources": ["toss", "sec-edgar", "alpaca"],
-      "reason": "Toss market data, SEC filings, Alpaca news and corporate actions are checked as independent vendor evidence; configured OpenBB/FMP history may supplement bars."
+      "sources": ["toss", "sec-edgar", "alpaca", "open-dart"],
+      "reason": "Toss market data, SEC filings, Alpaca news and corporate actions, and OpenDART receipts and statements are checked as independent vendor evidence; configured OpenBB/FMP history may supplement bars."
     }
   ],
   "requires": {

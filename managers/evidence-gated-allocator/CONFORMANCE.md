@@ -83,8 +83,11 @@ or absolute package path is embedded in the artifact.
 
 ## Release-gating checks that are not complete
 
-- Aumos does not yet have a secure SourceSpec query-secret injector for OpenDART's mandatory
-  `crtfc_key`; the structured KR single-name lane therefore remains blocked.
+- ✅ *Resolved.* Aumos gained secure SourceSpec query-secret injection (aumos #419, merged as aumos
+  #422), so `sources/open-dart` is published in this catalogue and the manifest names it. What is
+  **not** yet done is a fixture recorded from the live vendor: the KR parsers are exercised against
+  synthetic payloads, and a real `crtfc_key` is needed to confirm the receipt fields, the ZIP
+  behaviour of `corpCode.xml` and the `status`-on-200 error path against the vendor itself.
 - The three managers have not yet been installed together against the same Toss-connected shadow
   portfolio for consecutive KR close → US close → Global review cycles.
 - Real `manager_memory_write` → later `manager_memory_read`, append-only revision audit, historical

@@ -51,9 +51,9 @@ source 복사본, 자동 채택 규칙을 넣지 않는다. 같은 book의 다�
 Toss broker connector와 `toss` market source는 다르다. connector는 계좌와 실행을, source는
 가격·캔들·호가·메타데이터 등을 맡는다. US 단일주 lane은 `toss`, `sec-edgar`, `alpaca`가
 필요하고 `openbb-fmp`는 장기 가격 이력이 필요할 때만 선택한다. KR 단일주 fundamental lane은
-아직 catalogue에 없는 OpenDART([#51](https://github.com/untilled/aumos-catalogue/issues/51))가
-필요하다. 준비 전까지 KR ETF와 기존 보유종목의 가격·비중
-관리는 가능하지만 신규 KR 단일주 fundamental BUY/thesis 승격은 판단 불가 `WAIT`다.
+이 패키지와 함께 이 catalogue에 게시된 `open-dart`가 필요하다. 설치되지 않은 기기에서는 KR ETF와
+기존 보유종목의 가격·비중 관리는 가능하지만 신규 KR 단일주 fundamental BUY/thesis 승격은 판단 불가
+`WAIT`다 — *아무도 갖지 못한 기능*이 아니라 *이 기기가 설치하지 않은 소스*다.
 
 모든 호출에는 invocation의 `asOf`를 그대로 전달하고 이후 row를 폐기한다. SEC는 `filed`,
 DART는 접수시각/접수번호, 뉴스·기업행사는 공개 시각, 가격은 bar 시각을 시장 가용 시점으로
@@ -66,13 +66,17 @@ DART는 접수시각/접수번호, 뉴스·기업행사는 공개 시각, 가격
 | `toss` | 기존 Evidence/Thesis 검토 | 신규 가격 신호·목표 계산 |
 | `sec-edgar` | KR/ETF lane | 신규 US fundamental BUY/승격 |
 | `alpaca` | SEC/Toss 검토 | 뉴스/기업행사 확인이 필수인 신규 판단 |
-| OpenDART | KR ETF·가격/비중 관리 | 신규 KR 단일주 fundamental BUY/승격 |
+| `open-dart` | KR ETF·가격/비중 관리 | 신규 KR 단일주 fundamental BUY/승격 |
 | CLI web | core/exit/비중 관리 | theme radar·variant view·컨센서스 차이·정책/매크로 판단 |
 
-매니페스트의 `source:passthrough`가 `toss`·`sec-edgar`·`alpaca`를 이름으로 댄다. 그래서 설치
-화면이 *이 기기에 무엇이 없는지*를 런이 발견하기 전에 말한다. `openbb-fmp`는 선택이라 적지
-않았고, OpenDART는 게시되는 날 그 목록에 들어간다. 이름을 대는 것이 게이트웨이를 좁히지는
-않는다 — 런은 여전히 이 기기의 모든 source를 본다.
+매니페스트의 `source:passthrough`가 `toss`·`sec-edgar`·`alpaca`·`open-dart`를 이름으로 댄다. 그래서 설치
+화면이 *이 기기에 무엇이 없는지*를 런이 발견하기 전에 말한다. `openbb-fmp`는 선택이라 적지 않았다.
+이름을 대는 것이 게이트웨이를 좁히지는 않는다 — 런은 여전히 이 기기의 모든 source를 본다.
+
+OpenDART의 성질 셋은 매니저의 몫이다(Aumos는 읽지 않고 중계한다): `corpCode.xml`은 ZIP으로
+답하고(대신 `list.json`의 `corp_code`·`stock_code`를 읽는다), 오류가 200 응답의 `status`로 오며
+(한도 초과는 빈 결과가 아니다), XBRL 재무제표는 정기보고서를 따라오므로 잠정실적만 발표된 분기에는
+없다 — 잠정 수치로 메우지 않고 공백으로 기록한다.
 
 CLI web은 IR·컨센서스·정책·매크로·테마의 보조 계층이다. 확인 URL, 접근 시각, 미검증 범위를
 남기며 replay 가능한 Evidence를 대신하지 않는다. 실패는 무음 폴백하지 않는다.

@@ -74,13 +74,14 @@ invalid values.
 ### 2. Select the lane and collect evidence
 
 Load `skills/data-source-contract/SKILL.md`. Confirm installed endpoints before relying on them.
-Toss is market data, not the Toss broker connector. SEC EDGAR supplies point-in-time US filings;
+Toss is market data, not the Toss broker connector. SEC EDGAR supplies point-in-time US filings and OpenDART supplies Korean receipts and statements,
+where the receipt — not the business year — is the moment a fact became public;
 Alpaca supplies date-bounded US news, corporate actions and adjusted bars; configured OpenBB/FMP is
 only a long-history supplement. CLI web research may supplement IR, consensus, policy and themes,
 but it is not canonical replay Evidence: preserve URLs and explicitly state what remains unverified.
 
-Apply graceful degradation exactly. In particular, without OpenDART, a new Korean single-name
-fundamental `BUY` or thesis promotion is unable to be judged and therefore `WAIT`; Korean ETFs and
+Apply graceful degradation exactly. In particular, without `open-dart` installed, a new Korean
+single-name fundamental `BUY` or thesis promotion is unable to be judged and therefore `WAIT`; Korean ETFs and
 price/weight management may continue. Do not silently substitute web or Toss price data. Without web
 access, theme radar, variant view, consensus-difference and policy/macro claims are blocked, not
 softened.

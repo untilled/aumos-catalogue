@@ -18,7 +18,7 @@ discover a required source only after doing work that assumes it exists. Pass th
 | `sec-edgar` | ticker mapping and `/api/xbrl/companyfacts/{symbol}` | each fact unit is available at its `filed` date, not fiscal period end |
 | `alpaca` | bars, news, corporate actions | set `end` at `asOf`; snapshots are always current and never canonical replay evidence |
 | `openbb-fmp` | `/api/v1/equity/price/historical` only | optional long history; set `end_date`, record provider and adjustment |
-| OpenDART | not yet in this catalogue | required for point-in-time Korean single-name fundamentals |
+| `open-dart` | `/api/corpCode.xml`, `/api/company.json`, `/api/list.json`, `/api/fnlttSinglAcntAll.json`, `/api/fnlttSinglAcnt.json` | the **receipt** is the moment: `rcept_no` begins with the receipt date and `rcept_dt` repeats it; a business year is not a disclosure date |
 | CLI web | IR, consensus, policy, macro, industry/theme context | supplementary and non-canonical; retain URL/access time and disclose replay gap |
 
 ## Time filter
@@ -36,6 +36,13 @@ For every response:
    reasoning/diagnostics.
 5. Pagination repeats the same boundary. A later page may not reintroduce future rows.
 
+Three OpenDART behaviours change what a response means. `corpCode.xml` answers with a ZIP archive,
+relayed as sent — read `corp_code` and `stock_code` off `list.json` rows instead of trying to parse
+it. Errors arrive with HTTP 200 and a `status` field, so `020` (quota exceeded) must be read as *we
+were not allowed to look* rather than as an empty result. And XBRL statements follow the periodic
+report, so a quarter that has only been announced preliminarily has no statement — a real gap, never
+filled in with the preliminary figures.
+
 Never mix adjusted and unadjusted bars. Request the basis explicitly, verify discontinuities against
 corporate actions, and block price-derived returns or targets when the basis cannot be reconciled.
 
@@ -48,8 +55,9 @@ The core install requires the `source_request` gateway. The usable lane depends 
 - `sec-edgar`: required for new US fundamental BUY or thesis promotion.
 - `alpaca`: required when current news or a corporate action is material to the judgement. Without
   it, SEC/Toss review may continue but that new judgement is blocked.
-- OpenDART: required for new Korean single-name fundamental BUY or promotion. Until the source is
-  published, those outcomes are unable-to-judge WAIT.
+- `open-dart`: required for new Korean single-name fundamental BUY or promotion. Where it is not
+  installed, those outcomes are unable-to-judge WAIT — the source exists in the catalogue, so this is
+  a machine that has not installed it rather than a capability nobody has.
 - `openbb-fmp`: optional and used only when configured work needs history Toss/Alpaca cannot supply.
 - CLI web: optional for core/exit/weight management; unavailable web blocks theme radar, variant-view
   or consensus-difference claims and must never fail silently.
@@ -59,7 +67,7 @@ The core install requires the `source_request` gateway. The usable lane depends 
 | Toss market source | existing Evidence and Thesis review | new price signal or target calculation |
 | SEC EDGAR | Korean ETF and price/weight lanes | new US fundamental BUY/promotion |
 | Alpaca news/actions | SEC fundamentals and Toss prices | a judgement that requires news/action confirmation |
-| OpenDART | Korean ETF and existing-position price/weight management with stated uncertainty | new Korean single-name fundamental BUY/promotion |
+| `open-dart` | Korean ETF and existing-position price/weight management with stated uncertainty | new Korean single-name fundamental BUY/promotion |
 | CLI web | core, exit and weight management | theme radar, variant view, consensus-difference and policy/macro claims |
 
 Conflicting sources do not get averaged. Name the conflict, prefer the source whose field is primary

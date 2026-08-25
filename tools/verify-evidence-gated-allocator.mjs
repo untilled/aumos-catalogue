@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated-allocator/lib/index.mjs'
 import { handleMcpRequest } from '../managers/evidence-gated-allocator/lib/mcp-server.mjs'
@@ -186,6 +187,18 @@ assert.deepEqual(dartOutput.data.rows.map((row) => row.receiptNumber), krSource.
 assert.equal(dartOutput.data.rows.filter((row) => row.isPreliminaryEarnings).length, krSource.expected.preliminaryCount)
 assert.equal(dartOutput.data.rows.filter((row) => row.isPeriodicReport).length, krSource.expected.periodicCount)
 assert.equal(dartOutput.data.rows.filter((row) => row.isCorrection).length, krSource.expected.correctionCount)
+
+/**
+ * OpenDART reports its own refusals on an HTTP 200. Each of these must be a
+ * blocked read, never an empty list — the difference between *nothing was filed*
+ * and *we were not allowed to look*.
+ */
+for (const vendorCase of krSource.vendorStatusCases) {
+  const output = execute({ operation: 'normalizeDartFilings', asOf: krSource.asOf, input: vendorCase.payload })
+  assert.equal(output.status, vendorCase.expectedStatus, `DART ${vendorCase.name} is not read as an answer`)
+  assert.ok(output.diagnostics.some((row) => row.code === vendorCase.expectedCode), `DART ${vendorCase.name} names the vendor status`)
+  assert.deepEqual(output.data.rows, [], `DART ${vendorCase.name} returns no rows`)
+}
 const corpCodes = execute({ operation: 'parseDartCorpCodes', asOf: krSource.asOf, input: { xml: krSource.corpCodeXml } })
 assert.equal(corpCodes.data.rows[0].stockCode, '005930')
 const dartFinancials = execute({ operation: 'normalizeDartFinancials', asOf: krSource.asOf, input: krSource.financials })
@@ -470,7 +483,11 @@ assert.ok(copiedMemory.diagnostics.some((row) => row.code === 'memory_raw_source
  * The manifest names the sources this package requires. (aumos #384)
  */
 const passthrough = manifest.capabilities.find((row) => row.kind === 'source:passthrough')
-assert.deepEqual(passthrough.sources, ['toss', 'sec-edgar', 'alpaca'], 'the passthrough capability names its required sources')
+assert.deepEqual(passthrough.sources, ['toss', 'sec-edgar', 'alpaca', 'open-dart'], 'the passthrough capability names its required sources')
+assert.ok(
+  passthrough.sources.every((id) => existsSync(new URL(`../sources/${id}/source.json`, import.meta.url))),
+  'every named source is a document in this catalogue, not an id nobody publishes',
+)
 assert.ok(
   manifest.capabilities.every((row) => row.kind === 'source:passthrough' || row.sources === undefined),
   'no other capability carries a sources list',

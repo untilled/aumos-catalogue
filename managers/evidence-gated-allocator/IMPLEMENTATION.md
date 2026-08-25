@@ -12,7 +12,8 @@ deterministic contract is complete.
 - [x] Sleeve-budget Brief ownership and Global-only cross-market allocation
 - [x] Producer-less `event` WATCH refusal; earnings use official web research plus `at-time`
 - [x] Timezone/DST/session input, bounded retry and schedule-drift contracts
-- [ ] Secure OpenDART `crtfc_key` query-secret injection and published source
+- [x] Secure OpenDART `crtfc_key` query-secret injection (aumos #419/#422) and a published
+      `sources/open-dart` document named by this manifest
 - [ ] Installed KR/US market-calendar endpoint verified against real sessions
 
 ## Phase 1 — common methodology and legacy code
@@ -41,7 +42,8 @@ deterministic contract is complete.
 
 - [x] DART corp mapping/list/full-financial parsers and preliminary/correction/periodic distinction
 - [x] KR source-missing/stale BUY degradation, schedule and lens calibration contracts
-- [ ] Executable OpenDART source and real vendor fixture
+- [x] Executable OpenDART source (`sources/open-dart`, query-injected credential)
+- [ ] Fixture recorded from the live vendor with a real `crtfc_key`
 - [ ] Real KR preliminary/correction/periodic Thesis/WATCH/SELL/RESIZE/controlled-BUY runtime cycle
 
 ## Phase 4 — Global allocator
