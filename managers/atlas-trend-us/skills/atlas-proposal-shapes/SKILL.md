@@ -5,7 +5,7 @@ description: "The three worked DecisionProposal examples Atlas Trend reaches —
 
 # The shapes this methodology submits
 
-**The protocol is not here.** How to answer in AAP/1 — call `invocation_read` first, submit once
+**The protocol is not here.** How to answer in AMP/1 — call `invocation_read` first, submit once
 through `decision_submit`, what each action means, which action takes which target — is stated by
 the Aumos MCP server itself, once per session, and the shape is published as `decision_submit`'s
 own input schema. **Read that schema and follow it where it differs from anything below.** These

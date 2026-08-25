@@ -59,10 +59,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/atlas-trend-us",
         "ref": "main",
-        "sha": "c5a4dfcd75cbfbfd4442f50eb1af07d0efd84fa7"
+        "sha": "0b7f744b63b88dd06a79bfde21f8f579ebce1da3"
       },
       "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "metadata": {
         "name": "Atlas Trend US",
         "publisher": "aumos",
