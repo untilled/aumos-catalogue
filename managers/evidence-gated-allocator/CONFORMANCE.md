@@ -69,12 +69,50 @@ These smokes establish non-interactive submission, role fail-closed behavior, ro
 degradation, Brief writing and actual model-to-MCP calculation. They are not the consecutive
 Toss-connected KR/US/Global shadow evidence required for release.
 
-Two host/core defects were deliberately not counted as package failures:
+## AMP/1 conformance suite — 2026-08-25
 
-- The current `packages/manager-runtime/scripts/conformance.ts` does not write each canonical
-  invocation to `paths.invocationPath`, so its first `invocation_read` is refused as
-  `invocation-unavailable`. The package therefore cannot obtain a meaningful six-case report from
-  that script until the runner is updated to the current invocation-file contract.
+aumos #420 fixed the invocation-file defect recorded here previously, so the suite was run against
+this package for the first time: `pnpm --filter @aumos/manager-runtime conformance <package>`, claude
+2.1.241, all six canonical cases.
+
+**All six cases completed and submitted a schema-valid `DecisionProposal`.** Each was parsed directly
+by `decisionProposalSchema`; each is a `WAIT`, correctly, because a conformance invocation carries no
+`config.managerId` and this package refuses to infer its role from `managerInstanceId`, holdings or
+task. Seven of the suite's checks pass on the manifest and the invocations: manifest validity,
+immutable version, declared skills, eight in-enum capabilities, no broker-write, `network: deny`, and
+no invocation carrying context dated after its `asOf`.
+
+⚠️ **The report nonetheless reads NOT CONFORMANT, and no package can currently make it read
+otherwise.** `runConformance` validates each response against `managerResultSchema` — an envelope of
+`protocol`, `invocationId`, `artifacts` and `decision` — while `scripts/conformance.ts` hands it
+`readSubmittedDecision(paths.decisionPath)?.decision`, which is the bare proposal. Since #255 the
+judgement reaches the kernel through `decision_submit`, whose `inputSchema` is derived from
+`decisionProposalSchema` and has no field in which a manager could put `protocol`, `invocationId` or
+`artifacts`. All six responses therefore fail `produces-decision-proposal` with the same four
+messages, and `language-costs-nothing-structural` fails for that reason alone.
+
+⚠️ **Two checks report green about zero responses.** `protocol-declared` and `echoes-invocation-id`
+filter on `outcome.result`, which is set only when a payload validated. None did, so both filters are
+empty and both print a passing line — *"all responses declare AMP/1"*, *"no response could be
+mistaken for another run"* — about nothing. That is the shape this repository names after #196.
+
+Both belong to `untilled/aumos`, not to this package, and the fix is a decision between wrapping the
+proposal in the runner (the three missing fields are the runner's own facts) and changing what the
+suite reads. Neither is made here.
+
+✅ **One measured result that is about the package.** In the `non-english-output` (`ko-KR`) case the
+prose is Korean and the wire is not: `action` is `WAIT`, the rationale keys are English, and
+`uncertainty` carries `manager_identity_missing` verbatim beside Korean sentences. That is the
+issue's language requirement observed on a real run rather than asserted.
+
+⚠️ **The first attempt produced six timeouts and that was a third harness defect, now fixed
+locally.** `scripts/conformance.ts` did not pass `answered` to `runCli`, so an interactive CLI that
+had already submitted sat waiting for a person until `timeoutMs`. Measured: `portfolio-review` wrote
+a schema-valid WAIT to `decisionPath` 62 seconds in, its gateway audit showed `invocation_read`,
+`brief_read` and `decision_submit` all allowed, and the case was reported `timeout` fourteen minutes
+later. With the watcher wired in, the same six cases completed in about six minutes. `runCli`'s own
+documentation for that option names the cost exactly: *"the run ends on its timeout, which is a fact
+about the machine recorded where a fact about the manager belongs."*
 
 The first MCP smoke also exposed that `${CLAUDE_PLUGIN_ROOT}` is not expanded after Aumos merges a
 package-owned `.mcp.json` into its strict run config. The shipped config now uses

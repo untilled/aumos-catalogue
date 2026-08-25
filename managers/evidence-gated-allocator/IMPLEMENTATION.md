@@ -74,6 +74,9 @@ deterministic contract is complete.
 
 - [x] Catalogue lint and deterministic package verification
 - [x] Six AMP/1 proposal shapes parsed by the current Aumos schema
+- [x] All six canonical conformance cases run against a real CLI: completed, schema-valid `WAIT`,
+      Korean prose with an English wire (`CONFORMANCE.md`)
+- [ ] A conformant *report* — blocked on two harness defects in `untilled/aumos`, not on this package
 - [ ] Three-manager Toss-connected shadow installation and sufficient consecutive cycles
 - [ ] Legacy parity, coverage, missed/false wake and freshness reports
 - [ ] Planner/mandate/approval boundary runtime verification
