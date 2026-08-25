@@ -149,8 +149,15 @@ fixture는 `kr`, `us`, `global`로 나뉜다.
 `data/*.jsonl`, SQLite, cache, backup, `_workspace`, 개인 thesis, 주문 코드, 과거 성과는 포함하지
 않으며 원본 기록을 Aumos Forward Track Record로 주장하지 않는다.
 
-OpenDART는 API key를 query의 `crtfc_key`로만 받지만 현재 공개된 `SourceSpec/1` secret 주입은
-header만 지원한다. manager에게 key를 노출하지 않는 query-secret 주입이 Aumos에 생기기 전에는
-실행 가능한 source라고 주장하지 않는다. OpenDART 부재, vendor 응답 shape 변화, CLI web의 비정본성, 설치된 runtime/credential이 필요한
-실계좌 paper 검증은 현재 한계다. Private memory는 스스로 방법론을 바꾸거나 lens를 승격할 수
-없다.
+`open-dart`는 이제 이 catalogue에 게시돼 있다. 설치하지 않았거나 API key가 없는 기기는 KR
+단일주 fundamental을 판단할 수 없고, 그것이 남은 한계의 정확한 모양이다.
+
+⚠️ **`thesis:read`와 `evidence:read`는 선언돼 있고 현재 Aumos 빌드에서 아무것도 서빙하지
+않는다.** 매니페스트 어휘에는 있지만 `grant.ts`가 둘 다 빈 도구 목록으로 매핑하므로 런에
+`thesis_read`/`evidence_read` 도구가 생기지 않는다. 프롬프트가 *가능할 때* 읽는다고 적고
+매니페스트가 둘을 `optionalSkills`에 두는 이유가 그것이다. Aumos가 서빙하기 전까지 자산 논지는
+invocation payload와 Brief로 런에 닿으며, 이 패키지는 하지 못하는 조회를 하는 척하지 않는다.
+`RunProvenance.unservedTools`가 그 차이를 기록하는 자리다.
+
+vendor 응답 shape 변화, CLI web의 비정본성, 설치된 runtime/credential이 필요한 실계좌 paper
+검증은 현재 한계다. Private memory는 스스로 방법론을 바꾸거나 lens를 승격할 수 없다.

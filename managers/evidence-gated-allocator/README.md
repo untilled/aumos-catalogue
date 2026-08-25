@@ -199,11 +199,15 @@ and why, and the fixture asserts the difference so it cannot be undone silently.
 
 ## Known limits
 
-- OpenDART absence ([#51](https://github.com/untilled/aumos-catalogue/issues/51)) blocks the Korean
-  single-name fundamental entry/promotion lane.
-- OpenDART accepts its API key only as query parameter `crtfc_key`, while the currently published
-  `SourceSpec/1` secret injector supports headers. A source is not claimed executable until Aumos can
-  inject this query secret without exposing it to the manager.
+- Not installing `open-dart` blocks the Korean single-name fundamental entry/promotion lane. The
+  source is published ([#51](https://github.com/untilled/aumos-catalogue/issues/51)); a machine that
+  has not installed it, or has no API key for it, is a machine that cannot judge Korean fundamentals.
+- **`thesis:read` and `evidence:read` are declared and serve nothing in the current Aumos build.**
+  The manifest vocabulary carries both, and `grant.ts` maps each to an empty tool list, so a run gets
+  no `thesis_read`/`evidence_read` tool. The prompt reads them *when available* and the manifest lists
+  them under `optionalSkills` for exactly that reason. Until Aumos serves them, asset claims reach a
+  run through the invocation payload and through Brief, and the package says so rather than implying
+  a lookup it cannot make. `RunProvenance.unservedTools` is where a run records the difference.
 - Source vendors relay their own response shapes; this manager, not Aumos, checks dates and freshness.
 - CLI web observations are not replay-canonical Evidence.
 - Calibration cannot promote or rewrite a methodology without a reviewed package/config change.
