@@ -14,7 +14,9 @@ deterministic contract is complete.
 - [x] Timezone/DST/session input, bounded retry and schedule-drift contracts
 - [x] Secure OpenDART `crtfc_key` query-secret injection (aumos #419/#422) and a published
       `sources/open-dart` document named by this manifest
-- [ ] Installed KR/US market-calendar endpoint verified against real sessions
+- [x] KR/US market-calendar endpoints declared by the installed `toss` source and consumed by
+      `nextMarketReview` instead of a 24-hour addition
+- [ ] Those two endpoints called against real sessions — needs Toss credentials
 
 ## Phase 1 — common methodology and legacy code
 
