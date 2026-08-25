@@ -120,6 +120,17 @@ NOT CONFORMANT:
 The third is the one worth remembering: a red line gets read and a green one does not, so a check
 that passes over nothing is worse than one that fails.
 
+## Three-manager runtime cycle — 2026-08-25
+
+This package is one member of the `evidence-gated` collection, and the cycle that exercised all three
+is recorded once, in **`managers/evidence-gated-global/CONFORMANCE.md`** — kept in one place rather
+than copied, because three copies of one measurement are three things that can disagree later.
+
+What it establishes about *this* package: it ran on a Toss-connected book, read the briefs its
+siblings had written, wrote its own, sealed a Decision, and reached no order path. The four defects
+that had to be fixed first — all of them in `untilled/aumos`, none in any of these three packages —
+are listed there too.
+
 ## Release-gating checks that are not complete
 
 - ✅ *Resolved.* Aumos gained secure SourceSpec query-secret injection (aumos #419, merged as aumos

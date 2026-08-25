@@ -53,7 +53,8 @@ deterministic contract is complete.
 - [x] KRW/USD/SGOV sleeve NAV, FX requirement and one global budget denominator
 - [x] Specialist boundary, urgent exit, concentration and cross-market REBALANCE fixture
 - [x] AMP/1 multi-target REBALANCE conformance
-- [ ] Shared Brief revision and allocation calibration observed in installed runtime
+- [x] Shared Brief revision and allocation calibration observed in installed runtime — three
+      instances on one Toss-connected book, Global closing both specialists' open questions
 
 ## Phase 5 — scheduling and events
 
@@ -78,7 +79,8 @@ deterministic contract is complete.
       Korean prose with an English wire (`CONFORMANCE.md`)
 - [x] A conformant *report* — **AMP/1 CONFORMANT**, six of six, after three harness defects in
       `untilled/aumos` were fixed (aumos #424, #442); see `CONFORMANCE.md`
-- [ ] Three-manager Toss-connected shadow installation and sufficient consecutive cycles
+- [x] Three-manager Toss-connected shadow installation — one full KR → US → Global cycle
+- [ ] *Sufficient consecutive* cycles across real session boundaries — calendar-bound, not effort-bound
 - [ ] Legacy parity, coverage, missed/false wake and freshness reports
 - [ ] Planner/mandate/approval boundary runtime verification
 - [ ] Legacy retirement checklist and reviewed cutover
