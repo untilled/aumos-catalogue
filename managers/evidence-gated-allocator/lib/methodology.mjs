@@ -113,6 +113,43 @@ export function upsideRadar({ candidates = [], asOf }) {
   return { data: { ranked, unranked: rows.filter((row) => !row.eligible) }, diagnostics }
 }
 
+/**
+ * Field names that are the *body* of a source, not a summary of one.
+ *
+ * The rule this enforces is the one the issue states plainly: private memory
+ * cites Evidence ids and never copies IR, news or consensus prose. Two things go
+ * wrong when it does. The copy stops being the observation — nothing re-checks
+ * it against the vendor, so a stale paragraph outlives the source it came from —
+ * and the run that reads it can no longer say which Evidence its conclusion came
+ * from, which is what §5 asks of every recorded fact.
+ *
+ * ⚠️ The length ceiling is the part that actually catches this in practice: a
+ * pasted release does not usually arrive under a key called `articleBody`. It is
+ * deliberately generous, because every legitimate value here is an aggregate — a
+ * count, a metric, a status, a short label — and none of them is a paragraph.
+ */
+const SOURCE_TEXT_KEYS = new Set(['rawText', 'articleBody', 'filingText', 'transcript', 'consensusText', 'newsBody', 'pressRelease', 'sourceText'])
+const MAX_MEMORY_STRING = 500
+
+function copiedSourceText(value, path = 'value') {
+  const found = []
+  if (typeof value === 'string') {
+    if (value.length > MAX_MEMORY_STRING) found.push({ path, reason: 'string-too-long' })
+    return found
+  }
+  if (Array.isArray(value)) {
+    for (const [index, row] of value.entries()) found.push(...copiedSourceText(row, `${path}[${index}]`))
+    return found
+  }
+  if (value && typeof value === 'object') {
+    for (const [key, row] of Object.entries(value)) {
+      if (SOURCE_TEXT_KEYS.has(key)) found.push({ path: `${path}.${key}`, reason: 'source-body-key' })
+      else found.push(...copiedSourceText(row, `${path}.${key}`))
+    }
+  }
+  return found
+}
+
 export function validateMemory({ value, asOf, expectedSchemaVersion = 1 }) {
   const diagnostics = []
   if (!value || typeof value !== 'object' || value.schemaVersion !== expectedSchemaVersion || !MATURITY.has(value.status) || !Number.isFinite(Date.parse(value.updatedAsOf)) || Date.parse(value.updatedAsOf) > Date.parse(asOf)) {
@@ -122,6 +159,9 @@ export function validateMemory({ value, asOf, expectedSchemaVersion = 1 }) {
   if (value.sampleCount !== undefined && (!Number.isInteger(value.sampleCount) || value.sampleCount < 0)) diagnostics.push(diagnostic('memory_sample_count_invalid', 'unevaluated', 'Invalid sampleCount makes memory unusable', 'value.sampleCount'))
   const identifiers = [...(value.decisionIds ?? []), ...(value.evidenceIds ?? [])]
   if (value.sampleCount > 0 && !identifiers.length) diagnostics.push(diagnostic('memory_provenance_missing', 'unevaluated', 'Learned state must trace to Decision/Evidence ids', 'value'))
+  for (const copied of copiedSourceText(value)) {
+    diagnostics.push(diagnostic('memory_raw_source_copied', 'blocked', 'Private memory references Evidence ids; it never carries the source text itself', copied.path, { reason: copied.reason }))
+  }
   return { data: { accepted: diagnostics.length === 0, value: diagnostics.length ? null : value }, diagnostics }
 }
 

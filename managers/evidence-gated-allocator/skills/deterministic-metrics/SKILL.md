@@ -22,7 +22,8 @@ the JSON remains the canonical explanation.
 
 Supported operations are published in an `operation_unknown` diagnostic and include indicators,
 both candidate lenses, opportunity/sector/trend scanners, sleeve NAV and specialist/global budgets,
-target sizing/concentration, coverage, WATCH validation, consensus/research validation,
+target sizing/concentration, coverage, WATCH validation, consensus/macro/price-conflict and research
+validation,
 calibration/clusters/Brier/BH-FDR/quintiles/bootstrap/promotion, attribution/TWR/MWR/MDD/turnover,
 fill-based net outcome and forward MFE/MAE, mechanical backtests, point-in-time SEC/OpenDART parsing,
 adjustment validation, and market/earnings/retry/dedupe/theme-radar scheduling.

@@ -8,6 +8,7 @@ deterministic contract is complete.
 
 - [x] Three-manager manifest and market/task ownership
 - [x] Toss connector/source boundary, source freshness/conflict/degradation matrix
+- [x] Manifest names its required sources on `source:passthrough`; vendored catalogue lint refreshed to the build that reads the field
 - [x] Sleeve-budget Brief ownership and Global-only cross-market allocation
 - [x] Producer-less `event` WATCH refusal; earnings use official web research plus `at-time`
 - [x] Timezone/DST/session input, bounded retry and schedule-drift contracts
@@ -30,6 +31,8 @@ deterministic contract is complete.
 
 - [x] Toss-shaped bars, Alpaca adjustment boundary, SEC companyfacts/submissions `asOf` parsing
 - [x] Consensus provenance, preview/actual anchor, BMO/AMC/date-only scheduling and bounded retry
+- [x] Web-research layer: consensus/guidance/actual kept as three typed observations, dated macro and policy readings, Toss-versus-web price conflict, IR preview → actual → sentinel cycle and web-absent lane blocking
+- [x] Private memory refuses copied IR/news/consensus prose and cites Evidence ids instead
 - [x] USD cash plus policy-designated SGOV liquidity
 - [x] US source-missing/stale BUY degradation and lens calibration contracts
 - [ ] Real US official-source fixture and full Thesis/WATCH/SELL/RESIZE/controlled-BUY runtime cycle

@@ -200,14 +200,31 @@ export function normalizeSecSubmissions(payload, asOf) {
   return { data: { rows }, diagnostics }
 }
 
+const WEB_RESEARCH_INTENTS = new Set(['theme-radar', 'variant-view', 'consensus-difference', 'policy-macro'])
+
 export function laneCoverage({ lane, sources = {}, intent = 'review' }) {
   const diagnostics = []
   const rules = {
-    kr: { fundamental: ['toss', 'open-dart'], price: ['toss'] },
-    us: { fundamental: ['toss', 'sec-edgar', 'alpaca'], price: ['toss'] },
-    global: { allocation: ['toss'], price: ['toss'] },
+    kr: { fundamental: ['toss', 'open-dart'], price: ['toss'], research: ['web'] },
+    us: { fundamental: ['toss', 'sec-edgar', 'alpaca'], price: ['toss'], research: ['web'] },
+    global: { allocation: ['toss'], price: ['toss'], research: ['web'] },
   }
-  const category = intent === 'new-fundamental-buy' || intent === 'thesis-promotion' ? 'fundamental' : intent === 'cross-market-allocation' ? 'allocation' : 'price'
+  /**
+   * Intents that cannot be answered by a vendor endpoint. (issue #50 web-research layer)
+   *
+   * A theme, a variant view, a consensus difference and a policy reading are all
+   * claims about what is *not* in the price feed, and the only lane that carries
+   * them is the CLI's web access. Without it the honest outcome is a blocked
+   * gate, never the quiet one where the run falls back to prices and states the
+   * theme anyway — which is the failure this whole table exists to prevent.
+   */
+  const category = intent === 'new-fundamental-buy' || intent === 'thesis-promotion'
+    ? 'fundamental'
+    : intent === 'cross-market-allocation'
+      ? 'allocation'
+      : WEB_RESEARCH_INTENTS.has(intent)
+        ? 'research'
+        : 'price'
   const required = rules[lane]?.[category] ?? []
   const unavailable = required.filter((source) => !['fresh', 'available'].includes(sources[source]?.status))
   if (unavailable.length) diagnostics.push(diagnostic('lane_source_blocked', category === 'price' && intent === 'review' ? 'unevaluated' : 'blocked', 'Required source is missing or stale for this lane and intent', 'sources', { lane, intent, unavailable }))

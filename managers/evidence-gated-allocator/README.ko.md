@@ -67,10 +67,25 @@ DART는 접수시각/접수번호, 뉴스·기업행사는 공개 시각, 가격
 | `sec-edgar` | KR/ETF lane | 신규 US fundamental BUY/승격 |
 | `alpaca` | SEC/Toss 검토 | 뉴스/기업행사 확인이 필수인 신규 판단 |
 | OpenDART | KR ETF·가격/비중 관리 | 신규 KR 단일주 fundamental BUY/승격 |
-| CLI web | core/exit/비중 관리 | theme radar·variant view·컨센서스 차이 판단 |
+| CLI web | core/exit/비중 관리 | theme radar·variant view·컨센서스 차이·정책/매크로 판단 |
 
-CLI web은 IR·컨센서스·정책·테마의 보조 계층이다. 확인 URL, 접근 시각, 미검증 범위를 남기며
-replay 가능한 Evidence를 대신하지 않는다. 실패는 무음 폴백하지 않는다.
+매니페스트의 `source:passthrough`가 `toss`·`sec-edgar`·`alpaca`를 이름으로 댄다. 그래서 설치
+화면이 *이 기기에 무엇이 없는지*를 런이 발견하기 전에 말한다. `openbb-fmp`는 선택이라 적지
+않았고, OpenDART는 게시되는 날 그 목록에 들어간다. 이름을 대는 것이 게이트웨이를 좁히지는
+않는다 — 런은 여전히 이 기기의 모든 source를 본다.
+
+CLI web은 IR·컨센서스·정책·매크로·테마의 보조 계층이다. 확인 URL, 접근 시각, 미검증 범위를
+남기며 replay 가능한 Evidence를 대신하지 않는다. 실패는 무음 폴백하지 않는다.
+
+웹에서 온 숫자는 쓰기 전에 종류와 시각을 갖는다. 컨센서스·회사 guidance·실제 발표는 세 개의
+서로 다른 관측으로 남고 각각 metric, 단위와 통화가 붙은 값, 대상 기간, `sourceUrl`,
+`publishedAt`, `capturedAt`을 든다. 날짜 없는 검색 snippet은 point-in-time 근거가 아니고,
+aggregator끼리 어긋나면 평균하지 않고 충돌로 기록한다. 매크로·정책 관측(VIX, put/call, 심리
+지표, breadth, 지수와 이동평균, 중앙은행·산업 정책)은 `observedAt`과 source tier가 있어야 하며,
+공식 발행처가 aggregator 재인용을 이긴다. **날짜 없는 관측은 현재값으로 쓰지 않고 거절한다** —
+replay가 정직할 수 있는 이유가 그 한 줄이다. 웹 가격은 Toss와 교차검증하고, 설정된 5%를 넘으면
+Toss를 택한 뒤 차이를 provenance로 남긴다. macro score는 없다: regime 판단은 한 `asOf`의 Brief
+판단이지 이 패키지가 들 수 있는 숫자가 아니다.
 
 ## 학습과 검증
 

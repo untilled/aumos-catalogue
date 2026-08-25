@@ -118,6 +118,14 @@ const LOCALE_TAG = /^[a-z]{2}(-[A-Z]{2})?$/
 
 interface ManifestView {
   readonly capabilities: readonly string[]
+  /**
+   * Capability entries that carry a `sources` array, by kind. (#384)
+   *
+   * Kept beside `capabilities` rather than folded into it because the rule below
+   * asks a question about the *pairing* — which kind carried the field — and a
+   * flat list of kinds has thrown that away.
+   */
+  readonly capabilitiesWithSources: readonly string[]
   readonly configSchema: string | undefined
   readonly readme: string | undefined
   /** `manifest.prompt`, unresolved. Absent means the conventional `PROMPT.md`. (#286) */
@@ -152,6 +160,12 @@ function readManifest(raw: unknown): ManifestView {
   return {
     capabilities: Array.isArray(field(raw, 'capabilities'))
       ? (field(raw, 'capabilities') as unknown[])
+          .map((capability) => text(field(capability, 'kind')))
+          .filter((kind): kind is string => kind !== undefined)
+      : [],
+    capabilitiesWithSources: Array.isArray(field(raw, 'capabilities'))
+      ? (field(raw, 'capabilities') as unknown[])
+          .filter((capability) => Array.isArray(field(capability, 'sources')))
           .map((capability) => text(field(capability, 'kind')))
           .filter((kind): kind is string => kind !== undefined)
       : [],
@@ -367,6 +381,35 @@ export function lintManagerPackage(files: PackageFiles): readonly Problem[] {
       problem(
         'no-execution-capability',
         `capability ${kind} reads as a way to trade. There is no broker:write capability and there will not be one (design invariant 5)`,
+      )
+    }
+  }
+
+  /**
+   * `sources` belongs to `source:passthrough` and to nothing else. (#384)
+   *
+   * ── Why a lint rule and not a schema refusal ──────────────────────────────
+   *
+   * The schema could reject it with a `superRefine`, and that was the first
+   * draft. It is the wrong place twice over. The manifest schema is a **published
+   * document** — it generates the JSON Schema an outside implementer reads — and
+   * a cross-field condition does not survive that generation, so the published
+   * contract would be silently weaker than the one this build enforces. And
+   * `previewInstall` reads `sources` only off `source:passthrough` entries, so a
+   * misplaced key cannot widen anything: it is inert, which makes it exactly the
+   * kind of authoring mistake a linter is for.
+   *
+   * ⛔ **There is no rule requiring `sources` on a passthrough capability.** Four
+   * published packages declare the capability and name nothing, and they are not
+   * wrong — the field arrived after them. `InstallPreview.callsSources` is what
+   * carries that state to a screen, and it says *did not say* rather than
+   * *needs none*.
+   */
+  for (const kind of manifest.capabilitiesWithSources) {
+    if (kind !== 'source:passthrough') {
+      problem(
+        'sources-only-on-passthrough',
+        `capability ${kind} carries a sources list. Only source:passthrough reaches a data source, so the field says nothing here and nothing reads it`,
       )
     }
   }

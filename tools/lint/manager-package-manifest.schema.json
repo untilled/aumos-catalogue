@@ -230,6 +230,13 @@
           },
           "reason": {
             "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "required": ["kind"],

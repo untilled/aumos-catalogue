@@ -81,7 +81,18 @@ but it is not canonical replay Evidence: preserve URLs and explicitly state what
 
 Apply graceful degradation exactly. In particular, without OpenDART, a new Korean single-name
 fundamental `BUY` or thesis promotion is unable to be judged and therefore `WAIT`; Korean ETFs and
-price/weight management may continue. Do not silently substitute web or Toss price data.
+price/weight management may continue. Do not silently substitute web or Toss price data. Without web
+access, theme radar, variant view, consensus-difference and policy/macro claims are blocked, not
+softened.
+
+Every web figure is typed and dated before use. Consensus, company guidance and reported actuals stay
+three separate observations, each carrying metric, value with unit and currency, period, `sourceUrl`,
+`publishedAt` and `capturedAt`; an undated snippet is not point-in-time evidence. Macro and policy
+readings — VIX, put/call, sentiment, breadth, index level and moving averages, central-bank and
+industry policy — need an `observedAt` and a source tier; an undated reading is refused rather than
+treated as current, and a regime call is a Brief judgement, never a score. A web price is cross-checked
+against Toss; beyond the configured tolerance Toss is selected and the conflict is recorded rather than
+averaged.
 
 ### 3. Name the lens
 

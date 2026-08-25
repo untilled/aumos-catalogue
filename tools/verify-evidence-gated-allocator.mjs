@@ -22,6 +22,7 @@ const ampProposals = JSON.parse(await readFile(new URL('amp-decision-proposals.j
 const krSource = JSON.parse(await readFile(new URL('kr/source.json', fixtureRoot), 'utf8'))
 const usSchedule = JSON.parse(await readFile(new URL('us/schedule.json', fixtureRoot), 'utf8'))
 const globalIntegration = JSON.parse(await readFile(new URL('global/integration.json', fixtureRoot), 'utf8'))
+const research = JSON.parse(await readFile(new URL('research-contract.json', fixtureRoot), 'utf8'))
 
 function assertSubset(actual, expected, path = 'data') {
   for (const [key, value] of Object.entries(expected)) {
@@ -321,8 +322,8 @@ assert.deepEqual(completeCoverage.data.uncovered, [])
 const sleeve = execute({ operation: 'sleeveNav', asOf: methodology.asOf, input: { cash: [{ currency: 'KRW', amount: 1000000 }, { currency: 'USD', amount: 100 }], positions: [{ symbol: 'SGOV', currency: 'USD', marketValue: 200 }], fx: { USDKRW: 1300 } } })
 assert.equal(sleeve.data.usdLiquidity, 300)
 assert.equal(sleeve.data.globalNavKrw, 1390000)
-const research = execute({ operation: 'researchGate', asOf: methodology.asOf, input: { lens: 'mean-reversion', priceDeclineReason: 'temporary', opportunityCase: 'recovery', trapRisks: ['structural-risk'], variantView: 'different', benchmarkAlternative: { expectedReturn: 0.03 }, scenarios: { bear: { probability: 0.2, return: -0.2 }, base: { probability: 0.5, return: 0.12 }, bull: { probability: 0.3, return: 0.3 } }, minimumExpectedActiveReturn: 0.02, challengeVerdict: 'cleared', sourceFresh: true, sourceConflict: false } })
-assert.equal(research.data.passed, true)
+const researchGateRun = execute({ operation: 'researchGate', asOf: methodology.asOf, input: { lens: 'mean-reversion', priceDeclineReason: 'temporary', opportunityCase: 'recovery', trapRisks: ['structural-risk'], variantView: 'different', benchmarkAlternative: { expectedReturn: 0.03 }, scenarios: { bear: { probability: 0.2, return: -0.2 }, base: { probability: 0.5, return: 0.12 }, bull: { probability: 0.3, return: 0.3 } }, minimumExpectedActiveReturn: 0.02, challengeVerdict: 'cleared', sourceFresh: true, sourceConflict: false } })
+assert.equal(researchGateRun.data.passed, true)
 const futureWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-08-21T00:00:00Z' }, current: {} } })
 assert.equal(futureWatch.data.valid, true)
 const eventWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'event', event: 'earnings' }, current: {} } })
@@ -361,5 +362,117 @@ for (const fixture of ampProposals.cases) {
     assert.notEqual(watch.trigger.kind, 'event', 'earnings scheduling never depends on a producer-less event trigger')
   }
 }
+
+/**
+ * Web-research contract — consensus provenance, the macro layer and the IR cycle.
+ *
+ * These are the checks issue #50's research-layer comment asks for by name. They
+ * live here rather than in a prompt sentence because each one is a refusal: a
+ * rule the model cannot talk its way past is a rule this file can fail on.
+ */
+const researchAsOf = research.asOf
+const consensusOf = (observation) => execute({ operation: 'validateConsensus', asOf: researchAsOf, input: observation })
+
+assert.equal(consensusOf(research.consensus.complete).data.complete, true, 'a fully provenanced consensus observation is usable')
+
+const incompleteConsensus = consensusOf(research.consensus.missingFields)
+assert.equal(incompleteConsensus.status, 'blocked', 'missing consensus provenance blocks the gate')
+assert.equal(incompleteConsensus.data.complete, false)
+assert.equal(incompleteConsensus.data.normalized, null, 'an incomplete observation is never normalized into evidence')
+for (const code of research.consensus.expectedMissingCodes) {
+  assert.ok(incompleteConsensus.diagnostics.some((row) => row.code === code), `missing-field consensus reports ${code}`)
+}
+const missingKeys = new Set(incompleteConsensus.diagnostics.filter((row) => row.code === 'consensus_field_missing').map((row) => row.path))
+for (const key of ['sourceUrl', 'publishedAt', 'capturedAt', 'period']) {
+  assert.ok(missingKeys.has(key), `consensus gate names the missing ${key}`)
+}
+
+assert.equal(consensusOf(research.consensus.undatedSnippet).status, 'blocked', 'an undated search snippet is not point-in-time consensus')
+const noCurrency = consensusOf(research.consensus.monetaryWithoutCurrency)
+assert.equal(noCurrency.status, 'blocked', 'a monetary consensus value needs its currency')
+assert.ok(noCurrency.diagnostics.some((row) => row.code === 'consensus_currency_missing'))
+assert.equal(consensusOf(research.consensus.postAsOf).status, 'blocked', 'a release published after asOf is not evidence for this run')
+
+/**
+ * Guidance, consensus and actual stay three types, never one averaged number.
+ */
+const preserved = ['guidance', 'actual', 'complete'].map((key) => consensusOf(research.consensus[key]))
+assert.ok(preserved.every((row) => row.status === 'ok'), 'each observation type is independently valid')
+assert.deepEqual(
+  preserved.map((row) => row.data.normalized.type),
+  ['company-guidance', 'actual', 'consensus'],
+  'company guidance, actual and consensus are preserved as distinct evidence types',
+)
+
+const macro = execute({ operation: 'validateMacro', asOf: researchAsOf, input: { observations: research.macro.observations } })
+assert.equal(macro.status, 'blocked', 'an undated or future macro observation blocks the reading')
+assert.deepEqual(macro.data.retained.map((row) => row.indicator), research.macro.expectedRetained, 'only dated, sourced, past macro observations are retained')
+assert.deepEqual(macro.data.unusable.filter((row) => row.reason === 'undated').map((row) => row.indicator), research.macro.expectedUndated, 'a dateless put/call reading is refused, not defaulted to now')
+assert.deepEqual(macro.data.dropped.map((row) => row.indicator), research.macro.expectedDropped, 'a policy release after asOf is dropped')
+assert.deepEqual(macro.data.unusable.filter((row) => row.reason === 'indicator-unknown').map((row) => row.indicator), research.macro.expectedUnknown)
+assert.equal(macro.data.officialCount, research.macro.expectedOfficialCount, 'official and aggregator tiers are counted apart')
+assert.ok(macro.diagnostics.some((row) => row.code === 'macro_source_not_official'), 'an aggregator restatement keeps its provenance gap')
+assert.equal(macro.data.score, null, 'no aggregate macro score is produced')
+assert.equal(macro.data.scoreIsJudgement, true, 'a regime call is named as a judgement, not a database')
+assert.equal(
+  execute({ operation: 'validateMacro', asOf: researchAsOf, input: { observations: [research.macro.observations[0]], webAvailable: false } }).status,
+  'blocked',
+  'without web research the macro lane blocks instead of falling back silently',
+)
+
+const agreeing = execute({ operation: 'crossCheckPrice', asOf: researchAsOf, input: research.priceCrossCheck.agreeing })
+assert.equal(agreeing.status, 'ok', 'a web price within tolerance raises no conflict')
+const conflicting = execute({ operation: 'crossCheckPrice', asOf: researchAsOf, input: research.priceCrossCheck.conflicting })
+assert.ok(conflicting.diagnostics.some((row) => row.code === 'price_source_conflict'), 'a materially different web price is recorded as a conflict')
+assert.equal(conflicting.data.selectedSource, research.priceCrossCheck.expectedSelectedSource, 'Toss is the selected price and the choice is stated')
+assert.equal(conflicting.data.selected, research.priceCrossCheck.conflicting.tossPrice)
+
+/**
+ * The IR cycle: schedule → checkpoint → not-yet-released retry → actual → sentinel.
+ */
+const irSchedule = execute({
+  operation: 'earningsCheckpoint',
+  asOf: researchAsOf,
+  input: { observation: research.irCycle.schedule, marketSession: research.irCycle.scheduleSession, config: research.irCycle.scheduleConfig },
+})
+assert.equal(irSchedule.status, 'ok', 'a date-only Korean schedule is schedulable')
+assert.equal(irSchedule.data.at, research.irCycle.expectedCheckpointAt, 'a date-only Korean schedule resolves to that date closing plus buffer, not a fixed UTC hour')
+assert.equal(irSchedule.data.timing, 'unknown', 'the unknown BMO/AMC state is carried, not guessed')
+assert.equal(irSchedule.data.purpose, 'verify-earnings-release', 'the checkpoint asks whether it was released')
+
+const notReleased = execute({ operation: 'earningsActual', asOf: researchAsOf, input: research.irCycle.notReleasedYet })
+assert.equal(notReleased.status, 'blocked', 'an at-time wake without a public release confirms nothing')
+assert.equal(notReleased.data.actualConfirmed, false)
+
+const releasedReview = execute({ operation: 'earningsActual', asOf: researchAsOf, input: research.irCycle.released })
+assert.equal(releasedReview.data.actualConfirmed, true, 'a sourced release with its announcement time is confirmable')
+assert.equal(releasedReview.data.comparisons.operatingIncome.consensusSurprisePct, research.irCycle.expectedConsensusSurprisePct)
+assert.equal(releasedReview.data.comparisons.operatingIncome.guidanceSurprisePct, research.irCycle.expectedGuidanceSurprisePct)
+
+const sentinelAfter = execute({ operation: 'thesisSentinel', asOf: researchAsOf, input: research.irCycle.sentinelAfterRelease })
+assert.equal(sentinelAfter.data.verdict, research.irCycle.sentinelAfterRelease.expectedVerdict, 'the actual result updates the fundamental sentinel')
+const sentinelUnverified = execute({ operation: 'thesisSentinel', asOf: researchAsOf, input: research.irCycle.sentinelWhenUnverified })
+assert.equal(sentinelUnverified.data.verdict, research.irCycle.sentinelWhenUnverified.expectedVerdict, 'an unevaluable invalidation is watch, never intact')
+
+for (const lane of research.webAbsentLanes) {
+  const output = execute({ operation: 'laneCoverage', asOf: researchAsOf, input: { lane: lane.lane, intent: lane.intent, sources: { toss: { status: 'fresh' }, 'sec-edgar': { status: 'fresh' }, alpaca: { status: 'fresh' } } } })
+  assert.equal(output.status === 'blocked', lane.expectedBlocked, `web-absent ${lane.intent} degradation`)
+  if (lane.expectedBlocked) assert.deepEqual(output.data.unavailable, ['web'], `${lane.intent} names the missing web lane`)
+}
+
+const copiedMemory = execute({ operation: 'validateMemory', asOf: researchAsOf, input: { value: research.memoryRawCopy } })
+assert.equal(copiedMemory.status, 'blocked', 'private memory may not carry copied source prose')
+assert.equal(copiedMemory.data.accepted, false)
+assert.ok(copiedMemory.diagnostics.some((row) => row.code === 'memory_raw_source_copied'))
+
+/**
+ * The manifest names the sources this package requires. (aumos #384)
+ */
+const passthrough = manifest.capabilities.find((row) => row.kind === 'source:passthrough')
+assert.deepEqual(passthrough.sources, ['toss', 'sec-edgar', 'alpaca'], 'the passthrough capability names its required sources')
+assert.ok(
+  manifest.capabilities.every((row) => row.kind === 'source:passthrough' || row.sources === undefined),
+  'no other capability carries a sources list',
+)
 
 console.log('evidence-gated-allocator contract fixtures passed')

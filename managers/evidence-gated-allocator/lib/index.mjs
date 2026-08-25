@@ -3,7 +3,7 @@ import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength } from './scanners.mjs'
 import { sleeveNav, targetWeight, legacySizeSuggestion, concentration, specialistBudget, globalAllocation } from './sizing.mjs'
 import { coverageState, validateWatch } from './coverage.mjs'
-import { validateConsensus, researchGate, crossCheckPrice } from './evidence.mjs'
+import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
 import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
 import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
@@ -38,6 +38,7 @@ const operations = {
   validateConsensus: (input, asOf) => validateConsensus(input, asOf),
   researchGate,
   crossCheckPrice,
+  validateMacro: (input, asOf) => validateMacroObservations({ ...input, asOf }),
   calibration: calibrationSummary,
   clusters: (input) => ({ data: { clusters: independentDateClusters(input?.dates, input?.gapDays) }, diagnostics: [] }),
   brier: (input) => ({ data: { score: brierScore(input?.probabilities, input?.outcomeIndex) }, diagnostics: [] }),

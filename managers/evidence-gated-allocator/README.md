@@ -81,11 +81,27 @@ discontinuities.
 | `sec-edgar` | Korean/ETF lane | new US fundamental BUY/promotion |
 | `alpaca` news/actions | SEC/Toss review | a new judgement requiring news/action confirmation |
 | OpenDART | Korean ETF and price/weight management | new Korean single-name fundamental BUY/promotion |
-| CLI web | core/exit/weight management | theme radar, variant view and consensus-difference claims |
+| CLI web | core/exit/weight management | theme radar, variant view, consensus-difference and policy/macro claims |
 
-CLI web is supplementary for IR, consensus, policy and theme context. It is not canonical replay
-Evidence: a run records checked URLs, access time and unverified scope. Failure is explicit and never
-silently replaced with model knowledge.
+The manifest names `toss`, `sec-edgar` and `alpaca` on its `source:passthrough` capability, so the
+install screen can say which of them this machine is missing before a run discovers it. `openbb-fmp`
+is not named because it is optional; OpenDART joins that list on the day it is published. Naming a
+source does not narrow the gateway — a run still sees every source installed on the machine.
+
+CLI web is supplementary for IR, consensus, policy, macro and theme context. It is not canonical
+replay Evidence: a run records checked URLs, access time and unverified scope. Failure is explicit and
+never silently replaced with model knowledge.
+
+Web figures are typed and dated before use, and the deterministic core enforces both contracts.
+Consensus, company guidance and reported actuals stay three separate observations carrying metric,
+value with unit and currency, period, source URL, publication time and capture time; an undated
+snippet is not point-in-time evidence, and disagreeing aggregators are recorded as a conflict rather
+than averaged. Macro and policy readings — VIX, put/call, sentiment, breadth, index level and moving
+averages, central-bank and industry policy — need an observation time and a source tier, an official
+publisher outranks an aggregator restatement, and an undated reading is refused rather than treated as
+current. A web price is cross-checked against Toss; beyond the configured 5% tolerance Toss is the
+selected price and the difference is kept as provenance. There is no macro score: a regime call is a
+Brief judgement at one `asOf`, not a number this package can hold.
 
 ## Memory contract
 

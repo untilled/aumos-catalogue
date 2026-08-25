@@ -25,6 +25,10 @@ The verifier covers:
   conflicts;
 - exact/BMO/AMC/date-only checkpoints, DST, holiday, early close, schedule drift, bounded retry,
   late fire, outage, dedupe and theme-radar override;
+- consensus/guidance/actual provenance, undated-snippet refusal, monetary currency, dated macro and
+  policy readings, Toss-versus-web price conflict, the IR preview → actual → sentinel cycle,
+  web-absent lane blocking and refusal of copied source prose in private memory;
+- the manifest's declared required sources;
 - producer-less `event` WATCH rejection and AMP/1 action/target consistency;
 - absence of network, broker/order/database capabilities in the manager manifest.
 
