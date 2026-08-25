@@ -1,0 +1,45 @@
+{
+  "spec": "EvidenceGatedTopology/1",
+  "managers": [
+    {
+      "id": "evidence-gated-kr",
+      "markets": ["XKRX"],
+      "privateMemoryScope": "instance-kr",
+      "sleeve": "KR",
+      "mayCrossMarketRebalance": false,
+      "mayUrgentExitOwnMarket": true
+    },
+    {
+      "id": "evidence-gated-us",
+      "markets": ["XNAS", "XNYS"],
+      "privateMemoryScope": "instance-us",
+      "sleeve": "US",
+      "mayCrossMarketRebalance": false,
+      "mayUrgentExitOwnMarket": true
+    },
+    {
+      "id": "evidence-gated-global",
+      "markets": ["XKRX", "XNAS", "XNYS"],
+      "privateMemoryScope": "instance-global",
+      "sleeve": "GLOBAL",
+      "mayCrossMarketRebalance": true,
+      "mayUrgentExitOwnMarket": false
+    }
+  ],
+  "publicState": ["Evidence", "Thesis", "Brief", "WATCH", "Portfolio"],
+  "privateState": ["manager-memory"],
+  "emptyMemoryDecisions": [
+    { "managerId": "evidence-gated-kr", "action": "WAIT", "valid": true },
+    { "managerId": "evidence-gated-us", "action": "WAIT", "valid": true },
+    { "managerId": "evidence-gated-global", "action": "WAIT", "valid": true }
+  ],
+  "simultaneousCandidates": {
+    "availableGlobalCashWeight": 0.08,
+    "krRequestedWeight": 0.06,
+    "usRequestedWeight": 0.06,
+    "krBriefBudgetRemaining": 0.04,
+    "usBriefBudgetRemaining": 0.04,
+    "specialistMaximumCombinedWeight": 0.08,
+    "globalReviewRequired": true
+  }
+}

@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+import { createInterface } from 'node:readline'
+import { handleMcpRequest } from '../lib/mcp-server.mjs'
+
+const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })
+
+for await (const line of lines) {
+  if (line.trim() === '') continue
+  let response
+  try {
+    response = handleMcpRequest(JSON.parse(line))
+  } catch (error) {
+    response = {
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32700, message: error instanceof Error ? error.message : 'Parse error' },
+    }
+  }
+  if (response !== null) process.stdout.write(`${JSON.stringify(response)}\n`)
+}
+

@@ -1,0 +1,95 @@
+{
+  "spec": "EvidenceGatedKrFixture/1",
+  "asOf": "2026-07-31T06:30:00Z",
+  "dart": {
+    "status": "000",
+    "list": [
+      {
+        "rcept_no": "20260730000123",
+        "rcept_dt": "20260730",
+        "report_nm": "영업(잠정)실적(공정공시)"
+      },
+      {
+        "rcept_no": "20260730000456",
+        "rcept_dt": "20260730",
+        "report_nm": "[정정]영업(잠정)실적(공정공시)"
+      },
+      {
+        "rcept_no": "20260814000001",
+        "rcept_dt": "20260814",
+        "report_nm": "반기보고서 (2026.06)"
+      }
+    ]
+  },
+  "expected": {
+    "retainedReceiptNumbers": [
+      "20260730000123",
+      "20260730000456"
+    ],
+    "preliminaryCount": 2,
+    "periodicCount": 0,
+    "correctionCount": 1
+  },
+  "corpCodeXml": "<result><list><corp_code>00126380</corp_code><corp_name>합성전자</corp_name><stock_code>005930</stock_code><modify_date>20260801</modify_date></list></result>",
+  "financials": {
+    "status": "000",
+    "list": [
+      {
+        "rcept_no": "20260730000123",
+        "corp_code": "00126380",
+        "bsns_year": "2026",
+        "reprt_code": "11012",
+        "fs_div": "CFS",
+        "sj_div": "IS",
+        "account_id": "ifrs-full_Revenue",
+        "account_nm": "매출액",
+        "thstrm_nm": "제 58 기 반기",
+        "thstrm_amount": "123,456"
+      },
+      {
+        "rcept_no": "20260814000001",
+        "corp_code": "00126380",
+        "bsns_year": "2026",
+        "reprt_code": "11012",
+        "fs_div": "CFS",
+        "sj_div": "IS",
+        "account_id": "ifrs-full_ProfitLossFromOperatingActivities",
+        "account_nm": "영업이익",
+        "thstrm_nm": "제 58 기 반기",
+        "thstrm_amount": "-"
+      }
+    ]
+  },
+  "vendorStatusCases": [
+    {
+      "name": "quota-exceeded",
+      "payload": {
+        "status": "020",
+        "message": "요청 제한을 초과하였습니다."
+      },
+      "expectedStatus": "blocked",
+      "expectedCode": "dart_vendor_error",
+      "why": "OpenDART answers HTTP 200 and reports the refusal in `status`. Read as an empty list this becomes *nothing was filed* instead of *we were not allowed to look*."
+    },
+    {
+      "name": "no-data",
+      "payload": {
+        "status": "013",
+        "message": "조회된 데이터가 없습니다."
+      },
+      "expectedStatus": "blocked",
+      "expectedCode": "dart_vendor_error",
+      "why": "`013` is also not an empty result: the query itself matched nothing, which a caller must state rather than treat as an answered question."
+    },
+    {
+      "name": "invalid-key",
+      "payload": {
+        "status": "100",
+        "message": "필드의 부적절한 값입니다."
+      },
+      "expectedStatus": "blocked",
+      "expectedCode": "dart_vendor_error",
+      "why": "A rejected request is never a fundamental fact about the filer."
+    }
+  ]
+}

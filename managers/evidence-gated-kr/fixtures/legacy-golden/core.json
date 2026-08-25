@@ -1,0 +1,123 @@
+{
+  "spec": "EvidenceGatedGolden/1",
+  "legacyBaseline": "1fa18c595baa742f7323366a3c220fec5c6535a7",
+  "publicPreRemovalBaseline": "b4db865aced6c5b9c0c80d7f1c3bc661722fdee6",
+  "newRuleVersion": "ega-1.0.0",
+  "tolerance": 0.00000001,
+  "cases": [
+    {
+      "name": "attribution-additive-identity",
+      "request": {
+        "operation": "attribution",
+        "asOf": "2026-08-20T00:00:00Z",
+        "input": {
+          "totalReturn": 0.1,
+          "coreWeight": 0.4,
+          "coreReturn": 0.08,
+          "noncoreReturn": 0.2,
+          "noncoreBenchmarkReturn": 0.1
+        }
+      },
+      "expected": {
+        "coreBeta": 0.032,
+        "noncoreBenchmarkBeta": 0.06,
+        "selectionEffect": 0.06,
+        "cashFxDrag": -0.052,
+        "reconciliationError": 0
+      },
+      "legacyEquivalent": {
+        "units": "percent",
+        "core_beta_pct": 3.2,
+        "noncore_benchmark_beta_pct": 6,
+        "selection_effect_pct": 6,
+        "cash_fx_drag_pct": -5.2,
+        "reconciliation_check": 0
+      }
+    },
+    {
+      "name": "independent-date-cluster-chain-link",
+      "request": {
+        "operation": "clusters",
+        "asOf": "2026-08-20T00:00:00Z",
+        "input": { "dates": ["2026-01-01", "2026-01-03", "2026-01-09"], "gapDays": 5 }
+      },
+      "expected": { "clusters": [["2026-01-01", "2026-01-03"], ["2026-01-09"]] }
+    },
+    {
+      "name": "categorical-brier",
+      "request": {
+        "operation": "brier",
+        "asOf": "2026-08-20T00:00:00Z",
+        "input": { "probabilities": [0.2, 0.5, 0.3], "outcomeIndex": 1 }
+      },
+      "expected": { "score": 0.38 }
+    },
+    {
+      "name": "legacy-heuristic-sizing",
+      "request": {
+        "operation": "legacySizeSuggestion",
+        "asOf": "2026-08-20T00:00:00Z",
+        "input": { "riskRewardRatio": 1.5, "capWeight": 0.03, "expectedValue": 0.1 }
+      },
+      "expected": { "rawWeight": 0.015, "suggestedWeight": 0.015, "mode": "heuristic" }
+    },
+    {
+      "name": "kelly-is-gated-below-20-samples",
+      "request": {
+        "operation": "legacySizeSuggestion",
+        "asOf": "2026-08-20T00:00:00Z",
+        "input": { "riskRewardRatio": 1.5, "capWeight": 0.03, "expectedValue": 0.1, "winProbability": 0.6, "calibrationSamples": 19 }
+      },
+      "expected": { "suggestedWeight": 0.015, "mode": "heuristic-fallback-insufficient-calibration" }
+    },
+    {
+      "name": "twr-with-start-of-day-flow",
+      "request": {
+        "operation": "twr",
+        "asOf": "2026-08-20T00:00:00Z",
+        "input": {
+          "dailyValues": [
+            { "date": "2026-01-01", "value": 100 },
+            { "date": "2026-01-02", "value": 160 },
+            { "date": "2026-01-03", "value": 165 }
+          ],
+          "flows": { "2026-01-02": 50 }
+        }
+      },
+      "expected": { "return": 0.134375 },
+      "legacyEquivalent": { "return_pct": 13.4375 }
+    },
+    {
+      "name": "annualized-money-weighted-return",
+      "request": {
+        "operation": "mwr",
+        "asOf": "2027-01-01T00:00:00Z",
+        "input": {
+          "datedCashflows": [{ "date": "2026-01-01", "amount": -100 }],
+          "endingValue": 110,
+          "endingDate": "2027-01-01"
+        }
+      },
+      "expected": { "return": 0.1 },
+      "legacyEquivalent": { "return_pct": 10 }
+    },
+    {
+      "name": "new-york-dst-spring",
+      "request": {
+        "operation": "zonedDateTimeToUtc",
+        "asOf": "2026-01-01T00:00:00Z",
+        "input": { "date": "2026-03-09", "time": "16:00", "timeZone": "America/New_York" }
+      },
+      "expected": { "instant": "2026-03-09T20:00:00.000Z" }
+    },
+    {
+      "name": "new-york-dst-fall",
+      "request": {
+        "operation": "zonedDateTimeToUtc",
+        "asOf": "2026-01-01T00:00:00Z",
+        "input": { "date": "2026-11-02", "time": "16:00", "timeZone": "America/New_York" }
+      },
+      "expected": { "instant": "2026-11-02T21:00:00.000Z" }
+    }
+  ]
+}

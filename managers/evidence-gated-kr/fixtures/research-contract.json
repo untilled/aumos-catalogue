@@ -1,0 +1,277 @@
+{
+  "spec": "evidence-gated-allocator/research-contract/1",
+  "asOf": "2026-08-20T07:30:00Z",
+  "consensus": {
+    "complete": {
+      "metric": "operatingIncome",
+      "value": 1240000000000,
+      "unit": "currency",
+      "currency": "KRW",
+      "period": "2026Q2",
+      "sourceUrl": "https://ir.example.test/consensus/2026q2",
+      "publishedAt": "2026-08-11T01:00:00Z",
+      "capturedAt": "2026-08-20T06:00:00Z",
+      "type": "consensus"
+    },
+    "missingFields": {
+      "metric": "operatingIncome",
+      "value": 1240000000000,
+      "unit": "currency",
+      "currency": "KRW",
+      "type": "consensus"
+    },
+    "expectedMissingCodes": [
+      "consensus_field_missing",
+      "consensus_timestamp_invalid"
+    ],
+    "undatedSnippet": {
+      "metric": "eps",
+      "value": 3.1,
+      "unit": "currency",
+      "currency": "USD",
+      "period": "2026Q3",
+      "sourceUrl": "https://aggregator.example.test/search",
+      "publishedAt": "",
+      "capturedAt": "2026-08-20T06:00:00Z",
+      "type": "consensus"
+    },
+    "monetaryWithoutCurrency": {
+      "metric": "revenue",
+      "value": 812000000,
+      "unit": "currency",
+      "period": "2026Q2",
+      "sourceUrl": "https://ir.example.test/q2",
+      "publishedAt": "2026-08-11T01:00:00Z",
+      "capturedAt": "2026-08-20T06:00:00Z",
+      "type": "consensus"
+    },
+    "guidance": {
+      "metric": "operatingIncome",
+      "value": 1300000000000,
+      "unit": "currency",
+      "currency": "KRW",
+      "period": "2026Q2",
+      "sourceUrl": "https://ir.example.test/guidance",
+      "publishedAt": "2026-05-08T01:00:00Z",
+      "capturedAt": "2026-08-20T06:00:00Z",
+      "type": "company-guidance"
+    },
+    "actual": {
+      "metric": "operatingIncome",
+      "value": 1380000000000,
+      "unit": "currency",
+      "currency": "KRW",
+      "period": "2026Q2",
+      "sourceUrl": "https://ir.example.test/release/2026q2",
+      "publishedAt": "2026-08-19T20:05:00Z",
+      "capturedAt": "2026-08-20T06:10:00Z",
+      "type": "actual"
+    },
+    "postAsOf": {
+      "metric": "operatingIncome",
+      "value": 1400000000000,
+      "unit": "currency",
+      "currency": "KRW",
+      "period": "2026Q3",
+      "sourceUrl": "https://ir.example.test/release/2026q3",
+      "publishedAt": "2026-08-21T20:05:00Z",
+      "capturedAt": "2026-08-21T20:30:00Z",
+      "type": "actual"
+    }
+  },
+  "macro": {
+    "observations": [
+      {
+        "indicator": "vix",
+        "value": 17.4,
+        "observedAt": "2026-08-19T20:00:00Z",
+        "sourceTier": "official",
+        "sourceUrl": "https://www.cboe.test/vix"
+      },
+      {
+        "indicator": "put-call-ratio",
+        "value": 0.92,
+        "sourceTier": "aggregator",
+        "sourceUrl": "https://aggregator.example.test/putcall"
+      },
+      {
+        "indicator": "sentiment-index",
+        "value": 41,
+        "observedAt": "2026-08-19T22:00:00Z",
+        "sourceTier": "aggregator",
+        "sourceUrl": "https://aggregator.example.test/fear-greed"
+      },
+      {
+        "indicator": "policy-rate",
+        "value": 3.25,
+        "observedAt": "2026-08-28T05:00:00Z",
+        "sourceTier": "official",
+        "sourceUrl": "https://www.bok.test/rate"
+      },
+      {
+        "indicator": "analyst-vibes",
+        "value": 3,
+        "observedAt": "2026-08-19T22:00:00Z",
+        "sourceTier": "aggregator",
+        "sourceUrl": "https://aggregator.example.test/vibes"
+      }
+    ],
+    "expectedRetained": [
+      "vix",
+      "sentiment-index"
+    ],
+    "expectedUndated": [
+      "put-call-ratio"
+    ],
+    "expectedDropped": [
+      "policy-rate"
+    ],
+    "expectedUnknown": [
+      "analyst-vibes"
+    ],
+    "expectedOfficialCount": 1
+  },
+  "priceCrossCheck": {
+    "agreeing": {
+      "tossPrice": 74800,
+      "webPrice": 75200
+    },
+    "conflicting": {
+      "tossPrice": 74800,
+      "webPrice": 81000
+    },
+    "expectedSelectedSource": "toss"
+  },
+  "irCycle": {
+    "schedule": {
+      "asset": "005930",
+      "fiscalPeriod": "2026Q3",
+      "announcedDate": "2026-11-13",
+      "sourceTimeZone": "Asia/Seoul",
+      "sourceUrl": "https://ir.example.test/events",
+      "capturedAt": "2026-08-20T04:00:00Z",
+      "confidence": "medium"
+    },
+    "notReleasedYet": {
+      "preview": {
+        "consensus": {
+          "operatingIncome": 1240000000000
+        },
+        "guidance": {
+          "operatingIncome": {
+            "value": 1300000000000
+          }
+        }
+      },
+      "actual": {},
+      "filing": {}
+    },
+    "released": {
+      "preview": {
+        "consensus": {
+          "operatingIncome": 1240000000000
+        },
+        "guidance": {
+          "operatingIncome": {
+            "value": 1300000000000
+          }
+        }
+      },
+      "actual": {
+        "operatingIncome": 1380000000000
+      },
+      "filing": {
+        "announcedAt": "2026-08-19T20:05:00Z",
+        "sourceUrl": "https://ir.example.test/release/2026q2",
+        "sourceType": "press-release"
+      }
+    },
+    "expectedConsensusSurprisePct": 11.29,
+    "expectedGuidanceSurprisePct": 6.154,
+    "sentinelAfterRelease": {
+      "invalidations": [
+        {
+          "id": "operating-income-collapse",
+          "kind": "metric",
+          "operator": "below",
+          "level": 900000000000,
+          "evidenceId": "ev-actual-oi"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "ev-actual-oi",
+          "value": 1380000000000,
+          "availableAt": "2026-08-19T20:05:00Z"
+        }
+      ],
+      "expectedVerdict": "intact"
+    },
+    "sentinelWhenUnverified": {
+      "invalidations": [
+        {
+          "id": "operating-income-collapse",
+          "kind": "metric",
+          "operator": "below",
+          "level": 900000000000,
+          "evidenceId": "ev-missing"
+        }
+      ],
+      "evidence": [],
+      "expectedVerdict": "watch"
+    },
+    "scheduleSession": {
+      "date": "2026-11-13",
+      "openLocal": "09:00",
+      "closeLocal": "15:30",
+      "timeZone": "Asia/Seoul",
+      "isOpen": true
+    },
+    "scheduleConfig": {
+      "releaseBufferMinutes": 60
+    },
+    "expectedCheckpointAt": "2026-11-13T07:30:00.000Z"
+  },
+  "webAbsentLanes": [
+    {
+      "lane": "us",
+      "intent": "theme-radar",
+      "expectedBlocked": true
+    },
+    {
+      "lane": "us",
+      "intent": "variant-view",
+      "expectedBlocked": true
+    },
+    {
+      "lane": "us",
+      "intent": "consensus-difference",
+      "expectedBlocked": true
+    },
+    {
+      "lane": "us",
+      "intent": "policy-macro",
+      "expectedBlocked": true
+    },
+    {
+      "lane": "us",
+      "intent": "weight-management",
+      "expectedBlocked": false
+    }
+  ],
+  "memoryRawCopy": {
+    "schemaVersion": 1,
+    "updatedAsOf": "2026-08-20T07:00:00Z",
+    "status": "observing",
+    "sampleCount": 6,
+    "decisionIds": [
+      "dec_1"
+    ],
+    "evidenceIds": [
+      "ev-actual-oi"
+    ],
+    "notes": {
+      "articleBody": "Samsung Electronics reported..."
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "evidence-gated-global",
+  "version": "0.1.0",
+  "description": "Allocates KRW/USD sleeves, cash, FX and portfolio-wide sector/theme/factor concentration. It is the only manager that proposes cross-market REBALANCE targets."
+}
