@@ -125,6 +125,15 @@ trend/DCA/oversold backtest, specialist sleeve 제한, Global 단일 예산 분�
 dedupe도 같은 실행 코드가 맡는다. 시장별 실패가 package 공통 happy path에 가려지지 않도록
 fixture는 `kr`, `us`, `global`로 나뉜다.
 
+## 원본 하네스와의 parity
+
+방법론은 옮긴 것이지 다시 쓴 것이 아니다. `tools/legacy-parity.mjs`가 원본 Python 코어와 이
+패키지의 결정론 코어를 **같은 synthetic 입력**으로 돌려 필드 단위로 비교한다 — 현재 21개 케이스,
+59개 필드. legacy 쪽 숫자는 한 번 측정해서 `fixtures/legacy-golden/parity.json`에 얼려 두므로,
+이 저장소에서는 Python도 비공개 체크아웃도 없이 비교가 돈다. 일부러 갈라진 자리는 `MIGRATION.md`가
+어느 필드가 어느 방향으로 왜 갈라졌는지 적고, fixture가 **그 차이를 단언한다** — 조용히 되돌아가면
+거기서 깨진다.
+
 ## Migration과 provenance
 
 개인 authored instance만 한 번 bootstrap할 수 있다. 자산 논지는 Thesis, 공통 결론은 Brief,

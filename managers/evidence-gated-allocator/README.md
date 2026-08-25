@@ -182,6 +182,15 @@ No credentials, account/position data, `data/*.jsonl`, SQLite, cache, backup, `_
 thesis text, order implementation or historical performance is included. Historical Harness results
 are not Aumos Forward Track Record. See `NOTICE.md` for attribution.
 
+## Parity with the original harness
+
+The methodology was ported, not paraphrased. `tools/legacy-parity.mjs` runs the original Python core
+and this package's deterministic core over the same synthetic inputs and compares them field by field
+— 21 cases and 59 fields at the time of writing. The legacy numbers are measured once and frozen into
+`fixtures/legacy-golden/parity.json`, so the comparison runs here without Python and without the
+private checkout. Where the two deliberately part, `MIGRATION.md` says which field, which direction
+and why, and the fixture asserts the difference so it cannot be undone silently.
+
 ## Known limits
 
 - OpenDART absence ([#51](https://github.com/untilled/aumos-catalogue/issues/51)) blocks the Korean

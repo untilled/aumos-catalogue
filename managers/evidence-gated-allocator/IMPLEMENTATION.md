@@ -25,7 +25,7 @@ deterministic contract is complete.
 - [x] Scanner, sizing, coverage, calibration, promotion, outcome, attribution and backtest core
 - [x] Memory value/replay/isolation contract and canonical-owner migration mapper
 - [x] Synthetic legacy-golden and KR/US/Global fixtures
-- [ ] Every retained numeric field compared to a frozen Python output, including bootstrap CI
+- [x] Every retained numeric field compared to a frozen Python output, including bootstrap CI — 21 cases, 59 fields, two recorded methodology differences (`MIGRATION.md`)
 
 ## Phase 2 — US specialist
 

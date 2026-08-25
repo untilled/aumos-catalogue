@@ -10,12 +10,21 @@ Run:
 ```sh
 npm run lint
 npm run lint:sources
-node tools/verify-evidence-gated-allocator.mjs
+npm run check:allocator        # includes the frozen legacy-parity comparison
+npm run check:legacy-parity    # that comparison on its own
+```
+
+Re-measuring the legacy side needs the private checkout and is an operator step:
+
+```sh
+node tools/legacy-parity.mjs --freeze <legacy-harness-root>
 ```
 
 The verifier covers:
 
 - the 65-entry migration matrix and every named fixture group;
+- 21 legacy-parity cases and 59 fields measured from the Python core at `1fa18c59`, with the two
+  recorded methodology differences asserted rather than dropped;
 - deterministic stdin-JSON/stdout-JSON metrics and blocked exit code;
 - legacy indicators, scanners, sizing, outcomes, attribution and mechanical backtests;
 - cluster bootstrap, walk-forward OOS, BH-FDR and the combined promotion gate;

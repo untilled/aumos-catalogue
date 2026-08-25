@@ -13,7 +13,9 @@
     "lint:sources": "node --experimental-strip-types tools/lint-sources/main.ts",
     "check:docs": "node tools/check-docs.mjs",
     "check:index": "node tools/check-index.mjs",
-    "check:pins": "node tools/check-pins.mjs"
+    "check:pins": "node tools/check-pins.mjs",
+    "check:allocator": "node tools/verify-evidence-gated-allocator.mjs",
+    "check:legacy-parity": "node tools/legacy-parity.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1",

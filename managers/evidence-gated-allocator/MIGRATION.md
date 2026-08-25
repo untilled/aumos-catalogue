@@ -130,3 +130,50 @@ The executable accepts Aumos JSON snapshots on stdin and writes one JSON documen
 no credential, order, network, database, filesystem-ledger or personal-path access. Every result
 includes `ruleVersion`, `asOf`, units/currency/market where relevant, and explicit
 `missing`/`unevaluated` diagnostics rather than zero/false substitution.
+
+## Golden parity against the Python core
+
+The dispositions above say what each executable's rules became. This section says how that claim is
+checked: `tools/legacy-parity.mjs` drives the frozen Python and the port with the same synthetic
+inputs and compares them field by field.
+
+```sh
+node tools/legacy-parity.mjs --freeze <legacy-harness-root>   # measure, then write
+node tools/legacy-parity.mjs                                  # compare against what was written
+```
+
+`tools/legacy-parity.py` is the bridge. It imports `bin/_common.py` and the pure `suggest()` in
+`bin/size-suggest` from a checkout the operator names on the command line, and it holds no algorithm
+of its own — a bridge that restated the calculation could only ever agree with the port. Nothing else
+in the legacy tree is reachable from it: the `bin/*-credentials.json` files and the `data/` ledger of
+real positions are named nowhere, and every parity input is synthetic.
+
+The legacy side is measured once and frozen into `fixtures/legacy-golden/parity.json`, because the
+legacy checkout is private and a check that only runs beside it is a check this repository cannot
+make. **21 cases, 59 fields** currently match, covering the core/selection/cash-FX decomposition,
+time- and money-weighted return, independent date clusters, the categorical Brier score, quintile
+spread, Benjamini-Hochberg, cluster bootstrap, all five sizing modes, KRW and USD round-trip net
+return, maximum drawdown, turnover and exposure.
+
+⚠️ **The bootstrap interval cannot be exact and the fixture says so.** The legacy resamples with
+`random.Random` and the port with `mulberry32-v1`, so the two draw different resamples from the same
+distribution. Point estimate, cluster count, resample count and percentile indices are exact; the
+interval bounds are compared against the envelope the *legacy implementation itself* produces across
+ten seeds, which is what a Monte-Carlo bound can honestly claim. An envelope written by hand would be
+a tolerance chosen to make the test pass, so it is measured too. Changing either PRNG is a
+methodology-version change.
+
+### Differences that are on purpose
+
+A recorded difference is still a test: the fixture asserts that the port produces exactly the
+recorded value, so a later change that quietly restores the legacy behaviour fails here.
+
+| case | field | legacy | port | why |
+|---|---|---|---|---|
+| `sizing-invalid-risk-reward` | `suggestedWeight` | `0.0` | `null` + blocked | A non-positive reward:risk ratio is not a zero-sized position; it is an input the sizer cannot act on. `0.0` reads as a suggestion and can be averaged or drawn as a bar |
+| `sizing-invalid-risk-reward` | `mode` | `"invalid"` | absent | A refused call has no sizing mode. The refusal travels in the diagnostics with its reason |
+
+Two more differences were found and are **not** methodology: the legacy rounds the money-weighted
+return to four decimals before returning it, and this repository spells enum values in kebab case.
+Both are recorded in the fixture as a rounding rule and a value map so the comparison stays exact
+rather than being loosened with a tolerance.

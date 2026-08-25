@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated-allocator/lib/index.mjs'
 import { handleMcpRequest } from '../managers/evidence-gated-allocator/lib/mcp-server.mjs'
+import { loadParity, comparePort } from './legacy-parity.mjs'
 
 const fixtureRoot = new URL('../managers/evidence-gated-allocator/fixtures/', import.meta.url)
 const memory = JSON.parse(await readFile(new URL('memory-contract.json', fixtureRoot), 'utf8'))
@@ -475,4 +476,17 @@ assert.ok(
   'no other capability carries a sources list',
 )
 
-console.log('evidence-gated-allocator contract fixtures passed')
+/**
+ * Legacy parity, against numbers measured from the Python core rather than asserted.
+ *
+ * `tools/legacy-parity.mjs --freeze <legacy-root>` writes them; this runs the
+ * comparison with no Python and no private checkout, which is the only form the
+ * catalogue can keep.
+ */
+const parity = await loadParity()
+const parityFailures = comparePort(parity)
+for (const failure of parityFailures) console.error(`  FAIL ${failure}`)
+assert.equal(parityFailures.length, 0, 'the port still matches the frozen legacy numeric core')
+assert.ok(parity.cases.every((row) => row.legacyMeasured !== undefined), 'every parity case carries a measured legacy output')
+
+console.log(`evidence-gated-allocator contract fixtures passed (${parity.cases.length} legacy-parity cases)`)
