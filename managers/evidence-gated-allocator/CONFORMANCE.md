@@ -71,53 +71,42 @@ Toss-connected KR/US/Global shadow evidence required for release.
 
 ## AMP/1 conformance suite — 2026-08-25
 
-aumos #420 fixed the invocation-file defect recorded here previously, so the suite was run against
-this package for the first time: `pnpm --filter @aumos/manager-runtime conformance <package>`, claude
-2.1.241, all six canonical cases.
+**AMP/1 CONFORMANT.** All six canonical cases, claude 2.1.245, against Aumos `main` at
+`caba795`:
 
-**All six cases completed and submitted a schema-valid `DecisionProposal`.** Each was parsed directly
-by `decisionProposalSchema`; each is a `WAIT`, correctly, because a conformance invocation carries no
-`config.managerId` and this package refuses to infer its role from `managerInstanceId`, holdings or
-task. Seven of the suite's checks pass on the manifest and the invocations: manifest validity,
-immutable version, declared skills, eight in-enum capabilities, no broker-write, `network: deny`, and
-no invocation carrying context dated after its `asOf`.
+```
+AMP/1 CONFORMANT — aumos/evidence-gated-allocator@0.1.0
 
-⚠️ **The report nonetheless reads NOT CONFORMANT, and no package can currently make it read
-otherwise.** `runConformance` validates each response against `managerResultSchema` — an envelope of
-`protocol`, `invocationId`, `artifacts` and `decision` — while `scripts/conformance.ts` hands it
-`readSubmittedDecision(paths.decisionPath)?.decision`, which is the bare proposal. Since #255 the
-judgement reaches the kernel through `decision_submit`, whose `inputSchema` is derived from
-`decisionProposalSchema` and has no field in which a manager could put `protocol`, `invocationId` or
-`artifacts`. All six responses therefore fail `produces-decision-proposal` with the same four
-messages, and `language-costs-nothing-structural` fails for that reason alone.
+✓ produces-decision-proposal   6/6 response(s) valid; 6 arrived as a bare proposal
+– protocol-declared            No response carried an AMP envelope … (#255)
+– echoes-invocation-id         No response carried an AMP envelope … (#255)
+✓ supports-wait · wait-is-reasoned · watch-carries-trigger
+✓ language-costs-nothing-structural · no-direct-broker-execution
+✓ manifest-valid · immutable-version · declares-skills · declares-permissions
+✓ no-broker-write · network-declared · timegate-clean-context
+```
 
-⚠️ **Two checks report green about zero responses.** `protocol-declared` and `echoes-invocation-id`
-filter on `outcome.result`, which is set only when a payload validated. None did, so both filters are
-empty and both print a passing line — *"all responses declare AMP/1"*, *"no response could be
-mistaken for another run"* — about nothing. That is the shape this repository names after #196.
+Every case is a `WAIT`, correctly: a conformance invocation carries no `config.managerId`, and this
+package refuses to infer its role from `managerInstanceId`, holdings or task. The two skipped checks
+are about an envelope no `decision_submit` transport can carry; they name the transport rather than
+this package.
 
-Both belong to `untilled/aumos`, not to this package, and the fix is a decision between wrapping the
-proposal in the runner (the three missing fields are the runner's own facts) and changing what the
-suite reads. Neither is made here.
+✅ **The `ko-KR` case is the language requirement observed rather than asserted.** The prose is
+Korean and the wire is not: `action` is `WAIT`, the rationale keys are English, and `uncertainty`
+carries `manager_identity_missing` verbatim beside Korean sentences.
 
-✅ **One measured result that is about the package.** In the `non-english-output` (`ko-KR`) case the
-prose is Korean and the wire is not: `action` is `WAIT`, the rationale keys are English, and
-`uncertainty` carries `manager_identity_missing` verbatim beside Korean sentences. That is the
-issue's language requirement observed on a real run rather than asserted.
+⚠️ **Getting here required fixing three defects in the harness, none of them in this package.** They
+are recorded because the first report this file carried was produced by the broken harness and read
+NOT CONFORMANT:
 
-⚠️ **The first attempt produced six timeouts and that was a third harness defect, now fixed
-locally.** `scripts/conformance.ts` did not pass `answered` to `runCli`, so an interactive CLI that
-had already submitted sat waiting for a person until `timeoutMs`. Measured: `portfolio-review` wrote
-a schema-valid WAIT to `decisionPath` 62 seconds in, its gateway audit showed `invocation_read`,
-`brief_read` and `decision_submit` all allowed, and the case was reported `timeout` fourteen minutes
-later. With the watcher wired in, the same six cases completed in about six minutes. `runCli`'s own
-documentation for that option names the cost exactly: *"the run ends on its timeout, which is a fact
-about the machine recorded where a fact about the manager belongs."*
+| defect | what the report said instead | fixed by |
+|---|---|---|
+| the runner never passed `answered` to `runCli`, so an interactive CLI that had already submitted waited for a person until `timeoutMs` | six `timeout`s; measured, `portfolio-review` wrote a schema-valid WAIT **62 seconds** in and was reported `timeout` fourteen minutes later | aumos #423 / #424 |
+| `runConformance` validated against `managerResultSchema` while the runner handed it a bare proposal — and since #255 `decision_submit` has no field for `protocol`, `invocationId` or `artifacts` | six identical failures no package could fix | aumos #440 / #442 |
+| three checks filtered validated responses and read an empty list as "pass" | `✓ protocol-declared — all responses declare AMP/1`, about **zero** responses | aumos #440 / #442 |
 
-The first MCP smoke also exposed that `${CLAUDE_PLUGIN_ROOT}` is not expanded after Aumos merges a
-package-owned `.mcp.json` into its strict run config. The shipped config now uses
-`${AUMOS_MANAGER_PACKAGE}`, which the Aumos isolation grant exports to every manager run. No personal
-or absolute package path is embedded in the artifact.
+The third is the one worth remembering: a red line gets read and a green one does not, so a check
+that passes over nothing is worse than one that fails.
 
 ## Release-gating checks that are not complete
 
