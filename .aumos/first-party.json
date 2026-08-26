@@ -1,0 +1,22 @@
+{
+  "aumos": {
+    "managers": [
+      "ai-hedge-fund-value",
+      "atlas-trend-us",
+      "basic-investor",
+      "earnings-drift-watcher",
+      "evidence-gated-global",
+      "evidence-gated-kr",
+      "evidence-gated-us",
+      "prudent-allocator",
+      "undervalued-now"
+    ],
+    "sources": [
+      "alpaca",
+      "open-dart",
+      "openbb-fmp",
+      "sec-edgar",
+      "toss"
+    ]
+  }
+}
