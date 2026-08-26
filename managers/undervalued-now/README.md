@@ -21,8 +21,8 @@ It is the *"draw a pelican riding a bicycle"* of investing. That prompt became a
 image-model benchmark not because anyone specified how to draw a pelican, but because
 everybody could run the same sentence against a different model and compare what came back.
 Put *"find something undervalued"* in front of four models, score the forward return, and
-the comparison is the benchmark. How each one got there is its own business: when the agent
-does its own reading, the data pipeline is **part of the agent**, so a model that found
+the comparison is the benchmark. How each one got there is its own business: when the manager
+does its own reading, the data pipeline is **part of the manager**, so a model that found
 better sources and made more money is the better system rather than a confounded
 measurement of one.
 
@@ -40,13 +40,13 @@ purpose, by asking Aumos for nothing at all.
 - **Nothing pinned to a moment.** A request through Aumos carries the instant it asked
   about, and a request without one is refused — which is what makes *what did it ask, and
   about when* answerable afterwards. Nothing here answers it. The package is worthless for
-  replaying history and for asking a new agent about last quarter, and the reproduction
+  replaying history and for asking a new manager about last quarter, and the reproduction
   that costs was never really on offer (a model answers differently on Tuesday).
 - **No broker credential in the run.** ⚠️ Its portfolio *is* allowed a broker account since
   #258 — the refusal that stopped that read a manifest field which no longer exists. What did
-  not change is the reason behind it: this agent has a shell, a shell can read a keychain, and
+  not change is the reason behind it: this manager has a shell, a shell can read a keychain, and
   the person approving an order would not recognise an API key in the middle of a paragraph of
-  rationale. So the run still holds no broker credential, and a machine that runs agents under
+  rationale. So the run still holds no broker credential, and a machine that runs managers under
   your own account refuses to run this at all while it holds a live broker login. It is not
   that the model is not trusted — it is that a page it reads can tell it what to do.
 
@@ -65,12 +65,12 @@ purpose, by asking Aumos for nothing at all.
 
 ## The one thing it is told to answer
 
-Every other package proposes its own next review condition, because for an investor's agent
+Every other package proposes its own next review condition, because for an investor's manager
 that *is* part of the judgement — it is the only thing that decides when Aumos looks again.
 This one is told: **one timed watch, exactly 24 hours after the instant it judged, on every
 answer whatever the action.**
 
-It is the difference between an agent and an instrument.
+It is the difference between a manager and an instrument.
 
 - **Without it the row stops.** Nothing else asks this question again. An armed watch is
   the only thing that wakes the next run, so an answer with no watch is the last judgement
@@ -89,24 +89,28 @@ and named the fix it was not getting: *a cadence the mandate owns, which would s
 failed run … is not being built for a benchmark's sake.*
 
 It was built, for a general reason rather than for this one (#257), so this package can
-simply ask for it. `cadence.json` ships one line:
+simply ask for it. The manifest carries it (it was a `cadence.json` file until #286, when
+the manifest schema stopped refusing unknown keys):
 
 ```json
-{ "cadenceDays": 1 }
+"cadence": { "days": 1 }
 ```
 
-That is a **request, not a guarantee**, and the difference is worth reading before relying
-on it. The period that governs is `max(this, the book's minReviewIntervalDays)` — an agent
-may ask to be looked at *less* often than its book requires, never more. So:
+That is a **request, not a guarantee**: it pre-fills a box on the install screen and what
+governs is what the investor confirms there, as `manager_instances.cadence_days`.
 
-| the book's mandate says | what governs |
-|---|---|
-| nothing | **this file — daily**, and before 0.1.3 there was no cadence wake at all |
-| every 30 days | the mandate. This file loses, and the screen says which one won |
+⚠️ It was also a **ceiling** until #355. The period that governed was
+`max(this, the book's minReviewIntervalDays)`, so this package could ask to be looked at
+*less* often than its book required and never more; a mandate saying "every 30 days" beat
+this line, and the install screen said which one won. #355 removed the mandate's interval —
+a schedule is a property of a methodology rather than of money — so this number, confirmed,
+is the whole answer.
 
-The first row is the one this package lives in: a benchmark book's mandate sets no review
-interval, so its row previously ran only for as long as the armed chain held. Now a failed
-run costs a day rather than the rest of the row.
+What it is **for** has not changed: this package arms a 24-hour `at-time` watch on every
+answer, and the cadence is the net under that chain when a run fails and arms nothing. A
+failed run costs a day rather than the rest of the row. #356 is where that division of
+labour is written down for every package, and `AMP_MANAGER_INSTRUCTIONS` §Schedule is what
+every manager reads about it.
 
 ⚠️ **The armed watch is still there and is still the primary thing.** It is what makes the
 interval a property of *the judgement* — the sentence above about a confounded axis is

@@ -1,5 +1,5 @@
 {
   "name": "ai-hedge-fund-value",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A port of ai-hedge-fund's deep-value pod: Graham, Buffett and Munger read the same point-in-time fundamentals independently, and one reconciliation weighs their convictions. Graham's view counts double, as the source's own strategy file specifies."
 }

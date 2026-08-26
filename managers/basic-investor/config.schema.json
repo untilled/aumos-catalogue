@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Basic Investor instance configuration",
-  "description": "Reaches the agent as AgentInvocation.config. Every field bounds how much the agent gathers before it reasons; none of them can loosen the TimeGate, which is the gateway's and not configurable from here.",
+  "description": "Reaches the manager as ManagerInvocation.config. Every field bounds how much the manager gathers before it reasons; none of them can loosen the TimeGate, which is the gateway's and not configurable from here.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

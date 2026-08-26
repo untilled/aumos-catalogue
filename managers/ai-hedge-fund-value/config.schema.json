@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "AI Hedge Fund — Deep Value instance configuration",
-  "description": "Reaches the agent as AgentInvocation.config. Every field here corresponds to something the source harness put in its own YAML: the analyst blend weights are `StrategySpec.models[].weight` and the conviction floor is the `min-conviction floor` its portfolio-construction module names as the obvious next knob. What is deliberately NOT here is anything the Kernel owns — position caps and gross exposure were `RiskLimits` upstream and are the investor's Mandate here, so putting them in an agent's config would let a package argue with the constraint it is judged against. Aumos resolves this file and deliberately does not validate instance config against it — a half-validator would report a pass it did not establish.",
+  "description": "Reaches the manager as ManagerInvocation.config. Every field here corresponds to something the source harness put in its own YAML: the analyst blend weights are `StrategySpec.models[].weight` and the conviction floor is the `min-conviction floor` its portfolio-construction module names as the obvious next knob. What is deliberately NOT here is anything the Kernel owns — position caps and gross exposure were `RiskLimits` upstream and are the investor's Mandate here, so putting them in a manager's config would let a package argue with the constraint it is judged against. Aumos resolves this file and deliberately does not validate instance config against it — a half-validator would report a pass it did not establish.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

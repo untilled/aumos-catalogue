@@ -1,6 +1,6 @@
 # basic-investor
 
-**The reference AgentPackage, and the walkthrough for building one.**
+**The reference ManagerPackage, and the walkthrough for building one.**
 
 This is not a copy of the documentation — it is the package the documentation is about.
 Aumos loads *this* manifest and runs *these* prompt files on every commit to its own test
@@ -9,7 +9,7 @@ that breaks the description fails the build.
 
 ---
 
-## An agent is a manifest and a prompt bundle
+## A manager is a manifest and a prompt bundle
 
 That is the whole package. There is no code.
 
@@ -19,7 +19,7 @@ config.schema.json     JSON Schema for per-instance settings
 prompt/                the bundle, concatenated in filename order, sent as one prompt
 ```
 
-Aumos never analyses what is inside an agent. For this package the inside happens to be
+Aumos never analyses what is inside a manager. For this package the inside happens to be
 prose, which changes nothing: the prose is read to be *sent*, never to work out what the
 package is allowed to do. That comes from the manifest and only from the manifest.
 
@@ -55,7 +55,7 @@ establish about prose and a half-check would report one anyway.
 
 Two things a catalogue listing wants are deliberately **not** manifest fields. *Typical
 behaviour* is a set of numbers Aumos measures from actual runs, so no package is asked to
-declare them; *internal harness* is self-report about the inside of an agent, which Aumos
+declare them; *internal harness* is self-report about the inside of a manager, which Aumos
 has no way to check.
 
 ### prompt/ — order is the filename
@@ -81,11 +81,11 @@ a question nobody asked.
 
 #### ⚠️ The three stages are prompt structure, not orchestration
 
-There is **one** agent call per run. The stages are sections of one prompt.
+There is **one** manager call per run. The stages are sections of one prompt.
 
 Running a process per stage would be building an arbitrary workflow engine, and it would buy
 nothing — the stages share one context window, which is the entire reason the decomposition
-works. It would also mean claiming to know an agent's internals, and would then be unable to
+works. It would also mean claiming to know a manager's internals, and would then be unable to
 run any package that does not decompose the same way, which is every package somebody else
 writes.
 
@@ -102,7 +102,7 @@ test of whether it depends on the package cooperating.
 Every tool call carries `asOf`, there is no default, and absent / malformed / **future** are
 separate refusal codes. The prompt's job is to make that feel like the shape of the world
 rather than an obstacle, because a prompt that says *"check the current price"* produces an
-agent that fights the gate — and a transcript full of refusals reads like a leak that was
+manager that fights the gate — and a transcript full of refusals reads like a leak that was
 blocked rather than a run that never tried.
 
 This bundle is checked for exactly that phrasing. It is a lint on the prose, and it is there
@@ -118,10 +118,10 @@ good, and the portfolio-context file closes by asking "does this change what the
 should hold?" rather than "is this a good company" — because those questions have different
 answers, and only the first one is the product.
 
-### 3. The Thesis is not the agent's
+### 3. The Thesis is not the manager's
 
 It arrives as read-only context and goes back as a proposal. Long-term memory belongs to
-Aumos rather than to the agent: an agent that kept its own would take the reason a position
+Aumos rather than to the manager: a manager that kept its own would take the reason a position
 exists with it when it was swapped out. The thesis stage says to propose the *next revision*
 of an existing thesis rather than restate it, because a revision chain full of no-op
 restatements loses the property that makes it worth keeping — that every version transition
@@ -169,10 +169,10 @@ Three things about that diagram are decisions rather than mechanics:
 - **A schema failure does not become a WAIT.** WAIT is a judgement; minting one from a parse
   failure would put the Kernel's words in your mouth, and the track record could then no
   longer tell "decided to do nothing" from "could not be understood" — opposite facts about
-  an agent. It is recorded as a fact *about you* instead, with the raw answer and the exact
+  a manager. It is recorded as a fact *about you* instead, with the raw answer and the exact
   validation issues, so there is something to fix rather than a verdict to argue with.
 - **A mandate breach is not an error.** Your proposal is stored exactly as you made it and
-  the Kernel's ruling stands beside it, because an agent's track record is scored on what it
+  the Kernel's ruling stands beside it, because a manager's track record is scored on what it
   *proposed*, not on what it was allowed to do. Propose what you think is right.
 - **There is no retry.** One invocation, one Run. Whether to try again is a scheduling
   decision that belongs to whatever woke you, and it would be a second Run with its own
@@ -207,7 +207,7 @@ bundle in front of a real model on a real subscription.
 
 That the judgement is any good.
 
-One run against fixture data says nothing about whether this agent invests well, and no
+One run against fixture data says nothing about whether this manager invests well, and no
 number of runs against fixture data would. That is what a forward track record is for, and
 the reason it takes calendar time rather than compute. What is established here is narrower
 and worth stating exactly: that a package shaped like this loads, runs inside its

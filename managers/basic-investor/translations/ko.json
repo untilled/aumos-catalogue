@@ -1,5 +1,5 @@
 {
-  "description": "FinRobot의 Data-CoT → Concept-CoT → Thesis-CoT에 포트폴리오 컨텍스트와 결정 단계를 더한 구성. 표준이 되는 AgentPackage입니다.",
+  "description": "FinRobot의 Data-CoT → Concept-CoT → Thesis-CoT에 포트폴리오 컨텍스트와 결정 단계를 더한 구성. 표준이 되는 ManagerPackage입니다.",
   "managers": [
     {
       "id": "basic-investor",
