@@ -14,6 +14,8 @@ prevent.
 | `coherence.ts` | `packages/source-spec/src/coherence.ts` |
 | `errors.ts` | `packages/source-spec/src/errors.ts` |
 | `hosts.ts` | `packages/source-spec/src/hosts.ts` |
+| `broker-ceiling.ts` | `packages/source-spec/src/broker-ceiling.ts` |
+| `broker-ceiling.json` | `packages/skill-gateway/` — 커넥터 표에서 생성 |
 | `source-spec.schema.json` | `packages/source-spec/schema/` — generated from zod |
 | `main.ts` | written by `vendor.ts`; it is the only glue |
 
@@ -45,6 +47,8 @@ to relay a broker.
 | `coherence.ts` | `packages/source-spec/src/coherence.ts` |
 | `errors.ts` | `packages/source-spec/src/errors.ts` |
 | `hosts.ts` | `packages/source-spec/src/hosts.ts` |
+| `broker-ceiling.ts` | `packages/source-spec/src/broker-ceiling.ts` |
+| `broker-ceiling.json` | `packages/skill-gateway/` — 커넥터 표에서 생성 |
 | `source-spec.schema.json` | `packages/source-spec/schema/` — zod에서 생성 |
 | `main.ts` | `vendor.ts`가 쓴다. 유일한 접착 코드 |
 
@@ -53,7 +57,16 @@ to relay a broker.
 `coherence.ts`(Aumos가 돌리는 바로 그 파일)로 한 번 읽힌다. 여기의 초록 체크는
 머지가 뜻하는 것과 같은 것을 뜻한다.
 
-**규칙 하나는 남는다.** 문서는 **증권사**의 호스트에 엔드포인트를 선언할 수 없다 —
-증권사에서는 읽는 자격증명이 곧 거래하는 자격증명이기 때문이다. 그 검사는 발행되지
-않는 Aumos의 커넥터 표를 읽으므로 머지와 설치에서 돈다. 무언가를 발행할 수는 없고,
-증권사를 중계하려 한 제출을 놀라게 할 수 있을 뿐이다.
+⚠️ **여기에 «규칙 하나는 남는다»가 있었고 #486이 그것을 없앴다.** 문서는 **증권사**의
+호스트에 자기가 고르지 않은 엔드포인트를 선언할 수 없다 — 증권사에서는 읽는 자격증명이
+곧 거래하는 자격증명이기 때문이다. 그 검사는 Aumos의 커넥터 표를 읽어서 여기 살 수
+없었고, 그래서 증권사를 중계하려 한 제출은 **여기서 초록 체크를 받고 설치에서 거절**됐다.
+
+이제 그 표가 `broker-ceiling.json`으로 온다 — `skill-gateway/src/adapters/registry.ts`에서
+생성되고(그곳이 이 워크스페이스에서 벤더 이름이 나오는 유일한 곳이다), 저쪽
+`broker-ceiling.test.ts`가 커밋된 바이트와 표가 어긋나면 빌드를 깬다. 규칙 자체는
+`broker-ceiling.ts`이고 벤더도 호스트도 이름 대지 않는다 — 천장을 인자로 받는다.
+
+⛔ **발행되지 않던 것을 발행하는 것이 아니다**: `spec/relay.ts`의 거절문이 이미 걸린
+사람에게 허용 경로 목록을 그대로 찍어 준다. 그리고 이것은 통제가 아니다 — 천장은
+투자자의 기기에서 코드가 강제하고, 린터가 그것을 아는 것은 문장을 앞당길 뿐이다.
