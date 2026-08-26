@@ -66,8 +66,43 @@ function git(...args) {
   }
 }
 
+/**
+ * ⚠️ **The source list was not read here until untilled/aumos#486.**
+ *
+ * This script named one document, and `.aumos/sources.json` pins its entries the
+ * same way — `git-subdir` and a sha. So the two halves of this repository could
+ * point at different commits and nothing said so, which is exactly what
+ * happened: untilled/aumos#477's pull request repinned every manager entry and
+ * left every source entry on the commit before it, undoing #57's *every entry
+ * points at one commit* without a single red line.
+ *
+ * The manifest filename is the only real difference between the two, so it is a
+ * parameter and everything else is one loop.
+ */
+const SOURCES = '.aumos/sources.json'
+
 const marketplace = JSON.parse(readFileSync(join(ROOT, MARKETPLACE), 'utf8'))
-const plugins = Array.isArray(marketplace.plugins) ? marketplace.plugins : []
+const sourcesList = (() => {
+  try {
+    return JSON.parse(readFileSync(join(ROOT, SOURCES), 'utf8'))
+  } catch {
+    // ⚠️ Absent is **not** a failure: a repository with no source list simply
+    // has no sources, which `marketplace.ts` calls the ordinary case.
+    return null
+  }
+})()
+const plugins = [
+  ...(Array.isArray(marketplace.plugins) ? marketplace.plugins : []).map((entry) => ({
+    entry,
+    manifest: 'aumos.json',
+    document: MARKETPLACE,
+  })),
+  ...(Array.isArray(sourcesList?.sources) ? sourcesList.sources : []).map((entry) => ({
+    entry,
+    manifest: 'source.json',
+    document: SOURCES,
+  })),
+]
 
 let failed = 0
 const fail = (entry, message, detail) => {
@@ -81,7 +116,7 @@ if (plugins.length === 0) {
   process.exit(1)
 }
 
-for (const plugin of plugins) {
+for (const { entry: plugin, manifest: manifestFile, document } of plugins) {
   const entry = plugin?.name ?? '(unnamed entry)'
   const source = plugin?.source ?? {}
 
@@ -129,9 +164,9 @@ for (const plugin of plugins) {
   // The neighbours, once the pin itself is sound.
   let manifest
   try {
-    manifest = JSON.parse(readFileSync(join(ROOT, source.path, 'aumos.json'), 'utf8'))
+    manifest = JSON.parse(readFileSync(join(ROOT, source.path, manifestFile), 'utf8'))
   } catch {
-    fail(entry, `names ${source.path}, which has no readable aumos.json`)
+    fail(entry, `names ${source.path}, which has no readable ${manifestFile}`)
     continue
   }
   if (manifest.id !== plugin.name) {
@@ -143,7 +178,32 @@ for (const plugin of plugins) {
     continue
   }
 
-  console.log(`  ok  ${entry} — ${source.sha.slice(0, 12)} serves the tree in HEAD`)
+  console.log(`  ok  ${entry} — ${source.sha.slice(0, 12)} serves the tree in HEAD (${document})`)
+}
+
+/**
+ * Every entry, in both documents, on one commit. (catalogue #57, untilled/aumos#486)
+ *
+ * ⚠️ **A separate claim from the loop above, and it is the one that was silently
+ * broken.** Each entry can pin a commit that serves its own tree while the two
+ * documents disagree about *which* commit — every line prints ok and the
+ * repository is still in the state #57 merged its entries to leave.
+ */
+const pinned = new Map()
+for (const { entry: plugin, document } of plugins) {
+  const sha = plugin?.source?.sha
+  if (typeof sha !== 'string') continue
+  if (!pinned.has(sha)) pinned.set(sha, [])
+  pinned.get(sha).push(`${plugin.name} (${document})`)
+}
+if (pinned.size > 1) {
+  failed += 1
+  console.log('')
+  console.log('FAIL  the two documents pin different commits')
+  for (const [sha, names] of pinned) {
+    console.log(`        ${sha.slice(0, 12)} — ${names.join(', ')}`)
+  }
+  console.log('        Repin every entry to the commit that carries the reviewed tree.')
 }
 
 if (failed > 0) {

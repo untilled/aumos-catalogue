@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 // a mismatch that shows up as "no schema with key or ref" rather than as
 // anything about dialects.
 import { Ajv2020 } from 'ajv/dist/2020.js'
+import { assertUnderBrokerCeiling, type BrokerCeiling } from './broker-ceiling.ts'
 import { assertCoherent } from './coherence.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -27,6 +28,12 @@ const ajv = new Ajv2020({ strict: false, allErrors: true })
 const validate = ajv.compile(
   JSON.parse(readFileSync(join(HERE, 'source-spec.schema.json'), 'utf8')) as object,
 )
+
+// Generated from Aumos's connector table and carried here, which is what lets
+// this repository run the broker ceiling at all. (#486)
+const CEILING = JSON.parse(
+  readFileSync(join(HERE, 'broker-ceiling.json'), 'utf8'),
+) as BrokerCeiling
 
 const directories = (() => {
   try {
@@ -77,6 +84,25 @@ for (const name of directories) {
           credentials: Array.isArray(spec.credentials) ? spec.credentials : [],
           endpoints: Array.isArray(spec.endpoints) ? spec.endpoints : [],
         } as Parameters<typeof assertCoherent>[0])
+      } catch (error) {
+        problems.push(error instanceof Error ? error.message : String(error))
+      }
+
+      // At a broker, a document **selects**; it does not declare. (#486)
+      //
+      // ⚠️ **This is the rule this linter could not run until #486**, and
+      // `VENDORED.md` said so: it reads Aumos's connector table, so a
+      // submission relaying a broker used to get a green tick here and a refusal
+      // at install. The table is generated from that same code and carried in
+      // `broker-ceiling.json` beside this file.
+      try {
+        assertUnderBrokerCeiling(
+          {
+            id: String(spec.id),
+            endpoints: Array.isArray(spec.endpoints) ? (spec.endpoints as never) : [],
+          },
+          CEILING,
+        )
       } catch (error) {
         problems.push(error instanceof Error ? error.message : String(error))
       }

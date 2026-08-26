@@ -1,0 +1,150 @@
+{
+  "routes": {
+    "api.alpaca.markets": [],
+    "api.upbit.com": [],
+    "openapi.tossinvest.com": [
+      {
+        "path": "/api/v1/candles",
+        "query": [
+          "symbol",
+          "interval",
+          "count",
+          "before",
+          "adjusted"
+        ]
+      },
+      {
+        "path": "/api/v1/orderbook",
+        "query": [
+          "symbol"
+        ]
+      },
+      {
+        "path": "/api/v1/prices",
+        "query": [
+          "symbols"
+        ]
+      },
+      {
+        "path": "/api/v1/trades",
+        "query": [
+          "symbol",
+          "count"
+        ]
+      },
+      {
+        "path": "/api/v1/price-limits",
+        "query": [
+          "symbol"
+        ]
+      },
+      {
+        "path": "/api/v1/stocks",
+        "query": [
+          "symbols"
+        ]
+      },
+      {
+        "path": "/api/v1/stocks/all",
+        "query": [
+          "market",
+          "status",
+          "securityType",
+          "commonShare"
+        ]
+      },
+      {
+        "path": "/api/v1/stocks/{symbol}/warnings",
+        "query": []
+      },
+      {
+        "path": "/api/v1/stocks/{symbol}/program-trades",
+        "query": [
+          "count",
+          "until"
+        ]
+      },
+      {
+        "path": "/api/v1/stocks/{symbol}/credit-trades",
+        "query": [
+          "count",
+          "until"
+        ]
+      },
+      {
+        "path": "/api/v1/stocks/{symbol}/securities-lending",
+        "query": [
+          "count",
+          "until"
+        ]
+      },
+      {
+        "path": "/api/v1/stocks/{symbol}/investor-trading",
+        "query": [
+          "count",
+          "until"
+        ]
+      },
+      {
+        "path": "/api/v1/stocks/{symbol}/short-selling",
+        "query": [
+          "count",
+          "until"
+        ]
+      },
+      {
+        "path": "/api/v1/exchange-rate",
+        "query": [
+          "baseCurrency",
+          "quoteCurrency",
+          "dateTime"
+        ]
+      },
+      {
+        "path": "/api/v1/market-calendar/KR",
+        "query": [
+          "date"
+        ]
+      },
+      {
+        "path": "/api/v1/market-calendar/US",
+        "query": [
+          "date"
+        ]
+      },
+      {
+        "path": "/api/v1/rankings",
+        "query": [
+          "type",
+          "marketCountry",
+          "duration",
+          "excludeInvestmentCaution",
+          "count"
+        ]
+      },
+      {
+        "path": "/api/v1/market-indicators/prices",
+        "query": [
+          "symbols"
+        ]
+      },
+      {
+        "path": "/api/v1/market-indicators/{symbol}/candles",
+        "query": [
+          "interval",
+          "count",
+          "before"
+        ]
+      },
+      {
+        "path": "/api/v1/market-indicators/{symbol}/investor-trading",
+        "query": [
+          "interval",
+          "count",
+          "until"
+        ]
+      }
+    ],
+    "paper-api.alpaca.markets": []
+  }
+}
