@@ -1,0 +1,14 @@
+# The one file whose diff is a claim about who wrote something.
+#
+# `.aumos/first-party.json` says which packages here are untilled's own, and
+# `tools/check-publisher.mjs` refuses any entry that wears the reserved name
+# `aumos` without a line in it. This asks GitHub to put the owner on the review
+# of the file that grants it.
+#
+# ⚠️ **This is a request for review and not a gate.** Without branch protection
+# requiring owner review, a maintainer can merge past it — CODEOWNERS on its own
+# only auto-requests. It is written here rather than assumed so that nobody
+# reads a green tick as a signature; `check-publisher.mjs` argues the whole of
+# what this arrangement is worth, and ⬜ the answer that does not rest on
+# attention is untilled/aumos §45.
+/.aumos/first-party.json @morethanmin

@@ -84,6 +84,14 @@ jobs:
       # step, and a step that lives in somebody's memory is one that is skipped.
       - run: npm run check:pins
 
+      # Who may wear a reserved publisher name. ⚠️ **Not enforcement** — a
+      # fork's pull request can edit the roster exactly as it can edit the
+      # entry — and `tools/check-publisher.mjs` is blunt about that. What it
+      # buys is that claiming `aumos` cannot be done *quietly*: it stops being
+      # one field inside an entry a submitter writes anyway and also becomes a
+      # one-line diff in a file whose only subject is whose packages these are.
+      - run: npm run check:publisher
+
       # The English and Korean documents are the same document twice, and a
       # section on one side and not the other is a rule a contributor is never
       # told about — and is then refused for. Structure only; nothing here

@@ -276,6 +276,26 @@ What review is for:
 - **Do the capabilities match the prompt?** Asking for data the bundle never uses is
   a permission an investor is granting for nothing.
 
+## The publisher name
+
+`metadata.publisher` is who wrote it, and it is **yours**. Use a name you can be
+reached at — a GitHub handle is the ordinary answer — and use the same one across
+your packages, because a collection is `publisher` **and** `collection.id`, so two
+spellings are two collections.
+
+⛔ **`aumos` is reserved and a submission may not claim it.** It names the packages
+untilled publishes here, and those are listed in `.aumos/first-party.json`;
+`npm run check:publisher` refuses an entry that wears the name without a line in
+that file. If your pull request needs to touch that file, it is doing something
+other than adding a package.
+
+⚠️ Attribution used to be structural — this repository held `first-party/` beside
+`agents/` and the path was the provenance — and #48 merged them into `managers/`.
+The roster and that check are what stand in its place, and `tools/check-publisher.mjs`
+is deliberately blunt that they are **not** enforcement: a pull request can edit
+them. What they buy is that the claim shows up as its own diff instead of as a
+field inside one you were writing anyway.
+
 ## Versions
 
 `version` is semver. Publishing `0.2.0` does not remove `0.1.0` — the index carries
