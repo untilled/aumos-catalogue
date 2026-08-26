@@ -2,10 +2,10 @@
 
 **A second opinion that is actually a second opinion.**
 
-Installing two agents that read the same event the same way tells you nothing: you get one
+Installing two managers that read the same event the same way tells you nothing: you get one
 answer twice and a track record that cannot separate them. This package exists to be
 genuinely different from a bottom-up reader — **it reaches a different answer to the same
-event, for a reason you can state in one sentence**, which is the only kind of second agent
+event, for a reason you can state in one sentence**, which is the only kind of second manager
 worth installing.
 
 | | `basic-investor` | `prudent-allocator` |
@@ -23,7 +23,7 @@ worth installing.
 
 Top-down, and risk-budget-first.
 
-An event arrives attached to a company. This agent treats that as the *occasion* for a
+An event arrives attached to a company. This manager treats that as the *occasion* for a
 review rather than as its subject: what it is being asked is what the event does to the
 book you actually hold, under the mandate you actually wrote.
 
@@ -70,10 +70,10 @@ that is a different claim.
 
 No `fundamentals:read` and no `news:read`. `basic-investor` has both.
 
-This is a real difference and not a saving. Aumos builds each agent's toolbox from its
-declared capabilities, so this agent's session does not contain a filings tool or a news
+This is a real difference and not a saving. Aumos builds each manager's toolbox from its
+declared capabilities, so this manager's session does not contain a filings tool or a news
 tool at all. It cannot read a filing. Where the judgement turns on one, the prompt requires
-it to say so in its stated uncertainty — which is what a narrower agent owes you, and what
+it to say so in its stated uncertainty — which is what a narrower manager owes you, and what
 the install screen shows before anything is installed.
 
 `thesis:read` is declared and serves no tool: theses arrive with the question rather than
@@ -91,11 +91,11 @@ it is the absence of the spelling, not a denial that could get an exception late
   asks for an order of magnitude and says so; a number with three decimal places produced
   from a price series and a plausible story is a fabricated number in a lab coat.
 - **Not a rebalancer.** It does not run on a calendar and it does not restore target weights
-  as a matter of routine. It is woken by an event like every other agent, and `REBALANCE` is
+  as a matter of routine. It is woken by an event like every other manager, and `REBALANCE` is
   the answer it reaches least often.
-- **Not a second-opinion service.** It is not told what any other agent concluded, and there
-  is no way to tell it. Two agents judging one event independently is what makes the
-  comparison mean anything; showing one the other's answer would make them one agent with
+- **Not a second-opinion service.** It is not told what any other manager concluded, and there
+  is no way to tell it. Two managers judging one event independently is what makes the
+  comparison mean anything; showing one the other's answer would make them one manager with
   extra steps.
 
 ---
@@ -106,7 +106,7 @@ Browse the catalogue in Aumos, install it against a book, and consent to the thr
 capabilities above — they are shown before anything is installed.
 
 LIVE means proposals enter the approval queue against your real book. **A book may have
-more than one LIVE agent**, and Aumos does not merge them: two agents proposing conflicting
+more than one LIVE manager**, and Aumos does not merge them: two managers proposing conflicting
 targets for one book have no resolution rule, and inventing one would be Aumos deciding
 something nobody approved. So each seals its own judgement, each arrives in your approvals
 naming itself, and you decide the order — including deciding not to. Installing this one

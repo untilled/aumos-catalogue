@@ -92,6 +92,17 @@ jobs:
       # one-line diff in a file whose only subject is whose packages these are.
       - run: npm run check:publisher
 
+      # A ported package and the `harness.json` beside it have to agree — one
+      # commit, one licence, one notice, one capability list, and a graph whose
+      # roles are actually in the prompt in that order.
+      #
+      # ⚠️ **These ran in `untilled/aumos` and moved here** (that repository's
+      # #477): they need the package **and** its spec together, and after it
+      # deleted its copy of the published packages only this repository has
+      # both. A package with no `harness.json` is skipped rather than refused —
+      # most packages are nobody's derivative.
+      - run: npm run check:provenance
+
       # The English and Korean documents are the same document twice, and a
       # section on one side and not the other is a rule a contributor is never
       # told about — and is then refused for. Structure only; nothing here

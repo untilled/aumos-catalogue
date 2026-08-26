@@ -1,6 +1,6 @@
 # Third-party notice
 
-This AgentPackage is a **derivative work**. Its three analyst personas are ported from the
+This ManagerPackage is a **derivative work**. Its three analyst personas are ported from the
 `deep-value` strategy of [`virattt/ai-hedge-fund`](https://github.com/virattt/ai-hedge-fund),
 at commit `69e5946dcb7b5fbe739b516455d1b5392cb5f7ac`, and the notice below is retained as that
 project's licence requires.
@@ -41,7 +41,7 @@ SOFTWARE.
 Carried across from the source's own `VISION.md`, because it is a statement about the thing being
 ported and it does not become less true for having been ported:
 
-> The investor agents are *stylized approximations* of these investors' public philosophies — not
+> The investor managers are *stylized approximations* of these investors' public philosophies — not
 > the actual individuals, and not endorsements.
 
 Benjamin Graham, Warren Buffett and Charlie Munger have no connection to this package, to

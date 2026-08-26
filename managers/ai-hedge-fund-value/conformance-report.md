@@ -1,6 +1,6 @@
 # Conformance report — `aumos/ai-hedge-fund-value@0.1.0`
 
-**AAP/1 CONFORMANT.** 6/6 canonical invocations, against a real `claude` reading this package's
+**AMP/1 CONFORMANT.** 6/6 canonical invocations, against a real `claude` reading this package's
 prompt bundle through a real Skill Gateway.
 
 Reproduce with:
@@ -77,16 +77,16 @@ tools granted by its manifest: mcp__aumos__fundamentals_latest, mcp__aumos__mark
 
 ## report
 
-AAP/1 CONFORMANT — aumos/ai-hedge-fund-value@0.1.0
+AMP/1 CONFORMANT — aumos/ai-hedge-fund-value@0.1.0
 
-✓ manifest-valid  Manifest validates against AAP/1
+✓ manifest-valid  Manifest validates against AMP/1
     aumos/ai-hedge-fund-value@0.1.0
 ✓ immutable-version  Declares an immutable version
     0.1.0 is exact — a track record can be attached to it
 ✓ declares-skills  Declares required Skills
     requires 2 skill(s)
 ✓ declares-permissions  Declares permissions as capabilities
-    3 capability declaration(s), all within the AAP/1 enum
+    3 capability declaration(s), all within the AMP/1 enum
 ✓ no-broker-write  Requests no broker write capability
     No execution capability requested — and the enum has no way to spell one
 ✓ network-declared  Declares a network policy
@@ -95,8 +95,8 @@ AAP/1 CONFORMANT — aumos/ai-hedge-fund-value@0.1.0
     6 invocation(s) clean; runtime enforcement is the Skill Gateway's (#147)
 ✓ produces-decision-proposal  Every response is a schema-valid ManagerResult carrying a DecisionProposal
     6/6 response(s) valid
-✓ protocol-declared  Every response declares AAP/1
-    all responses declare AAP/1
+✓ protocol-declared  Every response declares AMP/1
+    all responses declare AMP/1
 ✓ echoes-invocation-id  Every response echoes its invocationId
     no response could be mistaken for another run
 ✓ no-direct-broker-execution  No response contains an execution instruction
@@ -121,7 +121,7 @@ otherwise is exactly what #154's Forward Track Record exists to replace. Conform
 contract and the permission surface: *can this thing be run at all, and does it answer in the
 protocol when asked in Korean, when the mandate excludes the subject, and when it has nothing to say.*
 
-`skills-used-declared` is skipped rather than passed, because AAP's `diagnostics.skillsUsed` is
+`skills-used-declared` is skipped rather than passed, because AMP's `diagnostics.skillsUsed` is
 self-report and no response volunteered it. What the manager actually reached for is enforced by the
 gateway at runtime (#147) and drawn from what the gateway *observed* (#264), which is the half that
 cannot be lied about.

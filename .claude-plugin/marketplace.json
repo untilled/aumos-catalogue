@@ -4,7 +4,7 @@
     "name": "Aumos",
     "url": "https://aumos.app"
   },
-  "description": "Investment methodologies you install and run as AI fund managers, under your own approval. Each plugin is an Aumos AgentPackage: it proposes decisions and never sends an order — a person approves every one.",
+  "description": "Investment methodologies you install and run as AI fund managers, under your own approval. Each plugin is an Aumos ManagerPackage: it proposes decisions and never sends an order — a person approves every one.",
   "plugins": [
     {
       "name": "ai-hedge-fund-value",
@@ -13,10 +13,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/ai-hedge-fund-value",
         "ref": "main",
-        "sha": "359691c20d130607eefdf1b4b3d26cfcdee30f64"
+        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
       },
       "description": "A port of ai-hedge-fund's deep-value pod: Graham, Buffett and Munger read the same point-in-time fundamentals independently, and one reconciliation weighs their convictions. Graham's view counts double, as the source's own strategy file specifies.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "metadata": {
         "name": "AI Hedge Fund — Deep Value",
         "publisher": "aumos",
@@ -59,7 +59,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/atlas-trend-us",
         "ref": "main",
-        "sha": "359691c20d130607eefdf1b4b3d26cfcdee30f64"
+        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
       },
       "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
       "version": "0.1.1",
@@ -102,10 +102,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/basic-investor",
         "ref": "main",
-        "sha": "359691c20d130607eefdf1b4b3d26cfcdee30f64"
+        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
       },
-      "description": "FinRobot's Data-CoT → Concept-CoT → Thesis-CoT, extended with Portfolio Context and a Decision stage. The reference AgentPackage.",
-      "version": "0.2.0",
+      "description": "FinRobot's Data-CoT → Concept-CoT → Thesis-CoT, extended with Portfolio Context and a Decision stage. The reference ManagerPackage.",
+      "version": "0.2.1",
       "metadata": {
         "name": "Basic Investor",
         "publisher": "aumos",
@@ -144,7 +144,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/earnings-drift-watcher",
         "ref": "main",
-        "sha": "359691c20d130607eefdf1b4b3d26cfcdee30f64"
+        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
       },
       "description": "Judges one thing only: whether the market has finished reacting to a reported surprise. Compares the reported figure against what was expected, then against how far the price has already travelled, and mostly concludes that it is too late.",
       "version": "0.2.0",
@@ -183,7 +183,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/evidence-gated-global",
         "ref": "main",
-        "sha": "359691c20d130607eefdf1b4b3d26cfcdee30f64"
+        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
       },
       "description": "Allocates KRW/USD sleeves, cash, FX and portfolio-wide sector/theme/factor concentration. It is the only manager that proposes cross-market REBALANCE targets.",
       "version": "0.1.0",
@@ -241,7 +241,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/evidence-gated-kr",
         "ref": "main",
-        "sha": "359691c20d130607eefdf1b4b3d26cfcdee30f64"
+        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
       },
       "description": "Researches XKRX assets and operates the Korean sleeve inside the Global allocator's shared Brief budget, using Korean market, disclosure-time and policy context.",
       "version": "0.1.0",
@@ -300,7 +300,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/evidence-gated-us",
         "ref": "main",
-        "sha": "359691c20d130607eefdf1b4b3d26cfcdee30f64"
+        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
       },
       "description": "Researches XNAS/XNYS assets and operates the US sleeve, including USD cash and policy-designated SGOV liquidity, inside the Global allocator's shared Brief budget.",
       "version": "0.1.0",
@@ -360,10 +360,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/prudent-allocator",
         "ref": "main",
-        "sha": "359691c20d130607eefdf1b4b3d26cfcdee30f64"
+        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
       },
       "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "metadata": {
         "name": "Prudent Allocator",
         "publisher": "aumos",
@@ -405,10 +405,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/undervalued-now",
         "ref": "main",
-        "sha": "359691c20d130607eefdf1b4b3d26cfcdee30f64"
+        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
       },
       "description": "One paragraph, no capabilities, and its own web and shell. A benchmark of the model rather than of a methodology — the prompt is the question, and the forward return is the answer.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "metadata": {
         "name": "Undervalued Now",
         "publisher": "aumos",

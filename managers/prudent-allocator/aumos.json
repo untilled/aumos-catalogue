@@ -3,7 +3,7 @@
   "id": "prudent-allocator",
   "publisher": "aumos",
   "name": "Prudent Allocator",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
@@ -32,7 +32,7 @@
     },
     {
       "kind": "portfolio:read",
-      "reason": "The book is the subject. Every judgement this agent makes is about the portfolio's exposure, not about an asset in the abstract."
+      "reason": "The book is the subject. Every judgement this manager makes is about the portfolio's exposure, not about an asset in the abstract."
     },
     {
       "kind": "thesis:read",
@@ -40,11 +40,11 @@
     },
     {
       "kind": "brief:read",
-      "reason": "What this portfolio has already concluded that is not about one asset — a regime read, a sector call, a hold. Written by this agent's earlier runs and by the other agents on this book."
+      "reason": "What this portfolio has already concluded that is not about one asset — a regime read, a sector call, a hold. Written by this manager's earlier runs and by the other managers on this book."
     },
     {
       "kind": "brief:write",
-      "reason": "To record such a conclusion when this agent reaches one. A judgement about the book that has no asset to attach to has nowhere else to live, and would otherwise be lost when the run ends."
+      "reason": "To record such a conclusion when this manager reaches one. A judgement about the book that has no asset to attach to has nowhere else to live, and would otherwise be lost when the run ends."
     }
   ],
   "requires": {

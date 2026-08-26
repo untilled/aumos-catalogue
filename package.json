@@ -15,6 +15,7 @@
     "check:index": "node tools/check-index.mjs",
     "check:pins": "node tools/check-pins.mjs",
     "check:publisher": "node tools/check-publisher.mjs",
+    "check:provenance": "node tools/check-provenance.mjs",
     "check:collection": "node tools/check-collection.mjs",
     "check:allocator": "node tools/verify-evidence-gated-allocator.mjs",
     "check:legacy-parity": "node tools/legacy-parity.mjs"

@@ -58,32 +58,32 @@
     {
       "sourceNode": "apply_limits",
       "sourcePath": "hedge_fund/risk/limits.py",
-      "reason": "Deterministic clamping of target weights against the fund's hard limits — 'conviction requests, risk disposes'. Not a prompt, and not ours to re-implement: an agent that clamped its own proposal would be arguing with the constraint it is judged against.",
-      "ownedBy": "Kernel.judge() against MandateConstraints — which downgrades to WAIT rather than clamping, so the difference is stated to the agent in prompt/60-mandate.md"
+      "reason": "Deterministic clamping of target weights against the fund's hard limits — 'conviction requests, risk disposes'. Not a prompt, and not ours to re-implement: a manager that clamped its own proposal would be arguing with the constraint it is judged against.",
+      "ownedBy": "Kernel.judge() against MandateConstraints — which downgrades to WAIT rather than clamping, so the difference is stated to the manager in prompt/60-mandate.md"
     },
     {
       "sourceNode": "build_orders",
       "sourcePath": "hedge_fund/pipeline/execution.py",
-      "reason": "Turning target weights into share counts. Every AAP payload is deliberately incapable of carrying a quantity, a limit price or an order type (plan.md §12).",
+      "reason": "Turning target weights into share counts. Every AMP payload is deliberately incapable of carrying a quantity, a limit price or an order type (plan.md §12).",
       "ownedBy": "planOrders in packages/kernel/src/execution/ — behind an investor Approval (M8x)"
     },
     {
       "sourceNode": "run_cycle",
       "sourcePath": "hedge_fund/pipeline/run_cycle.py",
-      "reason": "The fund's heartbeat: mark, run analysts, blend, clamp, execute, record. This is the wiring harness-porting.md §1 says the Kernel already does better, and porting it would have meant an agent that decides when it runs and writes its own record.",
+      "reason": "The fund's heartbeat: mark, run analysts, blend, clamp, execute, record. This is the wiring harness-porting.md §1 says the Kernel already does better, and porting it would have meant a manager that decides when it runs and writes its own record.",
       "ownedBy": "the Wake Engine (services/kernel-host/src/wake/) plus the run worker, which is the only writer"
     },
     {
       "sourceNode": "_mark_prices",
       "sourcePath": "hedge_fund/pipeline/run_cycle.py",
-      "reason": "Last close on or before as_of for every held and tradeable name, with a lookback window. Pricing the book is not something an agent may do — a book an agent priced is a book an agent could misprice in its own favour.",
+      "reason": "Last close on or before as_of for every held and tradeable name, with a lookback window. Pricing the book is not something a manager may do — a book a manager priced is a book a manager could misprice in its own favour.",
       "ownedBy": "markBooks (services/kernel-host/src/wake/books.ts) — one instant, one quote map, every book"
     },
     {
       "sourceNode": "normalize_universe / the per-ticker fanout",
       "sourcePath": "hedge_fund/fund/spec.py",
       "reason": "run_cycle fans out over tickers x models; graph.fanout names roles only. This is not an IR gap: which names a run is about is not something a harness declares in Aumos, it is what the invocation says.",
-      "ownedBy": "AgentInvocation.task and .events — the host chooses what a run is about, and an agent cannot widen it"
+      "ownedBy": "ManagerInvocation.task and .events — the host chooses what a run is about, and a manager cannot widen it"
     },
     {
       "sourceNode": "PromptCache",
@@ -94,7 +94,7 @@
     {
       "sourceNode": "FundSpec.strategies[].weight — capital slices across pods",
       "sourcePath": "hedge_fund/fund/spec.py",
-      "reason": "A fund nets several strategies by capital slice. Aumos allows one LIVE agent per Portfolio (design invariant 10) precisely because two agents proposing targets for the same positions have no resolution rule, so there is nothing here to slice.",
+      "reason": "A fund nets several strategies by capital slice. Aumos allows one LIVE manager per Portfolio (design invariant 10) precisely because two managers proposing targets for the same positions have no resolution rule, so there is nothing here to slice.",
       "ownedBy": null
     },
     {
@@ -112,8 +112,8 @@
     {
       "sourceNode": "SimBroker and the Broker protocol",
       "sourcePath": "hedge_fund/brokers/sim.py",
-      "reason": "The harness places its own orders. No AgentPackage can: capabilities.kind has no broker member to ask for (design invariant 5).",
-      "ownedBy": "BrokerReadPort for the book, and adapters/alpaca-execution.ts behind an Approval, neither reachable from an agent"
+      "reason": "The harness places its own orders. No ManagerPackage can: capabilities.kind has no broker member to ask for (design invariant 5).",
+      "ownedBy": "BrokerReadPort for the book, and adapters/alpaca-execution.ts behind an Approval, neither reachable from a manager"
     }
   ],
   "capabilities": ["source:passthrough", "portfolio:read"],
@@ -122,37 +122,37 @@
     "entries": [
       {
         "sourceField": "signal",
-        "aapField": null,
-        "rule": "There is no equivalent and deliberately so. bullish/bearish/neutral is an *input* to the blend, not an answer; what leaves this agent is a DecisionProposal.action reached in prompt/50-blend.md. Mapping signal straight onto action would have made each analyst a decision-maker, which is the one thing the source is careful they are not."
+        "ampField": null,
+        "rule": "There is no equivalent and deliberately so. bullish/bearish/neutral is an *input* to the blend, not an answer; what leaves this manager is a DecisionProposal.action reached in prompt/50-blend.md. Mapping signal straight onto action would have made each analyst a decision-maker, which is the one thing the source is careful they are not."
       },
       {
         "sourceField": "signal == 'neutral'",
-        "aapField": "action",
+        "ampField": "action",
         "rule": "Becomes WAIT or WATCH, never 'no position'. Upstream a neutral view demeans into a weight near zero and the fund quietly closes to flat, which is a trade nobody decided to make. Design invariant 4 makes WAIT and WATCH first-class judgements, so the same view becomes a sentence with reasons attached."
       },
       {
         "sourceField": "metadata.abstained",
-        "aapField": null,
-        "rule": "Stays inside the reasoning: an abstaining analyst does not vote in stage 4 and is named in rationale.uncertainty. The source excludes an abstention from the blend's numerator and denominator both, and Aumos draws the same line one level up — a run that could not answer is recorded as invalid-proposal or an AgentError, never as a WAIT."
+        "ampField": null,
+        "rule": "Stays inside the reasoning: an abstaining analyst does not vote in stage 4 and is named in rationale.uncertainty. The source excludes an abstention from the blend's numerator and denominator both, and Aumos draws the same line one level up — a run that could not answer is recorded as invalid-proposal or an ManagerError, never as a WAIT."
       },
       {
         "sourceField": "confidence (0-100)",
-        "aapField": "confidence",
-        "rule": "Divided by 100. AAP confidence is a unit interval, and the blended figure is the desk's, not any one analyst's — the per-analyst numbers go in rationale.keyReasons so the blend can be recomputed by a reader."
+        "ampField": "confidence",
+        "rule": "Divided by 100. AMP confidence is a unit interval, and the blended figure is the desk's, not any one analyst's — the per-analyst numbers go in rationale.keyReasons so the blend can be recomputed by a reader."
       },
       {
         "sourceField": "reasoning",
-        "aapField": "rationale.keyReasons[]",
+        "ampField": "rationale.keyReasons[]",
         "rule": "One entry per analyst, prefixed with the analyst's name, blend weight and confidence. Not rationale.conclusion: the conclusion is the desk's single sentence, and three voices collapsed into it would lose the disagreement that is the whole point of a fanout."
       },
       {
         "sourceField": "Signal.value (conviction in [-1, +1])",
-        "aapField": "target.targetWeight",
+        "ampField": "target.targetWeight",
         "rule": "conviction x mandate.constraints.maxPositionWeight, rather than the source's cross-sectional normalisation, which has no meaning on one subject. See omitted."
       },
       {
         "sourceField": "a negative Signal.value on an unheld name",
-        "aapField": null,
+        "ampField": null,
         "rule": "Dropped. The source's market_neutral mode shorts its least-liked names; allowShorting is a Mandate constraint and is normally false, so a bearish blend on something unheld is a WAIT that records the bearish case. The port loses the short side of this methodology and says so rather than approximating it with a hedge."
       }
     ]

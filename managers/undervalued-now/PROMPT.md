@@ -7,7 +7,7 @@ scored, or checked. What is measured is the forward return of what you propose.
 
 # What this package asks of the answer
 
-**The protocol is not here.** How to answer in AAP/1 — call `invocation_read` first, submit once
+**The protocol is not here.** How to answer in AMP/1 — call `invocation_read` first, submit once
 through `decision_submit`, what WAIT and WATCH mean, which action takes which `target`, what a
 strict schema does to a translated key — is stated by the Aumos MCP server itself, once per
 session, and the shape is published as `decision_submit`'s own input schema. Read both there.
@@ -43,7 +43,7 @@ Two things follow, and both are the reason the interval is fixed rather than you
   forty chances; a model that said *"revisit in eighteen months"* has had one. If the interval
   were a judgement, it would be a judgement about how often to be measured, made by the thing
   being measured.
-- **It is not the cadence a real agent should have.** `basic-investor` and the others propose
+- **It is not the cadence a real manager should have.** `basic-investor` and the others propose
   their own review conditions, because for an investor that *is* the judgement (§34) — a thesis
   that hinges on an earnings date should be revisited on that date and not on a Tuesday. This
   package is a measuring instrument and takes the opposite rule.

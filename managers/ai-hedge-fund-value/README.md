@@ -1,6 +1,6 @@
 # ai-hedge-fund-value
 
-**A port, and the first agent here whose knowledge is not ours.**
+**A port, and the first manager here whose knowledge is not ours.**
 
 Three analyst personas lifted out of
 [`virattt/ai-hedge-fund`](https://github.com/virattt/ai-hedge-fund) (MIT, © 2024 Virat Singh) at
@@ -32,7 +32,7 @@ answers**, and one reconciliation weighs their convictions into a single judgeme
 - **The blend** — a weighted mean over the analysts who *voted*, then sized against your mandate.
   Abstentions are excluded from both halves of the average, so "no opinion" never arrives as
   "opinion: neutral".
-- **The mandate check** — and an explanation of why the agent must respect a limit the source's
+- **The mandate check** — and an explanation of why the manager must respect a limit the source's
   harness would have clamped for it.
 
 **The independence is the whole methodology.** Three analysts who converge because the third read
@@ -42,7 +42,7 @@ its own echo. The stage files say so out loud, twice.
 It is given **no news access and no access to your theses**, and that is the port being faithful
 rather than the port being lazy. The source hands its value analysts a rendered fundamentals
 snapshot and nothing else; a port that quietly added a news feed would be an improvement filed
-under somebody else's name. Where that costs the judgement something, the agent is required to say
+under somebody else's name. Where that costs the judgement something, the manager is required to say
 so in its stated uncertainty.
 
 ### What is different from the source, and why each change was necessary
@@ -56,7 +56,7 @@ the Aumos rule that made it impossible.
 | clamps a target above the cap, silently | proposes inside the mandate, or explains that the mandate stopped it | Aumos does not clamp — it records the proposal verbatim and rules it a **WAIT**. A target over the cap costs the whole judgement, not some exposure |
 | an all-neutral cycle produces zero weights and the fund closes to flat | returns **WAIT or WATCH** with reasons | closing to flat is a *trade*, and one nobody decided to make. WAIT is a first-class judgement here |
 | shorts its least-liked names in market-neutral mode | drops the short side and says so | shorting is a mandate constraint and is normally off. Approximating a short with a hedge would be inventing an instruction |
-| states the point-in-time discipline as a prompt rule the model is asked to keep | states it as a description of machinery | Aumos enforces `asOf` and refuses a result stamped after it. A prompt that *asks* an agent not to look ahead produces an agent that tries |
+| states the point-in-time discipline as a prompt rule the model is asked to keep | states it as a description of machinery | Aumos enforces `asOf` and refuses a result stamped after it. A prompt that *asks* a manager not to look ahead produces a manager that tries |
 | has no minimum-conviction floor (its own docstring calls this the obvious next knob) | `config.convictionFloor`, default `0.2` | upstream, the risk stage caught the consequence by clamping. With no clamp, the floor stops being an improvement and becomes a requirement |
 | places its own orders | cannot | there is no broker-write capability in the protocol to ask for. Orders reach a venue through your approval and nowhere else |
 
@@ -93,7 +93,7 @@ Four things in that are the port rather than the model:
   reader can recompute the number the judgement rests on.
 - **The replacement sizing rule was reached and reported**: `-0.065`, and then not proposed,
   because shorting is off. The source would have shorted here.
-- **The point-in-time bound is in the agent's own words**, unprompted, as the thing it most wants
+- **The point-in-time bound is in the manager's own words**, unprompted, as the thing it most wants
   recorded.
 
 Everything the run saw is filed as evidence stamped at `asOf`, so the claim is checkable rather
