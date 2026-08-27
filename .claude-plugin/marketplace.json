@@ -16,7 +16,7 @@
         "sha": "9c38301be18e800f7785dae03a86bc678e3d47ce"
       },
       "description": "A port of ai-hedge-fund's deep-value pod: Graham, Buffett and Munger read the same point-in-time fundamentals independently, and one reconciliation weighs their convictions. Graham's view counts double, as the source's own strategy file specifies.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "metadata": {
         "name": "AI Hedge Fund — Deep Value",
         "publisher": "aumos",
@@ -103,7 +103,7 @@
         "sha": "9c38301be18e800f7785dae03a86bc678e3d47ce"
       },
       "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "metadata": {
         "name": "Atlas Trend US",
         "publisher": "aumos",
@@ -188,7 +188,7 @@
         "sha": "9c38301be18e800f7785dae03a86bc678e3d47ce"
       },
       "description": "Judges one thing only: whether the market has finished reacting to a reported surprise. Compares the reported figure against what was expected, then against how far the price has already travelled, and mostly concludes that it is too late.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "metadata": {
         "name": "Earnings Drift Watcher",
         "publisher": "aumos",

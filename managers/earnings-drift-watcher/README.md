@@ -7,7 +7,7 @@ Post-earnings-announcement drift is the observation that prices keep moving in t
 direction of an earnings surprise for weeks after it lands. It is one of the oldest
 documented anomalies and also one of the most heavily arbitraged, which means the
 interesting part is not whether the effect exists but **how much of it has already
-happened by the time you are looking.** That is the whole of what this agent judges.
+happened by the time you are looking.** That is the whole of what this manager judges.
 
 ## How it reasons
 
@@ -22,13 +22,13 @@ happened by the time you are looking.** That is the whole of what this agent jud
 It reasons from **one event and one number**, where a bottom-up analyst reasons from a
 company and a top-down allocator reasons from a risk budget. It reads fundamentals and
 price history and nothing else — no news, no thesis history — and that narrowness is the
-methodology rather than a gap in it: an agent that can only see the reported figure and the
+methodology rather than a gap in it: a manager that can only see the reported figure and the
 price cannot talk itself into a story.
 
 The consequence is that **its characteristic answer is WATCH**, not a trade. Drift is a
 question about timing, and the honest answer to "is there anything left in this" is usually
-"ask again in three weeks". A catalogue of agents that all propose trades would be a
-catalogue of agents that are all wrong at the same time.
+"ask again in three weeks". A catalogue of managers that all propose trades would be a
+catalogue of managers that are all wrong at the same time.
 
 ## What it is bad at
 
@@ -36,7 +36,7 @@ catalogue of agents that are all wrong at the same time.
   it will correctly say there is no surprise to drift from, which is a WAIT that tells you
   nothing you did not know.
 - **Judging whether the business is good.** It never asks. A company can beat expectations
-  on its way out of business and this agent will read the beat.
+  on its way out of business and this manager will read the beat.
 - **Faded moves.** It is instructed to treat a reversal as evidence against its own reading
   rather than as an opportunity, and it will therefore miss the cases where the market was
   wrong and later agreed with it.
@@ -53,7 +53,7 @@ agent is launched with no shell, no web and no filesystem of its own"* — and t
 being true when Aumos deleted the `tools` field and the deny list behind it. The sentence is
 corrected rather than deleted because it was a **safety claim on a published page**, and a
 reader who saw it once should be able to find out that it was withdrawn. What is true now:
-this agent's prompt asks the gateway for everything, so everything it *reasons from* is on
+this manager's prompt asks the gateway for everything, so everything it *reasons from* is on
 the record — and the session it runs in holds whatever its coding CLI ships, which nothing
 in this package can narrow. What contains that session is the OS account Aumos launches it
 as, on the investor's own machine.
@@ -63,7 +63,7 @@ as, on the investor's own machine.
 vendor, mapped the answer onto a port, dated every fact and refused anything published
 after the instant the judgement was pinned to. There are no ports now. A data source is a
 vendor Aumos holds a credential for, `source_request` hands back what that vendor sent —
-unread — and nothing clamps it to `asOf`. So for an agent whose entire subject is *what was
+unread — and nothing clamps it to `asOf`. So for a manager whose entire subject is *what was
 knowable when*, the honest statement is that the **prompt** is what keeps the window
 honest, and the gateway is what keeps the record of what was asked.
 

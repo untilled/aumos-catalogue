@@ -133,7 +133,7 @@
       {
         "sourceField": "metadata.abstained",
         "ampField": null,
-        "rule": "Stays inside the reasoning: an abstaining analyst does not vote in stage 4 and is named in rationale.uncertainty. The source excludes an abstention from the blend's numerator and denominator both, and Aumos draws the same line one level up — a run that could not answer is recorded as invalid-proposal or an ManagerError, never as a WAIT."
+        "rule": "Stays inside the reasoning: an abstaining analyst does not vote in stage 4 and is named in rationale.uncertainty. The source excludes an abstention from the blend's numerator and denominator both, and Aumos draws the same line one level up — a run that could not answer is recorded as invalid-proposal or a ManagerError, never as a WAIT."
       },
       {
         "sourceField": "confidence (0-100)",
