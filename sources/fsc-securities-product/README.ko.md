@@ -1,7 +1,7 @@
 # fsc-securities-product
 
-금융위원회의 **증권상품시세정보** — 한국거래소의 일별 ETF 수치를 공공데이터포털을 통해
-받습니다. 무료이고, 이용허락범위에 제한이 없습니다.
+금융위원회의 **증권상품시세정보** — 상장된 모든 ETF·ETN·ELW의 한국거래소 일별 수치를
+공공데이터포털을 통해 받습니다. 무료이고, 이용허락범위에 제한이 없습니다.
 
 ## 무엇을 얻는가
 
@@ -15,31 +15,38 @@
 
 ```
 /1160100/service/GetSecuritiesProductInfoService/getETFPriceInfo
-   ?numOfRows,pageNo,resultType
-   ,basDt,beginBasDt,endBasDt,likeBasDt
-   ,likeSrtnCd,isinCd,likeIsinCd,itmsNm,likeItmsNm
-   ,beginVs,endVs,beginFltRt,endFltRt,beginNav,endNav
-   ,beginTrqu,endTrqu,beginTrPrc,endTrPrc,beginMrktTotAmt,endMrktTotAmt
-   ,bssIdxIdxNm,likeBssIdxIdxNm
+/1160100/service/GetSecuritiesProductInfoService/getETNPriceInfo
+/1160100/service/GetSecuritiesProductInfoService/getELWPriceInfo
 ```
 
-같은 서비스에 `getETNPriceInfo`와 `getELWPriceInfo`도 있습니다. **여기에 선언하지
-않았습니다.** 벤더 자신의 Swagger에서 파라미터를 읽고 실제 응답과 대조한 것이 ETF
-오퍼레이션뿐이기 때문입니다. 그 확인을 한 사람에게는 한 줄 추가입니다.
+셋 다 같은 페이징·날짜·식별 필터를 받습니다 — `numOfRows`, `pageNo`, `resultType`, `basDt`,
+`beginBasDt`, `endBasDt`, `likeBasDt`, `likeSrtnCd`, `isinCd`, `likeIsinCd`, `itmsNm`,
+`likeItmsNm`, `beginVs`, `endVs`, 그리고 거래량·거래대금·시가총액의 범위 필터. 다른 것은 각
+상품이 자기 것으로 갖는 항목입니다.
+
+| | ETF | ETN | ELW |
+|---|---|---|---|
+| 가치 필터 | `beginNav`/`endNav` | `beginIndcVal`/`endIndcVal` | — |
+| 기초 | `bssIdxIdxNm` | `bssIdxIdxNm` | `udasAstNm` |
+| 등락률 필터 | `beginFltRt`/`endFltRt` | `beginFltRt`/`endFltRt` | — |
+
+위 파라미터는 전부 벤더 자신의 OpenAPI 문서에서 읽은 것입니다 — 포털 페이지가 그것을 인라인으로
+싣고 있습니다. ETF 오퍼레이션은 실제 응답과도 대조했고 나머지 둘은 하지 않았습니다. 둘의 차이는
+그것입니다.
 
 ## 한 행이 담는 것
 
-열여덟 개이고, 중요한 넷은 시세 피드에는 없는 것들입니다.
+중요한 넷은 시세 피드에는 없는 것들입니다.
 
 | | |
 |---|---|
-| `nav` | 순자산가치. `clpr`과 맞대면 **괴리율** |
-| `bssIdxIdxNm` · `bssIdxClpr` | 기초지수의 이름과 종가. `nav`와 맞대면 **추적오차** |
-| `nPptTotAmt` · `stLstgCnt` | 순자산총액과 상장좌수 — **펀드 규모와 그 추이** |
+| ETF `nav` · ETN `indcVal` | 좌당 자산가치. `clpr`과 맞대면 **괴리율** |
+| `bssIdxIdxNm` · `bssIdxClpr` | 기초지수의 이름과 종가. `nav`와 맞대면 **추적오차**. ELW는 기초자산을 `udasAstNm` · `udasAstClpr`로 부릅니다 |
+| ETF `nPptTotAmt` · `stLstgCnt`, ETN `indcValTotAmt` · `lstgScrtCnt` | 순자산총액과 상장좌수 — **규모와 그 추이** |
 | `trqu` · `trPrc` | 거래량과 거래대금 — **유동성** |
 
 나머지는 통상의 모양입니다: `basDt`, `srtnCd`, `isinCd`, `itmsNm`, `mkp`, `hipr`, `lopr`,
-`clpr`, `vs`, `fltRt`, `mrktTotAmt`.
+`clpr`, `vs`, `mrktTotAmt`, 그리고 ETF·ETN의 `fltRt`.
 
 ⚠️ **지수 이름이 그 지수의 종류를 말해줍니다.** `bssIdxIdxNm`에는 벤더 자신의 접미사가
 붙어 옵니다 — `S&P500 Yen Hedged Index(PR)`, `S&P 500 Covered Call 1% OTM Daily Index(TR)`.
@@ -50,8 +57,8 @@
 ## 이것이 아닌 것
 
 ⚠️ **`clpr`은 수정주가가 아닙니다.** 실제로 체결된 가격입니다. 분배나 분할이 이 계열에
-계단을 남기고, `nav`도 소급 조정되지 않습니다 — 즉 **두 계열 어느 쪽도 총수익률이 아니며**
-보정 없이는 총수익률로 쓸 수 없습니다.
+계단을 남기고, `nav`도 `indcVal`도 소급 조정되지 않습니다 — 즉 **여기 어떤 계열도 총수익률이
+아니며** 보정 없이는 총수익률로 쓸 수 없습니다.
 
 이것은 가정이 아니라 측정입니다. `069500`의 260 거래일에 대해 `clpr / nav` 비율은 ±0.5%
 안에서 평균회귀하고 어디에도 레벨 시프트가 없습니다. `nav`는 누구도 소급 조정하지 않으므로,

@@ -2,8 +2,9 @@
 
 <sub><a href="README.ko.md">한국어</a></sub>
 
-금융위원회's **증권상품시세정보** — the Korea Exchange's daily ETF numbers, served through
-Korea's public data portal. Free, and the licence puts no restriction on what you do with it.
+금융위원회's **증권상품시세정보** — the Korea Exchange's daily numbers for every listed ETF, ETN
+and ELW, served through Korea's public data portal. Free, and the licence puts no restriction on
+what you do with it.
 
 ## What you get
 
@@ -17,32 +18,38 @@ Korea's public data portal. Free, and the licence puts no restriction on what yo
 
 ```
 /1160100/service/GetSecuritiesProductInfoService/getETFPriceInfo
-   ?numOfRows,pageNo,resultType
-   ,basDt,beginBasDt,endBasDt,likeBasDt
-   ,likeSrtnCd,isinCd,likeIsinCd,itmsNm,likeItmsNm
-   ,beginVs,endVs,beginFltRt,endFltRt,beginNav,endNav
-   ,beginTrqu,endTrqu,beginTrPrc,endTrPrc,beginMrktTotAmt,endMrktTotAmt
-   ,bssIdxIdxNm,likeBssIdxIdxNm
+/1160100/service/GetSecuritiesProductInfoService/getETNPriceInfo
+/1160100/service/GetSecuritiesProductInfoService/getELWPriceInfo
 ```
 
-The same service also publishes `getETNPriceInfo` and `getELWPriceInfo`. **They are not
-declared here**, because only the ETF operation's parameters were read off the vendor's own
-Swagger and checked against live responses. Adding them is a one-line change for whoever
-needs them and has done that reading.
+All three take the same paging, date and identity filters — `numOfRows`, `pageNo`, `resultType`,
+`basDt`, `beginBasDt`, `endBasDt`, `likeBasDt`, `likeSrtnCd`, `isinCd`, `likeIsinCd`, `itmsNm`,
+`likeItmsNm`, `beginVs`, `endVs`, and range filters on volume, value traded and market cap. Where
+they differ is what each product has of its own:
+
+| | ETF | ETN | ELW |
+|---|---|---|---|
+| value filter | `beginNav`/`endNav` | `beginIndcVal`/`endIndcVal` | — |
+| underlying | `bssIdxIdxNm` | `bssIdxIdxNm` | `udasAstNm` |
+| rate filter | `beginFltRt`/`endFltRt` | `beginFltRt`/`endFltRt` | — |
+
+Every parameter above was read off the vendor's own OpenAPI document, which the portal page
+carries inline. The ETF operation was additionally checked against live responses; the other two
+were not, and that is the difference between them.
 
 ## What one row carries
 
-Eighteen fields, and the four that matter are the ones a price feed does not have.
+The four that matter are the ones a price feed does not have.
 
 | | |
 |---|---|
-| `nav` | net asset value. Against `clpr` this is the **premium or discount** |
-| `bssIdxIdxNm` · `bssIdxClpr` | the underlying index by name and close. Against `nav` this is **tracking** |
-| `nPptTotAmt` · `stLstgCnt` | net assets and units outstanding — **fund size, and whether it is growing** |
+| ETF `nav` · ETN `indcVal` | assets per unit. Against `clpr` this is the **premium or discount** |
+| `bssIdxIdxNm` · `bssIdxClpr` | the underlying index by name and close. Against `nav` this is **tracking**. ELW names its underlying `udasAstNm` · `udasAstClpr` instead |
+| ETF `nPptTotAmt` · `stLstgCnt`, ETN `indcValTotAmt` · `lstgScrtCnt` | net assets and units outstanding — **fund size, and whether it is growing** |
 | `trqu` · `trPrc` | volume and value traded — **liquidity** |
 
 The rest is the ordinary shape: `basDt`, `srtnCd`, `isinCd`, `itmsNm`, `mkp`, `hipr`, `lopr`,
-`clpr`, `vs`, `fltRt`, `mrktTotAmt`.
+`clpr`, `vs`, `mrktTotAmt`, and `fltRt` on ETF and ETN.
 
 ⚠️ **The index name tells you what kind of index it is.** `bssIdxIdxNm` carries the vendor's
 own suffix — `S&P500 Yen Hedged Index(PR)`, `S&P 500 Covered Call 1% OTM Daily Index(TR)`. A
@@ -53,8 +60,8 @@ and this field is how you tell them apart without a second source.
 ## What this is not
 
 ⚠️ **`clpr` is not adjusted.** It is the price that traded. A distribution or a split leaves a
-step in it, and `nav` is not back-adjusted either — so **neither series is a total return** and
-neither can be used for one without repair.
+step in it, and neither `nav` nor `indcVal` is back-adjusted either — so **no series here is a
+total return** and none can be used for one without repair.
 
 That was measured rather than assumed: over 260 sessions of `069500` the ratio `clpr / nav`
 stays inside ±0.5% and mean-reverts, with no level shift anywhere. `nav` is never back-adjusted
