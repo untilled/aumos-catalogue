@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Atlas Trend KR instance configuration",
+  "description": "Reaches the manager as ManagerInvocation.config. These are the constants of the methodology, exposed because an investor's risk appetite is theirs and not the author's — but the shape of the method is not configurable from here: the horizons are fixed, the ensemble rule is fixed, the universe is fixed, and nothing in this file can loosen the Mandate or the TimeGate. Every value here is also written into PROMPT.md, because an invocation may carry no config block at all.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "historyDays": {
+      "type": "integer",
+      "minimum": 400,
+      "maximum": 1500,
+      "default": 420,
+      "description": "Calendar days of daily bars to request, counting back from asOf. The floor is 400 rather than 365 because the twelve-month horizon needs a bar on or before t0 minus twelve months, so the window has to reach past that date with margin for a closure or a gap. Note that 토스증권 returns at most 200 candles per call, so this window is always several calls."
+    },
+    "volatilityWindowDays": {
+      "type": "integer",
+      "minimum": 20,
+      "maximum": 252,
+      "default": 63,
+      "description": "Trading sessions of daily returns behind realised volatility and behind the correlations in the portfolio volatility estimate."
+    },
+    "targetVolatility": {
+      "type": "number",
+      "minimum": 0.02,
+      "maximum": 0.4,
+      "default": 0.1,
+      "description": "Annualised volatility the risk sleeve is scaled toward. A ceiling in practice: the sleeve is scaled down when the estimate exceeds it and never levered up beyond fully invested."
+    },
+    "maxAssetWeight": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 1,
+      "default": 0.35,
+      "description": "The most any one ETF may be proposed at, before the Mandate's own cap is applied on top. Higher than the US sibling's 0.30 because this universe has four risk roles rather than seven, so an equal-weight sleeve is already 25%."
+    },
+    "rebalanceBand": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.2,
+      "default": 0.03,
+      "description": "The no-trade band. If no asset's target differs from its current weight by more than this, the answer is WAIT rather than a rebalance. The single largest determinant of what this methodology costs to run."
+    },
+    "cashProxy": {
+      "type": "string",
+      "enum": ["459580", "488770", "475630", "357870"],
+      "default": "459580",
+      "description": "Short code of the fund the unallocated fraction is held in. 459580 KODEX CD금리액티브(합성) is the most traded; 488770 KODEX 머니마켓액티브 holds its assets directly rather than through a swap, which is the trade an investor may want to make."
+    },
+    "preferTotalReturn": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether, among candidates for one role that share an underlying, a total-return share class is preferred over a distributing one. True by default: a TR class pays no distribution, so its price series needs no adjustment at all and the whole distribution question disappears for that role."
+    }
+  }
+}
