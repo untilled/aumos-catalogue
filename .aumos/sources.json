@@ -12,7 +12,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/alpaca",
         "ref": "main",
-        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
+        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
       },
       "version": "0.3.0",
       "metadata": {
@@ -92,13 +92,75 @@
       }
     },
     {
+      "name": "fsc-securities-product",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/untilled/aumos-catalogue",
+        "path": "sources/fsc-securities-product",
+        "ref": "main",
+        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
+      },
+      "version": "0.1.0",
+      "metadata": {
+        "publisher": "aumos",
+        "vendor": "fsc-securities-product",
+        "port": "library",
+        "fidelity": "none",
+        "hosts": [
+          "apis.data.go.kr"
+        ],
+        "credentials": [
+          {
+            "name": "service-key",
+            "required": true
+          }
+        ],
+        "endpoints": [
+          {
+            "host": "apis.data.go.kr",
+            "path": "/1160100/service/GetSecuritiesProductInfoService/getETFPriceInfo",
+            "query": [
+              "numOfRows",
+              "pageNo",
+              "resultType",
+              "basDt",
+              "beginBasDt",
+              "endBasDt",
+              "likeBasDt",
+              "likeSrtnCd",
+              "isinCd",
+              "likeIsinCd",
+              "itmsNm",
+              "likeItmsNm",
+              "beginVs",
+              "endVs",
+              "beginFltRt",
+              "endFltRt",
+              "beginNav",
+              "endNav",
+              "beginTrqu",
+              "endTrqu",
+              "beginTrPrc",
+              "endTrPrc",
+              "beginMrktTotAmt",
+              "endMrktTotAmt",
+              "bssIdxIdxNm",
+              "likeBssIdxIdxNm"
+            ]
+          }
+        ],
+        "publishedAt": "2026-08-27T00:00:00.000Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSLspp3qtozsg4Htkojsi5zshLjsoJXrs7QiPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMEIzRDkxIi8+PHBhdGggZD0iTTEyIDQ0aDQwIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuNSIvPjxyZWN0IHg9IjE2IiB5PSIyOCIgd2lkdGg9IjciIGhlaWdodD0iMTYiIHJ4PSIyIiBmaWxsPSIjN0ZCMkZGIi8+PHJlY3QgeD0iMjgiIHk9IjE5IiB3aWR0aD0iNyIgaGVpZ2h0PSIyNSIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0MCIgeT0iMzQiIHdpZHRoPSI3IiBoZWlnaHQ9IjEwIiByeD0iMiIgZmlsbD0iIzdGQjJGRiIvPjwvc3ZnPgo="
+      }
+    },
+    {
       "name": "open-dart",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/open-dart",
         "ref": "main",
-        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
+        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
       },
       "version": "0.1.0",
       "metadata": {
@@ -176,7 +238,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/openbb-fmp",
         "ref": "main",
-        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
+        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
       },
       "version": "0.3.2",
       "metadata": {
@@ -213,7 +275,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/sec-edgar",
         "ref": "main",
-        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
+        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
       },
       "version": "0.3.2",
       "metadata": {
@@ -254,7 +316,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/toss",
         "ref": "main",
-        "sha": "adc8efa01fb08407898968885f41bcaf648cd59e"
+        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
       },
       "version": "0.2.0",
       "metadata": {
