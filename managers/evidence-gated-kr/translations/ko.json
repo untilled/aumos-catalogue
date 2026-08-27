@@ -1,9 +1,0 @@
-{
-  "description": "한국 시장·공시시각·정책 맥락을 사용해 XKRX 자산을 조사하고 Global allocator가 Brief에 정한 한국 sleeve 안에서 운용합니다.",
-  "managers": [
-    {
-      "id": "evidence-gated-kr",
-      "description": "한국 시장·공시시각·정책 맥락을 사용해 XKRX 자산을 조사하고 Global allocator가 Brief에 정한 한국 sleeve 안에서 운용합니다."
-    }
-  ]
-}

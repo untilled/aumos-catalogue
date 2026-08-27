@@ -1,26 +1,25 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { execute } from '../managers/evidence-gated-global/lib/index.mjs'
-import { handleMcpRequest } from '../managers/evidence-gated-global/lib/mcp-server.mjs'
+import { execute } from '../managers/evidence-gated/lib/index.mjs'
+import { handleMcpRequest } from '../managers/evidence-gated/lib/mcp-server.mjs'
 import { loadParity, comparePort } from './legacy-parity.mjs'
 
 /**
- * ── One member, and `check:collection` is why that is enough (aumos #447) ───
+ * ── One package, and there is nothing left to compare it against (aumos #489) ─
  *
- * The methodology split into three packages — `evidence-gated-kr`,
- * `evidence-gated-us`, `evidence-gated-global` — because one package is one
- * manager and three market roles are three track records. The deterministic
- * core is therefore shipped **three times**, and the failure that creates is a
- * fix landing in one copy and not the others: three packages in one collection
- * quietly computing different numbers.
+ * The methodology was three packages — `evidence-gated-kr`, `evidence-gated-us`,
+ * `evidence-gated-global` — and the deterministic core was therefore committed
+ * **three times**. `check:collection` existed for the failure that creates: a
+ * fix landing in one copy and not the others, three packages sold as one
+ * methodology quietly computing different numbers.
  *
- * `check:collection` is the guard for exactly that — it compares the shared
- * trees byte for byte — so this file runs the core **once**, against the member
- * that owns the cross-market half. Running it three times over trees a sibling
- * check has just proved identical would be three copies of one measurement.
+ * They are one package with three market **flows** since 2026-08-27, so there is
+ * one copy of the core and that check has no subject — it was deleted in the
+ * same commit. This file is unchanged in what it does: it runs the core once,
+ * against its fixtures.
  */
-const fixtureRoot = new URL('../managers/evidence-gated-global/fixtures/', import.meta.url)
+const fixtureRoot = new URL('../managers/evidence-gated/fixtures/', import.meta.url)
 const memory = JSON.parse(await readFile(new URL('memory-contract.json', fixtureRoot), 'utf8'))
 const source = JSON.parse(await readFile(new URL('source-contract.json', fixtureRoot), 'utf8'))
 const golden = JSON.parse(await readFile(new URL('legacy-golden/core.json', fixtureRoot), 'utf8'))
@@ -334,15 +333,27 @@ assert.equal(
   false,
   'nothing requires an instance to name a role',
 )
-assert.deepEqual(
-  manifest.collection,
-  {
-    id: 'evidence-gated',
-    name: 'Evidence-Gated Allocator',
-    description:
-      'One evidence-gated methodology, run as three market roles: a Korean sleeve, a US sleeve, and the Global allocator that sets their budgets and is the only one that may rebalance across markets.',
-  },
-  'the package says which collection it is one of, in the words every member uses',
+/*
+ * ⛔ `manifest.collection` was asserted here and the field is gone (aumos #489):
+ * with one package there is no set to be one of, and its only consumer was the
+ * install screen's *install the rest of them* offer. What replaced it is the
+ * three flows, and what they are is not a manifest field — it is `agents/` and
+ * the skills they name, which the CLI reads and Aumos does not parse.
+ */
+assert.equal(manifest.collection, undefined, 'a package that is one of nothing declares no collection')
+for (const flow of ['kr-sleeve', 'us-sleeve', 'allocate']) {
+  assert.ok(
+    existsSync(new URL(`../managers/evidence-gated/agents/${flow}.md`, import.meta.url)),
+    `the ${flow} flow ships the subagent that runs it`,
+  )
+  assert.ok(
+    existsSync(new URL(`../managers/evidence-gated/skills/${flow}/SKILL.md`, import.meta.url)),
+    `the ${flow} flow ships the skill that holds its rules`,
+  )
+}
+assert.ok(
+  existsSync(new URL('../managers/evidence-gated/hooks/guard-submit.mjs', import.meta.url)),
+  'the submit guard ships with the package that states the rule',
 )
 assert.deepEqual(configSchema.properties.reserveLiquiditySymbols.default, [], 'reserve liquidity is opt-in')
 assert.equal(
@@ -549,4 +560,4 @@ for (const failure of parityFailures) console.error(`  FAIL ${failure}`)
 assert.equal(parityFailures.length, 0, 'the port still matches the frozen legacy numeric core')
 assert.ok(parity.cases.every((row) => row.legacyMeasured !== undefined), 'every parity case carries a measured legacy output')
 
-console.log(`evidence-gated collection contract fixtures passed (${parity.cases.length} legacy-parity cases)`)
+console.log(`evidence-gated contract fixtures passed (${parity.cases.length} legacy-parity cases)`)
