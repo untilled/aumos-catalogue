@@ -1,5 +1,0 @@
-{
-  "name": "evidence-gated-us",
-  "version": "0.1.0",
-  "description": "Researches XNAS/XNYS assets and operates the US sleeve, including USD cash and policy-designated SGOV liquidity, inside the Global allocator's shared Brief budget."
-}

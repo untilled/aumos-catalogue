@@ -33,9 +33,9 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { execute } from '../managers/evidence-gated-global/lib/index.mjs'
+import { execute } from '../managers/evidence-gated/lib/index.mjs'
 
-const fixtureUrl = new URL('../managers/evidence-gated-global/fixtures/legacy-golden/parity.json', import.meta.url)
+const fixtureUrl = new URL('../managers/evidence-gated/fixtures/legacy-golden/parity.json', import.meta.url)
 const bridgeUrl = new URL('legacy-parity.py', import.meta.url)
 
 const read = (value, path) => {

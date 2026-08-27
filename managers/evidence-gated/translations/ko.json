@@ -1,0 +1,9 @@
+{
+  "description": "한 방법론을 KR sleeve · US sleeve · 배분자 세 플로우로 굴립니다. 플로우는 이 매니저 하나의 서브에이전트이고, 판단을 제출하는 것은 오케스트레이터뿐입니다.",
+  "managers": [
+    {
+      "id": "evidence-gated",
+      "description": "한 방법론을 KR sleeve · US sleeve · 배분자 세 플로우로 굴립니다. 플로우는 이 매니저 하나의 서브에이전트이고, 판단을 제출하는 것은 오케스트레이터뿐입니다."
+    }
+  ]
+}

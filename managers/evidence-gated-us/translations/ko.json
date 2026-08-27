@@ -1,9 +1,0 @@
-{
-  "description": "미국 거래일·정책 맥락과 USD 현금·정책상 유동성인 SGOV를 포함해 XNAS/XNYS 자산과 미국 sleeve를 운용합니다.",
-  "managers": [
-    {
-      "id": "evidence-gated-us",
-      "description": "미국 거래일·정책 맥락과 USD 현금·정책상 유동성인 SGOV를 포함해 XNAS/XNYS 자산과 미국 sleeve를 운용합니다."
-    }
-  ]
-}
