@@ -8,15 +8,57 @@
 
 ## 모양
 
-`managers/` 아래 디렉토리 하나. 이름은 `manifest.json`의 `id`와 **정확히 같아야** 한다.
+`managers/` 아래 디렉토리 하나. 이름은 `aumos.json`의 `id`와 **정확히 같아야** 한다.
 디렉토리 이름이 곧 패키지 id다 — 리뷰어가 트리를 읽는 것이 카탈로그를 읽는 것이 되도록.
 
 ```
 managers/your-package-id/
-  manifest.json
-  prompt/00-….md … 90-….md
-  README.md
+  aumos.json                    manifest. 다른 이름이 아니라 이 이름
+  PROMPT.md                     방법론이자 진입점
+  README.md                     설치 전에 사람이 읽는 페이지
+  .claude-plugin/plugin.json    `runtimes`에 `claude`가 있으면 필수
+  AGENTS.md                     `runtimes`에 `codex`가 있으면 필수
+  skills/<name>/SKILL.md        선택
+  .mcp.json                     선택 — 이 패키지가 데려오는 서버
+  icon.svg                      선택
+  config.schema.json            선택
+  README.ko.md + translations/ko.json    선택이고, 짝이다
+  NOTICE.md                     포팅이라면 필수
 ```
+
+⚠️ **이 모양은 옛 이슈 몇 개가 아직 서술하고 있는 모양을 대체한 것이다.** `manifest.json`과
+번호가 붙은 `prompt/00-….md … 90-….md` 번들은 #286이 `prompt-bundle` 룰을 은퇴시키기
+전까지의 모양이었다. manifest 상수는 `aumos.json`이고(`rules.ts` → `MANIFEST_FILENAME`),
+프롬프트 기본값은 `PROMPT.md`다(`DEFAULT_PROMPT_PATH`). 옛 서술대로 만든 패키지는
+`manifest-present`와 `prompt-present`에서 **동시에** 떨어진다 — 우리 문서를 읽은 대가로
+첫 pull request가 거절되는 것이다.
+
+### `PROMPT.md`는 진입점이지 분량 제한이 아니다
+
+파일 하나가 번호 붙은 디렉토리를 대체했지만, 그것은 방법론을 짧게 쓰라는 지시가
+**아니다.** 바뀐 것은 재료를 *언제* 읽느냐다. `PROMPT.md`는 세션이 항상 읽는 것이고,
+조건부인 것은 전부 `skills/<name>/SKILL.md`로 간다 — 프롬프트가 그것을 지목하고, 모델은
+그 경우에 닿았을 때만 읽어 들인다. 한 시장에만, 한 task에만, 소스가 하나 빠졌을 때만
+적용되는 단계는 스킬이다. 매 실행이 걸어가는 단계는 `PROMPT.md`의 산문이다.
+
+원한다면 `manifest.prompt`로 다른 경로를 지목해도 된다 — `PROMPT.md`는 기본값이지
+요구사항이 아니다. 이 중에서 자유로운 것은 파일 이름뿐이다.
+
+### 런타임 파일 — lint가 요구하는데 어느 문서에도 없던 것
+
+manifest의 `runtimes`는 당신 파일이 어느 로더를 위한 것인지 말하고, lint는 그 로더가 읽는
+파일이 실제로 있는지 검사한다 — **부재만** 보고, 여분의 파일이 있는지는 보지 않는다.
+양쪽 파일을 다 실어도 잘못이 아니다.
+
+| `runtimes`에 있는 것 | 반드시 있어야 하는 파일 | 없으면 치르는 값 |
+|---|---|---|
+| `claude` | `.claude-plugin/plugin.json` | `--plugin-dir`가 플러그인이 없는 디렉토리를 읽고, 세션이 당신의 스킬·훅·MCP 서버 없이 시작된다 |
+| `codex` | `AGENTS.md` | codex가 읽는 유일한 관례이고, Aumos는 claude 플러그인을 그것으로 번역해 주지 않는다 |
+
+`.mcp.json`을 싣는다면 파싱되어야 하고, **그 안의 서버 이름이 `aumos`여서는 안 된다** —
+게이트웨이가 그 이름으로 쓰여 있어서 둘 중 하나가 조용히 다른 하나를 대체한다. Aumos는 그
+파일을 서버 이름까지만 읽는다. `--strict-mcp-config` 때문에, 실행 설정에 써 넣지 않은
+서버는 존재하지 않기 때문이다.
 
 pull request를 열기 전에 검사를 돌려라:
 
@@ -75,23 +117,50 @@ CLI 자신의 인벤토리가 빠뜨리는 이름을 볼 수 없었다. 호스�
 | 2 | `WAIT` 예시만 있어서 `target`이 서술만 되고 보여지지 않았다 |
 | 3 | `uncertainty`가 한 문장에서 이름만 불렸다 → 모델이 문자열로 추측했고 스키마는 배열을 원했다 |
 
-그래서 린트는 **모양**을 검사하고 산문은 검사하지 않는다:
+⚠️ **린트가 이것을 당신에게 요구했었고, 지금은 요구하지 않는다.** 규칙 셋이 여기 서
+있었다 — 모든 action의 worked JSON 예시, 이름을 부른 모든 `rationale` 필드를 배열로
+보이기, 키가 ASCII인 비영어 예시. 그것들이 있었던 이유는 `decision_submit`이
+`{"type":"object"}` 말고는 아무것도 발행하지 않아서, 모델이 읽을 수 있는 명세가 패키지가
+실어온 산문뿐이었기 때문이다.
 
-- **모든** decision action에 대한 worked JSON 예시 — `WAIT`, `WATCH`, `BUY`, `SELL`,
-  `RESIZE`, `HEDGE`, `REBALANCE`. 문장 속 언급은 잃어버린 세 런이 이미 갖고 있던 것이다.
-- 당신이 *이름을 부른* `rationale` 필드(`counterArguments`, `uncertainty`)는 fenced
-  JSON 블록 안에서 배열로 보여져야 한다.
-- `language`가 언급되고, 다른 언어로 된 worked 예시가 있어야 한다 — 단 JSON **키**는
-  전부 ASCII로. 키까지 번역한 예시는 규칙이 아니라 실패를 가르친다.
+**#269가 명세 자체를 발행했다.** `decision_submit`의 입력 스키마는 판정자가 검증에 쓰는
+객체에서 런 시점에 파생된 `decisionProposalSchema` 그 자체이고, 위 셋을 직접 말한다 —
+`watches`의 멤버가 무엇인지, 어느 action이 `target`을 받는지, `uncertainty`가 배열이라는
+것. 그러니 규칙이 틀리게 된 것이 아니라, **발행된 스키마를 패키지마다 복제하라는 요구**가
+된 것이다. 논증이 아니라 측정으로 은퇴시켰다 — 덜어낸 번들에 대한 실제 `claude` 런이
+`decided`에 도달했다.
 
-### `{{INVOCATION}}`는 정확히 하나
+당신에게 뜻하는 것: **프로토콜을 당신 패키지로 베껴 오지 마라.** *당신* 방법론에 대해 참인
+것을 쓰고, 와이어 포맷은 호스트가 말하게 두어라 — Aumos MCP 서버가 `initialize`에서 세션당
+한 번 돌려준다. 머지된 모든 패키지가 한 줄로 그렇게 적고 있고, 그 문장은 훔쳐 갈 만하다:
+*"The protocol is not here."*
 
-번들 전체에서. 이걸 빠뜨린 번들은 어떤 자산에 대한 것도 아닌, 아름답게 구조화된 지시문을
-보내고, 런은 아무도 묻지 않은 질문에 성공적으로 답한다.
+모양을 보여야 할 때는 그 모양이 **당신 것일** 때다 — 당신의 REBALANCE가 항상 싣는 `targets`
+배열, 당신 방법론이 고르는 대신 고정하는 `watches` 트리거(간격을 못 박고 그 이유를 적은
+`undervalued-now`를 보라). 그것은 스키마가 대신 내려 줄 수 없는 결정이다.
+
+### 여러 포지션을 옮기는 제안은 `target`이 아니라 `targets`다
+
+포지션 하나에 대한 판단은 `target`을 싣고, 여럿을 옮기는 `REBALANCE`는 같은 멤버의 배열인
+`targets`를 싣는다. 책 전체를 제안하는 매니저에게 필요한 필드이고, 단일 자산 예시가
+보여주는 것이 단수형이라 놓치기 쉽다.
+
+```jsonc
+{ "action": "REBALANCE",
+  "targets": [
+    { "type": "position-weight", "asset": { … }, "targetWeight": 0.4 },
+    { "type": "cash-weight", "targetWeight": 0.1 }
+  ] }
+```
+
+⚠️ **`{{INVOCATION}}` 마커가 있었고 지금은 없다.** 번들에 정확히 하나를 요구하는 규칙이
+여기 있었고, #270이 그것을 «많아야 하나»로 완화했으며, #286이 치환 자체를 지웠다. 프롬프트
+파일에 템플릿팅은 없다. `invocation_read`가 매니저가 AMP 문서를 받는 유일한 길이고, 그것이
+그 거래였다 — 보간된 프롬프트는 행을 남기지 않고, 도구 호출은 남긴다.
 
 ### 남의 작업이면 그쪽 고지를 실어라
 
-프롬프트를 포팅하면 2차적 저작물이 된다. 당신 패키지가 그렇다면 `manifest.json`에
+프롬프트를 포팅하면 2차적 저작물이 된다. 당신 패키지가 그렇다면 `aumos.json`에
 `provenance` 블록이 실린다 — 그리고 라이선스 의무는 SPDX id가 아니라 **저작권 표시
 줄**에 관한 것이므로:
 
@@ -114,7 +183,7 @@ CLI 자신의 인벤토리가 빠뜨리는 이름을 볼 수 없었다. 호스�
 위에 놓였다. 이제 패키지는 자기 번역을 실을 수 있다. 그리고 결코 의무가 아니다 — 페이지는
 원문을 그리고, 어느 쪽인지를 **말한다**.
 
-**양쪽 다 파일이다.** `manifest.json`에는 아무것도 넣지 않는다. 취향이 아니라 측정 결과다:
+**양쪽 다 파일이다.** `aumos.json`에는 아무것도 넣지 않는다. 취향이 아니라 측정 결과다:
 매니페스트 스키마는 strict라서, **이미 출시된** Aumos가 모르는 키 하나가 그 기계에서 당신
 패키지를 `unreadable`로 만든다 — 경고와 함께 설치되는 것이 아니라, 아무도 가져갈 수 없는
 카탈로그 행이 된다. 파일은 공짜다: 패키지가 어떤 파일들을 담고 있는지는 아무것도 검사하지

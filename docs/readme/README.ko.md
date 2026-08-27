@@ -12,15 +12,21 @@ manifest, 그리고 어떻게 추론하는지 적은 프롬프트 번들. 발행
 ```
 managers/
   your-package-id/
-    manifest.json          무엇을 읽어도 되는지, 그리고 저자가 대는 각각의 이유
-    prompt/                방법론. 번호가 붙은 Markdown 단계들
-      00-role.md
-      …
-      90-output.md
-    README.md              어떻게 추론하는가 — 사람이 보고 고르는 페이지
-    config.schema.json     선택
-    NOTICE.md              남의 작업을 포팅한 것이라면 필수
+    aumos.json                  무엇을 읽어도 되는지, 그리고 저자가 대는 각각의 이유
+    PROMPT.md                   방법론. 파일 하나이고, 진입점이다
+    README.md                   어떻게 추론하는가 — 사람이 보고 고르는 페이지
+    .claude-plugin/plugin.json  `runtimes`에 `claude`가 있으면 필수
+    skills/…/SKILL.md           선택 — PROMPT.md가 필요할 때만 읽어 들이는 것
+    icon.svg                    선택 — 카탈로그 카드의 마크
+    config.schema.json          선택
+    README.ko.md                선택 — 옆에 translations/ko.json과 함께
+    NOTICE.md                   남의 작업을 포팅한 것이라면 필수
 ```
+
+⚠️ **`manifest.json`과 번호가 붙은 `prompt/` 디렉토리가 있었고, 지금은 둘 다 없다.**
+manifest는 `aumos.json`이고 번들은 `PROMPT.md` 하나다. 이 저장소의 어떤 패키지도 옛
+모양이었던 적이 없으며 `npm run lint`가 그것을 거절한다 — 지금의 모양은
+[CONTRIBUTING.ko.md](contributing/CONTRIBUTING.ko.md)에 전부 적혀 있다.
 
 **데이터 소스**는 Aumos가 자격증명을 쥐고 요청을 보낼 벤더다. 닿는 호스트, 투자자가 줘야
 하는 것, 매니저가 물어볼 수 있는 엔드포인트를 적은 문서 하나. Aumos가 키를 쥐고 요청에
