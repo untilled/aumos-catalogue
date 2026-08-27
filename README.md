@@ -5,7 +5,7 @@
 The submission path for the [Aumos](https://aumos.app) catalogue. Two kinds of thing
 are published from here, and neither contains code.
 
-An **ManagerPackage** is an investment methodology written as prose: a manifest that
+A **ManagerPackage** is an investment methodology written as prose: a manifest that
 declares what data it may read, and a prompt bundle that says how it reasons. The
 published form is a JSON document of file paths to text, so there is no field an
 executable could live in.
@@ -13,15 +13,21 @@ executable could live in.
 ```
 managers/
   your-package-id/
-    manifest.json          what it may read, and the author's reason for each
-    prompt/                the methodology, in numbered Markdown stages
-      00-role.md
-      …
-      90-output.md
-    README.md              how it reasons — the page a person chooses from
-    config.schema.json     optional
-    NOTICE.md              required if this is a port of somebody else's work
+    aumos.json                  what it may read, and the author's reason for each
+    PROMPT.md                   the methodology — one file, and the entry point
+    README.md                   how it reasons — the page a person chooses from
+    .claude-plugin/plugin.json  required when `runtimes` lists `claude`
+    skills/…/SKILL.md           optional — what PROMPT.md loads only when it needs it
+    icon.svg                    optional — the catalogue card's mark
+    config.schema.json          optional
+    README.ko.md                optional — with translations/ko.json beside it
+    NOTICE.md                   required if this is a port of somebody else's work
 ```
+
+⚠️ **There was a `manifest.json` and a numbered `prompt/` directory, and there is
+neither any more.** The manifest is `aumos.json`; the bundle is one `PROMPT.md`. No
+package in this repository has ever had the old shape, and `npm run lint` refuses it —
+[CONTRIBUTING.md](CONTRIBUTING.md) is where the current shape is stated in full.
 
 A **data source** is a vendor Aumos holds a credential for and will make requests to:
 one document naming the hosts it reaches, what the investor has to supply, and the
@@ -65,7 +71,7 @@ thing, and a source may not be called what a package is called.
 ## What this repository is not
 
 - **Not a place for code.** There is no runtime here, no build, no dependency you can
-  add. If your methodology needs to execute something, it is not an ManagerPackage yet;
+  add. If your methodology needs to execute something, it is not a ManagerPackage yet;
   if your data source needs to reshape a response, that is not a document's job —
   say so in an issue rather than working around the format.
 - **Not a leaderboard, and not a claim about returns.** Nothing here records how a

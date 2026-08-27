@@ -2,23 +2,66 @@
 
 <sub><a href="docs/contributing/CONTRIBUTING.ko.md">한국어</a></sub>
 
-Two kinds of thing arrive here and they are not alike. An **ManagerPackage** is an
+Two kinds of thing arrive here and they are not alike. A **ManagerPackage** is an
 investment methodology written as prose. A **data source** is one JSON document naming
 a vendor, its endpoints, and what you have to supply to reach it. The first half of
 this page is the package; [the second](#submitting-a-data-source) is the source.
 
 ## The shape
 
-One directory under `managers/`, named exactly what your `manifest.json` says its `id`
+One directory under `managers/`, named exactly what your `aumos.json` says its `id`
 is. The directory name **is** the package id, so that a reviewer reading the tree is
 reading the catalogue.
 
 ```
 managers/your-package-id/
-  manifest.json
-  prompt/00-….md … 90-….md
-  README.md
+  aumos.json                    the manifest. This filename, not another
+  PROMPT.md                     the methodology, and the entry point
+  README.md                     the page a person reads before installing
+  .claude-plugin/plugin.json    required when `runtimes` lists `claude`
+  AGENTS.md                     required when `runtimes` lists `codex`
+  skills/<name>/SKILL.md        optional
+  .mcp.json                     optional — servers this package brings
+  icon.svg                      optional
+  config.schema.json            optional
+  README.ko.md + translations/ko.json    optional, and a pair
+  NOTICE.md                     required if this is a port
 ```
+
+⚠️ **This shape replaced one that some older issues still describe.** A `manifest.json`
+and a numbered `prompt/00-….md … 90-….md` bundle were the shape until #286 retired the
+`prompt-bundle` rule; the manifest constant is `aumos.json` (`rules.ts` →
+`MANIFEST_FILENAME`) and the prompt default is `PROMPT.md` (`DEFAULT_PROMPT_PATH`). A
+package built to the old description fails `manifest-present` and `prompt-present` at
+once, which is a first pull request refused for reading our own documentation.
+
+### `PROMPT.md` is an entry point, not a size limit
+
+One file replaced a numbered directory, and that is **not** an instruction to write a
+shorter methodology. What changed is *when* the material is read: `PROMPT.md` is what a
+session always loads, and everything conditional belongs in `skills/<name>/SKILL.md`,
+which the prompt names and the model loads only when it reaches the case. A stage that
+applies to one market, one task or one degraded source is a skill; a stage every run
+walks through is prose in `PROMPT.md`.
+
+`manifest.prompt` may name a different path if you want one — `PROMPT.md` is the
+default, not a requirement. The filename is the only part of this that is free.
+
+### The runtime files, which the lint requires and nothing else mentions
+
+`runtimes` in your manifest says which loader your files are for, and the lint checks
+that the files that loader reads are actually there — **the absence only**, never the
+presence of extras. A package may legitimately ship both sets.
+
+| `runtimes` contains | the file that must exist | what its absence costs |
+|---|---|---|
+| `claude` | `.claude-plugin/plugin.json` | `--plugin-dir` loads a directory with no plugin in it, and the session starts with none of your skills, hooks or MCP servers |
+| `codex` | `AGENTS.md` | it is the only convention codex reads, and Aumos does not translate the claude plugin for it |
+
+If you ship a `.mcp.json`, it must parse, and **no server in it may be named `aumos`** —
+the gateway is written under that name and one would silently replace the other. Aumos
+reads that file only as far as the server names, because `--strict-mcp-config` means a
+server it does not write into the run's config does not exist.
 
 Run the checks before you open the pull request:
 
@@ -80,26 +123,54 @@ judgement.
 | 2 | only a `WAIT` example was given, so `target` was described and never shown |
 | 3 | `uncertainty` was named in one sentence → the model guessed a string; the schema wants a list |
 
-So the lint checks **shape**, and never prose:
+⚠️ **The lint used to require you to fix this yourself, and it does not any more.**
+Three rules stood here — a worked JSON example for every action, every `rationale`
+field you name shown as an array, and a non-English example with ASCII keys. They
+existed because `decision_submit` published `{"type":"object"}` and nothing else, so
+the only specification a model could read was whatever prose its package carried.
 
-- a worked JSON example for **every** decision action — `WAIT`, `WATCH`, `BUY`,
-  `SELL`, `RESIZE`, `HEDGE`, `REBALANCE`. A mention in a sentence is what all three
-  lost runs already had.
-- any `rationale` field you *name* (`counterArguments`, `uncertainty`) shown as an
-  array in a fenced JSON block.
-- `language` mentioned, and a worked example in another language — with every JSON
-  **key** still ASCII. An example that translated its keys would teach the failure
-  rather than the rule.
+**#269 published the specification instead.** `decision_submit`'s input schema is
+`decisionProposalSchema` itself, derived at run time from the object the judge
+validates against, and it states all three directly — what `watches` members are,
+which actions take a `target`, that `uncertainty` is a list. So the rules did not
+become wrong; they became a demand that every package **duplicate a published
+schema**. They were retired against a measurement rather than an argument: a real
+`claude` run against a trimmed bundle reached `decided`.
 
-### Exactly one `{{INVOCATION}}`
+What that means for you: **do not copy the protocol into your package.** Write what is
+true of *your* methodology and let the host state the wire format — the Aumos MCP
+server returns it from `initialize`, once per session. Every merged package says so in
+one line, and the sentence is worth stealing: *"The protocol is not here."*
 
-Across the whole bundle. A bundle that forgot it sends a beautifully structured set of
-instructions about no particular asset, and the run succeeds at answering a question
-nobody asked.
+Show a shape when the shape is **yours** — a `targets` array your REBALANCE always
+carries, a `watches` trigger your methodology fixes rather than chooses (see
+`undervalued-now`, which pins its interval and says why). Those are decisions the
+schema cannot make for you.
+
+### Multi-position proposals carry `targets`, not `target`
+
+A judgement about one position carries `target`; a `REBALANCE` that moves several
+carries `targets`, an array of the same members. It is the field a manager that
+proposes a whole book needs, and it is easy to miss because the singular is what the
+single-asset examples show.
+
+```jsonc
+{ "action": "REBALANCE",
+  "targets": [
+    { "type": "position-weight", "asset": { … }, "targetWeight": 0.4 },
+    { "type": "cash-weight", "targetWeight": 0.1 }
+  ] }
+```
+
+⚠️ **There was a `{{INVOCATION}}` marker and there is not one any more.** A rule here
+required exactly one of them in the bundle, #270 relaxed it to at most one, and #286
+deleted the substitution itself. There is no templating in a prompt file: `invocation_read`
+is the only way a manager gets the AMP document, and that was the trade — a prompt that
+was interpolated leaves no row, and a tool call does.
 
 ### If it is somebody else's work, ship their notice
 
-Porting a prompt makes a derivative work. If your package is one, `manifest.json`
+Porting a prompt makes a derivative work. If your package is one, `aumos.json`
 carries a `provenance` block — and the licence obligation is about the copyright
 *line*, not the SPDX id, so:
 
@@ -124,7 +195,7 @@ and your README arrived in whatever language you wrote them in, on a page whose
 headings were in the reader's. A package may now carry its own translations, and it is
 never required to — a page draws the original and **says** which case it is in.
 
-**Both halves are files.** Nothing goes into `manifest.json`, and that is a
+**Both halves are files.** Nothing goes into `aumos.json`, and that is a
 measurement rather than a style: the manifest schema is strict, so a key that a
 *shipped* copy of Aumos does not know makes your package `unreadable` on that
 machine — not "installs with a warning", unreadable, a catalogue row nobody can get.

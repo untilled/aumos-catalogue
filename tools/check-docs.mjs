@@ -21,6 +21,34 @@
  *
  * What it does **not** claim: that the Korean says what the English says. Only
  * that neither has a section the other lacks.
+ *
+ * ── The second check: the shape the documents describe (#45) ───────────────
+ *
+ * The translations were guarded and the *content* was not, and the content went
+ * wrong in the way that costs a contributor their first pull request: all four
+ * documents drew a tree with `manifest.json` and a numbered `prompt/` directory
+ * long after `prompt-bundle` was retired (#286) and the constants became
+ * `aumos.json` and `PROMPT.md`. A package built to that description fails
+ * `manifest-present` and `prompt-present` at once — refused for reading our own
+ * documentation. Ten open issues had already copied the tree.
+ *
+ * So the filenames the lint actually keys on are read **out of `rules.ts`** and
+ * required to appear in every document. Reading them rather than repeating them
+ * is the whole point: a constant that moves in the lint moves this check with
+ * it, and the document that still names the old file is the one that fails.
+ *
+ * ⚠️ **It reads the fenced blocks and not the prose, and the first draft did
+ * not.** Requiring the string anywhere in the document passed a README whose
+ * tree had been reverted to `manifest.json`, because the ⚠️ note *correcting*
+ * that tree names both files — the guard was measuring its own correction. It
+ * was caught by planting the regression and watching it go green, which is the
+ * only way that class of mistake is ever caught.
+ *
+ * So the tree is what is checked: inside a fenced block, the manifest must be
+ * named and the retired filename must not be. Prose is left alone in both
+ * directions — this repository's convention is to keep a withdrawn claim
+ * visible with a ⚠️ note beside it, and a rule that forbade the old string
+ * outright would forbid the correction.
  */
 
 import { readFileSync } from 'node:fs'
@@ -78,10 +106,73 @@ for (const { source, translations } of TRANSLATED) {
   }
 }
 
+/**
+ * The lint's own filename constants, read from the file that owns them.
+ *
+ * `rules.ts` is TypeScript and this script runs on plain `node`, so it is read
+ * as text rather than imported — `npm run check:docs` would otherwise need the
+ * `--experimental-strip-types` flag that only `npm run lint` carries. A regex
+ * over an `export const` line is enough because the shape of that line is
+ * asserted by the lint's own tests, and a rename that changed the shape would
+ * fail loudly here rather than silently pass.
+ */
+function lintConstants() {
+  const source = readFileSync(join(ROOT, 'tools/lint/rules.ts'), 'utf8')
+  const names = ['MANIFEST_FILENAME', 'DEFAULT_PROMPT_PATH']
+  return names.map((name) => {
+    const match = new RegExp(`export const ${name} = '([^']+)'`).exec(source)
+    if (match === null) {
+      throw new Error(
+        `tools/lint/rules.ts no longer exports ${name} as a string literal — ` +
+          'this guard reads it as text and cannot follow a change of shape',
+      )
+    }
+    return { name, value: match[1] }
+  })
+}
+
+const CONSTANTS = lintConstants()
+const DESCRIBES_THE_SHAPE = [
+  'README.md',
+  'CONTRIBUTING.md',
+  'docs/readme/README.ko.md',
+  'docs/contributing/CONTRIBUTING.ko.md',
+]
+
+/** Every fenced block in a document, joined — where a tree example lives. */
+function fences(markdown) {
+  return (markdown.match(/```[\s\S]*?```/g) ?? []).join('\n')
+}
+
+/** Filenames the lint no longer opens. A tree that still draws one is the defect. */
+const RETIRED_IN_A_TREE = ['manifest.json']
+
+for (const document of DESCRIBES_THE_SHAPE) {
+  const drawn = fences(readFileSync(join(ROOT, document), 'utf8'))
+  const missing = CONSTANTS.filter(({ value }) => !drawn.includes(value))
+  const retired = RETIRED_IN_A_TREE.filter((value) => drawn.includes(value))
+
+  if (missing.length === 0 && retired.length === 0) {
+    console.log(`  ok  ${document} draws ${CONSTANTS.map((c) => c.value).join(' and ')}`)
+    continue
+  }
+
+  failed += 1
+  for (const { name, value } of missing) {
+    console.log(`FAIL  ${document} has no fenced block naming ${value} (rules.ts → ${name})`)
+  }
+  for (const value of retired) {
+    console.log(
+      `FAIL  ${document} draws ${value} in a fenced block, and the lint opens ` +
+        `${CONSTANTS[0].value}. Correcting it in prose is not enough — the tree is what gets copied`,
+    )
+  }
+}
+
 if (failed > 0) {
   console.log('')
   console.log(
-    `${failed} document(s) drifted. A section on one side and not the other is a rule a contributor is never told about, and then refused for.`,
+    `${failed} document(s) drifted. A section on one side and not the other is a rule a contributor is never told about, and then refused for — and a document that does not name the file the lint opens describes a package that cannot be submitted.`,
   )
   process.exit(1)
 }
