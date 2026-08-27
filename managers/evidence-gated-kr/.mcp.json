@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "evidence-gated-metrics": {
-      "command": "node",
-      "args": ["${AUMOS_MANAGER_PACKAGE}/bin/evidence-gated-metrics-mcp"]
-    }
-  }
-}

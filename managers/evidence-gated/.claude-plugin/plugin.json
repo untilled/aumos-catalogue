@@ -1,0 +1,5 @@
+{
+  "name": "evidence-gated",
+  "version": "0.1.0",
+  "description": "Evidence-gated allocator: KR and US sleeve flows plus the cross-market allocator."
+}
