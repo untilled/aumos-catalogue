@@ -11,6 +11,7 @@
     ],
     "sources": [
       "alpaca",
+      "fsc-securities-product",
       "open-dart",
       "openbb-fmp",
       "sec-edgar",
