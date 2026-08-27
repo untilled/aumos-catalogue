@@ -43,7 +43,10 @@ sleeves against each other and cannot do that against a sleeve that is still dec
 market flow only when the invocation's `task` cannot reach it (a single-asset `ASSET_REVIEW`
 in one market), and say so in `uncertainty`.
 
-Load `skills/orchestrate/SKILL.md` before dispatching anything.
+Load `skills/orchestrate/SKILL.md` before dispatching anything. ⚠️ **Every dispatch prompt
+names the tools that flow has**, from what this session was actually served — a flow that
+was not told goes looking, and looking means `Bash`, which stops the run on a permission
+question. That skill carries the list and the measurement behind it.
 
 ⛔ **Only you call `decision_submit`, and exactly once.** A flow that submitted would seal a
 judgement the other two never saw, and the second submission of a run is refused — so a flow
