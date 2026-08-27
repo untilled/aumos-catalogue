@@ -12,7 +12,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/alpaca",
         "ref": "main",
-        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
+        "sha": "04d1593b40fced6c13defc10a21e9055528bbf77"
       },
       "version": "0.3.0",
       "metadata": {
@@ -98,7 +98,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/fsc-securities-product",
         "ref": "main",
-        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
+        "sha": "04d1593b40fced6c13defc10a21e9055528bbf77"
       },
       "version": "0.1.0",
       "metadata": {
@@ -147,6 +147,66 @@
               "bssIdxIdxNm",
               "likeBssIdxIdxNm"
             ]
+          },
+          {
+            "host": "apis.data.go.kr",
+            "path": "/1160100/service/GetSecuritiesProductInfoService/getETNPriceInfo",
+            "query": [
+              "numOfRows",
+              "pageNo",
+              "resultType",
+              "basDt",
+              "beginBasDt",
+              "endBasDt",
+              "likeBasDt",
+              "likeSrtnCd",
+              "isinCd",
+              "likeIsinCd",
+              "itmsNm",
+              "likeItmsNm",
+              "beginVs",
+              "endVs",
+              "beginFltRt",
+              "endFltRt",
+              "beginIndcVal",
+              "endIndcVal",
+              "beginTrqu",
+              "endTrqu",
+              "beginTrPrc",
+              "endTrPrc",
+              "beginMrktTotAmt",
+              "endMrktTotAmt",
+              "bssIdxIdxNm",
+              "likeBssIdxIdxNm"
+            ]
+          },
+          {
+            "host": "apis.data.go.kr",
+            "path": "/1160100/service/GetSecuritiesProductInfoService/getELWPriceInfo",
+            "query": [
+              "numOfRows",
+              "pageNo",
+              "resultType",
+              "basDt",
+              "beginBasDt",
+              "endBasDt",
+              "likeBasDt",
+              "likeSrtnCd",
+              "isinCd",
+              "likeIsinCd",
+              "itmsNm",
+              "likeItmsNm",
+              "beginVs",
+              "endVs",
+              "beginTrqu",
+              "endTrqu",
+              "beginTrPrc",
+              "endTrPrc",
+              "beginMrktTotAmt",
+              "endMrktTotAmt",
+              "udasAstNm",
+              "likeUdasAstNm"
+            ]
           }
         ],
         "publishedAt": "2026-08-27T00:00:00.000Z",
@@ -160,7 +220,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/open-dart",
         "ref": "main",
-        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
+        "sha": "04d1593b40fced6c13defc10a21e9055528bbf77"
       },
       "version": "0.1.0",
       "metadata": {
@@ -238,7 +298,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/openbb-fmp",
         "ref": "main",
-        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
+        "sha": "04d1593b40fced6c13defc10a21e9055528bbf77"
       },
       "version": "0.3.2",
       "metadata": {
@@ -275,7 +335,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/sec-edgar",
         "ref": "main",
-        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
+        "sha": "04d1593b40fced6c13defc10a21e9055528bbf77"
       },
       "version": "0.3.2",
       "metadata": {
@@ -316,7 +376,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/toss",
         "ref": "main",
-        "sha": "8e7f06f861a2324665c6e010f1876b02551e4691"
+        "sha": "04d1593b40fced6c13defc10a21e9055528bbf77"
       },
       "version": "0.2.0",
       "metadata": {
