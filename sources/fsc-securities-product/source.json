@@ -1,0 +1,117 @@
+{
+  "spec": "SourceSpec/1",
+  "id": "fsc-securities-product",
+  "version": "0.1.0",
+  "vendor": "fsc-securities-product",
+  "caveat": "금융위원회's 증권상품시세정보, relayed unread — the Korea Exchange's own ETF, ETN and ELW numbers by way of 공공데이터포털. `clpr` is the traded close and is not adjusted, and neither `nav` nor `indcVal` is back-adjusted, so no series here is a total return: a distribution leaves a step in all of them. What this is for is what a price feed lacks — assets against price, the underlying against both, and how big the fund is. Dates are the caller's: `basDt` is one day, `beginBasDt`/`endBasDt` a range, and nothing is bounded by asOf. History begins 2020-01-02. An error arrives as `resultCode` on a 200.",
+  "hosts": [
+    "apis.data.go.kr"
+  ],
+  "headers": {
+    "accept": "application/json"
+  },
+  "credentials": [
+    {
+      "name": "service-key",
+      "inject": {
+        "location": "query",
+        "name": "serviceKey"
+      },
+      "required": true
+    }
+  ],
+  "endpoints": [
+    {
+      "host": "apis.data.go.kr",
+      "path": "/1160100/service/GetSecuritiesProductInfoService/getETFPriceInfo",
+      "query": [
+        "numOfRows",
+        "pageNo",
+        "resultType",
+        "basDt",
+        "beginBasDt",
+        "endBasDt",
+        "likeBasDt",
+        "likeSrtnCd",
+        "isinCd",
+        "likeIsinCd",
+        "itmsNm",
+        "likeItmsNm",
+        "beginVs",
+        "endVs",
+        "beginFltRt",
+        "endFltRt",
+        "beginNav",
+        "endNav",
+        "beginTrqu",
+        "endTrqu",
+        "beginTrPrc",
+        "endTrPrc",
+        "beginMrktTotAmt",
+        "endMrktTotAmt",
+        "bssIdxIdxNm",
+        "likeBssIdxIdxNm"
+      ]
+    },
+    {
+      "host": "apis.data.go.kr",
+      "path": "/1160100/service/GetSecuritiesProductInfoService/getETNPriceInfo",
+      "query": [
+        "numOfRows",
+        "pageNo",
+        "resultType",
+        "basDt",
+        "beginBasDt",
+        "endBasDt",
+        "likeBasDt",
+        "likeSrtnCd",
+        "isinCd",
+        "likeIsinCd",
+        "itmsNm",
+        "likeItmsNm",
+        "beginVs",
+        "endVs",
+        "beginFltRt",
+        "endFltRt",
+        "beginIndcVal",
+        "endIndcVal",
+        "beginTrqu",
+        "endTrqu",
+        "beginTrPrc",
+        "endTrPrc",
+        "beginMrktTotAmt",
+        "endMrktTotAmt",
+        "bssIdxIdxNm",
+        "likeBssIdxIdxNm"
+      ]
+    },
+    {
+      "host": "apis.data.go.kr",
+      "path": "/1160100/service/GetSecuritiesProductInfoService/getELWPriceInfo",
+      "query": [
+        "numOfRows",
+        "pageNo",
+        "resultType",
+        "basDt",
+        "beginBasDt",
+        "endBasDt",
+        "likeBasDt",
+        "likeSrtnCd",
+        "isinCd",
+        "likeIsinCd",
+        "itmsNm",
+        "likeItmsNm",
+        "beginVs",
+        "endVs",
+        "beginTrqu",
+        "endTrqu",
+        "beginTrPrc",
+        "endTrPrc",
+        "beginMrktTotAmt",
+        "endMrktTotAmt",
+        "udasAstNm",
+        "likeUdasAstNm"
+      ]
+    }
+  ]
+}
