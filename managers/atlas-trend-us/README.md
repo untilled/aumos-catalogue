@@ -102,9 +102,9 @@ its horizons in calendar months: a rolling interval drifts against month-end, an
 invisible.
 
 Two things still sit above it. Your Aumos may refuse an arming — what it refuses is its own
-rule and it changes between versions — and when it does, the agent records the refusal and the
+rule and it changes between versions — and when it does, the manager records the refusal and the
 review happens on your Aumos's schedule rather than the package's. And the review interval
-stored for the installed agent is whatever you confirm on the install screen: the package can
+stored for the installed manager is whatever you confirm on the install screen: the package can
 pre-fill a suggestion, it cannot set it.
 
 If you want this run monthly, check that interval when you install it.

@@ -25,7 +25,7 @@ refused, and a refusal looks like the vendor being down.
 ```
 
 Every universe member in one request. This is not an efficiency; it is a correctness rule, and
-it is the one an agent is most likely to break by being helpful.
+it is the one a manager is most likely to break by being helpful.
 
 ## 2. The corporate actions, over the same window
 

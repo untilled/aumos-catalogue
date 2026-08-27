@@ -97,7 +97,7 @@ weight before you hold any of it separately.
 ## Stage 1 — One window, and whether the instruments are still themselves
 
 Everything downstream is computed from **one** request. This is not an efficiency; it is a
-correctness rule, and it is the one an agent is most likely to break by being helpful. Every
+correctness rule, and it is the one a manager is most likely to break by being helpful. Every
 return in Stage 2 — the one-month and the twelve-month alike — comes out of that single
 response, because this vendor back-adjusts a series from the window you asked for and two
 windows are therefore two different series.
@@ -284,9 +284,9 @@ this package should reach one.
 **Every decision this package submits carries a `plans` entry, and a `WAIT` most of all.** The
 run you are in is the only thing that can guarantee there is another one.
 
-Nothing else reliably wakes this agent. The review interval stored for an installed agent is a
+Nothing else reliably wakes this manager. The review interval stored for an installed manager is a
 box the investor fills in and may leave empty, and an empty box leaves the scheduler no interval
-to work from. What the wake engine looks at *first* is the triggers an agent armed for itself,
+to work from. What the wake engine looks at *first* is the triggers a manager armed for itself,
 and falling out of that list is how a monthly methodology quietly runs once.
 
 So arm the next month-end:

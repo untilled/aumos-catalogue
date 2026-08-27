@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Atlas Trend US instance configuration",
-  "description": "Reaches the agent as AgentInvocation.config. These are the constants of the methodology, exposed because an investor's risk appetite is theirs and not the author's — but the shape of the method is not configurable from here: the horizons are fixed, the ensemble rule is fixed, and nothing in this file can loosen the Mandate or the TimeGate. Aumos resolves this file and deliberately does not validate instance config against it.",
+  "description": "Reaches the manager as ManagerInvocation.config. These are the constants of the methodology, exposed because an investor's risk appetite is theirs and not the author's — but the shape of the method is not configurable from here: the horizons are fixed, the ensemble rule is fixed, and nothing in this file can loosen the Mandate or the TimeGate. Aumos resolves this file and deliberately does not validate instance config against it.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

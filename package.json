@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Submitted AgentPackages and data sources for the Aumos catalogue",
+  "description": "Submitted ManagerPackages and data sources for the Aumos catalogue",
   "license": "MIT",
   "engines": {
     "node": ">=22"
