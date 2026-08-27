@@ -39,8 +39,8 @@ refuses the call when the payload names a subagent.
 split cost more than it bought: the three shipped byte-identical `lib/`, `bin/`, `fixtures/` and
 `skills/`, differing only in four lines of prompt and their manifests — three copies of one
 methodology, free to drift, that an investor had to find and install three times. What is
-genuinely lost is per-sleeve scoring and per-sleeve approval: §24's row and the approval gate
-are now one manager and one basket. `untilled/aumos#489` argues the trade.
+genuinely lost is per-sleeve scoring and per-sleeve approval: the track record's row and the
+approval gate are now one manager and one basket. `untilled/aumos#489` argues the trade.
 
 ## What makes it different
 
