@@ -70,6 +70,42 @@ A `weight-drift` WATCH is checked for already-met on the same terms as a price W
 `threshold` (the drift that fires it) and `baselineWeight` (the weight it was registered against).
 Without the baseline the condition is unevaluated rather than assumed unresolved.
 
+## When a WATCH can be evaluated, and what a met one is worth
+
+`evaluateWatch` scores a standing WATCH, and the cadence is **derived from the kind** rather than
+declared on the watch — a declared field would be a second place for the answer to live, and the
+first one to go wrong.
+
+| kind | cadence | needs | because |
+|---|---|---|---|
+| `price-below` · `price-above` | `intraday` | a last price | a level is touched or it is not, and a live price answers that |
+| `at-time` | `clock` | nothing | an instant is an instant whatever the session is doing |
+| `weight-drift` | `daily-close` | a completed bar | weight is price × quantity over the book, so an intraday drift reading is a reading of intraday noise |
+
+Five statuses, and the last two are the ones that were missing:
+
+- **`met`** — the condition is true.
+- **`near`** — within the configured band (`watchNear`: 3% of a price level, 80% of a drift
+  threshold, 7 days of an instant). A level approached is a person's cue to prepare; a two-state
+  check only ever says "too late" or "nothing".
+- **`not-met`** — evaluated, and the condition is not true.
+- **`blocked`** — met or near, with a standing earnings or cluster block. ⛔ **A block never
+  lowers `not-met`.** The report still has to say the level is not there; "blocked" and "nowhere
+  near" are different facts about the same day.
+- **`unevaluable`** — this run did not have the observation the condition needs. ⛔ **Never
+  report it as `not-met`.** That is the difference between "the basing did not confirm" and "I
+  never looked", and collapsing them is how a run claims a check it did not run.
+
+⚠️ **A met price WATCH is not an entry.** `entryConfirmationPending` is returned true when the
+`met` came off a live price, because entry quality — basing, `no_new_low`, the MA200 state — is
+`entryQualityGate`'s and needs a bar that has closed. A run woken by a touched level goes and
+looks; it does not treat the touch as the confirmation.
+
+**One alert per session.** `alertRequired` is false when the watch's `sessionKey` is already in
+`alertedSessionKeys`. The same level brushed four times in one session is one thing worth waking
+a person for, and the keys belong in private memory under the same rules as everything else
+there.
+
 ## Compact worked examples
 
 | finding | action/shape |

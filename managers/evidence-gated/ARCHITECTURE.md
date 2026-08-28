@@ -205,6 +205,14 @@ fixture asserts the difference so it cannot be undone silently.
   team's calls beat the index *and* the bot?" needs months of closed windows before it
   says anything. Until then the research layer's edge is a hypothesis, exactly as the
   baseline's is.
+- **Whether an intraday wake ever arrives is the runtime's, not this package's.** `evaluateWatch`
+  knows which conditions can honestly be scored on a live price and which need a bar that has
+  closed, and it refuses to call the second kind `not-met` when it only had the first. What it
+  cannot do is cause a wake: how often Aumos evaluates a standing price WATCH is a runtime
+  property this repository cannot see. If it evaluates them intraday, the original harness's
+  night path is covered. If it evaluates them only at the close, the package is still correct —
+  it simply never receives the observation — and the gap is a runtime request rather than a
+  package one. ([#88](https://github.com/untilled/aumos-catalogue/issues/88))
 - Source vendors relay their own response shapes; this manager, not Aumos, checks dates
   and freshness.
 - CLI web observations are not replay-canonical Evidence.

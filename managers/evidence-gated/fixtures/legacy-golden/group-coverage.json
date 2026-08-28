@@ -19,6 +19,6 @@
     "schedule": ["dst-holiday-early-close", "late-missing-duplicate-outage", "theme-radar-due", "theme-radar-workflow-wired", "wake-flow-dispatch"],
     "sizing": ["legacy-sizing", "specialist-budget", "global-denominator", "factor-concentration", "control-arm-limits"],
     "source-parsers": ["sec-dart-asof", "adjustment-conflict"],
-    "watch": ["future-at-time", "already-met", "producerless-event-rejected", "bounded-retry", "expiry-forced-review", "expiry-before-trigger", "drift-already-met", "no-new-low-dual-lens", "cluster-block"]
+    "watch": ["future-at-time", "already-met", "producerless-event-rejected", "bounded-retry", "expiry-forced-review", "expiry-before-trigger", "drift-already-met", "no-new-low-dual-lens", "cluster-block", "intraday-cadence-and-near"]
   }
 }

@@ -776,6 +776,74 @@ for (const lens of ['inflection', 'post-event-continuation']) {
  * A revisit promise expires, and a drift promise is checked for already-met.
  * (issue #70 §23)
  */
+/**
+ * A WATCH is evaluated on the observation a run actually has, and `near` and
+ * `unevaluable` are their own answers. (issue #88)
+ *
+ * The original harness shipped two evaluators — `bin/gate-check` on completed
+ * daily bars and `bin/night-gate-check` on live prices during the US session —
+ * and `night-gate-check`'s own docstring drew the line between them: basing
+ * gates need a bar that has closed, so the night path does not evaluate them.
+ * The port kept one evaluator and lost four things with the second: `near`, the
+ * hard-block downgrade that spares `not_met`, `unevaluable` as distinct from
+ * not-met, and one-alert-per-session.
+ *
+ * The assertion that matters most is the third. A daily-close condition looked
+ * at from an intraday run reporting `not-met` is a run claiming a check it
+ * never ran, and nothing downstream can tell the difference afterwards.
+ */
+covers('watch/intraday-cadence-and-near')
+const priceWatch = { id: 'nvda-entry', kind: 'price-below', threshold: 196 }
+const intradayObservation = { kind: 'last-price', sessionDate: '2026-09-01' }
+const scoreWatch = (input) => execute({ operation: 'evaluateWatch', asOf: methodology.asOf, input })
+
+const touched = scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 195 } })
+assert.equal(touched.data.status, 'met', 'a level touched on a live price is met — this is the condition the original evaluated intraday, and the only one it did')
+assert.equal(touched.data.entryConfirmationPending, true, 'and a met price WATCH is a reason to look, never a confirmed entry: basing and the MA200 state need a bar that has closed')
+assert.equal(touched.data.alertRequired, true, 'the first touch in a session wakes somebody')
+assert.equal(
+  scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 195 }, alertedSessionKeys: [touched.data.sessionKey] }).data.alertRequired,
+  false,
+  'the same level brushed again in the same session is the same event',
+)
+
+assert.equal(scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 200 } }).data.status, 'near', 'a level approached is `near`, which is what makes an alert useful before it is too late')
+assert.equal(scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 250 } }).data.status, 'not-met', 'and a price nowhere near it is not-met')
+
+const blockedWatch = scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 195 }, blocks: ['earnings_block'] })
+assert.equal(blockedWatch.data.status, 'blocked', 'a standing block lowers a met WATCH')
+assert.equal(blockedWatch.data.alertRequired, false, 'and a blocked WATCH does not wake anybody')
+assert.equal(
+  scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 250 }, blocks: ['earnings_block'] }).data.status,
+  'not-met',
+  'but a block never lowers not-met — the report still has to say the level is not there, which is the original `active_block` rule verbatim',
+)
+
+const driftWatch = { id: 'kospi-drift', kind: 'weight-drift', threshold: 0.05, baselineWeight: 0.2 }
+const driftIntraday = scoreWatch({ watch: driftWatch, observation: { kind: 'last-price', weight: 0.27, sessionDate: '2026-09-01' } })
+assert.equal(driftIntraday.data.status, 'unevaluable', 'a daily-close condition looked at from an intraday run is unevaluable, not not-met — reporting the second is claiming a check that never ran')
+assert.equal(driftIntraday.data.needs, 'completed-bar', 'and it says what it would have needed')
+assert.ok(driftIntraday.diagnostics.some((row) => row.code === 'watch_cadence_unavailable'), 'by name, so a reader afterwards can tell a missed check from a failed one')
+assert.equal(
+  scoreWatch({ watch: driftWatch, observation: { kind: 'completed-bar', weight: 0.27, sessionDate: '2026-09-01' } }).data.status,
+  'met',
+  'the same drift on a completed bar is evaluated normally',
+)
+assert.equal(
+  scoreWatch({ watch: driftWatch, observation: { kind: 'completed-bar', weight: 0.242, sessionDate: '2026-09-01' } }).data.status,
+  'near',
+  'and a drift inside the configured fraction of its threshold is near',
+)
+
+const sizingSkillText = await readFile(new URL('../skills/sizing-and-concentration/SKILL.md', fixtureRoot), 'utf8')
+for (const status of ['near', 'unevaluable', 'blocked']) {
+  assert.ok(sizingSkillText.includes(`\`${status}\``), `the skill names the ${status} status; a status the core returns and no skill explains is one a run will not act on`)
+}
+assert.ok(
+  (await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')).includes('evaluateWatch'),
+  'the run skeleton reaches for the evaluator; an operation nothing calls is the #87 shape again',
+)
+
 covers('watch/expiry-forced-review')
 const derivedExpiry = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-08-21T00:00:00Z' }, current: {}, config: { watchExpiryDays: 30 } } })
 assert.equal(derivedExpiry.data.expirySource, 'default', 'an undeclared expiry is derived from watchExpiryDays rather than left absent')
@@ -1393,7 +1461,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 79)
+assert.equal(supportedOperations.length, 80)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
