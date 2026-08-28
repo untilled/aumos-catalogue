@@ -82,7 +82,7 @@ kept as provenance. There is no macro score: a regime call is a Brief judgement 
 
 ## Memory contract
 
-The package uses nine stable keys documented in `skills/memory-contract/SKILL.md`. Values
+The package uses fourteen stable keys documented in `skills/memory-contract/SKILL.md`. Values
 are JSON objects with schema version, update instant, supporting Decision/Evidence ids,
 sample/independent cluster counts, computable metrics, missing fields and maturity status.
 Writes reuse a key and create a new revision only when an aggregate changes. A historical
@@ -205,6 +205,21 @@ fixture asserts the difference so it cannot be undone silently.
   team's calls beat the index *and* the bot?" needs months of closed windows before it
   says anything. Until then the research layer's edge is a hypothesis, exactly as the
   baseline's is.
+- **The intraday wake arrives, and the runtime is more general than the harness this was
+  ported from.** Aumos's Wake Engine ticks every 60 seconds and evaluates `price-below`,
+  `price-above` and `weight-drift` against live quotes, with no market-hours gate — where the
+  original harness ran one US-only script during the US session. With no market credentials it
+  reports a trigger `unevaluated` rather than "not fired", which is the same distinction
+  `evaluateWatch` returns as `unevaluable`. What the manager owes on its side is not to treat a
+  live reading as a confirmed number, which is `confirmationPending`.
+  ([#88](https://github.com/untilled/aumos-catalogue/issues/88))
+- **A run seals a judgement or is recorded as a failure; there is no third answer.**
+  `ManagerRunOutcomeKind` is `decided`, `invalid-proposal`, `no-proposal`, `refused`,
+  `unsound` — and `no-proposal` means no JSON could be recovered at all, which is a failure row
+  in the Forward Track Record rather than a manager declining to propose. So a run woken by a
+  touched level **submits a `WAIT`**: one that says it was woken, what it found, what still
+  needs a closed bar, and what it re-armed. Staying silent is available in mechanism and is
+  scored as a crash.
 - Source vendors relay their own response shapes; this manager, not Aumos, checks dates
   and freshness.
 - CLI web observations are not replay-canonical Evidence.

@@ -110,7 +110,7 @@ revision written after `asOf`, and never copy another manager's Brief into priva
 
 Read these stable keys only; do not invent per-run keys:
 
-`migration/schema-version`, `run/theme-radar-last`, `learning/evidence-maturity`,
+`migration/schema-version`, `run/theme-radar-last`, `run/watch-alerts`, `learning/evidence-maturity`,
 `learning/closed-decision-summary`, `calibration/mean-reversion`,
 `calibration/trend-pullback`, `calibration/quality-pullback`, `calibration/core-dca`,
 `calibration/inflection`, `calibration/post-event-continuation`,
@@ -252,6 +252,14 @@ position/sector/theme/factor thresholds and the portfolio heat cap. `targetWeigh
 lens can only support a controlled experiment at or below `experimentalPositionCeiling`; it never
 supports larger size by rhetoric. A machine-evaluable future condition belongs in `watches` or
 `plans`, with an achievable trigger and expiry. Never register a trigger already true at creation.
+
+**Evaluate a standing WATCH with `evaluateWatch`, and pass the observation you actually have.**
+It returns met / near / not-met / blocked / **unevaluable**, and the last one is the point: a
+condition that needs a completed daily bar, looked at from a run that only has a last price, is
+`unevaluable` and not `not-met`. Reporting "the drift never fired" when what happened is that
+nothing looked is the failure the original harness split two scripts to avoid. A standing
+earnings or cluster block lowers met and near to `blocked` and leaves not-met alone — a block is
+a reason not to act, never a reason to stop reporting where the price is.
 
 For every regular run, ask the Toss market-calendar source for the next actual open session and
 re-arm one future `at-time` review: KR after XKRX close plus configured buffer, US after the actual

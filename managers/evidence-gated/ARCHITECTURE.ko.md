@@ -72,7 +72,7 @@ provenance로 보관된다. macro score는 없다: 국면 판단은 한 `asOf`�
 
 ## 메모리 계약
 
-패키지는 `skills/memory-contract/SKILL.md`에 문서화된 안정적인 키 아홉 개를 쓴다. 값은 스키마
+패키지는 `skills/memory-contract/SKILL.md`에 문서화된 안정적인 키 열네 개를 쓴다. 값은 스키마
 버전, 갱신 시각, 뒷받침하는 Decision/Evidence id, 표본·독립 클러스터 수, 계산 가능한 지표, 결측
 필드, maturity 상태를 지닌 JSON 객체다. 쓰기는 키를 재사용하며, 집계가 바뀔 때만 새 revision을
 만든다. 과거 replay는 오늘의 head가 아니라 자기 `asOf` 이하의 최신 revision을 읽는다. 비었거나
@@ -176,6 +176,19 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   페이퍼 포지션을 내고 `sectorStrength`는 그것들이 비교될 기계 베이스라인 둘을 기록한다. "팀의
   콜이 지수와 봇을 *둘 다* 이기는가"에 답하는 비교는 닫힌 관측 창이 수개월 쌓여야 무언가를 말한다.
   그때까지 리서치 계층의 엣지는 베이스라인의 엣지와 똑같이 가설이다.
+- **장중 웨이크는 온다. 그리고 런타임이 이식 원본보다 더 일반적이다.** Aumos의 Wake Engine은
+  60초마다 틱을 돌며 `price-below`·`price-above`·`weight-drift`를 실시간 시세로 평가하고,
+  장중 여부로 거르지 않는다 — 원본 하네스가 미장 시간에 US 전용 스크립트 하나를 돌린 자리다.
+  시장 자격증명이 없으면 트리거를 "발화 안 함"이 아니라 `unevaluated`로 보고하는데, 이는
+  `evaluateWatch`가 `unevaluable`로 돌려주는 것과 같은 구별이다. 매니저 쪽이 지는 몫은 실시간
+  읽기를 확정된 숫자로 다루지 않는 것이고, 그게 `confirmationPending`이다.
+  ([#88](https://github.com/untilled/aumos-catalogue/issues/88))
+- **실행은 판단을 봉인하거나 실패로 기록되거나 둘 중 하나다. 세 번째 답은 없다.**
+  `ManagerRunOutcomeKind`는 `decided`·`invalid-proposal`·`no-proposal`·`refused`·`unsound`이고,
+  `no-proposal`은 JSON을 아예 회수하지 못했다는 뜻 — 제안하지 않기로 한 매니저가 아니라 포워드
+  트랙레코드의 실패 행이다. 그래서 닿은 레벨로 깨어난 실행은 **`WAIT`을 제출한다**: 무엇에
+  깨어났고, 무엇을 찾았고, 무엇이 아직 닫힌 봉을 요구하고, 무엇을 다시 걸었는지 말하는 WAIT.
+  침묵은 기계적으로 가능하지만 크래시로 채점된다.
 - 소스 벤더는 자기 응답 모양을 그대로 중계한다. 날짜와 신선도를 검사하는 것은 Aumos가 아니라 이
   매니저다.
 - CLI web 관측은 replay 정본 Evidence가 아니다.

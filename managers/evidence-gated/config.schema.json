@@ -150,6 +150,35 @@
       "maximum": 20,
       "default": 4
     },
+    "watchNear": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "How close a WATCH has to be before it is reported as `near` rather than not-met. A level approached is a person's cue to prepare; a two-state check only ever says \"too late\" or \"nothing\". The defaults are the original harness's own near bands.",
+      "properties": {
+        "priceRatio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.2,
+          "default": 0.03,
+          "description": "Fraction away from the level a price is still `near` at. 0.03 means a price-below level of 196 reports near from 201.88 down."
+        },
+        "driftFraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.8,
+          "description": "Fraction of a weight-drift threshold at which the drift is `near`. 0.8 means a 5-point threshold reports near from 4 points."
+        },
+        "timeDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60,
+          "default": 7,
+          "description": "Calendar days before an at-time WATCH's instant that it reports `near`."
+        }
+      }
+    },
     "watchExpiryDays": {
       "type": "integer",
       "minimum": 1,

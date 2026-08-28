@@ -67,6 +67,8 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `validateAdjustment` | split/dividend adjustment conflicts between vendors |
 | `coverage` | every declared-universe candidate has a current disposition |
 | `validateWatch` | kind, futurity, already-met, expiry and reachability |
+| `evaluateWatch` | a standing WATCH scored met / near / not-met / blocked / unevaluable, with the cadence its kind requires |
+| `watchAlertState` | one session's already-alerted WATCH keys, replaced when the session rolls |
 
 ### Position watch and outcomes
 

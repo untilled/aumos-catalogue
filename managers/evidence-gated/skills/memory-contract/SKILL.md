@@ -14,6 +14,7 @@ Use only:
 
 - `migration/schema-version`
 - `run/theme-radar-last`
+- `run/watch-alerts`
 - `learning/evidence-maturity`
 - `learning/closed-decision-summary`
 - `calibration/mean-reversion`
@@ -27,6 +28,18 @@ Use only:
 - `learning/paper-cohorts`
 
 Do not generate a key per run, asset or date.
+
+### The key that lasts one session
+
+`run/watch-alerts` is what stops the same WATCH from waking somebody four times as a price
+wobbles across its level. It holds `sessionDate` and the `sessionKey`s that already alerted in
+**that** session, and when the date changes the list is replaced rather than appended to.
+
+That bound is the whole design. A key that accumulated every alert ever raised would be the
+ledger this document forbids two sections up, and it would grow without limit for a fact that
+stops being interesting at the closing bell. `watchAlertState` returns `changed: false` when
+nothing new alerted, and a run that reads it then writes no revision — a revision records that an
+aggregate moved, not that a run happened.
 
 ### The one key that carries rows, and why it is still not a ledger
 

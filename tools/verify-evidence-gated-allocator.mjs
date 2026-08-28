@@ -788,6 +788,111 @@ for (const lens of ['inflection', 'post-event-continuation']) {
  * A revisit promise expires, and a drift promise is checked for already-met.
  * (issue #70 §23)
  */
+/**
+ * A WATCH is evaluated on the observation a run actually has, and `near` and
+ * `unevaluable` are their own answers. (issue #88)
+ *
+ * The original harness shipped two evaluators — `bin/gate-check` on completed
+ * daily bars and `bin/night-gate-check` on live prices during the US session —
+ * and `night-gate-check`'s own docstring drew the line between them: basing
+ * gates need a bar that has closed, so the night path does not evaluate them.
+ * The port kept one evaluator and lost four things with the second: `near`, the
+ * hard-block downgrade that spares `not_met`, `unevaluable` as distinct from
+ * not-met, and one-alert-per-session.
+ *
+ * The assertion that matters most is the third. A daily-close condition looked
+ * at from an intraday run reporting `not-met` is a run claiming a check it
+ * never ran, and nothing downstream can tell the difference afterwards.
+ */
+covers('watch/intraday-cadence-and-near')
+const priceWatch = { id: 'nvda-entry', kind: 'price-below', threshold: 196 }
+const intradayObservation = { kind: 'last-price', sessionDate: '2026-09-01' }
+const scoreWatch = (input) => execute({ operation: 'evaluateWatch', asOf: methodology.asOf, input })
+
+const touched = scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 195 } })
+assert.equal(touched.data.status, 'met', 'a level touched on a live price is met — this is the condition the original evaluated intraday, and the only one it did')
+assert.equal(touched.data.confirmationPending, true, 'and a met price WATCH is a reason to look, never a confirmed entry: basing and the MA200 state need a bar that has closed')
+assert.equal(touched.data.alertRequired, true, 'the first touch in a session wakes somebody')
+assert.equal(
+  scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 195 }, alertedSessionKeys: [touched.data.sessionKey] }).data.alertRequired,
+  false,
+  'the same level brushed again in the same session is the same event',
+)
+
+assert.equal(scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 200 } }).data.status, 'near', 'a level approached is `near`, which is what makes an alert useful before it is too late')
+assert.equal(scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 250 } }).data.status, 'not-met', 'and a price nowhere near it is not-met')
+
+const blockedWatch = scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 195 }, blocks: ['earnings_block'] })
+assert.equal(blockedWatch.data.status, 'blocked', 'a standing block lowers a met WATCH')
+assert.equal(blockedWatch.data.alertRequired, false, 'and a blocked WATCH does not wake anybody')
+assert.equal(
+  scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 250 }, blocks: ['earnings_block'] }).data.status,
+  'not-met',
+  'but a block never lowers not-met — the report still has to say the level is not there, which is the original `active_block` rule verbatim',
+)
+
+/**
+ * ⚠️ Drift is `intraday`, and this block asserted the opposite until the
+ * runtime was read. Aumos's Wake Engine evaluates a `weight-drift` trigger on a
+ * live quote, on the same tick as the price triggers — so an evaluator that
+ * called that `unevaluable` would refuse to score every drift wake it was sent.
+ */
+const driftWatch = { id: 'kospi-drift', kind: 'weight-drift', threshold: 0.05, baselineWeight: 0.2 }
+const driftIntraday = scoreWatch({ watch: driftWatch, observation: { kind: 'last-price', weight: 0.27, sessionDate: '2026-09-01' } })
+assert.equal(driftIntraday.data.status, 'met', 'a drift read off a live quote is scored, because that is the reading the wake engine fired on')
+assert.equal(driftIntraday.data.confirmationPending, true, 'and it is a reason to look rather than a weight to act on — it moves for the rest of the session')
+assert.equal(
+  scoreWatch({ watch: driftWatch, observation: { kind: 'last-price', weight: 0.242, sessionDate: '2026-09-01' } }).data.status,
+  'near',
+  'a drift inside the configured fraction of its threshold is near',
+)
+
+const driftBlind = scoreWatch({ watch: driftWatch, observation: { kind: 'clock' } })
+assert.equal(driftBlind.data.status, 'unevaluable', 'with no quote at all the answer is unevaluable, not not-met — reporting the second is claiming a check that never ran, and the wake engine draws the same line by reporting `unevaluated` rather than `not fired` when a quote is missing')
+assert.equal(driftBlind.data.needs, 'last-price', 'and it says what it would have needed')
+assert.ok(driftBlind.diagnostics.some((row) => row.code === 'watch_cadence_unavailable'), 'by name, so a reader afterwards can tell a missed check from a failed one')
+
+/**
+ * The dedupe state has a home, and the home has a bound.
+ *
+ * `alertedSessionKeys` is an input, so before this it was a list the caller had
+ * to keep somewhere and nothing said where. The original harness kept it in
+ * `data/night_gate_state.json`, per night; `run/watch-alerts` is that file with
+ * the state inside the memory contract, and the session bound is what keeps it
+ * from becoming the ledger `memory-contract` forbids.
+ */
+const foldAlerts = (input) => execute({ operation: 'watchAlertState', asOf: methodology.asOf, input })
+const firstAlert = foldAlerts({ previous: null, sessionDate: '2026-09-01', alerting: ['nvda-entry|2026-09-01'] })
+assert.equal(firstAlert.data.changed, true, 'a first alert in a session moves the aggregate, so a revision is worth writing')
+const sameSession = foldAlerts({ previous: firstAlert.data.nextState, sessionDate: '2026-09-01', alerting: ['nvda-entry|2026-09-01'] })
+assert.equal(sameSession.data.changed, false, 'and the same level brushed again does not — a revision records that an aggregate moved, not that a run happened')
+assert.deepEqual(sameSession.data.newlyAlerted, [], 'nothing new alerted')
+
+const nextSession = foldAlerts({ previous: firstAlert.data.nextState, sessionDate: '2026-09-02', alerting: ['nvda-entry|2026-09-02'] })
+assert.deepEqual(
+  nextSession.data.nextState.alerted,
+  ['nvda-entry|2026-09-02'],
+  "a new session replaces the previous session's list rather than appending — a key that accumulated every alert ever raised would grow without bound for a fact that stops mattering at the closing bell",
+)
+assert.ok(nextSession.diagnostics.some((row) => row.code === 'watch_alert_session_rolled'), 'and the roll is stated rather than silent')
+assert.equal(foldAlerts({ previous: null, alerting: [] }).status, 'unevaluated', 'without a session date the alerts of two days would merge, so there is no answer to give')
+
+const memoryContractSkill = await readFile(new URL('../skills/memory-contract/SKILL.md', fixtureRoot), 'utf8')
+assert.ok(memoryContractSkill.includes('`run/watch-alerts`'), 'the key is a published stable key, not one a run invents')
+assert.ok(
+  (await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')).includes('`run/watch-alerts`'),
+  'and the run skeleton reads it — a stable key no run opens is a key that never accumulates',
+)
+
+const sizingSkillText = await readFile(new URL('../skills/sizing-and-concentration/SKILL.md', fixtureRoot), 'utf8')
+for (const status of ['near', 'unevaluable', 'blocked']) {
+  assert.ok(sizingSkillText.includes(`\`${status}\``), `the skill names the ${status} status; a status the core returns and no skill explains is one a run will not act on`)
+}
+assert.ok(
+  (await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')).includes('evaluateWatch'),
+  'the run skeleton reaches for the evaluator; an operation nothing calls is the #87 shape again',
+)
+
 covers('watch/expiry-forced-review')
 const derivedExpiry = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-08-21T00:00:00Z' }, current: {}, config: { watchExpiryDays: 30 } } })
 assert.equal(derivedExpiry.data.expirySource, 'default', 'an undeclared expiry is derived from watchExpiryDays rather than left absent')
@@ -1405,7 +1510,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 79)
+assert.equal(supportedOperations.length, 81)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
