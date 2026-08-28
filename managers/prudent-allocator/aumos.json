@@ -3,7 +3,7 @@
   "id": "prudent-allocator",
   "publisher": "aumos",
   "name": "Prudent Allocator",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",

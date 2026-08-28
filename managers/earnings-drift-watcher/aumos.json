@@ -3,7 +3,7 @@
   "id": "earnings-drift-watcher",
   "publisher": "aumos",
   "name": "Earnings Drift Watcher",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Judges one thing only: whether the market has finished reacting to a reported surprise. Compares the reported figure against what was expected, then against how far the price has already travelled, and mostly concludes that it is too late.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
