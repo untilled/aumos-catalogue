@@ -54,7 +54,22 @@ are already calling it — and dispatch accordingly:
 | `kr-sleeve` | `kr-sleeve` only |
 | `us-sleeve` | `us-sleeve` only |
 | `allocate` | `allocate` only, unless a sleeve's Brief conclusion is older than that market's most recent close — then dispatch that sleeve first and say why in `uncertainty` |
-| none (manual run, event review, an earnings checkpoint) | all three, in order |
+| none (manual run, event review, an earnings checkpoint) | all three, in order — subject to the two rows below |
+| any, when pre-flight blocked | **nothing.** Report what is broken and propose `WAIT` |
+| none, landing inside a market's session | not that market's sleeve — say it has no closed bar |
+
+⛔ **A `harnessAudit` blocker stops dispatch too, not only planning.** §1b says a blocker stops
+planning and never stops reporting, and that is unchanged — but a flow dispatched into a blocked
+run spends a whole subagent producing targets this run must discard. Report what is broken, name
+it in `uncertainty`, propose `WAIT`, and dispatch nothing.
+
+⚠️ **A wake with no flow can land mid-session, and a scheduled one cannot.** That is the whole
+reason the reviews are armed at close plus buffer: by the time one fires, the bar it judges has
+closed. A manual run or an event review arrives whenever it arrives, so before dispatching a
+sleeve, check whether that market is currently open. If it is, **do not judge it** — record that
+it has no closed bar and say so in `uncertainty`. This is the same distinction `evaluateWatch`
+draws with `unevaluable`, for the same reason: a sleeve reported as *nothing to do* when it was
+never looked at is a claim nobody can tell from the real thing afterwards.
 
 ⚠️ **A market review is armed at the moment that market's bar closes, and that is the whole
 point of dispatching by flow.** `nextReviewSequence` puts KR at the XKRX close plus buffer, US
@@ -110,7 +125,8 @@ revision written after `asOf`, and never copy another manager's Brief into priva
 
 Read these stable keys only; do not invent per-run keys:
 
-`migration/schema-version`, `run/theme-radar-last`, `run/watch-alerts`, `learning/evidence-maturity`,
+`migration/schema-version`, `run/theme-radar-last`, `run/watch-alerts`, `run/armed-reviews`,
+`learning/evidence-maturity`,
 `learning/closed-decision-summary`, `calibration/mean-reversion`,
 `calibration/trend-pullback`, `calibration/quality-pullback`, `calibration/core-dca`,
 `calibration/inflection`, `calibration/post-event-continuation`,
@@ -267,6 +283,13 @@ XNYS/XNAS close plus buffer, Global at the next sourced 08:00 Asia/Seoul review 
 closes. **Pass the invocation's config to `nextReviewSequence`** — `schedule.krCloseBufferMinutes`
 and `usCloseBufferMinutes` are the investor's, and a run that omits them silently substitutes the
 package's own defaults for a number the install screen said was theirs. Never add 24 hours or reuse a fixed UTC close across DST, holidays or early closes.
+
+**Reconcile before you arm.** Read `run/armed-reviews`, pass it and the sequence to
+`reconcileArmedReviews`, and arm only what it returns in `toArm`. ⚠️ **You cannot read your own
+WATCHes** — the runtime publishes no watch capability — so this key is the only thing standing
+between a re-arm and a second review that wakes the same sleeve twice on the same day. Write
+`nextState` back. A `review_superseded` diagnostic means an older review is still out there and
+cannot be withdrawn; say so in `uncertainty` rather than assuming it replaced itself.
 
 **Arm each one with the `intent` and the `rule` `nextReviewSequence` returns**, verbatim.
 `rule` is `{ cron, timeZone }` and goes on the `at-time` trigger beside `at`. ⚠️ **It arms

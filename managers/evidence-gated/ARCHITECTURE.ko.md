@@ -72,7 +72,7 @@ provenance로 보관된다. macro score는 없다: 국면 판단은 한 `asOf`�
 
 ## 메모리 계약
 
-패키지는 `skills/memory-contract/SKILL.md`에 문서화된 안정적인 키 열네 개를 쓴다. 값은 스키마
+패키지는 `skills/memory-contract/SKILL.md`에 문서화된 안정적인 키 열다섯 개를 쓴다. 값은 스키마
 버전, 갱신 시각, 뒷받침하는 Decision/Evidence id, 표본·독립 클러스터 수, 계산 가능한 지표, 결측
 필드, maturity 상태를 지닌 JSON 객체다. 쓰기는 키를 재사용하며, 집계가 바뀔 때만 새 revision을
 만든다. 과거 replay는 오늘의 head가 아니라 자기 `asOf` 이하의 최신 revision을 읽는다. 비었거나
@@ -166,6 +166,16 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   매니페스트가 둘을 `optionalSkills`에 두는 이유가 정확히 그것이다. Aumos가 서빙하기 전까지 자산
   주장은 invocation 페이로드와 Brief로 실행에 닿고, 패키지는 하지 못하는 조회를 하는 척하는 대신
   그렇게 말한다. `RunProvenance.unservedTools`가 그 차이를 기록하는 자리다.
+- **매니저는 WATCH를 걸 수는 있고 읽을 수는 없다.** 권한→도구 맵은 `portfolio_read`,
+  `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request`를 내놓고, watch나 plan
+  권한은 아예 없다 — `thesis:read`처럼 선언만 되고 빈 목록인 것조차 아니다. WATCH는
+  `DecisionProposal`로 나가기만 하고 돌아오는 길이 없어서, 실행은 자기가 이미 건 검토를 다시
+  거는 중인지 알 수 없다. #87 이후로 그 비용이 커졌다: 웨이크마다 플로우 하나를 디스패치하므로,
+  30분 간격의 `kr-sleeve` 검토 둘이 각각 한국 슬리브를 돌리고 각각 판단을 봉인한다.
+  `run/armed-reviews`와 `reconcileArmedReviews`가 그 다리다 — 매니저가 무장한 것을 적어둔다 —
+  그리고 다리일 뿐이다: 사설 메모리는 인스턴스 범위라 새 인스턴스는 눈이 먼 채 시작하고 기록은
+  Aumos가 든 것과 갈라질 수 있다.
+  ([#97](https://github.com/untilled/aumos-catalogue/issues/97))
 - **페이퍼 트랙은 인스턴스 사설 메모리에 산다 — 담을 수 있는 곳이 그것뿐이기 때문이다.** 페이퍼
   콜은 주문도 체결도 없으므로 Decision이 아니고, 런타임은 `thesis:write`를 내지 않으며
   `thesis:read`는 도구를 하나도 주지 않는다. 그래서 `learning/paper-cohorts`가 누적 합과 열린 관측

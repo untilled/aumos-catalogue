@@ -356,3 +356,63 @@ export function resolveWakeFlow({ summary, intent, watchId } = {}) {
   }
   return { data: { flow, scheduledAt }, diagnostics }
 }
+
+/**
+ * What this instance last armed, so a re-arm does not duplicate it.
+ *
+ * ⚠️ **A manager can arm a WATCH and cannot read one back.** The grant map
+ * publishes `portfolio_read`, `brief_read/write`, `memory_read/write` and
+ * `source_request`, and there is no watch or plan capability at all — not even
+ * a declared-but-empty one like `thesis:read`. WATCHes leave in a
+ * `DecisionProposal` and there is no return path.
+ *
+ * Since #87 that costs more than it did. Every wake now dispatches one flow, so
+ * two `kr-sleeve` reviews armed half an hour apart each run the Korean sleeve
+ * and each seal a judgement — two rows on the same book, on the same day, with
+ * nothing in either saying which one read the close. That is the state #87
+ * existed to remove.
+ *
+ * So the manager writes down what it armed. Three rows, replaced every run rather
+ * than appended to, in the same shape `run/watch-alerts` uses for the same
+ * reason (#88): a key that grows is the ledger `memory-contract` forbids.
+ *
+ * ⛔ **This is a bridge, not the fix.** Private memory is scoped to this
+ * instance, so a new instance starts blind and this record can drift from the
+ * WATCHes Aumos actually holds. Two copies of one fact diverge; the fix is a
+ * read path, and that is Aumos's to publish. (#97)
+ */
+export function reconcileArmedReviews({ previous = null, sequence = [], asOf } = {}) {
+  const diagnostics = []
+  const armed = Array.isArray(previous?.armed) ? previous.armed : []
+  const stillOpen = armed.filter((row) => Number.isFinite(Date.parse(row?.at)) && Date.parse(row.at) > Date.parse(asOf))
+  const duplicates = []
+  const toArm = []
+  for (const row of sequence) {
+    const match = stillOpen.find((open) => open.flow === row.flow && open.at === row.at)
+    if (match) {
+      duplicates.push(row.flow)
+      continue
+    }
+    toArm.push(row)
+  }
+  if (duplicates.length) {
+    diagnostics.push(diagnostic('review_already_armed', 'info', 'A review at this instant is already armed for this flow; arming it again would wake the sleeve twice', 'sequence', { flows: duplicates }))
+  }
+  const superseded = stillOpen.filter((open) => sequence.some((row) => row.flow === open.flow && row.at !== open.at))
+  if (superseded.length) {
+    diagnostics.push(diagnostic('review_superseded', 'info', 'A previously armed review is being replaced by one at a different instant; the old one cannot be withdrawn without a read path', 'previous', { superseded }))
+  }
+  return {
+    data: {
+      toArm,
+      duplicateFlows: duplicates,
+      superseded,
+      nextState: {
+        schemaVersion: 1,
+        updatedAsOf: asOf ?? null,
+        armed: sequence.map((row) => ({ flow: row.flow, at: row.at })),
+      },
+    },
+    diagnostics,
+  }
+}

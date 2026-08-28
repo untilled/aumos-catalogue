@@ -15,6 +15,7 @@ Use only:
 - `migration/schema-version`
 - `run/theme-radar-last`
 - `run/watch-alerts`
+- `run/armed-reviews`
 - `learning/evidence-maturity`
 - `learning/closed-decision-summary`
 - `calibration/mean-reversion`
@@ -28,6 +29,23 @@ Use only:
 - `learning/paper-cohorts`
 
 Do not generate a key per run, asset or date.
+
+### The key that stands in for a read path
+
+`run/armed-reviews` holds the flow and instant of the three market reviews this instance last
+armed. ⚠️ **It exists because a manager can arm a WATCH and cannot read one back** — the grant map
+publishes no watch or plan capability at all, not even a declared-but-empty one. WATCHes leave in a
+`DecisionProposal` and there is no return path.
+
+Since #87 that costs more than it did: every wake dispatches one flow, so two `kr-sleeve` reviews
+armed half an hour apart each run the Korean sleeve and each seal a judgement — two rows on the
+same book, on the same day, neither saying which one read the close.
+
+Three rows, replaced every run rather than appended to, so the key does not grow.
+
+⛔ **A bridge, not the fix.** Private memory is scoped to this instance, so a new instance starts
+blind and this record can drift from the WATCHes Aumos actually holds. Two copies of one fact
+diverge. The fix is a read path and it is not this package's to publish. (#97)
 
 ### The key that lasts one session
 
