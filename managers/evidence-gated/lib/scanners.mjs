@@ -1,5 +1,6 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
 import { indicatorPacket } from './indicators.mjs'
+import { LENS_ENVELOPES } from './envelopes.mjs'
 
 function volumeCapitulation(bars) {
   if (bars.length < 6) return null
@@ -19,20 +20,28 @@ export function scanSymbol({ symbol, market, bars, held = false, pending = false
     return { candidate: null, diagnostics }
   }
   const capitulation = volumeCapitulation(bars)
+  /**
+   * Every threshold below comes from `LENS_ENVELOPES`, which is also what
+   * judges whether a revisit trigger is reachable. One source: a constant
+   * edited here without the declaration moving is not drift, it is a syntax
+   * error waiting to happen.
+   */
+  const meanReversion = LENS_ENVELOPES['mean-reversion'].signals
   const meanSignals = {
-    rsiOversold: packet.rsi14 < 30,
-    nearLow: packet.aboveLow200 !== null && packet.aboveLow200 <= 0.05,
-    ma200Discount: packet.ma200Distance !== null && packet.ma200Distance <= -0.1,
-    ma60Discount: packet.ma60Distance !== null && packet.ma60Distance <= -0.07,
+    rsiOversold: packet.rsi14 < meanReversion.rsiOversold.value,
+    nearLow: packet.aboveLow200 !== null && packet.aboveLow200 <= meanReversion.nearLow.value,
+    ma200Discount: packet.ma200Distance !== null && packet.ma200Distance <= meanReversion.ma200Discount.value,
+    ma60Discount: packet.ma60Distance !== null && packet.ma60Distance <= meanReversion.ma60Discount.value,
     volumeCapitulation: capitulation,
   }
   const knownMean = Object.values(meanSignals).filter((value) => value !== null)
   const meanCount = knownMean.filter(Boolean).length
+  const trendPullback = LENS_ENVELOPES['trend-pullback'].checks
   const trendSignals = {
     uptrend: packet.ma200 !== null && packet.close > packet.ma200 && packet.ma50 > packet.ma200,
-    pullback: packet.offHigh200 >= -0.2 && packet.offHigh200 <= -0.05,
-    healthyRsi: packet.rsi14 >= 35 && packet.rsi14 <= 55,
-    notExtended: packet.ma200 !== null && packet.close <= packet.ma200 * 1.4,
+    pullback: packet.offHigh200 >= trendPullback.pullback.min && packet.offHigh200 <= trendPullback.pullback.max,
+    healthyRsi: packet.rsi14 >= trendPullback.healthyRsi.min && packet.rsi14 <= trendPullback.healthyRsi.max,
+    notExtended: packet.ma200 !== null && packet.close <= packet.ma200 * (1 + trendPullback.notExtended.value),
   }
   /**
    * Lens C, the 5pp band the other two lenses drop between.
@@ -53,10 +62,11 @@ export function scanSymbol({ symbol, market, bars, held = false, pending = false
    * one calibration sample. Its samples accrue under its own memory key, so no
    * existing row is retagged.
    */
+  const qualityPullback = LENS_ENVELOPES['quality-pullback'].checks
   const qualityPullbackSignals = {
     aboveMa200: packet.ma200 !== null && packet.close > packet.ma200,
-    deepPullback: packet.offHigh200 !== null && packet.offHigh200 >= -0.35 && packet.offHigh200 <= -0.15,
-    rsiBand: packet.rsi14 >= 30 && packet.rsi14 <= 50,
+    deepPullback: packet.offHigh200 !== null && packet.offHigh200 >= qualityPullback.deepPullback.min && packet.offHigh200 <= qualityPullback.deepPullback.max,
+    rsiBand: packet.rsi14 >= qualityPullback.rsiBand.min && packet.rsi14 <= qualityPullback.rsiBand.max,
   }
   const lenses = []
   if (meanCount >= 2) lenses.push('mean-reversion')

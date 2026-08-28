@@ -41,8 +41,23 @@ lens rather than pointing to the level where it stops qualifying.
 
 ### Core DCA
 
-Broad ETFs are cash-allocation decisions. Record allocation purpose, reserve cash after each
-tranche, date/price conditions and stop conditions. Do not fabricate a single-name variant view.
+Broad ETFs are cash-allocation decisions. Do not fabricate a single-name variant view — there is no
+variant view to have about owning the index, and inventing one is how a cash decision gets recorded
+as a stock pick.
+
+Five conditions, all of them numbers rather than intentions:
+
+| | |
+|---|---|
+| cash threshold | the first tranche executes only when cash and short bonds are at least `coreDca.minimumCashWeightForFirstTranche` of the book. Deploying from a thin cash position turns the reserve into the tranche |
+| tranche plan | T1/T2/T3 each with its size and its date-or-price condition. "We will add on weakness" is not a tranche |
+| reserve floor | the arithmetic showing `coreDca.reserveFloorWeight` still stands **after** the tranche, not before it |
+| stop conditions | four, named: a market break, a better opportunity, the cash floor breached, a hedge gate firing |
+| classification | recorded as cash deployment. **It does not count as a ready single-name BUY** — pooling the two makes the single-name sample look larger than it is |
+
+`monthlyTrancheMaxWeight` paces the deployment and `catchUpMonthlyMaxWeight` is the ceiling while
+catching up on a schedule that fell behind. Catching up accelerates placement; it never raises the
+target.
 
 ## Candidate record
 

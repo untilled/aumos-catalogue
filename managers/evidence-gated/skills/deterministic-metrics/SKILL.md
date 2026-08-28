@@ -22,7 +22,7 @@ the JSON remains the canonical explanation.
 
 ## The operations
 
-All 72, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
+All 76, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
 calling it wrong is not a discovery path — every flow skill tells you not to go looking, so the
 names have to be here. A name absent from this table is a name you cannot call.
 
@@ -138,6 +138,15 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `deduplicateObservations` | the same observation arriving twice |
 | `themeRadarDue` | whether the forward-research interval has elapsed |
 
+### Declared thresholds — the numbers, and the drift they catch
+
+| operation | what it decides |
+|---|---|
+| `lensEnvelope` | the numeric envelope each lens can produce, and whether a revisit trigger is reachable inside it |
+| `clusterBlock` | whether a correlated event cluster holds promotion, and when it clears |
+| `timeStopPolicy` | review date reached with the catalyst unrealized and the benchmark ahead → exit candidate |
+| `ruleVersions` | the eleven versioned axes, what is current, and whether these rows may be pooled |
+
 ### Pre-flight — asked before planning, not after proposing
 
 | operation | what it decides |
@@ -177,6 +186,10 @@ named field is the difference between a gate that runs and a gate that blocks or
 | `upsideRadar` | `price.ma50`, `price.ma200`, `price.offHigh200` and `events` with `announcedAt`/`sue`/`preAnnouncementClose` | The three lanes read them. Without them a lane excludes every candidate and reports `starved`, which is a sourcing finding rather than an absence of opportunity. |
 | `controlArmLane` | `exitRegistered: true` on every row, and `experimentTotalRemainingWeight` | The exit discipline is this lane's product, so an unregistered entry is refused. The lane spends inside the experimental total, not beside it. |
 | `harnessAudit` | `decisions` with `orderReady`/`exitRegistered`/`quantity`, and `theses` | Without the decisions every held position reads as untracked. Without the theses every WATCH on an unheld name reads as orphaned. Both are true findings on a real book and noise on a partial input. |
+| `lensEnvelope` | `triggers` as `{ metric, level }` using indicator names (`offHigh200`, `rsi14`, `ma200Distance`) | A metric the lens declares no range for is unevaluated, never assumed reachable. |
+| `timeStopPolicy` | `catalystRealized`, `returnSinceEntryPct`, `benchmarkReturnSinceEntryPct`, and `core`/`parkedLiquidity` to exclude allocation holdings | Both halves are required: either one missing leaves the promotion unresolved rather than declined. |
+| `clusterBlock` | `clusters[].prints` and the `intent` | The end date is derived from the last print rather than trusted — a window copied from a sibling cluster ends a day early. The block applies to promotion only. |
+| `ruleVersions` | `registry` keyed by axis, and the `axis` these rows belong to | Without the axis the registry can say what is current but not whether these rows are stale. |
 | `outcomeClassification` | `executionAttributableToDecision` when the fill differed from the plan; `judgedFailures` for the judged axis | Without the flag a poor fill is an observation, not a methodology failure — which is the reading `outcome-calibration` mandates. An unrecognised judged reason is refused, never absorbed. |
 | `crossCheckPrice` | `config.priceConflictTolerance` | The 5% the documents call configured. Passing `tolerance` directly still overrides it. |
 

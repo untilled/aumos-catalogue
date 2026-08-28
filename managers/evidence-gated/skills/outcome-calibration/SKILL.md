@@ -26,8 +26,11 @@ When fields permit, compute by lens and version:
 - process compliance: thesis, challenge, stop/review and concentration rules;
 - outcome coverage and missingness.
 
-Do not mix lenses, rule versions, horizons or adjusted/unadjusted price bases merely to reach a
-threshold. Report `relative-only` where active return is positive but gross return is negative.
+Do not mix lenses, rule versions, horizons, **benchmarks** or adjusted/unadjusted price bases merely
+to reach a threshold. The benchmark belongs on that list and was missing from it: this methodology is
+benchmark-relative end to end, so two active returns measured against different denominators are not
+two samples of anything. `config.benchmarks` fixes the denominator per kind of holding — Korean
+equity, US equity, cash-like — so it does not get re-decided each run. Report `relative-only` where active return is positive but gross return is negative.
 
 ## Failure taxonomy — two axes, and they are not interchangeable
 

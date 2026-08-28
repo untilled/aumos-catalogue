@@ -1342,7 +1342,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 72)
+assert.equal(supportedOperations.length, 76)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -1730,6 +1730,139 @@ for (const named of ['lessonAudit', 'harnessAudit', 'exitCheck', 'trendState', '
 }
 assert.ok(/before any new buy is considered/i.test(preflightProse), 'exits are reported before purchases are considered — the ordering is the rule')
 assert.ok(/stops planning, never reporting/i.test(preflightProse), 'a blocker stops the plan and not the report')
+
+/**
+ * ── Declared thresholds (issue #70 §12–§15) ────────────────────────────────
+ *
+ * The numbers lived in `data/*.json`, which the matrix never inventoried.
+ */
+covers('scanner/lens-envelope-reachability', 'scanner/lens-envelope-is-the-scanner-source')
+const envelopeAsOf = '2026-08-20T00:00:00Z'
+const reachable = execute({ operation: 'lensEnvelope', asOf: envelopeAsOf, input: { lens: 'trend-pullback', triggers: [{ metric: 'offHigh200', level: -0.12 }] } })
+assert.equal(reachable.data.triggers[0].reachable, true)
+const unreachable = execute({ operation: 'lensEnvelope', asOf: envelopeAsOf, input: { lens: 'trend-pullback', triggers: [{ metric: 'offHigh200', level: -0.25 }] } })
+assert.equal(unreachable.status, 'blocked', 'a trigger where the lens stops producing candidates is one the book never comes back through')
+assert.equal(unreachable.data.triggers[0].reason, 'outside-the-lens-that-created-it')
+assert.equal(
+  execute({ operation: 'lensEnvelope', asOf: envelopeAsOf, input: { lens: 'mean-reversion', triggers: [{ metric: 'offHigh200', level: -0.6 }] } }).data.triggers[0].reachable,
+  true,
+  'deep dislocation has no floor, so a drawdown trigger is always reachable there',
+)
+assert.ok(
+  execute({ operation: 'lensEnvelope', asOf: envelopeAsOf, input: { lens: 'trend-pullback', triggers: [{ metric: 'bookValue', level: 1 }] } })
+    .diagnostics.some((row) => row.code === 'trigger_metric_undeclared'),
+  'an undeclared metric is unknown, never assumed reachable',
+)
+
+/**
+ * The property the original's copy-and-check-drift idiom protected: the
+ * scanner behaves at the declared boundaries. A constant edited into the code
+ * without the declaration moving fails here.
+ */
+const envelopes = JSON.parse(JSON.stringify((await import('../managers/evidence-gated/lib/envelopes.mjs')).LENS_ENVELOPES))
+const boundaryBars = (offHigh, rsiTarget) => {
+  const rise = Array.from({ length: 180 }, (_, index) => 60 + index * 0.9)
+  const peak = rise.at(-1)
+  const target = peak * (1 + offHigh)
+  const drop = (peak - target) / 40
+  return series([...rise, ...Array.from({ length: 40 }, (_, index) => peak - drop * (index + 1) + (index % 2 ? rsiTarget : -rsiTarget))])
+}
+const justInside = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'EDGE', market: 'us', bars: boundaryBars(-0.18, 3) } })
+assert.ok(justInside.data.indicators.offHigh200 >= envelopes['trend-pullback'].checks.pullback.min, 'the fixture sits inside the declared band')
+assert.equal(justInside.data.signals.trendPullback.pullback, true, 'the scanner fires where the declaration says it fires')
+const justOutside = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'PAST', market: 'us', bars: boundaryBars(-0.26, 3) } })
+assert.ok(justOutside.data.indicators.offHigh200 < envelopes['trend-pullback'].checks.pullback.min)
+assert.equal(justOutside.data.signals.trendPullback.pullback, false, 'and stops where the declaration says it stops')
+
+covers('watch/cluster-block')
+const cluster = { name: 'hyperscaler-capex', prints: [{ at: '2026-08-29' }, { at: '2026-08-30' }] }
+const blocked = execute({ operation: 'clusterBlock', asOf: envelopeAsOf, input: { clusters: [cluster], intent: 'promote-to-ready' } })
+assert.equal(blocked.data.blocked, true, 'a binary event that decides the thesis is waited out, not sized around')
+assert.equal(blocked.data.clearAfter, '2026-08-31', 'the block ends the day after the last print, not the day of it')
+const scoped = execute({ operation: 'clusterBlock', asOf: envelopeAsOf, input: { clusters: [cluster], intent: 'register-paper' } })
+assert.equal(scoped.data.blocked, false, 'research, WATCH and paper registration continue through a cluster')
+assert.ok(scoped.diagnostics.some((row) => row.code === 'cluster_block_scope' && row.severity === 'info'))
+assert.ok(
+  execute({ operation: 'clusterBlock', asOf: envelopeAsOf, input: { clusters: [{ ...cluster, blockUntil: '2026-08-30' }] } })
+    .diagnostics.some((row) => row.code === 'cluster_block_until_mismatch'),
+  'a window copied from a sibling cluster ends before its own last print, and is refused',
+)
+assert.equal(
+  execute({ operation: 'clusterBlock', asOf: '2026-09-05T00:00:00Z', input: { clusters: [cluster] } }).data.blocked,
+  false,
+  'once the cluster has passed it stops blocking',
+)
+
+covers('exit/time-stop-policy')
+const timeStop = (overrides) => execute({ operation: 'timeStopPolicy', asOf: envelopeAsOf, input: { positions: [{ symbol: 'T1', reviewBy: '2026-08-01', ...overrides }] } })
+assert.equal(timeStop({ catalystRealized: false, returnSinceEntryPct: -4, benchmarkReturnSinceEntryPct: 6 }).data.verdicts[0].verdict, 'exit-candidate')
+assert.equal(
+  timeStop({ catalystRealized: true, returnSinceEntryPct: -4, benchmarkReturnSinceEntryPct: 6 }).data.verdicts[0].reason,
+  'catalyst-happened-so-the-thesis-was-tested',
+  'a catalyst that fired tested the thesis; that is a review, not a time stop',
+)
+assert.equal(
+  timeStop({ catalystRealized: false, returnSinceEntryPct: 9, benchmarkReturnSinceEntryPct: 6 }).data.verdicts[0].reason,
+  'still-ahead-of-the-benchmark',
+  'a thesis still ahead of its benchmark has not had its window wasted',
+)
+assert.equal(timeStop({ reviewBy: '2027-01-01', catalystRealized: false, returnSinceEntryPct: -4, benchmarkReturnSinceEntryPct: 6 }).data.verdicts[0].verdict, 'not-due')
+assert.equal(
+  execute({ operation: 'timeStopPolicy', asOf: envelopeAsOf, input: { positions: [{ symbol: 'CORE', core: true, reviewBy: '2026-08-01' }] } }).data.verdicts[0].verdict,
+  'out-of-scope',
+  'an allocation holding claimed no catalyst, so no catalyst can go unrealized',
+)
+assert.ok(
+  timeStop({ catalystRealized: false }).diagnostics.some((row) => row.code === 'time_stop_unevaluated'),
+  'a missing half leaves the promotion unresolved rather than declined',
+)
+
+covers('audit/rule-version-registry')
+const registry = { signal_paper: { version: 'sp-v2', since: '2026-07-18' }, entry_quality: { version: 'eq-v2' } }
+const versions = execute({ operation: 'ruleVersions', asOf: envelopeAsOf, input: { registry, axis: 'entry_quality', rows: [{ ruleVersion: 'eq-v2' }, { ruleVersion: 'eq-v2' }] } })
+assert.equal(versions.data.declared.entry_quality.version, 'eq-v2')
+assert.equal(versions.data.poolable, true)
+assert.deepEqual(versions.data.axes.length, 11, 'the eleven versioned axes are declared, not inferred from whatever rows arrived')
+assert.ok(versions.diagnostics.some((row) => row.code === 'rule_axis_undeclared'), 'an axis with no current version cannot say what a comparison is comparing')
+assert.equal(
+  execute({ operation: 'ruleVersions', asOf: envelopeAsOf, input: { registry, axis: 'entry_quality', rows: [{ ruleVersion: 'eq-v1' }, { ruleVersion: 'eq-v2' }] } }).status,
+  'blocked',
+  'rows judged under two versions of one axis cannot be pooled; a definition change increments the axis rather than re-tagging what is recorded',
+)
+assert.ok(
+  execute({ operation: 'ruleVersions', asOf: envelopeAsOf, input: { registry: { ...registry, vibes: { version: 'v1' } } } })
+    .diagnostics.some((row) => row.code === 'rule_axis_unknown'),
+  'an axis outside the published set would version something nothing reads',
+)
+assert.ok(
+  execute({ operation: 'ruleVersions', asOf: envelopeAsOf, input: { registry, axis: 'entry_quality', rows: [{ ruleVersion: 'eq-v1' }] } })
+    .diagnostics.some((row) => row.code === 'rule_version_superseded'),
+  'superseded rows stay valid on their own terms and are counted separately',
+)
+
+covers('policy/declared-thresholds', 'policy/benchmark-fixed')
+for (const [path, value] of [['benchmarkHurdleAnnualPct', 7.67], ['coreDca.minimumCashWeightForFirstTranche', 0.5], ['coreDca.reserveFloorWeight', 0.15], ['coreDca.catchUpMonthlyMaxWeight', 0.125]]) {
+  const node = path.split('.').reduce((acc, key) => acc.properties[key], { properties: configSchema.properties })
+  assert.equal(node.default, value, `${path} is declared with its approved value rather than left to each run`)
+}
+assert.deepEqual(
+  Object.keys(configSchema.properties.benchmarks.properties),
+  ['koreanEquity', 'usEquity', 'cashLike'],
+  'the benchmark is fixed per kind of holding; a denominator that changes between runs makes every active return incomparable',
+)
+assert.equal(configSchema.properties.grandfather.properties.blocksNewNonCoreWhenBreached.default, true, 'existing exposure is tolerated and new exposure is not')
+const dcaSkill = await readFile(new URL('../skills/candidate-research/SKILL.md', fixtureRoot), 'utf8')
+for (const condition of ['minimumCashWeightForFirstTranche', 'reserveFloorWeight', 'catchUpMonthlyMaxWeight']) {
+  assert.ok(dcaSkill.includes(condition), `the Core DCA gate names ${condition} rather than describing it`)
+}
+assert.ok(/does not count as a ready single-name BUY/i.test(dcaSkill), 'a cash deployment is not counted as a single-name sample')
+assert.ok(/\*\*benchmarks\*\*/.test(calibrationSkill) || /benchmarks/.test(calibrationSkill), 'the benchmark is on the non-mixing list it was missing from')
+
+covers('audit/data-file-inventory')
+assert.ok(/The contract files the executables read/.test(migrationText), 'the data files every executable reads have an inventory rather than being out of scope')
+for (const file of ['lens_definitions.json', 'entry_gates.json', 'exit_rules.json', 'sizing_policy.json', 'workspace_policy.json', 'rule_versions.json', 'triage.py']) {
+  assert.ok(migrationText.includes(file), `${file} has a recorded disposition; an absence with no entry is the failure this document prevents`)
+}
 
 assertCoverageWasEarned()
 

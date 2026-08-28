@@ -131,6 +131,39 @@ no credential, order, network, database, filesystem-ledger or personal-path acce
 includes `ruleVersion`, `asOf`, units/currency/market where relevant, and explicit
 `missing`/`unevaluated` diagnostics rather than zero/false substitution.
 
+## The contract files the executables read (issue #70 §11)
+
+This matrix inventoried `bin/` and nothing else, and the thresholds a methodology is actually made
+of do not live in `bin/` — they live in `data/*.json`, which every one of those executables reads.
+Sixty-five programs were recorded with their disposition, rule version and golden fixture while the
+contract files they depend on were **out of scope: not ported, and not recorded as unported.** The
+absence had no entry, which is the failure mode this document exists to prevent.
+
+`AR` absorbed by Aumos · `PP` ported pure · `PX` ported with semantics changed · `RT` retired.
+
+| legacy data file | disposition | where it lives now |
+|---|---|---|
+| `lens_definitions.json` | PX | `lib/envelopes.mjs` `LENS_ENVELOPES` — one source the scanner reads, so the copy-and-check-drift idiom is unnecessary rather than unported |
+| `entry_gates.json` | PX | `clusterBlock` for the correlated-cluster hold; the rest is WATCH, which Aumos owns |
+| `exit_rules.json` | PX | `exitCheck` price rules + `timeStopPolicy` for the approved review-date promotion |
+| `sizing_policy.json` | PX | `config.schema.json` (`concentration`, `portfolioHeat`, `grandfather`, `experimentalPositionCeiling`), `entryQualityGate`, `newSinglePacing`, `controlArmLane` |
+| `allocation_policy.json` | PX | `config.coreDca` (cash threshold, reserve floor, tranche and catch-up ceilings); the targets themselves are the investor's Mandate |
+| `workspace_policy.json` | PX | `config.benchmarks`, `config.benchmarkHurdleAnnualPct`; `round_trip_cost_pct` is `promotionGate`'s cost model |
+| `prereg_policy.json` | PP | `verdictReport` pre-registered criteria — stricter-only at call time |
+| `rule_versions.json` | PP | `ruleVersions` registry, eleven axes |
+| `shadow_policy.json` · `real_sleeve_policy.json` | PP | `shadowTrack` thresholds and window |
+| `sector_map.json` · `sector_benchmarks.json` | RT | investor input to `sectorStrength`; a package-shipped sector map would be a claim about the investor's universe |
+| `symbol_sectors.json` | RT | rows carry their own `sector`; an override file is a second source of truth |
+| `screen_universe.json` · `universe_extensions.json` | AR | `coverageState({ scannerUniverses, extensions })` — Aumos owns the universe |
+| `triage_verdicts.json` · `analysis/triage.py` | RT | the axis-selection study behind `upsideRadar`; its conclusion is the lane definitions, and the study itself is history |
+| `radar_coverage_state.json` | PP | `upsideRadar.lanes` coverage and starvation, computed per run rather than stored |
+| `signal_paper_log.jsonl` · `shadow_portfolio.jsonl` · `outcomes.jsonl` · `decisions.jsonl` · `exit_signal_log.jsonl` · `sentinel_log.jsonl` · `features.jsonl` | AR | Aumos owns the Decision journal, Track Record and Evidence; this package computes over them and keeps no ledger |
+| `order_lifecycle.jsonl` · `order-limits.json` · `account_equity.jsonl` | AR | Aumos and the broker |
+| `history/` · `fundamentals/` · `mirror.sqlite` · `tradeos.sqlite` | AR | source data, fetched point-in-time through the source contract |
+| `schedule.json` · `watch_schedule.jsonl` · `night_gate_state.json` | AR | WATCH and the Wake Engine |
+| `config_changes.jsonl` · `notifications.jsonl` · `daily_check_log.jsonl` · `market_score_log.jsonl` · `parallel_run_log.jsonl` · `upside_radar_log.jsonl` · `proposed_sizing*.jsonl` | RT | run logs of a filesystem harness; a package that keeps no ledger has nothing to write them to |
+| `secrets/` · `*-credentials.json` | RT | never ported; the package declares `network.mode: deny` and holds no credential |
+
 ## What the last column names, and what stands behind it
 
 The `golden fixture` column names a **coverage group**, not a file. Seven of the nineteen groups
