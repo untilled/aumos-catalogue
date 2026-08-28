@@ -82,7 +82,7 @@ kept as provenance. There is no macro score: a regime call is a Brief judgement 
 
 ## Memory contract
 
-The package uses nine stable keys documented in `skills/memory-contract/SKILL.md`. Values
+The package uses fourteen stable keys documented in `skills/memory-contract/SKILL.md`. Values
 are JSON objects with schema version, update instant, supporting Decision/Evidence ids,
 sample/independent cluster counts, computable metrics, missing fields and maturity status.
 Writes reuse a key and create a new revision only when an aggregate changes. A historical

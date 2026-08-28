@@ -72,7 +72,7 @@ provenance로 보관된다. macro score는 없다: 국면 판단은 한 `asOf`�
 
 ## 메모리 계약
 
-패키지는 `skills/memory-contract/SKILL.md`에 문서화된 안정적인 키 아홉 개를 쓴다. 값은 스키마
+패키지는 `skills/memory-contract/SKILL.md`에 문서화된 안정적인 키 열네 개를 쓴다. 값은 스키마
 버전, 갱신 시각, 뒷받침하는 Decision/Evidence id, 표본·독립 클러스터 수, 계산 가능한 지표, 결측
 필드, maturity 상태를 지닌 JSON 객체다. 쓰기는 키를 재사용하며, 집계가 바뀔 때만 새 revision을
 만든다. 과거 replay는 오늘의 head가 아니라 자기 `asOf` 이하의 최신 revision을 읽는다. 비었거나

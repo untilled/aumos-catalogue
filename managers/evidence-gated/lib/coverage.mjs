@@ -273,3 +273,46 @@ export function evaluateWatch({ watch, observation = {}, blocks = [], alertedSes
     diagnostics,
   }
 }
+
+/**
+ * One alert per WATCH per session, with the state small enough to keep.
+ *
+ * `evaluateWatch` answers whether *this* reading should wake somebody, and it
+ * needs to be told what already did. The original harness kept that in
+ * `data/night_gate_state.json` — a per-night file whose only job was stopping
+ * the same level from alerting four times as a price wobbled across it.
+ *
+ * ⚠️ **It holds one session and no history, deliberately.** A key that
+ * accumulated every alert ever raised would be the ledger
+ * `skills/memory-contract/SKILL.md` forbids, and it would grow without bound
+ * for a fact that stops being interesting at the closing bell. When the session
+ * date changes the list is replaced rather than appended to, so the key is
+ * bounded by the number of watches armed on one day.
+ *
+ * `changed` is false when nothing new alerted, and a run that reads it writes no
+ * revision — which is the same rule every other key here follows: a revision
+ * records that an aggregate moved, not that a run happened.
+ */
+export function watchAlertState({ previous = null, sessionDate, alerting = [], asOf } = {}) {
+  const diagnostics = []
+  if (typeof sessionDate !== 'string' || sessionDate.length === 0) {
+    diagnostics.push(diagnostic('watch_alert_session_missing', 'unevaluated', 'A session date is what bounds this key; without one the alerts of two days would merge', 'sessionDate'))
+    return { data: null, diagnostics }
+  }
+  const carried = previous?.sessionDate === sessionDate && Array.isArray(previous?.alerted) ? previous.alerted : []
+  if (previous?.sessionDate !== undefined && previous.sessionDate !== sessionDate) {
+    diagnostics.push(diagnostic('watch_alert_session_rolled', 'info', 'A new session replaces the previous session’s alerts rather than appending to them', 'sessionDate', { from: previous.sessionDate, to: sessionDate }))
+  }
+  const added = alerting.filter((key) => typeof key === 'string' && key.length > 0 && !carried.includes(key))
+  const alerted = [...carried, ...new Set(added)].sort()
+  const changed = alerted.length !== carried.length || previous?.sessionDate !== sessionDate
+  return {
+    data: {
+      changed,
+      alerted,
+      newlyAlerted: [...new Set(added)].sort(),
+      nextState: { schemaVersion: 1, updatedAsOf: asOf ?? null, sessionDate, alerted },
+    },
+    diagnostics,
+  }
+}
