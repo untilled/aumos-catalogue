@@ -3,7 +3,7 @@
   "id": "atlas-trend-us",
   "publisher": "aumos",
   "name": "Atlas Trend US",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
@@ -12,7 +12,7 @@
   ],
   "license": "MIT",
   "engines": {
-    "aumos": ">=0.2.6"
+    "aumos": ">=0.3.15"
   },
   "ampVersion": 1,
   "cadence": {

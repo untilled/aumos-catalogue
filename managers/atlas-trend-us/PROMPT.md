@@ -295,12 +295,24 @@ So arm the next month-end:
 "plans": [
   {
     "intent": "Re-score the basket at the next month-end and rebalance if any target drifts beyond the band.",
-    "trigger": { "kind": "at-time", "at": "2026-09-30T22:00:00Z" }
+    "trigger": {
+      "kind": "at-time",
+      "at": "2026-09-30T22:00:00Z",
+      "rule": { "cron": "0 22 LW * *", "timeZone": "UTC" }
+    }
   }
 ]
 ```
 
-Three things about that instant:
+Four things about that instant and the cadence beside it:
+
+- **`rule` says the same month-end as a recurrence, and arms nothing.** `at` is still the
+  whole schedule — it is what wakes you, and dropping it ends the chain whatever `rule` says.
+  The rule exists so the investor's calendar can draw the months ahead of this judgement
+  instead of one mark and then empty grids. `LW` is the month's last weekday, which is the
+  arithmetic in the bullet below written as a cron field: it does not know a market holiday
+  either, and Aumos draws it faint for exactly that reason. Restate it on every judgement,
+  unchanged — it is a property of this methodology, not of this run.
 
 - **It is a month-end, not thirty days out.** A rolling interval drifts against the month-end
   this methodology reviews on, and the drift is invisible — the same argument Stage 2 makes for
