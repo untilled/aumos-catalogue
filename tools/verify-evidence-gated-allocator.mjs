@@ -1342,7 +1342,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 76)
+assert.equal(supportedOperations.length, 77)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -1863,6 +1863,115 @@ assert.ok(/The contract files the executables read/.test(migrationText), 'the da
 for (const file of ['lens_definitions.json', 'entry_gates.json', 'exit_rules.json', 'sizing_policy.json', 'workspace_policy.json', 'rule_versions.json', 'triage.py']) {
   assert.ok(migrationText.includes(file), `${file} has a recorded disposition; an absence with no entry is the failure this document prevents`)
 }
+
+/**
+ * ── The rest of the skill↔code vocabulary check (issue #70 §25–§27, §18) ───
+ *
+ * #73 wired the failure taxonomy. These are the other three enumerations and
+ * the config references — each one a place where a run could follow a skill
+ * and be refused by the code.
+ */
+covers('audit/skill-code-enum-agreement', 'audit/configured-x-exists')
+const methodologySource = await readFile(new URL('../lib/methodology.mjs', fixtureRoot), 'utf8')
+const evidenceSource = await readFile(new URL('../lib/evidence.mjs', fixtureRoot), 'utf8')
+const setLiteral = (source, name) => {
+  const start = source.indexOf(`${name} = new Set([`)
+  nodeAssert.ok(start >= 0, `${name} is declared as a set literal`)
+  return [...source.slice(start, source.indexOf('])', start)).matchAll(/'([a-z0-9-]+)'/g)].map((match) => match[1])
+}
+const researchSkill = await readFile(new URL('../skills/candidate-research/SKILL.md', fixtureRoot), 'utf8')
+const vocabularySection = researchSkill.slice(researchSkill.indexOf('## Trigger vocabulary'), researchSkill.indexOf('## Lens-specific reading'))
+for (const [name, section] of [['THESIS_TRIGGER_KINDS', vocabularySection], ['WATCH_TRIGGER_KINDS', vocabularySection]]) {
+  for (const kind of setLiteral(methodologySource, name)) {
+    assert.ok(section.includes(`\`${kind}\``), `the trigger vocabulary publishes ${kind}, which ${name} accepts`)
+  }
+}
+assert.deepEqual(
+  setLiteral(methodologySource, 'THESIS_TRIGGER_KINDS').filter((kind) => !setLiteral(methodologySource, 'WATCH_TRIGGER_KINDS').includes(kind)),
+  ['metric'],
+  'the one thesis-only kind is metric, and the skill says why',
+)
+assert.deepEqual(
+  setLiteral(methodologySource, 'WATCH_TRIGGER_KINDS').filter((kind) => !setLiteral(methodologySource, 'THESIS_TRIGGER_KINDS').includes(kind)),
+  ['weight-drift'],
+  'and the one watch-only kind is the portfolio one',
+)
+assert.ok(
+  setLiteral(methodologySource, 'THESIS_TRIGGER_KINDS').includes('at-time') && setLiteral(methodologySource, 'WATCH_TRIGGER_KINDS').includes('at-time'),
+  'the schedule anchor is one kind under one name; it used to be `time` on one side and `at-time` on the other',
+)
+assert.equal(
+  execute({ operation: 'validateThesis', asOf: methodology.asOf, input: { ...methodology.thesis, invalidationTriggers: [{ id: 'inv-1', kind: 'time', checkBy: '2026-11-15' }] } })
+    .diagnostics.some((row) => row.code === 'invalidation_kind_invalid'),
+  false,
+  'the retired spelling is normalized, so no recorded thesis becomes unreadable',
+)
+assert.ok(
+  execute({ operation: 'validateThesis', asOf: methodology.asOf, input: { ...methodology.thesis, invalidationTriggers: [{ id: 'inv-1', kind: 'price_below', level: 90, checkBy: '2026-11-15' }] } })
+    .diagnostics.some((row) => row.code === 'trigger_kind_alias' && row.severity === 'info'),
+  'and it says which name is canonical rather than accepting it silently',
+)
+for (const lens of setLiteral(evidenceSource, 'LENSES')) {
+  assert.ok(promptText.includes(`\`${lens}\``), `PROMPT names the ${lens} lens that researchGate accepts`)
+}
+for (const unit of setLiteral(evidenceSource, 'NON_MONETARY_UNITS')) {
+  assert.ok(contractSkill.includes(`\`${unit}\``), `the contract skill names the ${unit} unit`)
+}
+
+/**
+ * "The configured X" has to be a key an investor can actually set. This is the
+ * check that would have caught `priceConflictTolerance`, which three documents
+ * called configured while the schema refused it.
+ */
+const configurablePaths = new Set()
+const walkSchema = (node, prefix = '') => {
+  for (const [name, property] of Object.entries(node.properties ?? {})) {
+    const path = prefix ? `${prefix}.${name}` : name
+    configurablePaths.add(name)
+    configurablePaths.add(path)
+    if (property.type === 'object') walkSchema(property, path)
+  }
+}
+walkSchema(configSchema)
+const documents = { 'PROMPT.md': promptText, 'README.md': await readFile(new URL('../README.md', fixtureRoot), 'utf8') }
+for (const name of ['data-source-contract', 'sizing-and-concentration', 'evidence-gates', 'candidate-research', 'deterministic-metrics', 'outcome-calibration']) {
+  documents[name] = await readFile(new URL(`../skills/${name}/SKILL.md`, fixtureRoot), 'utf8')
+}
+for (const [where, text] of Object.entries(documents)) {
+  for (const match of text.matchAll(/configured `([A-Za-z.]+)`|`([A-Za-z]+(?:\.[A-Za-z]+)*)`[^.\n]{0,40}\bis configured\b/g)) {
+    const key = (match[1] ?? match[2]).replace(/^config\./, '')
+    assert.ok(configurablePaths.has(key) || configurablePaths.has(key.split('.').at(-1)), `${where} calls ${key} configured, so config.schema.json has it`)
+  }
+}
+for (const key of ['watchExpiryDays', 'priceConflictTolerance', 'experimentalPositionCeiling', 'minimumExpectedActiveReturn', 'reviewReadyClosedOutcomes', 'benchmarkHurdleAnnualPct']) {
+  assert.ok(configurablePaths.has(key), `${key} is a real configuration key`)
+  assert.ok(
+    Object.values(documents).some((text) => text.includes(key)),
+    `${key} is named in a document, not only in the schema — an unmentioned key is one nobody sets`,
+  )
+}
+
+covers('policy/policy-lint-provenance')
+const policyBase = { concentration: { position: 0.1 }, minimumExpectedActiveReturn: 0.05 }
+const stricter = execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, concentration: { position: 0.08 } }, provenance: { 'concentration.position': { approvedBy: 'investor', approvedAt: '2026-08-01' } } } })
+assert.equal(stricter.data.changes[0].effect, 'stricter')
+assert.equal(stricter.status, 'ok', 'a tightening with attribution is accepted')
+const looser = execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, minimumExpectedActiveReturn: 0.03 } } })
+assert.equal(looser.status, 'blocked')
+assert.ok(looser.diagnostics.some((row) => row.code === 'policy_auto_relax'), 'the moment to argue about a threshold is before it binds, not while it is refusing a trade')
+assert.ok(
+  execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, concentration: { position: 0.08 } }, provenance: { 'concentration.position': { immutable: true } } } })
+    .diagnostics.some((row) => row.code === 'policy_immutable_changed'),
+  'an immutable value moves by package revision, never by configuration',
+)
+assert.ok(
+  execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, concentration: { position: 0.08 } } } })
+    .diagnostics.some((row) => row.code === 'policy_requires_approval'),
+  'an unattributed change is unresolved rather than applied',
+)
+assert.equal(execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: policyBase } }).data.changeCount, 0)
+assert.ok(/rule DSL is deliberately not ported/.test(migrationText), 'the matrix states which half of the policy engine came across and which did not')
+assert.ok(/legacy and not shipped/.test(migrationText), 'and that the source tree workflow document describes a pipeline this port replaced')
 
 assertCoverageWasEarned()
 

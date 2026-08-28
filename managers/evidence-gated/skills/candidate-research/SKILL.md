@@ -8,6 +8,29 @@ description: Research a candidate under its discovery lens, including why-cheap,
 Complete this before promoting a new single-name candidate. A scanner ranks what to investigate; it
 does not rank what to buy.
 
+## Trigger vocabulary — one spelling, two sets
+
+Kebab-case everywhere, as in the `unit` and `lens` vocabularies. Underscore forms are accepted and
+normalized so no recorded thesis becomes unreadable, and using one says so.
+
+| | accepted kinds |
+|---|---|
+| thesis invalidation (`validateThesis`) | `price-below` · `price-above` · `metric` · `at-time` |
+| WATCH (`validateWatch`) | `at-time` · `price-below` · `price-above` · `weight-drift` |
+
+`at-time` is shared. It used to be spelled `time` on the thesis side and `at-time` on the WATCH
+side, which made one condition look like two; `time` is still accepted and normalized.
+
+The remaining difference is deliberate:
+
+- **`metric` is a thesis invalidation and not a WATCH.** A WATCH has to be evaluable by the wake
+  engine from published data; a thesis metric may need a filing that a person reads.
+- **`weight-drift` is a WATCH and not a thesis invalidation.** Drifting past a weight says something
+  about the portfolio, not about the claim.
+
+An event kind exists in neither: a producer-less `event: earnings` is refused in both places, because
+nothing publishes the fact that it happened at the moment it happens.
+
 ## Lens-specific reading
 
 ### Mean reversion

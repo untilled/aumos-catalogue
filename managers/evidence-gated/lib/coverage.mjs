@@ -1,4 +1,5 @@
 import { diagnostic } from './diagnostics.mjs'
+import { WATCH_TRIGGER_KINDS, normalizeTriggerKind } from './methodology.mjs'
 
 export function coverageState({ scannerUniverses = [], extensions = [], holdings = [], dispositions = [], asOf }) {
   const diagnostics = []
@@ -37,8 +38,12 @@ export function coverageState({ scannerUniverses = [], extensions = [], holdings
  */
 export function validateWatch(watch, current, asOf, config = {}) {
   const diagnostics = []
-  const supported = new Set(['at-time', 'price-below', 'price-above', 'weight-drift'])
-  if (!supported.has(watch?.kind)) diagnostics.push(diagnostic('watch_kind_unsupported', 'blocked', 'Use at-time, price or weight-drift; event producers are not assumed', 'watch.kind'))
+  const kind = normalizeTriggerKind(watch?.kind)
+  if (kind !== watch?.kind) {
+    diagnostics.push(diagnostic('trigger_kind_alias', 'info', 'The canonical spelling is kebab-case; the underscore form is accepted and normalized', 'watch.kind', { given: watch?.kind, canonical: kind }))
+  }
+  if (!WATCH_TRIGGER_KINDS.has(kind)) diagnostics.push(diagnostic('watch_kind_unsupported', 'blocked', 'Use at-time, price or weight-drift; event producers are not assumed', 'watch.kind', { supported: [...WATCH_TRIGGER_KINDS] }))
+  watch = watch ? { ...watch, kind } : watch
   if (watch?.kind === 'at-time') {
     if (!watch.at || !Number.isFinite(Date.parse(watch.at)) || Date.parse(watch.at) <= Date.parse(asOf)) {
       diagnostics.push(diagnostic('watch_not_future', 'blocked', 'at-time WATCH must be a valid future instant', 'watch.at'))
