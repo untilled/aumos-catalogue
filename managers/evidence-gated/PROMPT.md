@@ -182,6 +182,17 @@ never create an infinite near-term loop. Distinguish source failure from not-yet
 
 ### 5. Update durable state sparingly
 
+Score the paper track before the real one, because it is where most of the evidence is. Call
+`signalPaper` over the registered paper rows and `verdictReport` on the `llm-research` cohort's d60
+window; add `shadowTrack` and `baselineTrack` when both curves are available. ⛔ Paper counts are
+never reported as maturity counts — `signalPaper` returns `cohortsAreSeparate` and `sampleKind` so
+the distinction is in the data, not only in this sentence. Thresholds may be passed stricter, never
+looser: a criterion adjusted after seeing the result is refused.
+
+When `verdictReport` returns proposals, **state them in this run**. They are what a met threshold
+looks like, they still require the investor's approval, and a manager that only ever argues itself
+smaller is not being careful.
+
 Load `skills/outcome-calibration/SKILL.md` when closed decisions or forward outcomes are available,
 and `skills/memory-contract/SKILL.md` before any memory write. Write a new revision only when a
 meaningful aggregate changed. Every aggregate fact must trace to Decision/Evidence ids. Memory may

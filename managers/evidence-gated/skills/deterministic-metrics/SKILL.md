@@ -22,7 +22,7 @@ the JSON remains the canonical explanation.
 
 ## The operations
 
-All 64, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
+All 69, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
 calling it wrong is not a discovery path — every flow skill tells you not to go looking, so the
 names have to be here. A name absent from this table is a name you cannot call.
 
@@ -94,6 +94,16 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `mwr` | money-weighted return, annualized |
 | `portfolioMetrics` | drawdown, turnover and the rest of the book-level readings |
 
+### The learning loop — paper samples, kept apart from real ones
+
+| operation | what it decides |
+|---|---|
+| `paperAdmission` | promote / watch / rejected, and refuses a promote on stale price history |
+| `signalPaper` | forward scoring of the paper log, aggregated per setup and per cohort |
+| `shadowTrack` | same decisions at unconstrained size — is the cap what costs return? |
+| `baselineTrack` | what buying the index and waiting would have returned |
+| `verdictReport` | the §6 verdict against pre-registered criteria, and the proposals it raises |
+
 ### Mechanical backtests — baselines, not signals
 
 | operation | what it decides |
@@ -153,6 +163,9 @@ named field is the difference between a gate that runs and a gate that blocks or
 | `entryQualityGate` | `bars` with `high`/`low`/`open`/`close`, and the candidate's `lenses` | The gate reads both dual lenses. Without `lenses` the mean-reversion-only restriction cannot fire; without intraday `high`/`low` the no-new-low lens falls back to closes and cannot disagree with itself. |
 | `concentration` | `caps.portfolioHeat`, and `stopLossPct` + `core` on each row | Heat is loss-if-every-stop-fires, which weights do not measure. A non-core row with no stop is unevaluated, not zero. |
 | `newSinglePacing` | `proposedNewSingles`, `priorNewSingles` with `verified`, `sizingPolicyUpdatedAt`, `closedOutcomeCount` | Every field is a separate approved warning; omitting one silently drops that warning rather than failing. |
+| `signalPaper` | `ruleVersion` on every row, and `benchmarkBars` | A row with no rule version is refused: rows judged under different versions are reported together and never pooled. Without a benchmark a row scores no excess and drops out of the aggregate rather than counting as zero. |
+| `paperAdmission` | `challengeVerdict`, and for a call `thesis.evidenceStatus` plus `priceHistoryLatestDate` | The verdict decides the setup, so a conditional verdict cannot be logged as a call. A promote on price history stale by more than two weekdays is refused. |
+| `verdictReport` | `paper.d60` from `signalPaper.byCohort['llm-research']`, and optionally `shadow`, `baseline`, `closedOutcomeCount` | Thresholds may be passed **stricter only** — a looser one is refused, not honoured. |
 | `outcomeClassification` | `executionAttributableToDecision` when the fill differed from the plan; `judgedFailures` for the judged axis | Without the flag a poor fill is an observation, not a methodology failure — which is the reading `outcome-calibration` mandates. An unrecognised judged reason is refused, never absorbed. |
 | `crossCheckPrice` | `config.priceConflictTolerance` | The 5% the documents call configured. Passing `tolerance` directly still overrides it. |
 

@@ -49,8 +49,13 @@ the slot. Each one carries, and `validateThesis` refuses it without them:
 
 ## The two refusals
 
-**A thesis is registered as a paper call before it is anything else.** Tag it `thesis_call` and it
-starts accruing a forward record from the day it was written. This is what makes the layer
+**A thesis is registered as a paper call before it is anything else.** Call `paperAdmission` with the
+challenge verdict; a cleared one becomes `thesis_call`, a conditional one `thesis_watch`, an
+unresolved high risk `thesis_rejected`. The verdict decides the setup and you do not get to choose —
+logging a conditional idea as a call would put an unchallenged claim into the cohort that unlocks
+size. Only the call pays the full evidence cost, and a promote is refused outright when the price
+history is stale, because a forward record started from a stale price measures the pipeline rather
+than the idea. From admission it accrues a forward record through `signalPaper`. This is what makes the layer
 measurable: the team's calls are scored against the index *and* against the mechanical baseline
 signals `sectorStrength` logs, so "our research beats a dumb momentum bot" is a number rather than a
 belief. Until that number exists, the team's edge is a hypothesis exactly as the bot's is.

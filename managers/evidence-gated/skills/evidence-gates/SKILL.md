@@ -15,6 +15,35 @@ enough provenance to reproduce the lens classification. Do not backfill legacy T
 history into Aumos Forward Track Record. Open decisions, repeated runs on one still-open idea,
 synthetic backtests and five names found during one shock are not five independent samples.
 
+### Paper samples are counted, and never in the same column
+
+A paper position — a `thesis_call`, a mechanical baseline signal — is not a closed Decision and does
+not become one. It has no fill, no cost and no slippage, so admitting it here would let a
+hypothetical unlock real size, and that is the failure this whole gate exists to prevent.
+
+It is also the only thing that makes the gate reachable. The floors are 30 samples, 10 independent
+clusters and 3 regimes; real fills are capped at `experimentalPositionCeiling` while a lens is
+unpromoted, so a book that counted only real fills would take years to reach a verdict and the gate
+would be decoration. The methodology this is ported from answered that by running a paper track
+beside the real one — more throughput, no additional risk.
+
+So both are kept, in separate columns:
+
+| | what it counts | what it can unlock |
+|---|---|---|
+| real | closed Decisions with forward outcomes | lens maturity, and through it size |
+| paper | `signalPaper` rows, per setup and per cohort | the §6 verdict on whether the research layer has an edge, and a cap-increase **proposal** a person approves |
+
+`signalPaper` returns `cohortsAreSeparate: true` and `sampleKind` says which kind of sample it is
+holding. A run that reports a paper count as a maturity count has broken the rule the label exists to
+state. Rows carry the `ruleVersion` they were judged under and are never pooled across versions:
+re-tagging old rows under a new definition would manufacture a sample rather than gather one.
+
+The research cohort is measured against two things and not one — the index *and* the mechanical
+baselines `sectorStrength` logs. Beating the index while losing to a momentum bot is not an edge,
+and a bucket whose excess is positive while its absolute return is negative is marked `relativeOnly`
+rather than counted as a win.
+
 Cluster sample dates in ascending order. A date joins the current cluster when it is at most five
 calendar days after that cluster's latest date; otherwise it opens a new cluster. Chaining is
 transitive. Store both `sampleCount` and `independentDateClusterCount`.
@@ -31,6 +60,12 @@ transitive. Store both `sampleCount` and `independentDateClusterCount`.
 Meeting a numeric threshold yields `reviewable`, never automatic `promoted`. Methodology changes
 require user-approved package/config changes. A lens may be demoted by such a change; memory itself
 does not rewrite the rule.
+
+**But say so when the threshold is met.** These gates exist to earn size with proof, not to avoid
+risk forever, so when the evidence supports an increase the run proposes it without being asked —
+`verdictReport` raises the proposal and it still requires approval. A manager whose failures produce
+rule proposals and whose successes produce nothing is not being careful; it is structurally unable to
+grow and unable to report that it cannot.
 
 ## Entry gates
 

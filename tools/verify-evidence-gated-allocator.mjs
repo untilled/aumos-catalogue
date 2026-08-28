@@ -1335,7 +1335,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 64)
+assert.equal(supportedOperations.length, 69)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -1368,6 +1368,155 @@ assert.equal(
   12,
   'twelve groups are verified by in-file contract cases rather than by a frozen numeric file, and every one of them is registered and earned above',
 )
+
+/**
+ * ── The learning loop (issue #70 §6, §10) ──────────────────────────────────
+ *
+ * `MIGRATION.md` mapped `signal-paper` and `paper-log` to the `learning`
+ * group and `shadow-track` and `baseline-track` to `attribution`, and neither
+ * group's case list mentioned a paper registration, a shadow comparison or a
+ * passive baseline. The ninth instance of the same substitution.
+ */
+covers('learning/paper-admission')
+const callThesis = { evidenceStatus: 'complete' }
+const admit = (input) => execute({ operation: 'paperAdmission', asOf: '2026-08-20T00:00:00Z', input })
+const promoted = admit({ setup: 'thesis_call', challengeVerdict: 'cleared', thesis: callThesis, priceHistoryLatestDate: '2026-08-19' })
+assert.equal(promoted.data.disposition, 'promote')
+assert.equal(promoted.data.cohort, 'llm-research')
+assert.equal(promoted.data.tradeable, false, 'a paper row is never tradeable, whatever it is admitted as')
+assert.equal(admit({ setup: 'thesis_watch', challengeVerdict: 'conditional_watch' }).data.disposition, 'watch', 'the control group stays cheap to log')
+assert.equal(admit({ setup: 'thesis_rejected', challengeVerdict: 'high_risk_unresolved' }).data.disposition, 'rejected')
+assert.ok(
+  admit({ setup: 'thesis_call', challengeVerdict: 'conditional_watch', thesis: callThesis, priceHistoryLatestDate: '2026-08-19' })
+    .diagnostics.some((row) => row.code === 'paper_setup_mismatch'),
+  'a conditional verdict cannot be logged as a call — that is the one substitution the contract refuses',
+)
+assert.ok(
+  admit({ setup: 'thesis_call', challengeVerdict: 'cleared', thesis: { evidenceStatus: 'incomplete' }, priceHistoryLatestDate: '2026-08-19' })
+    .diagnostics.some((row) => row.code === 'call_thesis_incomplete'),
+  'only the cohort that can unlock sizing pays the full evidence cost',
+)
+assert.ok(
+  admit({ setup: 'thesis_call', challengeVerdict: 'cleared', thesis: callThesis, priceHistoryLatestDate: '2026-08-10' })
+    .diagnostics.some((row) => row.code === 'data_pipeline_stale'),
+  'a forward record started from stale prices would measure the pipeline, not the idea',
+)
+assert.equal(admit({ setup: 'vibes', challengeVerdict: 'cleared' }).status, 'blocked')
+
+covers('learning/signal-paper-cohorts')
+const paperBars = (rate, count = 70) => Array.from({ length: count }, (_, index) => {
+  const close = 100 * (1 + rate) ** index
+  return { timestamp: new Date(Date.parse('2026-01-01') + index * 86_400_000).toISOString(), open: close, high: close, low: close, close, volume: 1000 }
+})
+const flatBenchmark = paperBars(0)
+const paperRun = execute({
+  operation: 'signalPaper',
+  asOf: '2026-08-20T00:00:00Z',
+  input: {
+    rows: [
+      { symbol: 'CALL1', setup: 'thesis_call', ruleVersion: 'tc-v1', signalAt: paperBars(0)[10].timestamp, bars: paperBars(0.004), benchmarkBars: flatBenchmark },
+      { symbol: 'CALL2', setup: 'thesis_call', ruleVersion: 'tc-v1', signalAt: paperBars(0)[10].timestamp, bars: paperBars(0.002), benchmarkBars: flatBenchmark },
+      { symbol: 'BOT1', setup: 'rs_breakout', ruleVersion: 'rs-v1', signalAt: paperBars(0)[10].timestamp, bars: paperBars(-0.001), benchmarkBars: flatBenchmark },
+    ],
+  },
+})
+assert.deepEqual(Object.keys(paperRun.data.byCohort).sort(), ['llm-research', 'mechanical-baseline'], 'the team and the bot are counted apart')
+assert.equal(paperRun.data.byCohort['llm-research'].d60.samples, 2)
+assert.equal(paperRun.data.byCohort['llm-research'].d60.winRatePct, 100)
+assert.ok(paperRun.data.byCohort['mechanical-baseline'].d60.avgExcessPct < 0, 'the baseline is scored on the same terms, not assumed to lose')
+assert.equal(paperRun.data.cohortsAreSeparate, true)
+assert.equal(paperRun.data.sampleKind, 'paper-only-never-mixed-with-closed-decisions', 'the output says which kind of sample it is holding')
+assert.ok(paperRun.data.rows.every((row) => row.tradeable === false))
+assert.ok(
+  paperRun.diagnostics.some((row) => row.code === 'paper_rule_versions_mixed'),
+  'rows judged under different rule versions are reported together and flagged, never silently pooled',
+)
+assert.equal(
+  execute({ operation: 'signalPaper', asOf: '2026-08-20T00:00:00Z', input: { rows: [{ symbol: 'X', setup: 'thesis_call', signalAt: paperBars(0)[10].timestamp, bars: paperBars(0.004) }] } }).status,
+  'blocked',
+  'a row without its rule version cannot be scored; re-tagging is how a sample gets manufactured',
+)
+/**
+ * The relative-only trap: beat the benchmark by falling less.
+ */
+const relativeOnly = execute({
+  operation: 'signalPaper',
+  asOf: '2026-08-20T00:00:00Z',
+  input: { rows: [{ symbol: 'DOWN', setup: 'thesis_call', ruleVersion: 'tc-v1', signalAt: paperBars(0)[10].timestamp, bars: paperBars(-0.001), benchmarkBars: paperBars(-0.004) }] },
+})
+assert.equal(relativeOnly.data.byCohort['llm-research'].d60.relativeOnly, true, 'positive excess with a negative absolute return is marked, not counted as a win')
+
+covers('attribution/shadow-sizing-bottleneck')
+const bottleneck = execute({ operation: 'shadowTrack', asOf: '2026-08-20T00:00:00Z', input: { shadowReturnPct: 12, realReturnPct: 8, windowDays: 90 } })
+assert.equal(bottleneck.data.excessPp, 4)
+assert.equal(bottleneck.data.sizingBottleneck, true, 'same decisions, larger size, materially ahead over a full window')
+const immature = execute({ operation: 'shadowTrack', asOf: '2026-08-20T00:00:00Z', input: { shadowReturnPct: 12, realReturnPct: 8, windowDays: 20 } })
+assert.equal(immature.data.sizingBottleneck, false, 'a good fortnight is not an argument for size')
+assert.ok(immature.diagnostics.some((row) => row.code === 'shadow_window_immature'))
+assert.equal(
+  execute({ operation: 'shadowTrack', asOf: '2026-08-20T00:00:00Z', input: { shadowReturnPct: 12, realReturnPct: 8, windowDays: 90, thresholds: { minExcessVsRealPp: 1 } } }).data.thresholds.minExcessVsRealPp,
+  3,
+  'a pre-registered threshold cannot be loosened at call time',
+)
+
+covers('attribution/passive-baseline')
+const passive = execute({ operation: 'baselineTrack', asOf: '2026-08-20T00:00:00Z', input: { portfolioReturnPct: 6, baselines: [{ key: 'kospi200', returnPct: 4 }, { key: 'sp500', returnPct: 9 }] } })
+assert.deepEqual(passive.data.comparisons.map((row) => row.ahead), [true, false])
+assert.equal(passive.data.beatsEveryBaseline, false)
+assert.ok(passive.diagnostics.some((row) => row.code === 'baseline_not_beaten'), 'a baseline ahead of the book is something the methodology has to answer for')
+assert.ok(
+  execute({ operation: 'baselineTrack', asOf: '2026-08-20T00:00:00Z', input: { portfolioReturnPct: 6, baselines: [{ key: 'unknown' }] } })
+    .diagnostics.some((row) => row.code === 'baseline_return_unevaluated'),
+  'a baseline with no return is unread, never assumed to be behind',
+)
+
+covers('promotion/prereg-verdict', 'promotion/threshold-reached-proposal')
+const verdict = (paper, extra = {}) => execute({ operation: 'verdictReport', asOf: '2026-08-20T00:00:00Z', input: { paper, ...extra } })
+assert.equal(verdict({ d60: { samples: 8, winRatePct: 80, avgExcessPct: 6 } }).data.verdict, 'insufficient_sample', 'a small sample is not a GO however good it looks')
+assert.equal(verdict({ d60: { samples: 24, winRatePct: 60, avgExcessPct: 3 } }).data.verdict, 'GO')
+assert.equal(verdict({ d60: { samples: 24, winRatePct: 44, avgExcessPct: -1 } }).data.verdict, 'NO_GO')
+const borderline = verdict({ d60: { samples: 24, winRatePct: 52, avgExcessPct: 1 } })
+assert.equal(borderline.data.verdict, 'borderline', 'some criteria met is not a GO, and the rest are not relaxed to reach one')
+assert.deepEqual(borderline.data.proposals, [])
+assert.ok(
+  verdict({ d60: { samples: 24, winRatePct: 60, avgExcessPct: 3 } }, { thresholds: { go: { minWinRatePct: 50 } } })
+    .diagnostics.some((row) => row.code === 'prereg_relaxed'),
+  'a criterion loosened after the data exists is refused; that is what pre-registration is for',
+)
+assert.equal(
+  verdict({ d60: { samples: 24, winRatePct: 60, avgExcessPct: 3 } }, { thresholds: { go: { minWinRatePct: 70 } } }).data.verdict,
+  'borderline',
+  'a stricter threshold is honoured — the only direction that moves',
+)
+/**
+ * §10 — the run proposes the increase without being asked. Before this,
+ * failure produced rule proposals and success produced nothing.
+ */
+const goRun = verdict({ d60: { samples: 24, winRatePct: 60, avgExcessPct: 3 } }, { shadow: bottleneck.data, closedOutcomeCount: 12, baseline: passive.data })
+assert.deepEqual(
+  [...new Set(goRun.data.proposals.map((row) => row.kind))].sort(),
+  ['answer-the-baseline', 'cap-increase-review', 'cap-review-session'],
+  'evidence that reached a threshold surfaces its proposal unasked',
+)
+assert.ok(goRun.data.proposals.every((row) => row.requiresApproval === true), 'every proposal still requires the investor')
+assert.equal(goRun.data.changesNothingAutomatically, true)
+assert.ok(goRun.diagnostics.some((row) => row.code === 'threshold_reached_proposal' && row.severity === 'info'))
+assert.deepEqual(
+  verdict({ d60: { samples: 24, winRatePct: 44, avgExcessPct: -1 } }).data.proposals.map((row) => row.kind),
+  ['freeze-new-experiments'],
+  'a NO-GO is a correct outcome with its own proposal, not a silence',
+)
+assert.ok(
+  verdict({ d60: { samples: 24, winRatePct: 60, avgExcessPct: 3, avgReturnPct: -2, relativeOnly: true } })
+    .diagnostics.some((row) => row.code === 'go_is_relative_only'),
+  'a GO earned by falling less than the benchmark carries that caveat',
+)
+
+covers('audit/paper-sample-status-stated')
+const gatesSkill = await readFile(new URL('../skills/evidence-gates/SKILL.md', fixtureRoot), 'utf8')
+assert.ok(gatesSkill.includes('cohortsAreSeparate'), 'the skill names the field that states the separation')
+assert.ok(/paper/i.test(gatesSkill) && /closed Decision/.test(gatesSkill), 'the skill says what a paper sample is and is not')
+assert.ok(/without being asked/.test(gatesSkill), 'the skill carries the directive that a met threshold is proposed unasked')
 
 assertCoverageWasEarned()
 
