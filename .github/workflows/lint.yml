@@ -77,13 +77,6 @@ jobs:
       # more, including why this is not the Aumos schema copied a third time.
       - run: npm run check:index
 
-      # The pair to it, and a different question: `check:index` asks whether an
-      # entry **resolves**, this asks whether what it resolves to is what is
-      # committed beside it. A pin names a commit that already exists, so the
-      # commit that fixes a package cannot pin itself — the repin is a separate
-      # step, and a step that lives in somebody's memory is one that is skipped.
-      - run: npm run check:pins
-
       # Who may wear a reserved publisher name. ⚠️ **Not enforcement** — a
       # fork's pull request can edit the roster exactly as it can edit the
       # entry — and `tools/check-publisher.mjs` is blunt about that. What it
@@ -122,3 +115,27 @@ jobs:
       # three members became one package and there is no longer a second copy
       # of those bytes to disagree with.
       - run: npm run check:allocator
+
+      # ── Last, and that position is the point ──────────────────────────────
+      #
+      # The pair to `check:index`, and a different question: `check:index` asks
+      # whether an entry **resolves**, this asks whether what it resolves to is
+      # what is committed beside it. A pin names a commit that already exists,
+      # so the commit that fixes a package cannot pin itself — the repin is a
+      # separate step, and a step that lives in somebody's memory is one that is
+      # skipped.
+      #
+      # ⚠️ **Which means this step is red on every pull request that changes a
+      # package, by construction rather than by mistake.** It ran fourth for a
+      # while and the cost was measured over three consecutive package pull
+      # requests: `steps` are sequential and a failure ends the job, so an
+      # expected red shadowed `check:publisher`, `check:provenance`,
+      # `check:docs` and `check:allocator` — the four that actually judge the
+      # submission — and none of them ran on any of the three. One of those pull
+      # requests was extending `check:allocator` itself, and its new assertions
+      # were never executed by CI.
+      #
+      # Moving it last changes nothing about what is checked or about the job's
+      # result: an unrepinned pull request still fails. What it buys is that the
+      # failure no longer hides the checks a reviewer needs.
+      - run: npm run check:pins
