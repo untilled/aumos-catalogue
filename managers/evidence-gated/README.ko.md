@@ -173,6 +173,13 @@ fixture는 `kr`, `us`, `global`로 나뉜다.
 invocation payload와 Brief로 런에 닿으며, 이 패키지는 하지 못하는 조회를 하는 척하지 않는다.
 `RunProvenance.unservedTools`가 그 차이를 기록하는 자리다.
 
+**페이퍼 트랙은 인스턴스 사설 메모리에 산다 — 담을 수 있는 곳이 그것뿐이기 때문이다.** 페이퍼
+콜은 주문도 체결도 없으므로 Decision이 아니고, 런타임은 `thesis:write`를 내지 않으며
+`thesis:read`는 도구를 하나도 주지 않는다. 그래서 `learning/paper-cohorts`가 누적 합과 열린
+관측 창 목록을 갖는다. 따라오는 결과 둘을 숨기지 않는다 — **같은 장부의 다른 매니저는 이 증거를
+볼 수 없고, 인스턴스가 바뀌면 트랙이 처음부터 시작된다.** 공유 기록이 옳은 집이지만, 런타임이
+서빙하는 것은 이것뿐이다.
+
 선행 리서치(theme-radar)와 매도 감시(position-research) 계층은 이식됐지만 **그 트랙레코드는
 아직 없다.** `theme-radar`는 `thesis_call` 페이퍼를 내고 `sectorStrength`는 그것이 비교될 기계
 베이스라인 둘을 기록하지만, "팀의 콜이 지수와 봇을 **둘 다** 이기는가"는 닫힌 관측 창이 수개월

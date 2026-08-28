@@ -157,7 +157,8 @@ absence had no entry, which is the failure mode this document exists to prevent.
 | `screen_universe.json` · `universe_extensions.json` | AR | `coverageState({ scannerUniverses, extensions })` — Aumos owns the universe |
 | `triage_verdicts.json` · `analysis/triage.py` | RT | the axis-selection study behind `upsideRadar`; its conclusion is the lane definitions, and the study itself is history |
 | `radar_coverage_state.json` | PP | `upsideRadar.lanes` coverage and starvation, computed per run rather than stored |
-| `signal_paper_log.jsonl` · `shadow_portfolio.jsonl` · `outcomes.jsonl` · `decisions.jsonl` · `exit_signal_log.jsonl` · `sentinel_log.jsonl` · `features.jsonl` | AR | Aumos owns the Decision journal, Track Record and Evidence; this package computes over them and keeps no ledger |
+| `outcomes.jsonl` · `decisions.jsonl` · `exit_signal_log.jsonl` · `sentinel_log.jsonl` · `features.jsonl` | AR | Aumos owns the Decision journal, Track Record and Evidence; this package computes over them and keeps no ledger |
+| `signal_paper_log.jsonl` · `shadow_portfolio.jsonl` | PX | `learning/paper-cohorts` in private memory, as running sums plus an index of open measurement windows. ⚠️ **This was recorded as `AR` and that was wrong.** A paper call has no order and no fill, so it is not a Decision and the journal does not hold it; the runtime publishes no `thesis:write` and `thesis:read` grants no tool, so Thesis cannot either. Private memory is the only durable store served, and the cost — instance-scoped, invisible to any other manager on the book — is in `README.md` under Known limits |
 | `order_lifecycle.jsonl` · `order-limits.json` · `account_equity.jsonl` | AR | Aumos and the broker |
 | `history/` · `fundamentals/` · `mirror.sqlite` · `tradeos.sqlite` | AR | source data, fetched point-in-time through the source contract |
 | `schedule.json` · `watch_schedule.jsonl` · `night_gate_state.json` | AR | WATCH and the Wake Engine |

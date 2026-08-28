@@ -140,7 +140,18 @@ export function paperAdmission({ setup, challengeVerdict, thesis = {}, priceHist
   }
   const admitted = !diagnostics.some((row) => row.severity === 'blocked')
   const disposition = !admitted ? null : setup === 'thesis_call' ? 'promote' : setup === 'thesis_watch' ? 'watch' : setup === 'thesis_rejected' ? 'rejected' : 'baseline'
-  return { data: { admitted, setup, cohort, disposition, tradeable: false }, diagnostics }
+  /**
+   * The row to append to `learning/paper-cohorts.openWindows`. It is the whole
+   * of what persists: enough to keep scoring, and nothing that would make the
+   * key a copy of the observations it points at.
+   */
+  const openWindow = admitted && typeof asOf === 'string'
+    ? { symbol: thesis?.asset ?? thesis?.symbol ?? null, setup, cohort, ruleVersion: thesis?.ruleVersion ?? null, signalAt: asOf, benchmark: thesis?.benchmark ?? null }
+    : null
+  if (openWindow && !openWindow.ruleVersion) {
+    diagnostics.push(diagnostic('paper_rule_version_missing', 'blocked', 'A registered window carries the rule version it will be scored under; without it the row cannot be pooled or excluded later', 'thesis.ruleVersion'))
+  }
+  return { data: { admitted: admitted && !diagnostics.some((row) => row.severity === 'blocked'), setup, cohort, disposition, tradeable: false, openWindow }, diagnostics }
 }
 
 /**
@@ -157,9 +168,55 @@ export function paperAdmission({ setup, challengeVerdict, thesis = {}, priceHist
  * It beat the benchmark by falling less, and reading that as an edge is how a
  * long-only book talks itself into losing money on purpose.
  */
-export function signalPaper({ rows = [], horizons = [5, 20, 60], asOf } = {}) {
+/**
+ * The paper track's home, which nothing declared until now.
+ *
+ * `signalPaper` computed over rows it was handed and no document said where a
+ * registered row lived between runs. It could not be the Decision journal — a
+ * paper call has no order and no fill, so it is not a Decision. It could not be
+ * Thesis either: Aumos publishes no `thesis:write` capability and `thesis:read`
+ * grants no tool. That left private memory, and this package's own memory
+ * contract forbade a key per run, asset or date.
+ *
+ * So the track had no home and the promotion gate this layer exists to open
+ * stayed shut for a second reason.
+ *
+ * One stable key holds it, and its shape is what keeps it inside the contract:
+ *
+ * - **`closed`** — running sums per cohort and horizon. A matured window folds
+ *   into these and its row is dropped, so the key does not grow with history.
+ * - **`openWindows`** — the minimum needed to keep scoring a live window:
+ *   symbol, setup, rule version, the instant it was registered. No prices, no
+ *   prose, no positions. The observations stay in Evidence and are re-read each
+ *   run; this is an index of what is being measured, not a copy of it.
+ *
+ * ⚠️ **The cost is stated rather than hidden.** Private memory is namespaced by
+ * manager instance, so a paper track kept here is invisible to any other
+ * manager on the same book, and an instance change starts it over. That is a
+ * worse home than a shared record and it is the only one Aumos serves today.
+ * `README.md` says so under Known limits.
+ */
+function foldWindow(closed, cohort, setup, horizon, forward) {
+  for (const key of [`cohort:${cohort}`, `setup:${setup}`]) {
+    const bucket = (closed[key] ??= {})
+    const stats = (bucket[`d${horizon}`] ??= { samples: 0, sumExcess: 0, sumReturn: 0, wins: 0, absoluteWins: 0, absoluteSamples: 0 })
+    stats.samples += 1
+    stats.sumExcess += forward.benchmarkExcessPct
+    if (forward.benchmarkExcessPct > 0) stats.wins += 1
+    if (finite(forward.returnPct)) {
+      stats.absoluteSamples += 1
+      stats.sumReturn += forward.returnPct
+      if (forward.returnPct > 0) stats.absoluteWins += 1
+    }
+  }
+}
+
+export function signalPaper({ rows = [], state = {}, horizons = [5, 20, 60], asOf } = {}) {
   const diagnostics = []
   const scored = []
+  const closed = JSON.parse(JSON.stringify(state?.closed ?? {}))
+  const priorWindows = state?.openWindows ?? []
+  const matured = []
   for (const [index, row] of rows.entries()) {
     if (!SETUP_COHORTS[row?.setup]) {
       diagnostics.push(diagnostic('paper_setup_unknown', 'blocked', 'Every paper row names a published setup', `rows[${index}].setup`, { setup: row?.setup ?? null }))
@@ -183,6 +240,22 @@ export function signalPaper({ rows = [], horizons = [5, 20, 60], asOf } = {}) {
     })
   }
 
+  /**
+   * A window whose longest horizon has matured is folded into the running sums
+   * and stops being carried. That is what bounds the key.
+   */
+  const longest = Math.max(...horizons)
+  for (const entry of scored) {
+    const forward = entry.forward[`d${longest}`]
+    if (!forward || !finite(forward.benchmarkExcessPct)) continue
+    for (const horizon of horizons) {
+      const reading = entry.forward[`d${horizon}`]
+      if (reading && finite(reading.benchmarkExcessPct)) foldWindow(closed, entry.cohort, entry.setup, horizon, reading)
+    }
+    matured.push(entry.symbol)
+  }
+  const openWindows = priorWindows.filter((window) => !matured.includes(window?.symbol))
+
   const bucket = () => ({ samples: 0, sumExcess: 0, sumReturn: 0, wins: 0, absoluteWins: 0, absoluteSamples: 0 })
   const summarize = (map) => Object.fromEntries([...map].map(([key, horizonMap]) => [key, Object.fromEntries([...horizonMap].map(([horizon, stats]) => {
     const avgExcessPct = stats.samples ? round(stats.sumExcess / stats.samples, 3) : null
@@ -197,9 +270,20 @@ export function signalPaper({ rows = [], horizons = [5, 20, 60], asOf } = {}) {
     }]
   }))]))
 
+  /**
+   * The aggregate is what closed before plus what this run could read. A
+   * matured window contributes once — it is in `closed` now and its row is not
+   * re-counted below.
+   */
   const bySetup = new Map()
   const byCohort = new Map()
-  for (const entry of scored) {
+  for (const [key, horizonMap] of Object.entries(closed)) {
+    const [kind, name] = key.split(':')
+    const target = kind === 'cohort' ? byCohort : bySetup
+    if (!target.has(name)) target.set(name, new Map())
+    for (const [horizon, stats] of Object.entries(horizonMap)) target.get(name).set(horizon, { ...stats })
+  }
+  for (const entry of scored.filter((row) => !matured.includes(row.symbol))) {
     for (const horizon of horizons) {
       const forward = entry.forward[`d${horizon}`]
       if (!forward || !finite(forward.benchmarkExcessPct)) continue
@@ -229,6 +313,9 @@ export function signalPaper({ rows = [], horizons = [5, 20, 60], asOf } = {}) {
       bySetup: summarize(bySetup),
       byCohort: summarize(byCohort),
       ruleVersions: versions,
+      nextState: { schemaVersion: 1, updatedAsOf: asOf ?? null, closed, openWindows, maturedThisRun: matured },
+      openWindowCount: openWindows.length,
+      maturedThisRun: matured,
       cohortsAreSeparate: true,
       sampleKind: 'paper-only-never-mixed-with-closed-decisions',
       asOf: asOf ?? null,

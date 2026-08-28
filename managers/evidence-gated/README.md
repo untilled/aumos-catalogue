@@ -226,6 +226,12 @@ and why, and the fixture asserts the difference so it cannot be undone silently.
   them under `optionalSkills` for exactly that reason. Until Aumos serves them, asset claims reach a
   run through the invocation payload and through Brief, and the package says so rather than implying
   a lookup it cannot make. `RunProvenance.unservedTools` is where a run records the difference.
+- **The paper track lives in instance-private memory, because nothing else can hold it.** A paper
+  call has no order and no fill, so it is not a Decision; the runtime publishes no `thesis:write`
+  and `thesis:read` grants no tool. `learning/paper-cohorts` therefore carries running sums and an
+  index of open measurement windows. Two consequences follow and neither is hidden: another manager
+  on the same book cannot see this evidence, and a new manager instance starts the track over. A
+  shared record would be the right home; this is the one the runtime serves.
 - The forward-research and sell-side layers are ported, but their track record is not. `theme-radar`
   produces `thesis_call` paper positions and `sectorStrength` logs the two mechanical baselines they
   are measured against; the comparison that answers "do the team's calls beat the index *and* the

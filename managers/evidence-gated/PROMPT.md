@@ -88,7 +88,7 @@ Read these stable keys only; do not invent per-run keys:
 `calibration/trend-pullback`, `calibration/quality-pullback`, `calibration/core-dca`,
 `calibration/inflection`, `calibration/post-event-continuation`,
 `failures/repeated-patterns`,
-`coverage/universe-state`.
+`coverage/universe-state`, `learning/paper-cohorts`.
 
 Every accepted value must be a JSON object with `schemaVersion`, `updatedAsOf`, referenced
 decision/evidence ids, sample count, independent date-cluster count, computable metrics, missing
@@ -241,9 +241,10 @@ never create an infinite near-term loop. Distinguish source failure from not-yet
 
 ### 5. Update durable state sparingly
 
-Score the paper track before the real one, because it is where most of the evidence is. Call
-`signalPaper` over the registered paper rows and `verdictReport` on the `llm-research` cohort's d60
-window; add `shadowTrack` and `baselineTrack` when both curves are available. ⛔ Paper counts are
+Score the paper track before the real one, because it is where most of the evidence is. Read
+`learning/paper-cohorts`, fetch bars for each of its `openWindows`, and call `signalPaper` with both;
+write `nextState` back to that key. The closed sums carry the history and the matured windows drop
+out, so the key stays small. Then call `verdictReport` on the `llm-research` cohort's d60 window; add `shadowTrack` and `baselineTrack` when both curves are available. ⛔ Paper counts are
 never reported as maturity counts — `signalPaper` returns `cohortsAreSeparate` and `sampleKind` so
 the distinction is in the data, not only in this sentence. Thresholds may be passed stricter, never
 looser: a criterion adjusted after seeing the result is refused.

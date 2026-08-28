@@ -8,7 +8,7 @@
     "coverage": ["universe-union", "uncovered-zero"],
     "earnings": ["exact-bmo-amc-date-only", "actual-anchor"],
     "exit": ["exit-check-sell-trim-review", "exit-price-and-fundamental-lanes", "exit-candidate-never-order", "forward-outcome", "mfe-mae", "time-stop-policy"],
-    "learning": ["upside-radar", "memory-revision", "no-auto-method-change", "paper-admission", "signal-paper-cohorts", "lesson-audit"],
+    "learning": ["upside-radar", "memory-revision", "no-auto-method-change", "paper-admission", "signal-paper-cohorts", "lesson-audit", "paper-track-persists"],
     "outcome": ["fill-net-return", "missing-cost-explicit", "failure-taxonomy", "computed-vs-judged-axes", "execution-observation-only", "skill-code-taxonomy-agreement"],
     "owner-cutover": ["single-manager-three-flows", "flow-lane-ownership", "no-order-code", "canonical-owner-map"],
     "policy": ["config-schema-lint", "no-auto-relax", "price-conflict-tolerance-configurable", "declared-thresholds", "benchmark-fixed", "policy-lint-provenance"],

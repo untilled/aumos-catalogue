@@ -1410,6 +1410,53 @@ assert.ok(
 )
 assert.equal(admit({ setup: 'vibes', challengeVerdict: 'cleared' }).status, 'blocked')
 
+covers('learning/paper-track-persists')
+/**
+ * The track has a home, and it is bounded. Before this, `signalPaper` scored
+ * whatever a run handed it and nothing said where a registered row lived
+ * between runs — so the sample never accumulated and the promotion gate stayed
+ * shut for a second reason.
+ */
+const memorySkill = await readFile(new URL('../skills/memory-contract/SKILL.md', fixtureRoot), 'utf8')
+assert.ok(memorySkill.includes('`learning/paper-cohorts`'), 'the key is a published stable key, not one a run invents')
+assert.ok(prompt.includes('learning/paper-cohorts'), 'and the run skeleton reads and writes it')
+const priorState = {
+  closed: { 'cohort:llm-research': { d60: { samples: 5, sumExcess: 10, sumReturn: 8, wins: 4, absoluteWins: 4, absoluteSamples: 5 } } },
+  openWindows: [{ symbol: 'STILL-OPEN', setup: 'thesis_call', ruleVersion: 'tc-v1' }, { symbol: 'MATURING', setup: 'thesis_call', ruleVersion: 'tc-v1' }],
+}
+const paperBarsFor = (rate, count = 70) => Array.from({ length: count }, (_, index) => {
+  const close = 100 * (1 + rate) ** index
+  return { timestamp: new Date(Date.parse('2026-01-01') + index * 86_400_000).toISOString(), open: close, high: close, low: close, close, volume: 1000 }
+})
+const carried = execute({
+  operation: 'signalPaper',
+  asOf: '2026-08-20T00:00:00Z',
+  input: { state: priorState, rows: [{ symbol: 'MATURING', setup: 'thesis_call', ruleVersion: 'tc-v1', signalAt: paperBarsFor(0)[10].timestamp, bars: paperBarsFor(0.004), benchmarkBars: paperBarsFor(0) }] },
+})
+assert.equal(carried.data.byCohort['llm-research'].d60.samples, 6, 'the aggregate is what closed before plus what this run could read')
+assert.deepEqual(carried.data.maturedThisRun, ['MATURING'])
+assert.deepEqual(carried.data.nextState.openWindows.map((row) => row.symbol), ['STILL-OPEN'], 'a matured window folds into the sums and stops being carried, which is what bounds the key')
+assert.equal(carried.data.nextState.closed['cohort:llm-research'].d60.samples, 6)
+/**
+ * The key is an index of what is being measured, not a copy of it. If a field
+ * would let you reconstruct the book from this key, it does not belong here.
+ */
+const windowFields = new Set(Object.keys(execute({
+  operation: 'paperAdmission',
+  asOf: '2026-08-20T00:00:00Z',
+  input: { setup: 'thesis_call', challengeVerdict: 'cleared', thesis: { evidenceStatus: 'complete', asset: 'AAA', ruleVersion: 'tc-v1' }, priceHistoryLatestDate: '2026-08-19' },
+}).data.openWindow))
+assert.deepEqual([...windowFields].sort(), ['benchmark', 'cohort', 'ruleVersion', 'setup', 'signalAt', 'symbol'])
+for (const forbidden of ['price', 'close', 'quantity', 'weight', 'cash', 'reasoning']) {
+  assert.equal(windowFields.has(forbidden), false, `an open window carries no ${forbidden}; the observations stay in Evidence`)
+}
+assert.ok(
+  execute({ operation: 'paperAdmission', asOf: '2026-08-20T00:00:00Z', input: { setup: 'thesis_call', challengeVerdict: 'cleared', thesis: { evidenceStatus: 'complete', asset: 'AAA' }, priceHistoryLatestDate: '2026-08-19' } })
+    .diagnostics.some((row) => row.code === 'paper_rule_version_missing'),
+  'a registered window carries the version it will be scored under, or it cannot be pooled or excluded later',
+)
+assert.ok(/instance/i.test(memorySkill.slice(memorySkill.indexOf('What it costs'))), 'the cost of this home — instance-scoped, invisible to another manager — is stated where the key is')
+
 covers('learning/signal-paper-cohorts')
 const paperBars = (rate, count = 70) => Array.from({ length: count }, (_, index) => {
   const close = 100 * (1 + rate) ** index

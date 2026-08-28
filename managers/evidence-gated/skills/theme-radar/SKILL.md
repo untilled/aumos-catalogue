@@ -55,7 +55,7 @@ unresolved high risk `thesis_rejected`. The verdict decides the setup and you do
 logging a conditional idea as a call would put an unchallenged claim into the cohort that unlocks
 size. Only the call pays the full evidence cost, and a promote is refused outright when the price
 history is stale, because a forward record started from a stale price measures the pipeline rather
-than the idea. From admission it accrues a forward record through `signalPaper`. This is what makes the layer
+than the idea. Admission returns the `openWindow` row; append it to `learning/paper-cohorts` and it accrues a forward record through `signalPaper` from that instant. This is what makes the layer
 measurable: the team's calls are scored against the index *and* against the mechanical baseline
 signals `sectorStrength` logs, so "our research beats a dumb momentum bot" is a number rather than a
 belief. Until that number exists, the team's edge is a hypothesis exactly as the bot's is.
