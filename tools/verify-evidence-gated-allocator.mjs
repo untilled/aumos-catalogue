@@ -906,6 +906,70 @@ assert.ok(prompt.includes('themeRadarDue'), 'the schedule key is wired to the wo
 assert.ok(prompt.includes('exitCheck') && prompt.includes('thesisSentinel'), 'the sell-side watch has a named call site')
 
 /**
+ * The failure taxonomy the skill prints is the one the code produces and
+ * accepts. (issue #70 §16, §21)
+ *
+ * This is the check that would have caught the contradiction: the skill named
+ * eleven categories, `outcomeClassification` produced eight, four overlapped,
+ * and one of the skill's own rules — execution is an observation, not a
+ * methodology failure — was contradicted by the code it described.
+ */
+const calibrationSkill = await readFile(new URL('../skills/outcome-calibration/SKILL.md', fixtureRoot), 'utf8')
+/**
+ * ⚠️ Each list is checked against **its own section**, not against the whole
+ * document. Searching the file caught a planted regression that removed a
+ * bucket from the computed table and missed nothing, because the judged
+ * section's worked example names the same value in prose — the guard was
+ * measuring the document's own commentary. Same class of mistake
+ * `tools/check-docs.mjs` documents, caught the same way: by planting it.
+ */
+const section = (heading, next) => calibrationSkill.slice(calibrationSkill.indexOf(heading), calibrationSkill.indexOf(next))
+const computedSection = section('### Computed', '### Judged')
+const judgedSection = section('### Judged', '### Execution')
+const outcomesSource = await readFile(new URL('../lib/outcomes.mjs', fixtureRoot), 'utf8')
+const computedBuckets = [...new Set([...outcomesSource.matchAll(/\[failureType, grade\] = \['([a-z_]+)'/g)].map((match) => match[1]))]
+assert.equal(computedBuckets.length, 8, 'the computed axis has eight mutually exclusive buckets')
+for (const bucket of computedBuckets) {
+  assert.ok(computedSection.includes(`\`${bucket}\``), `the computed table names the bucket ${bucket} the code can return`)
+}
+const judgedVocabulary = outcomesSource.slice(outcomesSource.indexOf('const JUDGED_FAILURES'), outcomesSource.indexOf('])', outcomesSource.indexOf('const JUDGED_FAILURES')))
+const judged = [...judgedVocabulary.matchAll(/'([a-z_]+)'/g)].map((match) => match[1])
+assert.equal(judged.length, 6)
+for (const tag of judged) assert.ok(judgedSection.includes(`\`${tag}\``), `the judged list names the reason ${tag} the code accepts`)
+for (const named of [...calibrationSkill.matchAll(/`([a-z_]+_(?:failure|outcome|only))`/g)].map((match) => match[1])) {
+  assert.ok(
+    computedBuckets.includes(named) || judged.includes(named) || named === 'execution_observation_only',
+    `the skill only names taxonomy values the code knows: ${named}`,
+  )
+}
+assert.ok(outcomesSource.includes("'execution_observation_only'"), 'the reading the skill mandates exists in the code')
+
+/**
+ * And the rule itself, not only the vocabulary.
+ */
+const brokerSlippage = { grossReturnPct: 8, activeReturnPct: 2, thesisCompliance: 'followed', riskCompliance: 'followed', executionQuality: 'poor' }
+const observed = execute({ operation: 'outcomeClassification', asOf: methodology.asOf, input: brokerSlippage })
+assert.equal(observed.data.failureType, 'good_process_good_outcome', 'a broker fill this manager cannot place does not make the methodology fail')
+assert.equal(observed.data.executionObservation.classified, 'execution_observation_only')
+assert.equal(observed.data.processGood, true, 'the process reading survives an execution observation')
+assert.ok(observed.diagnostics.some((row) => row.code === 'execution_observation_only' && row.severity === 'info'), 'the observation is still recorded rather than disappearing with the grade')
+const decisionCaused = execute({ operation: 'outcomeClassification', asOf: methodology.asOf, input: { ...brokerSlippage, executionAttributableToDecision: true } })
+assert.equal(decisionCaused.data.failureType, 'execution_failure', 'a mismatch the Decision caused is the exception the skill carves out')
+assert.equal(decisionCaused.data.grade, 'Mixed')
+assert.equal(
+  execute({ operation: 'outcomeClassification', asOf: methodology.asOf, input: { grossReturnPct: 9, thesisCompliance: 'broken', riskCompliance: 'followed', executionQuality: 'good' } }).data.failureType,
+  'thesis_failure',
+  'a broken thesis that made money is still a broken thesis',
+)
+const judgedRun = execute({ operation: 'outcomeClassification', asOf: methodology.asOf, input: { ...brokerSlippage, judgedFailures: ['trap_missed'] } })
+assert.deepEqual(judgedRun.data.judgedFailures, ['trap_missed'], 'a judged reason travels beside the computed bucket rather than replacing it')
+assert.equal(
+  execute({ operation: 'outcomeClassification', asOf: methodology.asOf, input: { ...brokerSlippage, judgedFailures: ['vibes_failure'] } }).status,
+  'blocked',
+  'an unrecognised reason is refused rather than becoming a category with a sample size of one',
+)
+
+/**
  * The manifest names the sources this package requires. (aumos #384)
  */
 const passthrough = manifest.capabilities.find((row) => row.kind === 'source:passthrough')

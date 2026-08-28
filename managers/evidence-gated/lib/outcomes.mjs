@@ -39,11 +39,75 @@ export function netReturnBreakdown({ entry = {}, exit = {}, currency = 'KRW' }) 
   }
 }
 
+/**
+ * Execution readings that raise no question about how the trade was worked.
+ */
+const EXECUTION_CLEAN = new Set(['good', 'unknown'])
+
+/**
+ * The judged axis: reasons a person or a run assigns after reading the
+ * decision, which no compliance flag computes. They are a controlled
+ * vocabulary rather than free text so `failures/repeated-patterns` can count
+ * the same thing twice, and they are validated here so a typo becomes a
+ * refusal instead of a new category with a sample size of one.
+ */
+const JUDGED_FAILURES = new Set([
+  'entry_quality_failure',
+  'trap_missed',
+  'variant_view_failure',
+  'timing_failure',
+  'source_freshness_failure',
+  'coverage_failure',
+])
+
+/**
+ * The mechanical axis: one bucket per closed decision, computed.
+ *
+ * ⚠️ **Execution is where this function and `outcome-calibration` used to
+ * contradict each other.** The skill says execution belongs to the Kernel and
+ * the broker and is recorded as an observation, *not* a methodology failure —
+ * "unless the Decision itself caused the mismatch" — and named that reading
+ * `execution_observation_only`. This function ignored the exception clause and
+ * graded every poor fill `Bad` or `Mixed` as `execution_failure`, which is the
+ * one classification the skill forbids. A run following the skill and a run
+ * reading the output disagreed about whether the methodology had failed.
+ *
+ * The skill's rule wins, because it is the one that matches what this package
+ * owns: a manager that cannot place an order cannot be at fault for how the
+ * order filled. So the exception is now implemented rather than described.
+ * `executionAttributableToDecision` is what separates the two — an unreachable
+ * limit price the Decision itself set is the methodology's failure; slippage
+ * the broker took is an observation that leaves the process reading intact.
+ *
+ * The default is the safer of the two readings for a manager judging itself:
+ * absent the flag, a poor fill is *not* charged to the methodology, so the
+ * grade is not quietly improved by an unset field either — the observation is
+ * still returned and still diagnosed.
+ */
 export function outcomeClassification(input) {
   const diagnostics = []
   const thesisOk = input?.thesisCompliance === 'followed'
   const riskOk = input?.riskCompliance === 'followed'
-  const executionOk = ['good', 'unknown'].includes(input?.executionQuality)
+  const executionClean = EXECUTION_CLEAN.has(input?.executionQuality)
+  const decisionCausedMismatch = input?.executionAttributableToDecision === true
+  const executionObservation = executionClean
+    ? null
+    : {
+      quality: input?.executionQuality ?? null,
+      attributableToDecision: decisionCausedMismatch,
+      classified: decisionCausedMismatch ? 'execution_failure' : 'execution_observation_only',
+    }
+  if (executionObservation?.classified === 'execution_observation_only') {
+    diagnostics.push(diagnostic('execution_observation_only', 'info', 'The fill differed from the plan without the Decision causing it; recorded as an observation, not a methodology failure', 'executionQuality', executionObservation))
+  }
+  const executionOk = executionClean || !decisionCausedMismatch
+
+  const judgedFailures = []
+  for (const tag of input?.judgedFailures ?? []) {
+    if (JUDGED_FAILURES.has(tag)) judgedFailures.push(tag)
+    else diagnostics.push(diagnostic('judged_failure_unknown', 'blocked', 'A judged failure reason must come from the published vocabulary', 'judgedFailures', { tag, supported: [...JUDGED_FAILURES] }))
+  }
+
   const outcomeGood = finite(input?.grossReturnPct) && input.grossReturnPct >= 0 && (!finite(input?.activeReturnPct) || input.activeReturnPct >= 0)
   let failureType
   let grade
@@ -55,7 +119,7 @@ export function outcomeClassification(input) {
   else if (thesisOk && riskOk && executionOk) [failureType, grade] = ['good_process_bad_outcome', 'Mixed']
   else if (outcomeGood) [failureType, grade] = ['bad_process_good_outcome', 'Mixed']
   else [failureType, grade] = ['bad_process_bad_outcome', 'Bad']
-  return { data: { failureType, grade, processGood: thesisOk && riskOk && executionOk, outcomeGood }, diagnostics }
+  return { data: { failureType, grade, processGood: thesisOk && riskOk && executionOk, outcomeGood, executionObservation, judgedFailures }, diagnostics }
 }
 
 function orderedBars(bars) {
