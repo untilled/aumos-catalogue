@@ -1342,7 +1342,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 70)
+assert.equal(supportedOperations.length, 72)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -1661,6 +1661,75 @@ for (const lens of ['inflection', 'quality-pullback', 'post-event-continuation']
 assert.ok(/control arm, not the strategy/i.test(promptProse), 'the price branch is named as the control arm where lenses are chosen')
 assert.ok(/redemptions|capacity constraint/i.test(promptProse), 'the account structural advantage is stated as the reason WAIT is a position')
 assert.ok(/no source for that yet/i.test(promptProse), 'and the honest limit beside it — no branch actually uses that advantage')
+
+/**
+ * ── Pre-flight (issue #70 §7) ──────────────────────────────────────────────
+ *
+ * Three of the seven checks the original runs before planning had no operation
+ * here, and the run skeleton had no step to hold them: the package could
+ * compute the answers and was never asked the questions.
+ */
+covers('audit/harness-audit-blockers')
+const auditAsOf = '2026-08-20T00:00:00Z'
+const cleanBook = {
+  positions: [{ symbol: 'AAA', quantity: 10 }],
+  decisions: [{ asset: 'AAA', quantity: 10, orderReady: true, exitRegistered: true }],
+  theses: [{ asset: 'AAA' }],
+  watches: [{ subject: 'AAA', registeredAt: '2026-08-15T00:00:00Z' }],
+}
+const clean = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: cleanBook })
+assert.equal(clean.data.clearToPlan, true)
+assert.equal(clean.status, 'ok')
+const orphaned = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, watches: [{ subject: 'GONE', registeredAt: '2026-08-15T00:00:00Z' }] } })
+assert.ok(orphaned.data.issues.some((row) => row.code === 'audit_watch_orphan'), 'a WATCH on something the book neither holds nor claims keeps firing with nothing behind it')
+assert.equal(orphaned.data.clearToPlan, false)
+assert.ok(
+  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, decisions: [{ asset: 'AAA', quantity: 4, orderReady: true, exitRegistered: true }] } })
+    .data.issues.some((row) => row.code === 'audit_position_mismatch'),
+  'a size disagreement makes the denominator every weight uses wrong',
+)
+assert.ok(
+  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, decisions: [] } })
+    .data.issues.some((row) => row.code === 'audit_position_untracked'),
+  'a held position no decision accounts for is a blocker, not a rounding difference',
+)
+assert.ok(
+  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, decisions: [{ asset: 'AAA', quantity: 10, orderReady: true }] } })
+    .data.issues.some((row) => row.code === 'audit_unregistered_ready'),
+  'order-ready with no registered exit is the leak the original measured at two of seven orders',
+)
+const staleGate = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, watches: [{ subject: 'AAA', registeredAt: '2026-06-01T00:00:00Z' }] } })
+assert.ok(staleGate.data.issues.some((row) => row.code === 'audit_watch_stale' && row.severity === 'warn'), 'a month-old WATCH that never fired and cannot expire has stopped being a promise')
+assert.equal(staleGate.data.clearToPlan, true, 'a stale gate is a warning; it does not stop planning')
+
+covers('learning/lesson-audit')
+const lessons = execute({
+  operation: 'lessonAudit',
+  asOf: auditAsOf,
+  input: { proposals: [
+    { id: 'p1', raisedAt: '2026-08-18T00:00:00Z' },
+    { id: 'p2', raisedAt: '2026-05-01T00:00:00Z', status: 'pending_user_review' },
+    { id: 'p3', status: 'accepted' },
+  ] },
+})
+assert.equal(lessons.data.pendingCount, 2, 'a proposal with no status is awaiting review, not resolved')
+assert.equal(lessons.data.counts.accepted, 1)
+assert.equal(lessons.data.canApply, false, 'this run reads proposals and cannot apply one')
+assert.ok(lessons.diagnostics.some((row) => row.code === 'proposal_pending_stale'), 'a long-waiting proposal is more likely to be repeated than acted on')
+assert.equal(
+  execute({ operation: 'lessonAudit', asOf: auditAsOf, input: { proposals: [{ id: 'p4', status: 'pending-review' }] } }).status,
+  'blocked',
+  'an unrecognised status is refused: a typo silently decides a proposal nobody decided',
+)
+
+covers('audit/preflight-order-stated')
+const preflightProse = (await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')).replace(/\s+/g, ' ')
+assert.ok(/Pre-flight, before planning any trade/i.test(preflightProse), 'the run skeleton has a step for the checks, not only the operations')
+for (const named of ['lessonAudit', 'harnessAudit', 'exitCheck', 'trendState', 'verdictReport']) {
+  assert.ok(preflightProse.includes(named), `pre-flight names ${named}; an operation with no call site is not a check`)
+}
+assert.ok(/before any new buy is considered/i.test(preflightProse), 'exits are reported before purchases are considered — the ordering is the rule')
+assert.ok(/stops planning, never reporting/i.test(preflightProse), 'a blocker stops the plan and not the report')
 
 assertCoverageWasEarned()
 

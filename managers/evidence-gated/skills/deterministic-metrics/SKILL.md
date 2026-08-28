@@ -22,7 +22,7 @@ the JSON remains the canonical explanation.
 
 ## The operations
 
-All 70, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
+All 72, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
 calling it wrong is not a discovery path — every flow skill tells you not to go looking, so the
 names have to be here. A name absent from this table is a name you cannot call.
 
@@ -138,6 +138,13 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `deduplicateObservations` | the same observation arriving twice |
 | `themeRadarDue` | whether the forward-research interval has elapsed |
 
+### Pre-flight — asked before planning, not after proposing
+
+| operation | what it decides |
+|---|---|
+| `harnessAudit` | orphaned WATCHes, untracked or mismatched positions, stale gates, order-ready decisions with no exit |
+| `lessonAudit` | what is already waiting for the investor, so this run does not propose it again |
+
 ### Memory and migration
 
 | operation | what it decides |
@@ -169,6 +176,7 @@ named field is the difference between a gate that runs and a gate that blocks or
 | `verdictReport` | `paper.d60` from `signalPaper.byCohort['llm-research']`, the `cohort` it came from, and optionally `shadow`, `baseline`, `closedOutcomeCount` | Thresholds may be passed **stricter only** — a looser one is refused, not honoured. Any cohort other than `llm-research` is refused outright: a control arm is measured, never promoted. |
 | `upsideRadar` | `price.ma50`, `price.ma200`, `price.offHigh200` and `events` with `announcedAt`/`sue`/`preAnnouncementClose` | The three lanes read them. Without them a lane excludes every candidate and reports `starved`, which is a sourcing finding rather than an absence of opportunity. |
 | `controlArmLane` | `exitRegistered: true` on every row, and `experimentTotalRemainingWeight` | The exit discipline is this lane's product, so an unregistered entry is refused. The lane spends inside the experimental total, not beside it. |
+| `harnessAudit` | `decisions` with `orderReady`/`exitRegistered`/`quantity`, and `theses` | Without the decisions every held position reads as untracked. Without the theses every WATCH on an unheld name reads as orphaned. Both are true findings on a real book and noise on a partial input. |
 | `outcomeClassification` | `executionAttributableToDecision` when the fill differed from the plan; `judgedFailures` for the judged axis | Without the flag a poor fill is an observation, not a methodology failure — which is the reading `outcome-calibration` mandates. An unrecognised judged reason is refused, never absorbed. |
 | `crossCheckPrice` | `config.priceConflictTolerance` | The 5% the documents call configured. Passing `tolerance` directly still overrides it. |
 
