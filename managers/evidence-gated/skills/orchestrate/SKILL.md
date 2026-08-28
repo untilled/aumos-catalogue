@@ -7,9 +7,18 @@ description: How this manager runs its three market flows and assembles their an
 
 ## Which flows this run dispatches
 
-**Not all of them, most runs.** `resolveWakeFlow` reads the WATCH id that woke this run and
-returns the flow it was armed for; `classifyScheduledWake` returns the same `flow` alongside
-its due/duplicate/late verdict, so a run already making that call has the answer.
+**Not all of them, most runs.** `resolveWakeFlow` reads the `summary` of the `plan-trigger`
+event that woke this run and returns the flow it was armed for; `classifyScheduledWake` returns
+the same `flow` alongside its due/duplicate/late verdict, so a run already making that call has
+the answer.
+
+⚠️ **The flow rides in the watch's `intent`, because nothing else survives the trip.** A watch
+the manager arms is `{ subject?, intent, trigger, expiresAt? }` — no id it may choose — and the
+`AumosEvent` a fired plan raises carries `eventId`, `kind`, `subject`, `occurredAt`,
+`detectedAt`, `summary`, `materiality` and `evidenceIds`, with no plan id on it. The wake engine
+composes the summary as `<what fired> — watching for: <the intent>`, which is the one place the
+manager's own words come back. Arm the intent `nextReviewSequence` returns and the marker is
+already in it.
 
 | the wake's `flow` | dispatch | why |
 |---|---|---|
@@ -38,6 +47,19 @@ also judged Korea on yesterday's bar, the 16:00 KST Korean wake also judged the 
 market opened, and `allocate` ran three times a day when only one of those three sat where it
 was meant to sit. Three times the work, and each sleeve judged twice on data it had already
 read. (#87)
+
+## A wake always ends in a submission
+
+⛔ **There is no "ran and said nothing".** `ManagerRunOutcomeKind` is `decided`,
+`invalid-proposal`, `no-proposal`, `refused`, `unsound` — and `no-proposal` means no JSON could
+be recovered at all, a failure row in the Forward Track Record. A run that deliberately submits
+nothing is scored the same as one that crashed.
+
+So a run woken by a touched price level, where entry quality still needs a bar that has closed,
+**submits a `WAIT`** — one whose `keyReasons` say it was woken by that level, what the live
+reading was, that the confirmation is pending on a closed bar, and what it re-armed. That is
+invariant 5's second sentence applied to this case: *"unable to judge" is a reason for `WAIT`*,
+and it is told apart from the `WAIT` that means no change is needed.
 
 ## What a single-sleeve run may propose
 

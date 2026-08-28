@@ -103,7 +103,7 @@ export function boundedRetry({ checkpointAt, asOf, attempt = 0, announcedReplace
   return { data: { at: new Date(anchor + retryMinutes * 60_000).toISOString(), reason: 'release-not-yet-published', attempt: attempt + 1 }, diagnostics }
 }
 
-export function classifyScheduledWake({ watchId, scheduledAt, asOf, consumedWatchIds = [], sourceStatus = 'available', releaseFound = false }, { lateToleranceMinutes = 5 } = {}) {
+export function classifyScheduledWake({ watchId, summary, scheduledAt, asOf, consumedWatchIds = [], sourceStatus = 'available', releaseFound = false }, { lateToleranceMinutes = 5 } = {}) {
   const diagnostics = []
   if (!watchId || !Number.isFinite(Date.parse(scheduledAt)) || !Number.isFinite(Date.parse(asOf))) {
     diagnostics.push(diagnostic('scheduled_wake_invalid', 'blocked', 'watchId, scheduledAt and asOf are required', 'input'))
@@ -116,8 +116,12 @@ export function classifyScheduledWake({ watchId, scheduledAt, asOf, consumedWatc
    * made every wake run all three flows (#87). Resolving it here rather than in
    * a second operation means the run cannot ask whether it is due without also
    * being told what it was woken for.
+   *
+   * `watchId` stays the dedupe key and `summary` is where the flow is: the
+   * first is Aumos's `eventId`, unique per firing, and the second is the
+   * sentence the manager itself armed. Neither can do the other's job.
    */
-  const wake = resolveWakeFlow({ watchId })
+  const wake = resolveWakeFlow({ summary, watchId })
   diagnostics.push(...wake.diagnostics)
   const flow = wake.data?.flow ?? null
   if (consumedWatchIds.includes(watchId)) {
@@ -225,57 +229,81 @@ export function nextReviewSequence({ krSessions = [], usSessions = [], globalRev
    * nowhere, so all three wakes arrived as an undistinguished `PORTFOLIO_REVIEW`
    * and the orchestrator ran all three flows on each of them — three times the
    * work, and each sleeve judged twice, once on a bar that had not closed yet.
-   * `watchId` is what carries the flow across the gap: the wake comes back as a
-   * WATCH id and `resolveWakeFlow` reads it.
+   * `intent` is what carries the flow across the gap. It is the only field a
+   * manager writes that survives the round trip — a plan has no id the manager
+   * can choose, and the event it raises has no plan id on it — so the wake comes
+   * back as an event `summary` with the intent inside, and `resolveWakeFlow`
+   * reads it out.
    */
   const sequence = [
     kr.data.next && { owner: MANAGER_ID, flow: 'kr-sleeve', task: 'PORTFOLIO_REVIEW', at: kr.data.next.reviewAt, session: kr.data.next },
     us.data.next && { owner: MANAGER_ID, flow: 'us-sleeve', task: 'PORTFOLIO_REVIEW', at: us.data.next.reviewAt, session: us.data.next },
     globalAt && Date.parse(globalAt) > Date.parse(asOf) && { owner: MANAGER_ID, flow: ALLOCATOR_FLOW, task: 'PORTFOLIO_REVIEW', at: globalAt },
   ].filter(Boolean)
-    .map((row) => ({ ...row, watchId: marketReviewWatchId(row.flow, row.at) }))
+    .map((row) => ({ ...row, intent: marketReviewIntent(row.flow, row.at) }))
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
   return { data: { sequence }, diagnostics }
 }
 
-/** The prefix that marks a WATCH as one of this manager's own market reviews. */
+/** The marker that opens a market review's `intent`. */
 const MARKET_REVIEW_PREFIX = 'market-review'
+const MARKET_REVIEW_MARKER = /market-review:([a-z-]+):(\S+)/
 
 /**
- * The id a market review is armed under.
+ * The `intent` a market review is armed with.
  *
- * The scheduled instant is part of it deliberately. A stable per-flow id would
- * read as consumed forever after its first firing — `classifyScheduledWake`
- * refuses a `watchId` already in `consumedWatchIds`, and yesterday's KR review
- * would then swallow today's.
+ * ⚠️ **The manager cannot choose an id, and this is why the flow rides in the
+ * intent.** `watchProposalSchema` is `{ subject?, intent, trigger, expiresAt? }`
+ * — there is no id field to write — and the `AumosEvent` a fired plan produces
+ * is a strict object of `eventId`, `kind`, `subject`, `occurredAt`,
+ * `detectedAt`, `summary`, `materiality`, `evidenceIds`, with no plan id on it.
+ * The one thing the manager writes that survives the round trip is `intent`,
+ * which the wake engine composes into the event as
+ * `` `${verdict.reason} — watching for: ${intent}` ``. That composition is
+ * deliberate and recent — before it, the engine's own note says, an armed plan
+ * was "a **timer** rather than a note to self".
+ *
+ * So the marker goes first and the sentence follows it: the first half is for
+ * this package, the second is for the person reading PLANS.
+ *
+ * The scheduled instant is in the marker so a late or stale fire is
+ * distinguishable. It is **not** the dedupe key — `eventId` is, and it is
+ * Aumos's, unique per firing, and needs no help from a name.
  */
-export function marketReviewWatchId(flow, at) {
-  return `${MARKET_REVIEW_PREFIX}:${flow}:${at}`
+export function marketReviewIntent(flow, at) {
+  const sleeve = flow === ALLOCATOR_FLOW ? 'Cross-market allocation' : `${flow} review`
+  return `${MARKET_REVIEW_PREFIX}:${flow}:${at} — ${sleeve} after the close it is armed against`
 }
 
 /**
- * Which flow a wake is for, read back off the WATCH id that fired.
+ * Which flow a wake is for, read out of the event a fired plan raised.
  *
- * Returns `null` data for any id this manager did not mint — a manual run, an
- * event review, an earnings checkpoint. That is not an error and carries no
+ * Pass the `plan-trigger` event's `summary`; the manager's own `intent` is
+ * inside it. A bare intent works too, which is what the arming side has.
+ *
+ * Returns `null` data for any wake this manager did not arm — a manual run, an
+ * asset review, an earnings checkpoint. That is not an error and carries no
  * diagnostic: those wakes are real and the orchestrator's answer for them is to
  * run every flow, which is what it did for everything before #87. What *is* a
- * diagnostic is a market-review id naming a flow nothing dispatches, because
- * that is a wake nobody will answer.
+ * diagnostic is a market-review marker naming a flow nothing dispatches,
+ * because that is a wake nobody will answer.
  */
-export function resolveWakeFlow({ watchId }) {
+export function resolveWakeFlow({ summary, intent, watchId } = {}) {
   const diagnostics = []
-  if (typeof watchId !== 'string' || !watchId.startsWith(`${MARKET_REVIEW_PREFIX}:`)) {
+  const text = [summary, intent, watchId].find((value) => typeof value === 'string' && value.includes(`${MARKET_REVIEW_PREFIX}:`))
+  if (text === undefined) return { data: null, diagnostics }
+  const match = MARKET_REVIEW_MARKER.exec(text)
+  if (match === null) {
+    diagnostics.push(diagnostic('wake_marker_unreadable', 'unevaluated', 'A market-review marker is present but not in the shape this package arms', 'summary', { text }))
     return { data: null, diagnostics }
   }
-  const [, flow, ...rest] = watchId.split(':')
-  const scheduledAt = rest.join(':')
+  const [, flow, scheduledAt] = match
   if (!DISPATCHABLE_FLOWS.includes(flow)) {
-    diagnostics.push(diagnostic('wake_flow_unknown', 'blocked', 'A market-review wake names a flow this manager does not dispatch', 'watchId', { flow, dispatchable: DISPATCHABLE_FLOWS }))
+    diagnostics.push(diagnostic('wake_flow_unknown', 'blocked', 'A market-review wake names a flow this manager does not dispatch', 'summary', { flow, dispatchable: DISPATCHABLE_FLOWS }))
     return { data: null, diagnostics }
   }
   if (!Number.isFinite(Date.parse(scheduledAt))) {
-    diagnostics.push(diagnostic('wake_instant_unreadable', 'unevaluated', 'A market-review wake carries no readable scheduled instant', 'watchId', { flow }))
+    diagnostics.push(diagnostic('wake_instant_unreadable', 'unevaluated', 'A market-review wake carries no readable scheduled instant', 'summary', { flow }))
     return { data: { flow, scheduledAt: null }, diagnostics }
   }
   return { data: { flow, scheduledAt }, diagnostics }

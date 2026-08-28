@@ -759,31 +759,43 @@ for (const key of Object.keys(schemaSchedule)) {
 }
 
 covers('schedule/wake-flow-dispatch')
+/**
+ * The wake engine composes a fired plan's event summary as
+ * `` `${verdict.reason} — watching for: ${plan.intent}` ``, so the round trip
+ * this exercises is the real one rather than the field name this package would
+ * have preferred: a plan carries no id the manager may choose, and the event it
+ * raises carries no plan id at all.
+ */
+const marketReviewIntentFor = (flow, at) => reviewSequence.data.sequence.find((row) => row.flow === flow)?.intent ?? `market-review:${flow}:${at} — review`
+const asFiredEvent = (intent) => `A session closed — watching for: ${intent}`
 for (const row of reviewSequence.data.sequence) {
-  const resolved = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { watchId: row.watchId } })
-  assert.equal(resolved.data?.flow, row.flow, `the watch id a ${row.flow} review is armed under resolves back to that flow`)
+  const resolved = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { summary: asFiredEvent(row.intent) } })
+  assert.equal(resolved.data?.flow, row.flow, `the intent a ${row.flow} review is armed with survives into the event summary and resolves back to that flow`)
   assert.equal(resolved.data?.scheduledAt, row.at, 'and to the instant it was scheduled for, so a stale wake is distinguishable')
 }
-assert.equal(
-  new Set(reviewSequence.data.sequence.map((row) => row.watchId)).size,
-  reviewSequence.data.sequence.length,
-  'each armed review has its own id — a stable per-flow id would read as consumed forever after its first firing',
-)
+for (const row of reviewSequence.data.sequence) {
+  assert.ok(row.intent.length > `market-review:${row.flow}:${row.at}`.length, 'the intent is a sentence a person reads on PLANS as well as a marker this package parses — the marker alone would take the field back to being a timer')
+}
 
-const unknownFlowWake = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { watchId: 'market-review:jp-sleeve:2026-09-01T00:00:00.000Z' } })
+const unknownFlowWake = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { summary: asFiredEvent('market-review:jp-sleeve:2026-09-01T00:00:00.000Z — a sleeve that does not exist') } })
 assert.equal(unknownFlowWake.status, 'blocked', 'a market review naming a flow nothing dispatches is a wake nobody answers, not a silent null')
 assert.ok(unknownFlowWake.diagnostics.some((row) => row.code === 'wake_flow_unknown'), 'and it says so by name')
 
-const foreignWake = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { watchId: 'earnings:NVDA:2026-09-01' } })
-assert.equal(foreignWake.status, 'ok', 'a wake this manager did not mint is not an error')
+const foreignWake = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { summary: 'NVDA traded at $195.00, below the $196.00 line — watching for: revisit the stabilization thesis' } })
+assert.equal(foreignWake.status, 'ok', 'a wake this manager did not arm is not an error')
 assert.equal(foreignWake.data, null, 'it simply carries no flow, and the orchestrator runs everything')
 
 const classified = execute({
   operation: 'classifyScheduledWake',
   asOf: '2026-09-01T07:01:00.000Z',
-  input: { watchId: 'market-review:kr-sleeve:2026-09-01T07:00:00.000Z', scheduledAt: '2026-09-01T07:00:00.000Z', asOf: '2026-09-01T07:01:00.000Z' },
+  input: { watchId: 'evt_01HQ', summary: asFiredEvent(marketReviewIntentFor('kr-sleeve', '2026-09-01T07:00:00.000Z')), scheduledAt: '2026-09-01T07:00:00.000Z', asOf: '2026-09-01T07:01:00.000Z' },
 })
 assert.equal(classified.data.flow, 'kr-sleeve', 'the call a run already makes to ask whether it is due also tells it what it was woken for')
+assert.equal(
+  execute({ operation: 'classifyScheduledWake', asOf: '2026-09-01T07:01:00.000Z', input: { watchId: 'evt_01HQ', consumedWatchIds: ['evt_01HQ'], scheduledAt: '2026-09-01T07:00:00.000Z', asOf: '2026-09-01T07:01:00.000Z' } }).data.disposition,
+  'deduplicated',
+  "dedupe stays on the wake's own id — Aumos's eventId is unique per firing, and the intent is deliberately not, because tomorrow's KR review says the same words",
+)
 
 const orchestrateSkill = await readFile(new URL('../skills/orchestrate/SKILL.md', fixtureRoot), 'utf8')
 const orchestrationProse = `${await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')}\n${orchestrateSkill}`
@@ -836,7 +848,7 @@ const scoreWatch = (input) => execute({ operation: 'evaluateWatch', asOf: method
 
 const touched = scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 195 } })
 assert.equal(touched.data.status, 'met', 'a level touched on a live price is met — this is the condition the original evaluated intraday, and the only one it did')
-assert.equal(touched.data.entryConfirmationPending, true, 'and a met price WATCH is a reason to look, never a confirmed entry: basing and the MA200 state need a bar that has closed')
+assert.equal(touched.data.confirmationPending, true, 'and a met price WATCH is a reason to look, never a confirmed entry: basing and the MA200 state need a bar that has closed')
 assert.equal(touched.data.alertRequired, true, 'the first touch in a session wakes somebody')
 assert.equal(
   scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 195 }, alertedSessionKeys: [touched.data.sessionKey] }).data.alertRequired,
@@ -856,21 +868,26 @@ assert.equal(
   'but a block never lowers not-met — the report still has to say the level is not there, which is the original `active_block` rule verbatim',
 )
 
+/**
+ * ⚠️ Drift is `intraday`, and this block asserted the opposite until the
+ * runtime was read. Aumos's Wake Engine evaluates a `weight-drift` trigger on a
+ * live quote, on the same tick as the price triggers — so an evaluator that
+ * called that `unevaluable` would refuse to score every drift wake it was sent.
+ */
 const driftWatch = { id: 'kospi-drift', kind: 'weight-drift', threshold: 0.05, baselineWeight: 0.2 }
 const driftIntraday = scoreWatch({ watch: driftWatch, observation: { kind: 'last-price', weight: 0.27, sessionDate: '2026-09-01' } })
-assert.equal(driftIntraday.data.status, 'unevaluable', 'a daily-close condition looked at from an intraday run is unevaluable, not not-met — reporting the second is claiming a check that never ran')
-assert.equal(driftIntraday.data.needs, 'completed-bar', 'and it says what it would have needed')
-assert.ok(driftIntraday.diagnostics.some((row) => row.code === 'watch_cadence_unavailable'), 'by name, so a reader afterwards can tell a missed check from a failed one')
+assert.equal(driftIntraday.data.status, 'met', 'a drift read off a live quote is scored, because that is the reading the wake engine fired on')
+assert.equal(driftIntraday.data.confirmationPending, true, 'and it is a reason to look rather than a weight to act on — it moves for the rest of the session')
 assert.equal(
-  scoreWatch({ watch: driftWatch, observation: { kind: 'completed-bar', weight: 0.27, sessionDate: '2026-09-01' } }).data.status,
-  'met',
-  'the same drift on a completed bar is evaluated normally',
-)
-assert.equal(
-  scoreWatch({ watch: driftWatch, observation: { kind: 'completed-bar', weight: 0.242, sessionDate: '2026-09-01' } }).data.status,
+  scoreWatch({ watch: driftWatch, observation: { kind: 'last-price', weight: 0.242, sessionDate: '2026-09-01' } }).data.status,
   'near',
-  'and a drift inside the configured fraction of its threshold is near',
+  'a drift inside the configured fraction of its threshold is near',
 )
+
+const driftBlind = scoreWatch({ watch: driftWatch, observation: { kind: 'clock' } })
+assert.equal(driftBlind.data.status, 'unevaluable', 'with no quote at all the answer is unevaluable, not not-met — reporting the second is claiming a check that never ran, and the wake engine draws the same line by reporting `unevaluated` rather than `not fired` when a quote is missing')
+assert.equal(driftBlind.data.needs, 'last-price', 'and it says what it would have needed')
+assert.ok(driftBlind.diagnostics.some((row) => row.code === 'watch_cadence_unavailable'), 'by name, so a reader afterwards can tell a missed check from a failed one')
 
 const sizingSkillText = await readFile(new URL('../skills/sizing-and-concentration/SKILL.md', fixtureRoot), 'utf8')
 for (const status of ['near', 'unevaluable', 'blocked']) {
