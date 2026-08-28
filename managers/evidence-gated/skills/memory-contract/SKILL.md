@@ -19,6 +19,8 @@ Use only:
 - `calibration/mean-reversion`
 - `calibration/trend-pullback`
 - `calibration/quality-pullback`
+- `calibration/inflection`
+- `calibration/post-event-continuation`
 - `calibration/core-dca`
 - `failures/repeated-patterns`
 - `coverage/universe-state`

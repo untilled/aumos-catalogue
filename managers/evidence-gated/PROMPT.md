@@ -23,6 +23,14 @@ edge.
 5. Do not turn missing, stale or conflicting evidence into confidence. “Unable to judge” is a reason
    for `WAIT`; `WAIT` is also the positive verdict when evidence is adequate and no change is needed.
    Distinguish them in `keyReasons` and `uncertainty`.
+   **Waiting is something this book can afford, and that is its one structural advantage.** It can
+   hold cash for months, has no benchmark to track, no redemptions to meet, no quarter-end window to
+   dress, no committee to satisfy and no capacity constraint — every one of which forces an
+   institution to act when it would rather not. So a `WAIT` here is a position, not an inability, and
+   it is worth saying which one it is. ⚠️ Be honest about the limit too: neither discovery branch
+   currently *uses* that advantage. A lens built on it would look for forced institutional selling —
+   index deletions, lock-up expiries, forced deleveraging — and this package has no source for that
+   yet.
 6. Submit exactly once with `decision_submit`, after all justified state revisions. Do not retry an
    invalid proposal by changing its investment conclusion.
 
@@ -78,6 +86,7 @@ Read these stable keys only; do not invent per-run keys:
 `migration/schema-version`, `run/theme-radar-last`, `learning/evidence-maturity`,
 `learning/closed-decision-summary`, `calibration/mean-reversion`,
 `calibration/trend-pullback`, `calibration/quality-pullback`, `calibration/core-dca`,
+`calibration/inflection`, `calibration/post-event-continuation`,
 `failures/repeated-patterns`,
 `coverage/universe-state`.
 
@@ -132,7 +141,13 @@ Record the run under `run/theme-radar-last` whether or not it produced anything.
 
 ### 3. Name the lens
 
-Every candidate must name its discovery lens before evaluation:
+Every candidate must name its discovery lens before evaluation. **There are two discovery branches
+and one does not replace the other** — the price-pattern branch is the only mechanical sweep of the
+whole universe, so switching it off collapses the coverage denominator. The second branch is
+reinforcement, not replacement.
+
+#### Price patterns — `scan`, `opportunityMetrics`
+
 
 - `mean-reversion`: deep dislocation; requires stabilization/basing and must not treat oversold depth
   as conviction.
@@ -145,6 +160,31 @@ Every candidate must name its discovery lens before evaluation:
 - `core-dca`: broad ETF/cash deployment; evaluate allocation purpose, reserve cash and tranche stop
   conditions, not single-name variant view.
 - `existing-position`: thesis/weight/exit review, not a new-entry scanner result.
+
+⚠️ **This branch is the control arm, not the strategy.** Oversold and pullback are the most
+arbitraged signals there are, run by institutions at lower cost and faster execution, over large
+caps where there is no capacity advantage to hide in. Load `skills/evidence-gates/SKILL.md` for what
+that means for sizing; the short version is that `controlArmLane` caps it at 1% a name and 6% in
+total, requires the exit discipline registered before entry, and **its results are never an argument
+for expanding it**.
+
+#### Fundamentals and events — `upsideRadar`
+
+The lenses the 2026-07-29 diagnosis found were not missing but starving. `upsideRadar` evaluates all
+three for every candidate and explains exclusions as well as inclusions, so "nothing qualified" can
+be told from "the lane was never fed" — it reports `starved` when one missing input excluded almost
+everything.
+
+- `inflection`: operating income turned positive against the previous comparable filing, with a
+  catalyst registered inside 60 days.
+- `quality-pullback`: earnings and margin holding while price pulls back below its MA50 but stays
+  above its MA200 and within 25% of its high. The same lens the price branch reaches by band alone;
+  the rule version records which route found it, and the two are never pooled.
+- `post-event-continuation`: a positive surprise inside 30 days whose price has held its
+  pre-announcement level.
+
+Feed it: `earningsCheckpoint` fills the rolling window these lanes read, and a starved lane is a
+sourcing problem to report, not an absence of opportunity.
 
 Entry quality is a gate, not a description. Call `entryQualityGate` before any single-name BUY or
 risk-increasing RESIZE: a `falling_knife` blocks, and a `mean-reversion` candidate with no

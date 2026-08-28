@@ -310,8 +310,21 @@ export function baselineTrack({ portfolioReturnPct, baselines = [] } = {}) {
  * a candidate for an edge; the cap change is a separate proposal that a person
  * approves, and `promotionGate` still has to pass on its own terms.
  */
-export function verdictReport({ paper = {}, shadow = {}, baseline = {}, closedOutcomeCount = 0, thresholds = {}, asOf } = {}) {
+export function verdictReport({ paper = {}, cohort = 'llm-research', shadow = {}, baseline = {}, closedOutcomeCount = 0, thresholds = {}, asOf } = {}) {
   const diagnostics = []
+  /**
+   * ⛔ `expansion_prohibition` in code (issue #70 §9).
+   *
+   * A control-arm result is a baseline reading and never an argument for more
+   * of itself. Good numbers from the mechanical cohort mean the bar is high,
+   * not that the bar should be lowered onto them — and expanding a control arm
+   * destroys the thing every later edge claim is measured against. So this
+   * function refuses to render a verdict on that cohort at all.
+   */
+  if (cohort !== 'llm-research') {
+    diagnostics.push(diagnostic('control_arm_expansion_prohibited', 'blocked', 'The mechanical cohort is the control arm; its result is the baseline others must clear, never a basis for promoting or expanding itself', 'cohort', { cohort, judged: 'llm-research' }))
+    return { data: { verdict: 'not-applicable', meaning: 'A control arm is measured, not promoted', cohort, proposals: [], changesNothingAutomatically: true }, diagnostics }
+  }
   const go = { ...PREREGISTERED.go }
   const noGo = { ...PREREGISTERED.noGo }
   for (const [key, value] of Object.entries(thresholds.go ?? {})) {
@@ -374,12 +387,100 @@ export function verdictReport({ paper = {}, shadow = {}, baseline = {}, closedOu
     data: {
       verdict,
       meaning,
+      cohort,
       horizon: PREREGISTERED.horizon,
       criteria: { go, noGo, source: PREREGISTERED.source },
       stats: stats ?? null,
       proposals,
       changesNothingAutomatically: true,
       asOf: asOf ?? null,
+    },
+    diagnostics,
+  }
+}
+
+/**
+ * ── The control arm, and why it must not be expanded (issue #70 §9) ────────
+ *
+ * The price-pattern lenses — oversold, pullback — are the most arbitraged
+ * signals in existence, run by institutions at lower cost and faster
+ * execution, over a universe of large caps where there is no capacity
+ * advantage to hide in. The methodology this is ported from concluded the
+ * obvious thing and wrote it down: **this lane is not a strategy, it is a
+ * control arm.** It is the baseline measured with real money, and any claimed
+ * edge has to clear it to mean anything.
+ *
+ * In this package that lane became the *main* lane — mechanical scanners were
+ * the only route in — so the label came across (`discoveryScoreMeaning:
+ * 'research-priority-only'`) and the rule attached to it did not.
+ *
+ * Its purpose is to produce **closed outcomes**, not returns. The original
+ * measured the deadlock: two single names ever bought, zero closed decisions,
+ * and sizing that only opens on closed evidence. A lane that reliably closes
+ * positions — 40 trading days or −8%, whichever comes first — is how that gate
+ * starts moving. A loss is a valid output.
+ *
+ * ⛔ `expansionProhibited` is the part that has to be code. When a control arm
+ * performs well the temptation is to expand it, and expanding it destroys the
+ * control — after which no edge claim can be verified against anything. A good
+ * result reads "the baseline is high, so our bar is high", never "let us do
+ * more of this". Expansion is a separate proposal that must first say what
+ * replaces the control.
+ */
+const CONTROL_ARM = {
+  singleMaxWeight: 0.01,
+  laneTotalMaxWeight: 0.06,
+  maxConcurrentPositions: 6,
+  timeStopTradingDays: 40,
+  hardStopPct: -0.08,
+}
+
+export function controlArmLane({ positions = [], proposed = [], experimentTotalRemainingWeight = null } = {}) {
+  const diagnostics = []
+  const rows = [...positions, ...proposed]
+  let total = 0
+  for (const [index, row] of rows.entries()) {
+    const where = index < positions.length ? `positions[${index}]` : `proposed[${index - positions.length}]`
+    if (!finite(row?.weight)) {
+      diagnostics.push(diagnostic('control_arm_weight_missing', 'unevaluated', 'A control-arm row needs its weight', `${where}.weight`))
+      continue
+    }
+    total += row.weight
+    if (row.weight > CONTROL_ARM.singleMaxWeight) {
+      diagnostics.push(diagnostic('control_arm_single_cap', 'blocked', 'The control arm buys 1% positions; a bigger one is the main lane and owes a variant view', `${where}.weight`, { weight: row.weight, cap: CONTROL_ARM.singleMaxWeight }))
+    }
+    /**
+     * The exit discipline is the lane's product. Registering it is what turns
+     * "we will review this" into a WATCH `exitCheck` is already looking at, so
+     * an unregistered entry is refused rather than promised.
+     */
+    if (row.exitRegistered !== true) {
+      diagnostics.push(diagnostic('control_arm_exit_unregistered', 'blocked', 'A control-arm entry registers its time stop and hard stop before it is an entry; closed outcomes are what this lane is for', `${where}.exitRegistered`, { timeStopTradingDays: CONTROL_ARM.timeStopTradingDays, hardStopPct: CONTROL_ARM.hardStopPct }))
+    }
+  }
+  if (total > CONTROL_ARM.laneTotalMaxWeight) {
+    diagnostics.push(diagnostic('control_arm_lane_cap', 'blocked', 'The control arm is capped as a whole, not only per name', 'proposed', { total: round(total), cap: CONTROL_ARM.laneTotalMaxWeight }))
+  }
+  if (rows.length > CONTROL_ARM.maxConcurrentPositions) {
+    diagnostics.push(diagnostic('control_arm_concurrency', 'blocked', 'The control arm holds a bounded number of positions at once', 'proposed', { held: rows.length, maximum: CONTROL_ARM.maxConcurrentPositions }))
+  }
+  /**
+   * It spends inside the experimental total; it is not an extra allowance.
+   */
+  if (finite(experimentTotalRemainingWeight) && total > experimentTotalRemainingWeight) {
+    diagnostics.push(diagnostic('control_arm_exceeds_experiment_total', 'blocked', 'The control arm spends inside the experimental total rather than beside it', 'experimentTotalRemainingWeight', { total: round(total), remaining: experimentTotalRemainingWeight }))
+  }
+  return {
+    data: {
+      totalWeight: round(total),
+      limits: CONTROL_ARM,
+      role: 'control-arm',
+      purpose: 'produce-closed-outcomes-not-returns',
+      expansionProhibited: true,
+      countsAgainstExperimentTotal: true,
+      variantViewRequired: false,
+      variantViewNote: 'Waived only because the size is bounded at 1% — a candidate that does have a variant view belongs in the main lane, where it can be sized.',
+      admitted: !diagnostics.some((row) => row.severity === 'blocked'),
     },
     diagnostics,
   }

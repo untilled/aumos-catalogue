@@ -22,7 +22,7 @@ the JSON remains the canonical explanation.
 
 ## The operations
 
-All 69, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
+All 70, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
 calling it wrong is not a discovery path — every flow skill tells you not to go looking, so the
 names have to be here. A name absent from this table is a name you cannot call.
 
@@ -39,7 +39,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `blendedSectorStrength` | one sector's weighted RS against one benchmark |
 | `sectorStrength` | L1: lane ranking, rank moves, regime, `researchQueue`, bot baselines |
 | `entryQualityGate` | `falling_knife` blocks; eq-v2 and `no_new_low` dual lenses |
-| `upsideRadar` | fundamental/event lanes — research priority, never an order |
+| `upsideRadar` | the three fundamental/event lanes, with every exclusion explained and starvation reported |
 
 ### Sizing, concentration and budgets
 
@@ -103,6 +103,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `shadowTrack` | same decisions at unconstrained size — is the cap what costs return? |
 | `baselineTrack` | what buying the index and waiting would have returned |
 | `verdictReport` | the §6 verdict against pre-registered criteria, and the proposals it raises |
+| `controlArmLane` | the bounded lane whose product is closed outcomes, and which may never be expanded on its own result |
 
 ### Mechanical backtests — baselines, not signals
 
@@ -165,7 +166,9 @@ named field is the difference between a gate that runs and a gate that blocks or
 | `newSinglePacing` | `proposedNewSingles`, `priorNewSingles` with `verified`, `sizingPolicyUpdatedAt`, `closedOutcomeCount` | Every field is a separate approved warning; omitting one silently drops that warning rather than failing. |
 | `signalPaper` | `ruleVersion` on every row, and `benchmarkBars` | A row with no rule version is refused: rows judged under different versions are reported together and never pooled. Without a benchmark a row scores no excess and drops out of the aggregate rather than counting as zero. |
 | `paperAdmission` | `challengeVerdict`, and for a call `thesis.evidenceStatus` plus `priceHistoryLatestDate` | The verdict decides the setup, so a conditional verdict cannot be logged as a call. A promote on price history stale by more than two weekdays is refused. |
-| `verdictReport` | `paper.d60` from `signalPaper.byCohort['llm-research']`, and optionally `shadow`, `baseline`, `closedOutcomeCount` | Thresholds may be passed **stricter only** — a looser one is refused, not honoured. |
+| `verdictReport` | `paper.d60` from `signalPaper.byCohort['llm-research']`, the `cohort` it came from, and optionally `shadow`, `baseline`, `closedOutcomeCount` | Thresholds may be passed **stricter only** — a looser one is refused, not honoured. Any cohort other than `llm-research` is refused outright: a control arm is measured, never promoted. |
+| `upsideRadar` | `price.ma50`, `price.ma200`, `price.offHigh200` and `events` with `announcedAt`/`sue`/`preAnnouncementClose` | The three lanes read them. Without them a lane excludes every candidate and reports `starved`, which is a sourcing finding rather than an absence of opportunity. |
+| `controlArmLane` | `exitRegistered: true` on every row, and `experimentTotalRemainingWeight` | The exit discipline is this lane's product, so an unregistered entry is refused. The lane spends inside the experimental total, not beside it. |
 | `outcomeClassification` | `executionAttributableToDecision` when the fill differed from the plan; `judgedFailures` for the judged axis | Without the flag a poor fill is an observation, not a methodology failure — which is the reading `outcome-calibration` mandates. An unrecognised judged reason is refused, never absorbed. |
 | `crossCheckPrice` | `config.priceConflictTolerance` | The 5% the documents call configured. Passing `tolerance` directly still overrides it. |
 

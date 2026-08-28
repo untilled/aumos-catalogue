@@ -10,7 +10,7 @@ import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActu
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
 import { validateThesis, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap, exitCheck } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
-import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport } from './learning.mjs'
+import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport, controlArmLane } from './learning.mjs'
 import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence } from './schedule.mjs'
 
 const operations = {
@@ -65,6 +65,7 @@ const operations = {
   paperAdmission: (input, asOf) => paperAdmission({ ...input, asOf }),
   shadowTrack,
   baselineTrack,
+  controlArmLane,
   verdictReport: (input, asOf) => verdictReport({ ...input, asOf }),
   validateThesis,
   thesisSentinel,

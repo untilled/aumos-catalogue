@@ -67,6 +67,29 @@ risk forever, so when the evidence supports an increase the run proposes it with
 rule proposals and whose successes produce nothing is not being careful; it is structurally unable to
 grow and unable to report that it cannot.
 
+## The control arm
+
+The price-pattern branch is a **control arm, not a strategy**. Oversold depth and moving-average
+pullbacks are the most arbitraged signals in existence; institutions run them at lower cost with
+faster execution, and a large-cap universe offers no capacity advantage to shelter in. Its job is to
+be the baseline every claimed edge has to clear, measured with real money rather than asserted.
+
+Its second job is to close positions. Sizing only opens on closed evidence, and a book that never
+closes anything keeps that gate shut forever — so this lane runs a fixed exit discipline and a loss
+is a valid output, because the output being bought is the outcome record.
+
+`controlArmLane` holds the limits: 1% a name, 6% across the lane, six concurrent at most, spent
+inside the experimental total rather than beside it, and the time stop (40 trading days) and hard
+stop (−8%) registered **before** the entry rather than promised after it. A variant view is not
+required here — the size is why. A candidate that does have one belongs in the main lane, where it
+can be sized properly.
+
+⛔ **A good result from this lane is never an argument for enlarging it.** `verdictReport` refuses to
+render a verdict on the mechanical cohort at all. Read a strong baseline as "our bar is high", not as
+"do more of this": expanding a control arm destroys the control, and after that no edge claim can be
+verified against anything. Expansion is a separate proposal that must first say what replaces the
+control.
+
 ## Entry gates
 
 For a new single-name BUY require all of the following:

@@ -713,6 +713,13 @@ covers('research/resize-lens')
 const resizeResearch = { lens: 'existing-position', priceDeclineReason: 'temporary', opportunityCase: 'recovery', trapRisks: ['structural-risk'], variantView: 'different', benchmarkAlternative: { expectedReturn: 0.03 }, scenarios: { bear: { probability: 0.2, return: -0.2 }, base: { probability: 0.5, return: 0.12 }, bull: { probability: 0.3, return: 0.3 } }, minimumExpectedActiveReturn: 0.02, challengeVerdict: 'cleared', sourceFresh: true, sourceConflict: false }
 assert.equal(execute({ operation: 'researchGate', asOf: methodology.asOf, input: resizeResearch }).data.passed, true, 'the RESIZE lens the skills name has a passing path')
 assert.equal(execute({ operation: 'researchGate', asOf: methodology.asOf, input: { ...resizeResearch, lens: 'vibes' } }).status, 'blocked', 'an unnamed lens is still rejected')
+for (const lens of ['inflection', 'post-event-continuation']) {
+  assert.equal(
+    execute({ operation: 'researchGate', asOf: methodology.asOf, input: { ...resizeResearch, lens } }).data.passed,
+    true,
+    `the radar branch lens ${lens} has a passing research path; a lens the prompt names and the gate refuses is not a lens`,
+  )
+}
 
 /**
  * A revisit promise expires, and a drift promise is checked for already-met.
@@ -1335,7 +1342,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 69)
+assert.equal(supportedOperations.length, 70)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -1517,6 +1524,143 @@ const gatesSkill = await readFile(new URL('../skills/evidence-gates/SKILL.md', f
 assert.ok(gatesSkill.includes('cohortsAreSeparate'), 'the skill names the field that states the separation')
 assert.ok(/paper/i.test(gatesSkill) && /closed Decision/.test(gatesSkill), 'the skill says what a paper sample is and is not')
 assert.ok(/without being asked/.test(gatesSkill), 'the skill carries the directive that a met threshold is proposed unasked')
+
+/**
+ * ── The second discovery branch (issue #70 §8) ─────────────────────────────
+ *
+ * `upsideRadar` computed five axes and named no lens, so the fundamental and
+ * event branch had no way into the lens-naming step. The three lanes are
+ * pre-registered (`ur-v1`, 2026-07-18) and each carries its own rule version,
+ * and every lane is evaluated for every candidate so an exclusion is explained
+ * as mechanically as an inclusion.
+ */
+covers('scanner/radar-lanes', 'scanner/radar-lane-starvation')
+const radarAsOf = '2026-08-20T00:00:00Z'
+const radarCandidate = (overrides) => ({
+  asset: 'R1',
+  market: 'us',
+  filings: [
+    { periodEnd: '2026-03-31', availableAt: '2026-04-15T00:00:00Z', operatingIncomeYoy: -5, marginDeltaYoy: -1 },
+    { periodEnd: '2026-06-30', availableAt: '2026-07-20T00:00:00Z', operatingIncomeYoy: 12, marginDeltaYoy: 2 },
+  ],
+  price: { status: 'confirmed', close: 120, ma50: 130, ma200: 100, offHigh200: -0.12, rs20VsBenchmarkPct: 4 },
+  catalysts: [{ windowStart: '2026-08-25', windowEnd: '2026-09-15' }],
+  valuation: { shares: 10, equity: 1000, debt: 200 },
+  ...overrides,
+})
+const radar = execute({ operation: 'upsideRadar', asOf: radarAsOf, input: { candidates: [radarCandidate({})] } })
+const laneRow = radar.data.ranked[0]
+assert.deepEqual(Object.keys(laneRow.lanes).sort(), ['inflection', 'post-event-continuation', 'quality-pullback'], 'all three pre-registered lanes are evaluated')
+assert.deepEqual(
+  Object.values(laneRow.lanes).map((verdict) => verdict.ruleVersion),
+  ['uri-v1', 'urq-v1', 'urp-v1'],
+  'each lane carries its own rule version so one revision does not invalidate another lane sample',
+)
+assert.deepEqual(laneRow.lensesEntered.sort(), ['inflection', 'quality-pullback'])
+assert.equal(laneRow.lanes['post-event-continuation'].included, false)
+assert.equal(laneRow.lanes['post-event-continuation'].reason, 'no-event-in-the-last-30-days', 'an exclusion is explained, not merely absent')
+assert.equal(radar.data.branch, 'fundamental-and-event')
+
+const withEvent = execute({
+  operation: 'upsideRadar',
+  asOf: radarAsOf,
+  input: { candidates: [radarCandidate({ events: [{ announcedAt: '2026-08-05T00:00:00Z', sue: 1.4, preAnnouncementClose: 110 }] })] },
+})
+assert.equal(withEvent.data.ranked[0].lanes['post-event-continuation'].included, true, 'a positive surprise whose price held enters the lane')
+const surpriseFaded = execute({
+  operation: 'upsideRadar',
+  asOf: radarAsOf,
+  input: { candidates: [radarCandidate({ events: [{ announcedAt: '2026-08-05T00:00:00Z', sue: 1.4, preAnnouncementClose: 130 }] })] },
+})
+assert.equal(surpriseFaded.data.ranked[0].lanes['post-event-continuation'].reason, 'price-has-not-held-the-pre-announcement-level')
+const brokenDown = execute({
+  operation: 'upsideRadar',
+  asOf: radarAsOf,
+  input: { candidates: [radarCandidate({ price: { status: 'confirmed', close: 120, ma50: 130, ma200: 100, offHigh200: -0.4 } })] },
+})
+assert.equal(brokenDown.data.ranked[0].lanes['quality-pullback'].reason, 'drawdown-past-25-percent-is-a-breakdown-not-a-pullback', 'a collapse is not a pullback')
+
+/**
+ * Starvation is a finding: a lane that excluded almost everything for one
+ * missing input was never fed, and reporting only its hits would hide that.
+ */
+const starved = execute({
+  operation: 'upsideRadar',
+  asOf: radarAsOf,
+  input: { candidates: Array.from({ length: 5 }, (_, index) => radarCandidate({ asset: `S${index}` })) },
+})
+assert.equal(starved.data.lanes['post-event-continuation'].starved, true)
+assert.equal(starved.data.lanes['post-event-continuation'].reasons['no-event-in-the-last-30-days'], 5)
+assert.ok(starved.diagnostics.some((row) => row.code === 'radar_lane_starved'), 'an unfed lane says so rather than reading as no opportunity')
+assert.equal(starved.data.lanes.inflection.starved, false, 'a lane that is being fed is not flagged')
+
+/**
+ * ── The control arm, and the prohibition on expanding it (issue #70 §9) ────
+ */
+covers('sizing/control-arm-limits')
+const armRow = (weight) => ({ symbol: 'M1', weight, exitRegistered: true })
+const arm = execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: [armRow(0.01), { ...armRow(0.01), symbol: 'M2' }] } })
+assert.equal(arm.data.admitted, true)
+assert.equal(arm.data.role, 'control-arm')
+assert.equal(arm.data.purpose, 'produce-closed-outcomes-not-returns')
+assert.equal(arm.data.expansionProhibited, true)
+assert.equal(arm.data.countsAgainstExperimentTotal, true)
+assert.equal(arm.data.variantViewRequired, false, 'the variant view is waived because the size is bounded, not because the bar was lowered')
+assert.deepEqual(arm.data.limits, { singleMaxWeight: 0.01, laneTotalMaxWeight: 0.06, maxConcurrentPositions: 6, timeStopTradingDays: 40, hardStopPct: -0.08 })
+assert.ok(
+  execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: [armRow(0.03)] } })
+    .diagnostics.some((row) => row.code === 'control_arm_single_cap'),
+  'a bigger position is the main lane and owes a variant view',
+)
+assert.ok(
+  execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: [{ symbol: 'M1', weight: 0.01 }] } })
+    .diagnostics.some((row) => row.code === 'control_arm_exit_unregistered'),
+  'the exit discipline is this lane product; an unregistered entry is refused rather than promised',
+)
+assert.ok(
+  execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: Array.from({ length: 7 }, () => armRow(0.005)) } })
+    .diagnostics.some((row) => row.code === 'control_arm_concurrency'),
+  'the lane holds a bounded number of positions at once',
+)
+assert.ok(
+  execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: [armRow(0.01)], experimentTotalRemainingWeight: 0.005 } })
+    .diagnostics.some((row) => row.code === 'control_arm_exceeds_experiment_total'),
+  'the lane spends inside the experimental total, not beside it',
+)
+
+covers('promotion/expansion-prohibition')
+const controlVerdict = execute({
+  operation: 'verdictReport',
+  asOf: radarAsOf,
+  input: { cohort: 'mechanical-baseline', paper: { d60: { samples: 40, winRatePct: 80, avgExcessPct: 9 } } },
+})
+assert.equal(controlVerdict.status, 'blocked', 'a control arm is measured, never promoted — however well it did')
+assert.equal(controlVerdict.data.verdict, 'not-applicable')
+assert.deepEqual(controlVerdict.data.proposals, [], 'no proposal is raised on control-arm evidence')
+assert.ok(controlVerdict.diagnostics.some((row) => row.code === 'control_arm_expansion_prohibited'))
+assert.equal(
+  execute({ operation: 'verdictReport', asOf: radarAsOf, input: { paper: { d60: { samples: 24, winRatePct: 60, avgExcessPct: 3 } } } }).data.cohort,
+  'llm-research',
+  'the judged cohort defaults to the one the verdict is about and is stated in the output',
+)
+
+covers('audit/two-discovery-branches-stated', 'audit/structural-advantage-stated')
+const promptText = await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')
+/**
+ * ⚠️ Matched against a whitespace-collapsed copy. The first version tested the
+ * raw text and failed on a phrase that happened to wrap across two lines —
+ * a check that depends on where a paragraph was reflowed is measuring the
+ * formatter, not the claim.
+ */
+const promptProse = promptText.replace(/\s+/g, ' ')
+assert.ok(/two discovery branches/i.test(promptProse), 'the prompt states there are two branches')
+assert.ok(/does not replace the other/i.test(promptProse), 'and that one does not replace the other')
+for (const lens of ['inflection', 'quality-pullback', 'post-event-continuation']) {
+  assert.ok(promptText.includes(`\`${lens}\``), `the prompt names the ${lens} lens the radar produces`)
+}
+assert.ok(/control arm, not the strategy/i.test(promptProse), 'the price branch is named as the control arm where lenses are chosen')
+assert.ok(/redemptions|capacity constraint/i.test(promptProse), 'the account structural advantage is stated as the reason WAIT is a position')
+assert.ok(/no source for that yet/i.test(promptProse), 'and the honest limit beside it — no branch actually uses that advantage')
 
 assertCoverageWasEarned()
 

@@ -67,6 +67,74 @@ export function thesisSentinel({ invalidations = [], evidence = [], priorVerdict
   return { data: { verdict, evaluations, consecutiveThreatened, escalationRequired }, diagnostics }
 }
 
+/**
+ * The three pre-registered radar lanes (`ur-v1`, registered 2026-07-18 —
+ * before any signal was accumulated, which is the point of registering them).
+ *
+ * Each carries its own rule version so revising one lane's definition does not
+ * invalidate another lane's sample, and every lane is evaluated for **every**
+ * candidate. Inclusion and exclusion are both explained mechanically: a
+ * candidate that fell out of a lane says which condition it failed, so "the
+ * radar found nothing" can be told apart from "the radar was starving".
+ *
+ * That distinction was the whole 2026-07-29 diagnosis in the original — the
+ * information-edge lenses were not missing, their inputs were. `inflection`
+ * matched 2 of 92 candidates with 16 excluded for "no registered catalyst";
+ * filling the rolling earnings window took it to 12. A lane that reports only
+ * its hits cannot surface that.
+ */
+const RADAR_LANES = {
+  inflection: 'uri-v1',
+  'quality-pullback': 'urq-v1',
+  'post-event-continuation': 'urp-v1',
+}
+
+function radarLaneVerdicts(row, candidate, asOf) {
+  const { inflection, catalyst, price } = row.axes
+  const filingYoy = inflection.operatingIncomeYoy
+  const marginDelta = inflection.marginDeltaYoy
+  const detail = {}
+
+  const decide = (lane, included, reason) => { detail[lane] = { included, ruleVersion: RADAR_LANES[lane], reason } }
+
+  if (inflection.status === 'unknown') decide('inflection', false, 'no-valid-point-in-time-filing')
+  else if (!(filingYoy > 0)) decide('inflection', false, 'latest-filing-operating-income-not-improving')
+  else if (!inflection.signFlip) decide('inflection', false, 'no-sign-flip-against-the-previous-comparable-filing')
+  else if (catalyst.status !== 'present') decide('inflection', false, 'no-catalyst-registered-within-60-days')
+  else decide('inflection', true, 'sign-flip-with-a-registered-catalyst')
+
+  /**
+   * The radar's route into the same population the scanner's `quality-pullback`
+   * lens reaches by price alone. One lens, two routes: the rule version is what
+   * keeps their samples from pooling, exactly as it does across lanes.
+   */
+  const close = price?.close
+  const conditions = [
+    [filingYoy > 0, 'latest-filing-operating-income-not-improving'],
+    [finite(marginDelta) && marginDelta >= 0, 'operating-margin-not-holding'],
+    [finite(close) && finite(price?.ma200) && close > price.ma200, 'trend-not-preserved-above-ma200'],
+    [finite(close) && finite(price?.ma50) && close < price.ma50, 'not-actually-pulling-back-below-ma50'],
+    [finite(price?.offHigh200) && price.offHigh200 >= -0.25, 'drawdown-past-25-percent-is-a-breakdown-not-a-pullback'],
+  ]
+  const failed = conditions.find(([ok]) => !ok)
+  if (inflection.status === 'unknown') decide('quality-pullback', false, 'no-valid-point-in-time-filing')
+  else if (failed) decide('quality-pullback', false, failed[1])
+  else decide('quality-pullback', true, 'quality-holding-through-a-preserved-uptrend-pullback')
+
+  const event = (candidate.events ?? []).find((entry) => {
+    const since = (Date.parse(asOf) - Date.parse(entry?.announcedAt)) / 86_400_000
+    return Number.isFinite(since) && since >= 0 && since <= 30
+  })
+  if (!event) decide('post-event-continuation', false, 'no-event-in-the-last-30-days')
+  else if (!(finite(event.sue) ? event.sue > 0 : finite(event.day1ExcessPct) && event.day1ExcessPct > 0)) {
+    decide('post-event-continuation', false, finite(event.sue) ? 'surprise-not-positive' : 'no-surprise-and-no-day-one-excess')
+  } else if (!(finite(close) && finite(event.preAnnouncementClose) && close >= event.preAnnouncementClose)) {
+    decide('post-event-continuation', false, 'price-has-not-held-the-pre-announcement-level')
+  } else decide('post-event-continuation', true, 'positive-surprise-the-price-has-held')
+
+  return detail
+}
+
 export function upsideRadar({ candidates = [], asOf }) {
   const diagnostics = []
   const maximumFilingLagDays = 120
@@ -100,7 +168,10 @@ export function upsideRadar({ candidates = [], asOf }) {
     } : { status: 'unknown', reason: 'missing-shares-or-equity-never-zero-filled' }
     const eligible = price.status !== 'unknown' && inflection.status !== 'unknown' && (inflection.status === 'improving' || catalyst.status === 'present')
     if (!eligible) diagnostics.push(diagnostic('upside_candidate_unranked', 'info', 'Candidate remains visible but unranked because an axis is missing', `candidates[${index}]`, { asset: candidate.asset }))
-    return { asset: candidate.asset, market: candidate.market, sector: candidate.sector ?? null, eligible, axes: { inflection, expectation, catalyst, price, valuation }, rankMeaning: 'research-priority-only' }
+    const row = { asset: candidate.asset, market: candidate.market, sector: candidate.sector ?? null, eligible, axes: { inflection, expectation, catalyst, price, valuation }, rankMeaning: 'research-priority-only' }
+    row.lanes = radarLaneVerdicts(row, candidate, asOf)
+    row.lensesEntered = Object.entries(row.lanes).filter(([, verdict]) => verdict.included).map(([lane]) => lane)
+    return row
   })
   const rankKey = (row) => {
     const cell = row.axes.inflection.status === 'improving' && row.axes.price.status === 'confirmed' ? 2 : row.axes.inflection.status === 'improving' || row.axes.catalyst.status === 'present' ? 1 : 0
@@ -110,7 +181,21 @@ export function upsideRadar({ candidates = [], asOf }) {
     const aa = rankKey(a); const bb = rankKey(b)
     return bb[0] - aa[0] || bb[1] - aa[1] || bb[2] - aa[2] || String(a.asset).localeCompare(String(b.asset))
   }).map((row, index) => ({ ...row, rank: index + 1 }))
-  return { data: { ranked, unranked: rows.filter((row) => !row.eligible) }, diagnostics }
+  /**
+   * Starvation is a finding. A lane whose every exclusion is the same missing
+   * input is not saying "nothing qualifies", it is saying it was never fed.
+   */
+  const laneCoverage = Object.fromEntries(Object.keys(RADAR_LANES).map((lane) => {
+    const verdicts = rows.map((row) => row.lanes[lane])
+    const excluded = verdicts.filter((verdict) => !verdict.included)
+    const reasons = {}
+    for (const verdict of excluded) reasons[verdict.reason] = (reasons[verdict.reason] ?? 0) + 1
+    const dominant = Object.entries(reasons).sort((a, b) => b[1] - a[1])[0] ?? null
+    const starved = Boolean(dominant && rows.length && dominant[1] / rows.length >= 0.8 && /no-valid-point-in-time-filing|no-catalyst-registered|no-event-in-the-last-30-days/.test(dominant[0]))
+    if (starved) diagnostics.push(diagnostic('radar_lane_starved', 'unevaluated', 'This lane excluded almost every candidate for one missing input; it is unfed rather than empty', 'candidates', { lane, reason: dominant[0], of: rows.length }))
+    return [lane, { ruleVersion: RADAR_LANES[lane], included: verdicts.length - excluded.length, excluded: excluded.length, reasons, starved }]
+  }))
+  return { data: { ranked, unranked: rows.filter((row) => !row.eligible), lanes: laneCoverage, branch: 'fundamental-and-event', rankMeaning: 'research-priority-only' }, diagnostics }
 }
 
 /**
