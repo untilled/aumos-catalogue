@@ -182,6 +182,42 @@ carries a `provenance` block — and the licence obligation is about the copyrig
 A package that declares a provenance it did not ship does not load. This is not
 politeness — it is the licence.
 
+### Your README is the page an investor chooses from, and it has a shape
+
+The catalogue deliberately shows no returns, so what a person decides on is your README.
+It is rendered verbatim on your catalogue page, and it is read by people who are not
+engineers — so it carries **six sections, with these headings, in this order**:
+
+| `README.md` | `README.ko.md` | what belongs there |
+|---|---|---|
+| `## In one paragraph` | `## 한 문단 요약` | what this manager does, in plain words, with no jargon left undefined |
+| `## The methodology` | `## 방법론` | the principles it judges by, what it deliberately does not do, and a short glossary of any term you had to use |
+| `## How a run works` | `## 실행 흐름` | the run drawn as a **`mermaid` diagram**, plus its cadence |
+| `## What it needs` | `## 필요한 것` | markets, data sources, what a key costs, settings, and where a person has to approve |
+| `## What it is bad at` | `## 약한 지점` | the shape of market it is wrong in, and who should *not* install it |
+| `## Notes` | `## 덧붙임` | everything else — provenance, known limits, withdrawn claims, install detail |
+
+`npm run check:docs` refuses a package README that answers five of the six, answers them
+in another order, or carries no fenced `mermaid` block. Sub-headings under a section are
+free.
+
+**The order is not a style preference.** Two managers compared side by side have to answer
+the same question in the same place, or a catalogue of eight is eight essays. Before this
+was fixed, three of the eight packages had no flow section at all and no two of them named
+the same heading twice.
+
+Three things to keep off that page:
+
+- **Do not claim a track record.** Typical behaviour is a set of numbers Aumos measures
+  from actual runs. A README that quotes a return is quoting a backtest.
+- **Do not draw the package's file tree.** [The shape](#the-shape) is this document's job,
+  and a tree copied into a README is the thing that went stale last time.
+- **Do not write it for the person maintaining it.** Port audits, state ownership tables,
+  operation names and fixture inventories belong in a second document beside the README —
+  `evidence-gated` keeps its in `ARCHITECTURE.md`, and `basic-investor` keeps its authoring
+  walkthrough in `WALKTHROUGH.md`. Both are linked from the `## Notes` section, and both
+  are guarded: any `X.md` with an `X.ko.md` beside it is held to the same structure.
+
 ### Everything is text
 
 Every file in your directory is UTF-8 text. No binaries, no symlinks. The published

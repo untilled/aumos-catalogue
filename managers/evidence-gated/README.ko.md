@@ -1,189 +1,220 @@
 # Evidence-Gated Allocator
 
-`evidence-gated`는 한 방법론을 **세 개의 시장 플로우**로 굴린다 — KR sleeve, US sleeve, 그리고
-둘의 예산을 정하고 cross-market `REBALANCE`를 내는 배분자.
+<sub><a href="README.md">English</a></sub>
 
-주식·ETF·현금을 다루는 long-only Aumos manager다. `morethanmin/trading-harness`의 개인 데이터나 주문 스택이 아니라 방법론과 검증
-루프만 포팅한다. 포트폴리오를 바꾸기 전에 다음을 묻는다.
+> 기계 신호 하나만으로는 아무것도 사지 않는다. 적어둔 논거, 그 논거에 반하는 논거, 그리고 이
+> *종류*의 판단이 실제로 통했다는 기록이 있어야 크게 잡는다.
 
-1. 반증 가능한 thesis, 반대 evidence, benchmark 대안보다 나은 논리가 있는가?
-2. 이 판단 lens가 독립 forward evidence를 충분히 쌓아 그 크기를 정당화하는가?
+## 한 문단 요약
 
-`PORTFOLIO_REVIEW`, `ASSET_REVIEW`, `THESIS_REVIEW`, `EVENT_REVIEW`를 지원하며 실행마다
-정확히 하나의 AMP/1 `DecisionProposal`을 낸다. 주문 수량·유형·지정가·승인·체결은 Toss
-broker connector와 Aumos Kernel/Planner의 책임이고 이 패키지에는 주문 코드가 없다.
+화면에서 기회처럼 보이는 것의 대부분은 그냥 화면이다. 이 매니저는 스캐너 점수를 무언가를
+**조사할** 이유로 다루지, 살 이유로는 절대 다루지 않는다. 새 포지션을 제안하기 전에 이것들을
+요구한다: 틀렸음이 증명될 수 있는 주장, *왜* 싼지에 대한 설명, 그냥 지수를 사는 것보다 낫다는
+논증, 그리고 그 논거를 무너뜨리려고 시도한 적대적 검토. 그리고 확신이 아니라 실적으로 크기를
+정한다: 이 *종류*의 판단이 독립적인 포워드 증거를 충분히 쌓기 전까지 제안할 수 있는 최대치는
+작은 통제된 실험이다. 한국과 미국을 한 매니저에서 다루고, 실행당 정확히 하나의 제안을 낸다.
 
-## 세 플로우
+이것은 `morethanmin/trading-harness`의 방법론과 검증 루프를 옮긴 **이식본**이다 — 그 하네스의
+개인 데이터나 주문 스택이 아니라. 증권사 연동, 수량, 주문 유형, 지정가, 승인, 체결은 전부 Aumos에
+남는다. **이 패키지에는 주문 코드가 없다.**
 
-역할은 **이 매니저 하나의 서브에이전트**이고, 오케스트레이터가 순서대로 부른다.
+## 방법론
 
-| 플로우 | 책임 |
+포트폴리오의 무엇이든 바뀌기 전에, 이 순서로 던지는 두 질문:
+
+1. **반증 가능한 논지와, 반대 증거와, 그냥 벤치마크를 사는 것보다 나은 논거가 있는가?**
+2. **이 종류의 판단이 그 크기를 받을 만큼 독립적인 포워드 증거를 쌓았는가?**
+
+*이 페이지가 쓰는 용어를 쉬운 말로:*
+
+| | |
 |---|---|
-| `kr-sleeve` | XKRX 조사와 기록된 예산 안의 KR sleeve BUY/SELL/RESIZE |
-| `us-sleeve` | XNAS/XNYS 조사와 정책상 SGOV 유동성을 포함한 US sleeve |
-| `allocate` | KRW/USD sleeve 목표, FX, 장부 전체 현금·concentration, cross-market REBALANCE |
+| **논지(thesis)** | 미래에 대해 적어둔 주장과, 그것이 틀렸음을 증명할 조건 |
+| **렌즈(lens)** | 후보를 읽는 셋업의 종류 — 싼 것이 되튀는 경우, 강한 것이 눌리는 경우 등. 렌즈마다 자기 트랙레코드를 따로 갖는다 |
+| **낙하하는 칼** | 아직 떨어지는 중인 것. 권고가 아니라 코드에서 차단된다 |
+| **basing** | 신저가를 더는 만들지 않고 평평해진 가격 — 하락이 끝났다는 증거 |
+| **벤치마크 대안** | 정직한 비교: 이 모든 수고 없이 지수만 샀어도 비슷했는가? |
+| **maturity(성숙도)** | 렌즈가 쌓은 닫힌 포워드 증거의 양. 낮은 maturity는 크기를 제한하지, 확신을 제한하지 않는다 |
+| **슬리브(sleeve)** | 장부에서 한 시장이 차지하는 조각. 이 매니저는 한국 슬리브와 미국 슬리브를 굴린다 |
+| **페이퍼 콜** | 돈을 걸지 않은 채 기록되고 채점되는 리서치 콜 |
 
-각 규칙은 `skills/<flow>/SKILL.md`에 있고 `agents/<flow>.md`는 그 스킬을 지목하는 얇은 파일이다.
-병렬이 아니라 순차인 이유: `allocate`가 두 sleeve를 서로에 대고 값매기는데, 아직 판단 중인
-sleeve에 대고는 그럴 수 없다.
+**스캐너 점수는 발견이지 엣지가 아니다.** 패키지는 자기 발견 점수를 코드에서
+`research-priority-only`로 라벨링한다. 나중에 읽는 사람이 기계 신호를 매수 신호로 읽을 수 없도록.
 
-⛔ **`decision_submit`은 오케스트레이터만, 한 번만 부른다.** 한 런은 판단 하나를 봉인하고 두 번째
-제출은 거절되므로, 플로우가 제출하면 나머지 둘이 보지도 않은 판단을 봉인하면서 오케스트레이터의
-제출까지 함께 무너뜨린다. 프롬프트와 스킬 넷이 그렇게 적고, `hooks/guard-submit.mjs`가 강제한다 —
-payload가 서브에이전트를 이름 대면 그 호출을 거절하는 `PreToolUse` 훅이다.
+**렌즈 넷을 따로 판단한다.** 평균회귀, 추세 눌림, quality pullback, basing은 서로 다른 질문이고
+서로 다른 기록을 갖는다. quality pullback은 200일 이동평균 위에서 고점 대비 15~35% 조정된
+구간으로, 다른 둘이 그 사이에 떨어뜨리는 밴드다 — 좋은 종목이 싸질수록 오히려 커버리지에서
+사라지는 자리.
+
+**진입 품질은 서술이 아니라 코드가 거절한다.** 낙하하는 칼은 차단된다. 홀로 선 평균회귀 후보는
+확인된 basing이나 눌림 상태를 요구받는다. 산문으로 적힌 요구사항은 지친 독자가 면제해주는
+요구사항이다.
+
+**리스크는 비중 네 축 — 종목·섹터·테마·팩터 — 그리고 모든 손절이 동시에 발동했을 때의 총손실에
+상한이 걸린다.** 마지막 것은 어떤 비중 축도 재지 않는다. 총 리스크 노출 상한과, 신규 단일종목이
+너무 빠르게 늘 때의 경고도 있다.
+
+**충족되지 않은 조건은 기계가 평가할 수 있는 WATCH 항목이 된다** — 가격, 날짜 또는 공시 트리거와
+만료를 달고. 사라지는 산문이 아니라.
+
+**크기는 확신이 아니라 증거를 따른다.** 닫힌 성과가 각 렌즈의 maturity와 보정을 인스턴스의 사설
+메모리에서 갱신한다. 낮은 maturity는 모든 리서치 게이트가 충족됐을 때 작은 통제된 실험을
+허용한다. 자신 있는 크기를 허가하는 일은 절대 없다. 그리고 보정이 스스로 방법론을 승격하거나 다시
+쓸 수는 없다 — 그건 검토된 패키지나 config 변경의 몫이다.
+
+### 세 플로우, 한 매니저
+
+역할들은 **이 한 매니저의 서브에이전트**이고, 순서대로 호출된다.
+
+| 플로우 | 무엇을 소유하는가 |
+|---|---|
+| `kr-sleeve` | 한국 리서치와, 기록된 예산 안에서의 한국 슬리브 BUY/SELL/RESIZE |
+| `us-sleeve` | 미국 리서치와 미국 슬리브. 정책상 지정된 유동성 포함 |
+| `allocate` | 원/달러 슬리브 목표, FX, 장부 전체의 현금과 집중도, 그리고 시장 간 `REBALANCE` |
+
+병렬이 아니라 순차다: `allocate`는 두 슬리브를 서로에 대고 값매기는데, 아직 판단 중인 슬리브를
+상대로는 그럴 수 없다.
+
+⛔ **오케스트레이터만, 정확히 한 번 제출한다.** 한 실행은 판단 하나를 봉인하고 두 번째 제출은
+거절되므로, 플로우가 제출하면 나머지 둘이 보지도 않은 판단을 봉인하면서 오케스트레이터 자신의
+제출까지 함께 무너뜨린다. 프롬프트와 스킬 넷이 그렇게 적고, 페이로드가 서브에이전트를 이름 대면
+호출을 거절하는 훅이 강제한다.
 
 ⚠️ **2026-08-27까지 이것은 패키지 셋이었다**(`evidence-gated-kr`·`-us`·`-global`). 나눠 둔 값이
-얻는 것보다 컸다: 셋은 `lib/`·`bin/`·`fixtures/`·`skills/`를 **바이트로 똑같이** 싣고 프롬프트 네
-줄과 매니페스트만 달랐다 — 한 방법론의 사본 셋이 갈라질 자유를 갖고 있었고, 투자자는 그것을 세 번
-찾아 세 번 설치해야 했다. 진짜로 잃은 것은 sleeve별 채점과 sleeve별 승인이다: 트랙 레코드의
-행도 승인 게이트도 이제 매니저 하나이고 바스켓 하나다. 논거는 `untilled/aumos#489`.
+얻는 것보다 컸다: 셋은 바이트로 똑같은 코드와 스킬을 싣고 프롬프트 네 줄과 매니페스트만 달랐다 —
+한 방법론의 사본 셋이 갈라질 자유를 갖고 있었고, 투자자는 그것을 세 번 찾아 세 번 설치해야 했다.
+진짜로 잃은 것은 슬리브별 채점과 슬리브별 승인이다: 트랙레코드의 행도 승인 게이트도 이제 한
+매니저이고 한 바구니다.
 
-## 상태의 정본
+## 실행 흐름
 
-| 내용 | 정본 |
+한 번의 실행에 하나의 제안. 아래 어느 것도 주문을 내지 않는다.
+
+```mermaid
+flowchart TB
+    classDef reads fill:#1e2a44,stroke:#6f9bf0,color:#cfe0ff
+    classDef judges fill:#2f2f38,stroke:#9aa0b4,color:#e8eaf2
+    classDef proposes fill:#1b4332,stroke:#40916c,color:#d8f3dc
+    classDef person fill:#5c4813,stroke:#f6a609,color:#ffe8b0
+
+    WAKE["포트폴리오 · 자산 · 논지 · 사건 검토로<br/>Aumos가 깨운다"]:::reads
+
+    subgraph IN["1 · 범위와 상태"]
+        direction TB
+        BOOK["장부, 현금, 체결"]:::reads
+        SRC["벤더 데이터 — 한국·미국 가격,<br/>공시, 뉴스, 기업행위"]:::reads
+        MEM["이 인스턴스가 배운 것:<br/>렌즈 maturity, 보정, 반복 실패"]:::reads
+        PRE["거래를 계획하기 전 사전 점검"]:::judges
+    end
+
+    subgraph FLOWS["2 · 세 플로우, 순서대로"]
+        direction TB
+        KR["kr-sleeve<br/>한국 리서치와 슬리브"]:::judges
+        US["us-sleeve<br/>미국 리서치와 슬리브"]:::judges
+        AL["allocate<br/>두 슬리브를 서로에 대고 값매긴다"]:::judges
+    end
+
+    HOLD["2b · 이미 보유한 것을 감시<br/>가격과 펀더멘털을 병행,<br/>매도 방향 전용"]:::judges
+
+    LENS["3 · 렌즈를 지목<br/>평균회귀 · 추세 눌림 ·<br/>quality pullback · basing"]:::judges
+
+    GATE{"진입 게이트 — 코드가 거절한다<br/>낙하하는 칼 · basing 확인 ·<br/>why-cheap · variant view ·<br/>벤치마크 대안 · 챌린지"}:::judges
+
+    SIZE["4 · 크기와 일정<br/>비중 네 상한, 총손절 상한,<br/>그리고 그 렌즈 자신의 maturity"]:::judges
+
+    WATCH["WATCH / plan<br/>충족되지 않은 조건을 가격 ·<br/>날짜 · 공시 트리거와 함께"]:::proposes
+    ACT["BUY / SELL / RESIZE / REBALANCE<br/>오케스트레이터만 내는 하나의 제안"]:::proposes
+
+    LEARN["5 · 지속 상태를 아껴서 갱신<br/>6 · 다음 검토를 다시 건다"]:::proposes
+
+    subgraph HUMAN["사람이 결정하는 자리"]
+        direction TB
+        MAND["Aumos가 당신의 Mandate에 비추어 판정"]:::person
+        YOU["당신이 승인하거나, 하지 않는다"]:::person
+        ORD["그때에야 주문이 존재한다"]:::person
+    end
+
+    WAKE --> IN --> PRE --> KR --> US --> AL
+    AL --> HOLD --> LENS --> GATE
+    GATE -- "게이트 미충족" --> WATCH
+    GATE -- "모든 게이트 통과" --> SIZE --> ACT
+    WATCH --> LEARN
+    ACT --> LEARN
+    LEARN --> MAND --> YOU --> ORD
+```
+
+**범례** — 🟦 읽는 것 · ⬜ 스스로 계산하는 것 · 🟩 돌려주는 것 · 🟧 사람이 결정하는 자리.
+
+**주기.** 달력이 아니라 검토나 사건으로 깨어난다. 다시 데려오는 것은 스스로 걸어둔 WATCH —
+가격, 날짜 또는 공시를 트리거로 — 그리고 앞을 내다보기 위해 유지하는 리서치 일정이다.
+
+**산술은 모델의 것이 아니다.** 스캐닝, 사이징, 커버리지, 증거 채택, 보정, 귀속, 시점 고정 파싱,
+스케줄 계산은 전부 산문이 아니라 패키지 자신의 결정론 코어를 통해 돈다. 그 코어에는 파일시스템
+원장도, 자격증명도, 네트워크도, DB도, 주문 접근도 없다.
+
+## 필요한 것
+
+| | |
 |---|---|
-| 실시간 포지션·현금·체결 | Portfolio / Toss broker connector |
-| 자산별 주장과 무효화 | Thesis |
-| 포트폴리오 공통 결론 | Brief |
-| vendor 원시 조사 | Evidence |
-| 재검토 약속 | WATCH / plan |
-| lens 표본·보정·반복 실패 | instance-private manager memory |
-| 판단과 실제 성과 | Decision journal / Forward Track Record |
-| 영구 규칙 | 승인된 package version / config |
+| **시장** | 한국과 미국의 주식·ETF·현금. 롱온리 |
+| **데이터 소스** | 완전한 미국 단일종목 레인은 `toss`·`sec-edgar`·`alpaca`를 설치한다. 완전한 한국 단일종목 펀더멘털 레인은 이 패키지와 함께 이 카탈로그에 게시된 `open-dart`를 추가로 요구한다. `openbb-fmp`는 선택이고 장기 가격 이력을 보충할 때만 쓴다 |
+| **장부** | 실시간 포지션·현금·체결. 이 패키지가 아니라 Aumos와 증권사 커넥터가 계속 소유한다 |
+| **설정** | 방법론이 비교하는 문턱값들. 기본 5%인 가격 충돌 허용치를 포함한다. 어느 것도 당신의 Mandate를 느슨하게 만들 수 없다 |
+| **당신의 승인** | **제안할 뿐 거래하지 않는다.** 수량·주문 유형·지정가·승인·체결은 Aumos의 것이고, 모든 주문은 사람이 승인한다 |
 
-Private memory에는 활성 thesis, raw evidence 본문, Brief 내용, 실행 gate, 주문/체결, stale
-source 복사본, 자동 채택 규칙을 넣지 않는다. 같은 book의 다른 manager는 Brief를 읽을 수
-있지만 private memory는 읽지 못한다. 별도 instance/model도 서로의 memory를 공유하지 않는다.
-
-## Source와 설치 정책
-
-Toss broker connector와 `toss` market source는 다르다. connector는 계좌와 실행을, source는
-가격·캔들·호가·메타데이터 등을 맡는다. US 단일주 lane은 `toss`, `sec-edgar`, `alpaca`가
-필요하고 `openbb-fmp`는 장기 가격 이력이 필요할 때만 선택한다. KR 단일주 fundamental lane은
-이 패키지와 함께 이 catalogue에 게시된 `open-dart`가 필요하다. 설치되지 않은 기기에서는 KR ETF와
-기존 보유종목의 가격·비중 관리는 가능하지만 신규 KR 단일주 fundamental BUY/thesis 승격은 판단 불가
-`WAIT`다 — *아무도 갖지 못한 기능*이 아니라 *이 기기가 설치하지 않은 소스*다.
-
-모든 호출에는 invocation의 `asOf`를 그대로 전달하고 이후 row를 폐기한다. SEC는 `filed`,
-DART는 접수시각/접수번호, 뉴스·기업행사는 공개 시각, 가격은 bar 시각을 시장 가용 시점으로
-쓴다. 항상 현재를 반환하는 snapshot은 replay 정본이 아니다. adjusted/unadjusted series를
-섞지 않고 corporate action으로 불연속을 검산한다. 누락·stale·상충은 `uncertainty`에 적으며
-모델 지식으로 메우지 않는다.
+**소스가 없을 때의 비용을, 실행이 발견하기 전에 말한다.** 매니페스트가 `toss`·`sec-edgar`·
+`alpaca`·`open-dart`를 이름으로 대므로, 설치 화면이 이 기계에 무엇이 없는지 말할 수 있다.
 
 | 누락 | 계속 가능 | 차단 |
 |---|---|---|
-| `toss` | 기존 Evidence/Thesis 검토 | 신규 가격 신호·목표 계산 |
-| `sec-edgar` | KR/ETF lane | 신규 US fundamental BUY/승격 |
-| `alpaca` | SEC/Toss 검토 | 뉴스/기업행사 확인이 필수인 신규 판단 |
-| `open-dart` | KR ETF·가격/비중 관리 | 신규 KR 단일주 fundamental BUY/승격 |
-| CLI web | core/exit/비중 관리 | theme radar·variant view·컨센서스 차이·정책/매크로 판단 |
+| `toss` market source | 기존 증거·논지 검토 | 신규 가격 신호와 목표 계산 |
+| `sec-edgar` | 한국·ETF 레인 | 신규 미국 펀더멘털 BUY 또는 승격 |
+| `alpaca` news/actions | SEC·Toss 검토 | 뉴스·기업행위 확인이 필요한 신규 판단 |
+| `open-dart` | 한국 ETF와 가격/비중 관리 | 신규 한국 단일종목 펀더멘털 BUY 또는 승격 |
+| CLI web | 코어·청산·비중 관리 | theme radar, variant view, 컨센서스 차이, 정책·매크로 주장 |
 
-매니페스트의 `source:passthrough`가 `toss`·`sec-edgar`·`alpaca`·`open-dart`를 이름으로 댄다. 그래서 설치
-화면이 *이 기기에 무엇이 없는지*를 런이 발견하기 전에 말한다. `openbb-fmp`는 선택이라 적지 않았다.
-이름을 대는 것이 게이트웨이를 좁히지는 않는다 — 런은 여전히 이 기기의 모든 source를 본다.
+소스를 설치하지 않은 기계는 **소스를 설치하지 않은 기계**다 — 아무도 갖지 못한 기능이 아니라.
+레인이 막힌 곳에서 답은 어느 것 때문인지 말하는 판단 불가 WAIT다.
 
-OpenDART의 성질 셋은 매니저의 몫이다(Aumos는 읽지 않고 중계한다): `corpCode.xml`은 ZIP으로
-답하고(대신 `list.json`의 `corp_code`·`stock_code`를 읽는다), 오류가 200 응답의 `status`로 오며
-(한도 초과는 빈 결과가 아니다), XBRL 재무제표는 정기보고서를 따라오므로 잠정실적만 발표된 분기에는
-없다 — 잠정 수치로 메우지 않고 공백으로 기록한다.
+## 약한 지점
 
-CLI web은 IR·컨센서스·정책·매크로·테마의 보조 계층이다. 확인 URL, 접근 시각, 미검증 범위를
-남기며 replay 가능한 Evidence를 대신하지 않는다. 실패는 무음 폴백하지 않는다.
+- **빠른 것.** 모든 게이트는 새 포지션을 늦추려고 존재하고, 대부분의 실행은 거래가 아니라 WATCH로
+  끝난다. 그게 우유부단으로 읽힌다면 잘못 고른 패키지다.
+- **공매도와 레버리지.** 롱온리다.
+- **자신의 가장 새로운 계층들.** 선행 리서치와 매도 방향 계층은 이식됐지만 그 트랙레코드는 아니다:
+  *"팀의 콜이 지수와 기계 베이스라인을 **둘 다** 이기는가?"*에 답하는 비교는 닫힌 관측 창이 수개월
+  쌓여야 무언가를 말한다. 그때까지 리서치 계층의 엣지는 베이스라인의 엣지와 똑같이 가설이다.
+- **`open-dart` 없는 한국 펀더멘털.** 소스는 게시돼 있다. 그것이 없거나 API 키가 없는 기계는 그것을
+  판단할 수 없다.
+- **벤더가 틀린 모든 것.** 벤더는 자기 응답 모양을 그대로 중계한다. **날짜와 신선도를 검사하는 것은
+  Aumos가 아니라 이 매니저다.**
 
-웹에서 온 숫자는 쓰기 전에 종류와 시각을 갖는다. 컨센서스·회사 guidance·실제 발표는 세 개의
-서로 다른 관측으로 남고 각각 metric, 단위와 통화가 붙은 값, 대상 기간, `sourceUrl`,
-`publishedAt`, `capturedAt`을 든다. 날짜 없는 검색 snippet은 point-in-time 근거가 아니고,
-aggregator끼리 어긋나면 평균하지 않고 충돌로 기록한다. 매크로·정책 관측(VIX, put/call, 심리
-지표, breadth, 지수와 이동평균, 중앙은행·산업 정책)은 `observedAt`과 source tier가 있어야 하며,
-공식 발행처가 aggregator 재인용을 이긴다. **날짜 없는 관측은 현재값으로 쓰지 않고 거절한다** —
-replay가 정직할 수 있는 이유가 그 한 줄이다. 웹 가격은 Toss와 교차검증하고, `priceConflictTolerance`(기본 5%)를 넘으면
-Toss를 택한 뒤 차이를 provenance로 남긴다. macro score는 없다: regime 판단은 한 `asOf`의 Brief
-판단이지 이 패키지가 들 수 있는 숫자가 아니다.
+**설치하지 마라** — 잦은 거래를 원한다면, 단일 시장 매니저를 원한다면, 또는 화면에 뜬 결과대로
+움직여줄 무언가를 원한다면.
 
-## 학습과 검증
+## 덧붙임
 
-평균회귀 과매도 깊이는 확신도가 아니다. 안정화/basing이 별도로 필요하다. 추세 눌림은 얕은
-낙폭이 정의이므로 추세 온전성·사업 품질·촉매·active edge로 판정한다. **quality pullback**은
-MA200 위에서 고점 대비 15~35% 조정된 구간 — 추세 눌림(-20%에서 끊긴다)과 평균회귀(MA200 위
-종목이 갖기 어려운 과매도 신호 2개를 요구한다) 사이에서 **싸질수록 커버리지에서 사라지던**
-밴드다. 신규 단일주 BUY는 why-cheap, trap risk, variant view, benchmark alternative, 시나리오와
-thesis challenge를 모두 요구한다. 진입 품질은 서술이 아니라 코드가 거절한다 — 낙하칼은
-차단되고, 추세 눌림 없이 홀로 선 평균회귀 후보는 확인된 basing/추세눌림 상태를 요구한다.
-리스크 상한은 비중 네 축(종목·섹터·테마·팩터)과, 그 어느 축도 재지 않는 **전 손절 동시 발동 시
-총손실**에 걸린다. 조건 미충족은 기계 판정 가능한 WATCH/plan으로 남긴다.
+**세부는 어디 있는가.** [ARCHITECTURE.ko.md](ARCHITECTURE.ko.md)가 이 패키지의 엔지니어링
+절반이다 — 어떤 상태를 누가 소유하는지, 데이터·설치 계약, 메모리 계약, 스킬, 그리고 원본 Python
+하네스와의 parity 검사. `MIGRATION.md`는 레거시 실행파일 65개와 그 처리를 기록하고,
+`IMPLEMENTATION.md`는 빌드 체크리스트를, `CONFORMANCE.md`는 이 저장소에서 도는 검사와 설치된
+런타임이 필요한 릴리스 게이트를 분리한다.
 
-Memory 값은 고정 key, schema version, `updatedAsOf`, Decision/Evidence id, sample 수, 독립 date
-cluster 수, metric, 결측 필드, maturity 상태를 가진 JSON object다. 같은 key 쓰기는 과거 row를
-덮지 않고 새 revision을 만든다. replay는 자기 `asOf` 이후 revision을 읽지 않는다. empty 또는
-손상 memory는 diagnostics에 남기고 무시한다.
-
-다음 명령은 persistence, revision, replay, instance/model 격리, Brief/memory 경계, audit/Evidence
-관측, empty/corrupt memory, 미래 source row, stale/conflict/가격 기준 혼합 fixture를 검증한다.
-
-```sh
-node tools/verify-evidence-gated-allocator.mjs
-```
-
-이는 결정론적 contract model이다. 배포 전에는 설치된 Aumos와 Toss paper portfolio에서 2회
-연속 실행, 별도 instance 격리, broker-connected shadow run도 반복해야 한다.
-
-`IMPLEMENTATION.md`는 이슈 #50의 Phase 0–7 체크리스트를 추적하고 `CONFORMANCE.md`는 이
-저장소에서 재현 가능한 검증과 설치 runtime/사용자 연결이 필요한 release gate를 분리한다.
-release gate가 남아 있는 동안 package는 publish하지 않는다.
-
-Scanner, sizing, coverage, evidence admission, calibration, attribution, point-in-time parsing과
-scheduling 계산은 LLM 산문이나 대화형 Bash 승인이 아니라 package의
-`evidence-gated-metrics` MCP server가 수행한다. `bin/evidence-gated-metrics`는 같은 코어를
-operator/CI용 stdin JSON → stdout JSON으로 제공한다. 두 인터페이스 모두 filesystem ledger,
-credential, network, DB, order에 접근하지 않는다. `MIGRATION.md`에 legacy 실행 파일 65개/helper의 disposition을,
-`fixtures/legacy-golden`에 parity 사례를 기록한다.
-
-promotion gate의 cluster bootstrap/walk-forward/FDR, 실체결 비용 outcome과 MFE/MAE, 기계적
-trend/DCA/oversold backtest, specialist sleeve 제한, Global 단일 예산 분모, 일정 변경·late-fire·
-dedupe도 같은 실행 코드가 맡는다. 시장별 실패가 package 공통 happy path에 가려지지 않도록
-fixture는 `kr`, `us`, `global`로 나뉜다.
-
-## 원본 하네스와의 parity
-
-방법론은 옮긴 것이지 다시 쓴 것이 아니다. `tools/legacy-parity.mjs`가 원본 Python 코어와 이
-패키지의 결정론 코어를 **같은 synthetic 입력**으로 돌려 필드 단위로 비교한다 — 현재 21개 케이스,
-59개 필드. legacy 쪽 숫자는 한 번 측정해서 `fixtures/legacy-golden/parity.json`에 얼려 두므로,
-이 저장소에서는 Python도 비공개 체크아웃도 없이 비교가 돈다. 일부러 갈라진 자리는 `MIGRATION.md`가
-어느 필드가 어느 방향으로 왜 갈라졌는지 적고, fixture가 **그 차이를 단언한다** — 조용히 되돌아가면
-거기서 깨진다.
-
-## Migration과 provenance
-
-개인 authored instance만 한 번 bootstrap할 수 있다. 자산 논지는 Thesis, 공통 결론은 Brief,
-살아 있는 조건은 WATCH/plan, 원시 조사는 Evidence, 집계 calibration/failure만 private memory로
-옮기고 `migration/schema-version`으로 재실행을 막는다. 공개 패키지는 항상 empty memory에서
-시작한다.
-
-원본 commit과 저작권 고지는 `aumos.json`과 `NOTICE.md`에 있다. credential, 계좌/보유 데이터,
-`data/*.jsonl`, SQLite, cache, backup, `_workspace`, 개인 thesis, 주문 코드, 과거 성과는 포함하지
-않으며 원본 기록을 Aumos Forward Track Record로 주장하지 않는다.
-
-`open-dart`는 이제 이 catalogue에 게시돼 있다. 설치하지 않았거나 API key가 없는 기기는 KR
-단일주 fundamental을 판단할 수 없고, 그것이 남은 한계의 정확한 모양이다.
-
-⚠️ **`thesis:read`와 `evidence:read`는 선언돼 있고 현재 Aumos 빌드에서 아무것도 서빙하지
-않는다.** 매니페스트 어휘에는 있지만 `grant.ts`가 둘 다 빈 도구 목록으로 매핑하므로 런에
-`thesis_read`/`evidence_read` 도구가 생기지 않는다. 프롬프트가 *가능할 때* 읽는다고 적고
-매니페스트가 둘을 `optionalSkills`에 두는 이유가 그것이다. Aumos가 서빙하기 전까지 자산 논지는
-invocation payload와 Brief로 런에 닿으며, 이 패키지는 하지 못하는 조회를 하는 척하지 않는다.
-`RunProvenance.unservedTools`가 그 차이를 기록하는 자리다.
+**선언된 권한 둘은 현재 아무것도 서빙하지 않는다.** `thesis:read`와 `evidence:read`는 매니페스트
+어휘에 있고, 현재 Aumos 빌드는 각각을 빈 도구 목록으로 매핑하므로 실행에 그 도구가 생기지 않는다.
+프롬프트가 *가능할 때* 읽는다고 적고 매니페스트가 둘을 `optionalSkills`에 두는 이유가 정확히
+그것이다. Aumos가 서빙하기 전까지 자산 주장은 invocation 페이로드와 장부의 브리프로 실행에 닿고,
+패키지는 하지 못하는 조회를 하는 척하는 대신 그렇게 말한다.
 
 **페이퍼 트랙은 인스턴스 사설 메모리에 산다 — 담을 수 있는 곳이 그것뿐이기 때문이다.** 페이퍼
-콜은 주문도 체결도 없으므로 Decision이 아니고, 런타임은 `thesis:write`를 내지 않으며
-`thesis:read`는 도구를 하나도 주지 않는다. 그래서 `learning/paper-cohorts`가 누적 합과 열린
-관측 창 목록을 갖는다. 따라오는 결과 둘을 숨기지 않는다 — **같은 장부의 다른 매니저는 이 증거를
-볼 수 없고, 인스턴스가 바뀌면 트랙이 처음부터 시작된다.** 공유 기록이 옳은 집이지만, 런타임이
-서빙하는 것은 이것뿐이다.
+콜은 주문도 체결도 없으므로 Decision이 아니다. 결과 둘이 따라오고 어느 쪽도 숨기지 않는다: 같은
+장부의 다른 매니저는 이 증거를 볼 수 없고, 새 매니저 인스턴스는 트랙을 처음부터 다시 시작한다.
+공유 기록이 옳은 집이지만, 런타임이 서빙하는 것은 이것이다.
 
-선행 리서치(theme-radar)와 매도 감시(position-research) 계층은 이식됐지만 **그 트랙레코드는
-아직 없다.** `theme-radar`는 `thesis_call` 페이퍼를 내고 `sectorStrength`는 그것이 비교될 기계
-베이스라인 둘을 기록하지만, "팀의 콜이 지수와 봇을 **둘 다** 이기는가"는 닫힌 관측 창이 수개월
-쌓여야 답이 나온다. 그때까지 리서치 계층의 엣지는 봇의 엣지와 똑같이 가설이다.
+**출처.** 매니페스트에 기록된 커밋의 `morethanmin/trading-harness`에서 이식했다. 자격증명, 계좌나
+포지션 데이터, 캐시, 백업, 개인 thesis 텍스트, 주문 구현, 과거 성과는 넘어오지 않았다. **원본
+하네스의 과거 결과는 Aumos 포워드 트랙레코드가 아니고**, 이 패키지는 그것을 트랙레코드로 주장하지
+않는다. 저작자 표시는 `NOTICE.md`에 있다.
 
-vendor 응답 shape 변화, CLI web의 비정본성, 설치된 runtime/credential이 필요한 실계좌 paper
-검증은 현재 한계다. Private memory는 스스로 방법론을 바꾸거나 lens를 승격할 수 없다.
+Aumos는 이 패키지가 실적을 쌓기 전까지 어떤 수익률도 보여주지 않는다. 포워드 트랙레코드는
+연산이 아니라 달력 시간을 요구하고, 이 페이지의 어떤 것도 트랙레코드가 아니다.
