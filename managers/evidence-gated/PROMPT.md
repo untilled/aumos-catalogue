@@ -268,7 +268,15 @@ closes. **Pass the invocation's config to `nextReviewSequence`** — `schedule.k
 and `usCloseBufferMinutes` are the investor's, and a run that omits them silently substitutes the
 package's own defaults for a number the install screen said was theirs. Never add 24 hours or reuse a fixed UTC close across DST, holidays or early closes.
 
-**Arm each one with the `intent` `nextReviewSequence` returns**, verbatim. ⚠️ **The intent is
+**Arm each one with the `intent` and the `rule` `nextReviewSequence` returns**, verbatim.
+`rule` is `{ cron, timeZone }` and goes on the `at-time` trigger beside `at`. ⚠️ **It arms
+nothing.** `at` is still the entire schedule — Aumos wakes on it and on nothing else — and the
+rule is there so the investor's calendar can draw the weeks this manager has not judged yet
+instead of one appointment and then empty months. Cron cannot say *trading day*, so the rule is
+drawn as a faint forecast that marks Chuseok and marks a half-day at the wrong hour, while the
+armed instant beside it is exact. Never bend `at` to agree with the rule, and never drop `at`
+because the rule looks like it already said so. A flow whose buffer would push its review past
+local midnight gets `rule: null` — pass it through as null rather than inventing one. ⚠️ **The intent is
 the only channel there is.** A watch carries `subject`, `intent`, `trigger` and `expiresAt` and
 no id you may choose, and the event a fired plan raises carries no plan id either — what it
 carries is a `summary` composed as `<what fired> — watching for: <your intent>`. So the intent

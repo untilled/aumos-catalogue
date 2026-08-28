@@ -133,7 +133,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 |---|---|
 | `zonedDateTimeToUtc` | a local date/time in an IANA zone → one instant |
 | `nextMarketReview` | the next real open session close plus buffer |
-| `nextReviewSequence` | the three flows' reviews in order, owned by one manager, each with the `intent` it must be armed with |
+| `nextReviewSequence` | the three flows' reviews in order, owned by one manager, each with the `intent` it must be armed with and the `{ cron, timeZone }` `rule` that goes beside `at` on the trigger. The rule draws the calendar forward and wakes nothing; `at` is still the whole schedule, and a review whose buffer crosses local midnight returns `rule: null` |
 | `resolveWakeFlow` | which flow a fired plan's event summary was armed for — `null` for a wake this manager did not arm |
 | `earningsCheckpoint` | BMO/AMC/date-only → an at-time checkpoint |
 | `boundedRetry` | the bounded retry after a wake found nothing published |
