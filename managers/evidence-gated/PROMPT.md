@@ -95,6 +95,25 @@ decision/evidence ids, sample count, independent date-cluster count, computable 
 fields and one status from `insufficient`, `observing`, `reviewable`, `promoted`. Ignore and diagnose
 invalid values.
 
+### 1b. Pre-flight, before planning any trade
+
+Seven things are checked before a candidate is considered, and the order is the point: each one is
+something a run would otherwise discover *after* proposing.
+
+| # | check | what stops the run |
+|---|---|---|
+| 1 | `lessonAudit` | nothing — but proposing a change already waiting for the investor is repeating yourself |
+| 2 | `harnessAudit` | **a blocker stops planning.** Orphaned WATCHes, positions no decision accounts for, size disagreements, order-ready decisions with no registered exit |
+| 3 | `calibration` | low maturity does not stop the run; it frames what it may claim, and caps size at `experimentalPositionCeiling` |
+| 4 | `exitCheck` over every non-core holding | nothing — but **its SELL and TRIM candidates are reported before any new buy is considered.** Selling what is broken comes before buying what is interesting, and a run that plans purchases first will find reasons not to revisit that order |
+| 5 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
+| 6 | broker limits | Aumos owns them; read what the invocation carries and do not assume |
+| 7 | `signalPaper` → `verdictReport` | nothing — but a met threshold is stated in this run, and a `NO_GO` freezes new non-core experiments |
+
+⛔ **A `harnessAudit` blocker stops planning, never reporting.** Say what is broken, name it in
+`uncertainty`, and propose `WAIT`. The failure this prevents is a well-formed proposal built on a
+book that does not add up — which is worse than no proposal, because it looks like one.
+
 ### 2. Select the lane and collect evidence
 
 Load `skills/data-source-contract/SKILL.md`. Confirm installed endpoints before relying on them.
