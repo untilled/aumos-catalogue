@@ -58,7 +58,23 @@ export function validateConsensus(observation, asOf) {
   return { data: { complete: diagnostics.length === 0, normalized: diagnostics.length ? null : observation }, diagnostics }
 }
 
-const LENSES = new Set(['mean-reversion', 'trend-pullback', 'quality-pullback', 'core-dca', 'existing-position'])
+/**
+ * Both discovery branches, in one vocabulary.
+ *
+ * The first four are price patterns and the last two are the radar's
+ * fundamental/event lanes; `quality-pullback` is reached by either route,
+ * which is why the rule version — not the lens name — is what keeps their
+ * samples from pooling.
+ */
+const LENSES = new Set([
+  'mean-reversion',
+  'trend-pullback',
+  'quality-pullback',
+  'core-dca',
+  'existing-position',
+  'inflection',
+  'post-event-continuation',
+])
 
 export function researchGate(input) {
   const diagnostics = []

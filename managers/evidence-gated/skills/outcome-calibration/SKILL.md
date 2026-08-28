@@ -15,6 +15,27 @@ same-horizon return, active return, thesis/process compliance and outcome availa
 Incomplete rows remain referenced under `missingFields` but do not increase complete sample count.
 Group dates into independent clusters using the five-day transitive rule in `evidence-gates`.
 
+## The regime a sample was gathered in
+
+Every sample carries the regime it was decided under, from one closed vocabulary: `risk-on`,
+`risk-off`, `mixed` — exactly what `sectorStrength` reads mechanically, so a Brief call and a sector
+reading can be compared instead of merely coexisting.
+
+The judgement stays with Brief. A regime call is a mixed quantitative and qualitative reading at one
+`asOf` and this package holds no macro score to make it with; `regimeTag` canonicalizes the call,
+attaches the Brief revision that made it, and **says so when Brief calls a regime the sector reading
+does not see.** The call stands — a person reading a policy statement can be right where a moving
+average is wrong — but the disagreement travels with the sample.
+
+⛔ **A regime is recorded at decision time and is not re-tagged.** Changing it later reshapes a
+sample after the fact, exactly as re-tagging a rule version would, and the promotion requirement it
+feeds would then be measuring a story rather than a history.
+
+Why it is a closed vocabulary rather than free text: the promotion gate requires three distinct
+regimes so that a sample gathered entirely in one market state cannot pass. Counting distinct
+strings made three spellings of one state satisfy it (`risk-on`, `risk_on`, `Risk On`) — the exact bias the requirement exists to
+reveal, hidden by the thing meant to reveal it.
+
 ## Metrics
 
 When fields permit, compute by lens and version:
@@ -26,16 +47,63 @@ When fields permit, compute by lens and version:
 - process compliance: thesis, challenge, stop/review and concentration rules;
 - outcome coverage and missingness.
 
-Do not mix lenses, rule versions, horizons or adjusted/unadjusted price bases merely to reach a
-threshold. Report `relative-only` where active return is positive but gross return is negative.
+Do not mix lenses, rule versions, horizons, **benchmarks**, **regimes** or adjusted/unadjusted price
+bases merely to reach a threshold. The benchmark belongs on that list and was missing from it: this methodology is
+benchmark-relative end to end, so two active returns measured against different denominators are not
+two samples of anything. `config.benchmarks` fixes the denominator per kind of holding — Korean
+equity, US equity, cash-like — so it does not get re-decided each run. Report `relative-only` where active return is positive but gross return is negative.
 
-## Failure taxonomy
+## Failure taxonomy — two axes, and they are not interchangeable
 
-Use stable categories: `thesis_failure`, `entry_quality_failure`, `trap_missed`,
-`variant_view_failure`, `benchmark_failure`, `risk_rule_failure`, `timing_failure`,
-`source_freshness_failure`, `coverage_failure`, `execution_observation_only`, and
-`good_process_bad_outcome`. Execution belongs to Kernel/broker; record it as observation, not a
-methodology failure unless the Decision itself caused the mismatch.
+This section named eleven categories and `outcomeClassification` produced eight, and only four were
+the same word. A run following this list and a run reading that output disagreed about what had
+happened. They are two different questions, so they are now two lists.
+
+### Computed — `outcomeClassification.failureType`
+
+One bucket per closed decision, mutually exclusive, decided from the compliance flags and the
+returns. You do not choose it; you read it.
+
+| value | grade | when |
+|---|---|---|
+| `risk_rule_failure` | Bad | a risk rule was not followed — checked first, because a rule that was broken makes the rest of the reading moot |
+| `execution_failure` | Bad / Mixed | the fill differed from the plan **and the Decision caused it** — see below |
+| `thesis_failure` | Bad / Mixed | the thesis was broken |
+| `benchmark_failure` | Mixed | positive gross return, negative active return: right about the asset, wrong about owning it instead of the benchmark |
+| `good_process_good_outcome` | Good | every gate followed and the result agreed |
+| `good_process_bad_outcome` | Mixed | every gate followed and the result did not — the outcome the methodology is built to keep counting as acceptable |
+| `bad_process_good_outcome` | Mixed | the gates were not followed and it worked anyway. **This is the dangerous one**: it is the row that teaches the wrong lesson if it is read as a success |
+| `bad_process_bad_outcome` | Bad | neither |
+
+### Judged — `judgedFailures`
+
+Reasons that no compliance flag computes, assigned after reading the decision. Zero or more per
+decision, passed in and validated against the vocabulary; an unrecognised tag is refused rather than
+becoming a new category with a sample size of one.
+
+`entry_quality_failure` · `trap_missed` · `variant_view_failure` · `timing_failure` ·
+`source_freshness_failure` · `coverage_failure`
+
+A judged reason explains a computed bucket; it never replaces one. `bad_process_good_outcome` with
+`trap_missed` is a coherent row and the pair is the lesson.
+
+### Execution, which is the one that was contradictory
+
+Execution belongs to the Kernel and the broker. This manager cannot place an order, so it is not at
+fault for how one filled: a poor fill is recorded as `execution_observation_only` and leaves the
+process reading intact — **unless the Decision itself caused the mismatch**, which is what
+`executionAttributableToDecision` says. A limit price the Decision set where it could not be reached
+is the methodology's failure; slippage the broker took is not. Absent the flag, the fill is not
+charged to the methodology, and the observation is still returned and still diagnosed rather than
+disappearing with the grade.
+
+## The hurdle the whole book has to clear
+
+Per-candidate gates ask whether *this* trade is worth doing. `benchmarkHurdleAnnualPct` asks the
+other question: annualized, has any of it been worth running rather than held passively? Report the
+book against it alongside `baselineTrack`, and report it when the answer is no — a methodology that
+only measures its own decisions against each other can be internally consistent and still behind the
+index for years.
 
 Update `learning/evidence-maturity`, `learning/closed-decision-summary`, the applicable
 `calibration/*` key and `failures/repeated-patterns` only when an outcome changes an aggregate. Store

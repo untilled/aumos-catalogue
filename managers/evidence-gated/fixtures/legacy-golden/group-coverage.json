@@ -1,24 +1,24 @@
 {
   "spec": "EvidenceGatedMigrationCoverage/1",
   "groups": {
-    "attribution": ["attribution-additive-identity", "twr-with-start-of-day-flow", "annualized-money-weighted-return"],
-    "audit": ["memory-contract", "migration-matrix-structure", "package-boundary-scan", "skill-code-unit-vocabulary", "portfolio-heat", "new-single-pacing"],
+    "attribution": ["attribution-additive-identity", "twr-with-start-of-day-flow", "annualized-money-weighted-return", "shadow-sizing-bottleneck", "passive-baseline"],
+    "audit": ["memory-contract", "migration-matrix-structure", "package-boundary-scan", "skill-code-unit-vocabulary", "portfolio-heat", "new-single-pacing", "paper-sample-status-stated", "two-discovery-branches-stated", "structural-advantage-stated", "harness-audit-blockers", "preflight-order-stated", "rule-version-registry", "data-file-inventory", "skill-code-enum-agreement", "configured-x-exists"],
     "backtest": ["trend-gate-forward", "dca-multiplier", "oversold-strata"],
     "calibration": ["categorical-brier", "independent-date-clusters", "calibration-maturity"],
     "coverage": ["universe-union", "uncovered-zero"],
     "earnings": ["exact-bmo-amc-date-only", "actual-anchor"],
-    "exit": ["forward-outcome", "mfe-mae", "failure-taxonomy"],
-    "learning": ["upside-radar", "memory-revision", "no-auto-method-change"],
-    "outcome": ["fill-net-return", "missing-cost-explicit"],
+    "exit": ["exit-check-sell-trim-review", "exit-price-and-fundamental-lanes", "exit-candidate-never-order", "forward-outcome", "mfe-mae", "time-stop-policy"],
+    "learning": ["upside-radar", "memory-revision", "no-auto-method-change", "paper-admission", "signal-paper-cohorts", "lesson-audit", "paper-track-persists"],
+    "outcome": ["fill-net-return", "missing-cost-explicit", "failure-taxonomy", "computed-vs-judged-axes", "execution-observation-only", "skill-code-taxonomy-agreement"],
     "owner-cutover": ["single-manager-three-flows", "flow-lane-ownership", "no-order-code", "canonical-owner-map"],
-    "policy": ["config-schema-lint", "no-auto-relax", "price-conflict-tolerance-configurable"],
+    "policy": ["config-schema-lint", "no-auto-relax", "price-conflict-tolerance-configurable", "declared-thresholds", "benchmark-fixed", "policy-lint-provenance"],
     "portfolio": ["krw-usd-sgov-nav", "fx-missing"],
-    "promotion": ["cluster-bootstrap", "walk-forward", "bh-fdr"],
-    "research": ["thesis-metadata", "research-gate", "challenge-block", "resize-lens"],
-    "scanner": ["buy-radar", "opportunity-five-axis", "trend", "sector-strength", "upside-radar", "quality-pullback-lens", "entry-quality-gate", "eq-v2-window-artifact", "mean-reversion-unconfirmed"],
-    "schedule": ["dst-holiday-early-close", "late-missing-duplicate-outage", "theme-radar"],
-    "sizing": ["legacy-sizing", "specialist-budget", "global-denominator", "factor-concentration"],
+    "promotion": ["cluster-bootstrap", "walk-forward", "bh-fdr", "prereg-verdict", "threshold-reached-proposal", "expansion-prohibition", "regime-vocabulary-closed"],
+    "research": ["thesis-metadata", "research-gate", "challenge-block", "resize-lens", "thesis-field-contract"],
+    "scanner": ["buy-radar", "opportunity-five-axis", "trend", "upside-radar", "quality-pullback-lens", "entry-quality-gate", "eq-v2-window-artifact", "mean-reversion-unconfirmed", "sector-rank-and-regime", "research-queue", "bot-baseline-never-traded", "radar-lanes", "radar-lane-starvation", "lens-envelope-reachability", "lens-envelope-is-the-scanner-source", "regime-tag-provenance"],
+    "schedule": ["dst-holiday-early-close", "late-missing-duplicate-outage", "theme-radar-due", "theme-radar-workflow-wired"],
+    "sizing": ["legacy-sizing", "specialist-budget", "global-denominator", "factor-concentration", "control-arm-limits"],
     "source-parsers": ["sec-dart-asof", "adjustment-conflict"],
-    "watch": ["future-at-time", "already-met", "producerless-event-rejected", "bounded-retry", "expiry-forced-review", "expiry-before-trigger", "drift-already-met", "no-new-low-dual-lens"]
+    "watch": ["future-at-time", "already-met", "producerless-event-rejected", "bounded-retry", "expiry-forced-review", "expiry-before-trigger", "drift-already-met", "no-new-low-dual-lens", "cluster-block"]
   }
 }

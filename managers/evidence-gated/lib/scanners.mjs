@@ -1,5 +1,6 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
 import { indicatorPacket } from './indicators.mjs'
+import { LENS_ENVELOPES } from './envelopes.mjs'
 
 function volumeCapitulation(bars) {
   if (bars.length < 6) return null
@@ -19,20 +20,28 @@ export function scanSymbol({ symbol, market, bars, held = false, pending = false
     return { candidate: null, diagnostics }
   }
   const capitulation = volumeCapitulation(bars)
+  /**
+   * Every threshold below comes from `LENS_ENVELOPES`, which is also what
+   * judges whether a revisit trigger is reachable. One source: a constant
+   * edited here without the declaration moving is not drift, it is a syntax
+   * error waiting to happen.
+   */
+  const meanReversion = LENS_ENVELOPES['mean-reversion'].signals
   const meanSignals = {
-    rsiOversold: packet.rsi14 < 30,
-    nearLow: packet.aboveLow200 !== null && packet.aboveLow200 <= 0.05,
-    ma200Discount: packet.ma200Distance !== null && packet.ma200Distance <= -0.1,
-    ma60Discount: packet.ma60Distance !== null && packet.ma60Distance <= -0.07,
+    rsiOversold: packet.rsi14 < meanReversion.rsiOversold.value,
+    nearLow: packet.aboveLow200 !== null && packet.aboveLow200 <= meanReversion.nearLow.value,
+    ma200Discount: packet.ma200Distance !== null && packet.ma200Distance <= meanReversion.ma200Discount.value,
+    ma60Discount: packet.ma60Distance !== null && packet.ma60Distance <= meanReversion.ma60Discount.value,
     volumeCapitulation: capitulation,
   }
   const knownMean = Object.values(meanSignals).filter((value) => value !== null)
   const meanCount = knownMean.filter(Boolean).length
+  const trendPullback = LENS_ENVELOPES['trend-pullback'].checks
   const trendSignals = {
     uptrend: packet.ma200 !== null && packet.close > packet.ma200 && packet.ma50 > packet.ma200,
-    pullback: packet.offHigh200 >= -0.2 && packet.offHigh200 <= -0.05,
-    healthyRsi: packet.rsi14 >= 35 && packet.rsi14 <= 55,
-    notExtended: packet.ma200 !== null && packet.close <= packet.ma200 * 1.4,
+    pullback: packet.offHigh200 >= trendPullback.pullback.min && packet.offHigh200 <= trendPullback.pullback.max,
+    healthyRsi: packet.rsi14 >= trendPullback.healthyRsi.min && packet.rsi14 <= trendPullback.healthyRsi.max,
+    notExtended: packet.ma200 !== null && packet.close <= packet.ma200 * (1 + trendPullback.notExtended.value),
   }
   /**
    * Lens C, the 5pp band the other two lenses drop between.
@@ -53,10 +62,11 @@ export function scanSymbol({ symbol, market, bars, held = false, pending = false
    * one calibration sample. Its samples accrue under its own memory key, so no
    * existing row is retagged.
    */
+  const qualityPullback = LENS_ENVELOPES['quality-pullback'].checks
   const qualityPullbackSignals = {
     aboveMa200: packet.ma200 !== null && packet.close > packet.ma200,
-    deepPullback: packet.offHigh200 !== null && packet.offHigh200 >= -0.35 && packet.offHigh200 <= -0.15,
-    rsiBand: packet.rsi14 >= 30 && packet.rsi14 <= 50,
+    deepPullback: packet.offHigh200 !== null && packet.offHigh200 >= qualityPullback.deepPullback.min && packet.offHigh200 <= qualityPullback.deepPullback.max,
+    rsiBand: packet.rsi14 >= qualityPullback.rsiBand.min && packet.rsi14 <= qualityPullback.rsiBand.max,
   }
   const lenses = []
   if (meanCount >= 2) lenses.push('mean-reversion')
@@ -226,6 +236,59 @@ export function entryQualityGate({ bars = [], lenses = [], noNewLow = {} }) {
   }
 }
 
+/**
+ * A Brief's regime call, canonicalized and given provenance.
+ *
+ * Brief owns the judgement and this does not overrule it — a person reading a
+ * central-bank statement can be right where a moving average is wrong. What it
+ * does is make the call sayable in one vocabulary, attach the revision that
+ * asserted it, and **state the disagreement** when Brief calls a regime the
+ * mechanical reading does not see.
+ *
+ * ⛔ And it refuses a retag. A regime recorded at decision time is what that
+ * decision was made under; changing it later reshapes a sample after the fact,
+ * exactly as re-tagging a rule version would.
+ */
+export function regimeTag({ asserted, mechanical = null, briefRevisionId = null, assertedAt = null, recorded = null, asOf } = {}) {
+  const diagnostics = []
+  const canonical = normalizeRegime(asserted)
+  if (canonical !== asserted && canonical !== null) {
+    diagnostics.push(diagnostic('regime_spelling_normalized', 'info', 'The regime vocabulary is kebab-case, as every other vocabulary here is; a variant spelling is normalized rather than counted as a different regime', 'asserted', { asserted, canonical }))
+  }
+  if (!REGIMES.has(canonical)) {
+    diagnostics.push(diagnostic('regime_outside_vocabulary', 'blocked', 'A regime tag must come from the published vocabulary; free text makes one market state look like several', 'asserted', { asserted: asserted ?? null, supported: [...REGIMES] }))
+    return { data: { regime: null, valid: false }, diagnostics }
+  }
+  if (!briefRevisionId) {
+    diagnostics.push(diagnostic('regime_unattributed', 'blocked', 'A regime call is a Brief judgement, so it carries the revision that made it', 'briefRevisionId'))
+  }
+  /**
+   * A disagreement is information, not an error. The mechanical reading is one
+   * input to the call and the call may still be right against it — but a run
+   * that silently overrides it leaves no trace of having done so.
+   */
+  const mechanicalCharacter = mechanical?.leadershipCharacter ?? null
+  const agrees = mechanicalCharacter === null ? null : mechanicalCharacter === canonical
+  if (agrees === false) {
+    diagnostics.push(diagnostic('regime_disagrees_with_reading', 'info', 'Brief calls a regime the sector reading does not see; the call stands and the disagreement is recorded with it', 'asserted', { asserted: canonical, mechanical: mechanicalCharacter, benchmarkAboveMa200: mechanical?.benchmarkAboveMa200 ?? null }))
+  }
+  if (recorded && recorded !== canonical) {
+    diagnostics.push(diagnostic('regime_retagged', 'blocked', 'This sample already carries a regime from the decision that made it; changing it now reshapes the sample after the fact', 'recorded', { recorded, asserted: canonical }))
+  }
+  return {
+    data: {
+      regime: canonical,
+      valid: !diagnostics.some((row) => row.severity === 'blocked'),
+      briefRevisionId,
+      assertedAt: assertedAt ?? asOf ?? null,
+      agreesWithReading: agrees,
+      mechanicalReading: mechanicalCharacter,
+      judgementOwner: 'brief',
+    },
+    diagnostics,
+  }
+}
+
 export function relativeStrength(assetBars, benchmarkBars, periods = [20, 60, 120]) {
   const output = {}
   for (const period of periods) {
@@ -387,4 +450,197 @@ export function blendedSectorStrength(assetBars, benchmarkBars, weights = [[60, 
     if (finite(excess)) { score += excess * allocation; weight += allocation }
   }
   return { data: { scorePct: weight ? round(score / weight * 100, 3) : null, detail, weights: Object.fromEntries(weights.map(([period, value]) => [`d${period}`, value])) }, diagnostics: [] }
+}
+
+/**
+ * The regime vocabulary, closed. (issue #81)
+ *
+ * ⛔ This is not the package deciding the regime. `data-source-contract` is
+ * explicit that there is no aggregate macro score and that a regime call is a
+ * Brief judgement at one `asOf`; `validateMacro` returns `score: null` to say
+ * so in data rather than prose. That stands.
+ *
+ * What this fixes is narrower and was a real defect: `promotionGate` counted
+ * distinct **strings**, so the same market state written `risk_on`, `risk-on`
+ * and `Risk On` satisfied the three-regime requirement and opened
+ * `reviewReady` on a sample gathered entirely in one regime — which is the one
+ * thing that gate exists to prevent.
+ *
+ * The judgement stays with Brief. The vocabulary it must speak in is here, and
+ * it is exactly what `sectorStrength` reads mechanically, so the two can be
+ * compared.
+ */
+export const REGIMES = new Set(['risk-on', 'risk-off', 'mixed'])
+
+/**
+ * The same three states under other names, normalized rather than refused.
+ *
+ * `risk_on` is the port's own spelling, carried over from the source tree;
+ * `neutral` is what `fixtures/legacy-golden/promotion.json` called the third
+ * state. Kebab-case is canonical here because every other vocabulary in this
+ * package settled there — units, lenses, trigger kinds. A recorded tag in an
+ * older spelling stays readable and says which name is canonical.
+ */
+const REGIME_ALIASES = { risk_on: 'risk-on', risk_off: 'risk-off', neutral: 'mixed' }
+
+export function normalizeRegime(value) {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim().toLowerCase()
+  const collapsed = trimmed.replace(/\s+/g, '-')
+  return REGIME_ALIASES[trimmed] ?? REGIME_ALIASES[collapsed] ?? collapsed.replace(/_/g, '-')
+}
+
+const TOP_RESEARCH_RANK = 3
+const RANK_JUMP_FOR_RESEARCH = 3
+const AT_HIGH_TOLERANCE = 0.995
+
+/**
+ * L1 — where the team should look, which is not what the team should buy.
+ *
+ * `blendedSectorStrength` above scores one sector against one benchmark. That
+ * number alone was all this package carried, and a score with nothing to rank
+ * it against decides nothing. The Trading Harness `bin/sector-strength` ranked
+ * the lane, tracked each sector's move since the previous run, read the regime
+ * off the benchmark and the character of the leaders, and emitted a
+ * `research_queue`. The queue is the input to the research layer; without it a
+ * schedule that says "wake up and research" has nowhere to send anyone.
+ *
+ * ⛔ Nothing here is a buy signal, and the output says so in `meaning` rather
+ * than only in prose. The design this is ported from is explicit that mechanical
+ * RS confirmed the 2026 semiconductor leadership only after the move had already
+ * happened; its job is to aim attention cheaply, not to take positions.
+ *
+ * The bot baseline is the second half of that demotion. `rs_leader_pullback` and
+ * `rs_breakout` are logged as paper signals so the question "do the team's picks
+ * beat a dumb momentum bot, and not merely the index?" has an answer. They are
+ * never traded, and `tradeable: false` travels with every row.
+ */
+export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks = {}, lane = null, weights } = {}) {
+  const diagnostics = []
+  if (benchmarkBars.length === 0) {
+    diagnostics.push(diagnostic('sector_benchmark_missing', 'unevaluated', 'Without the lane benchmark no relative strength is measurable; the lane is unread rather than neutral', 'benchmarkBars'))
+    return { data: { lane, regime: null, sectors: [], researchQueue: [], baselineSignals: [], meaning: 'research-priority-only' }, diagnostics }
+  }
+  const scored = []
+  const unread = []
+  for (const sector of sectors) {
+    const bars = sector?.bars ?? []
+    if (bars.length === 0) {
+      unread.push({ name: sector?.name ?? null, etf: sector?.etf ?? null, status: 'unverified' })
+      diagnostics.push(diagnostic('sector_series_unverified', 'unevaluated', 'A sector whose series could not be read is named as unread, never dropped silently', 'sectors', { name: sector?.name ?? null }))
+      continue
+    }
+    const { data: rs } = blendedSectorStrength(bars, benchmarkBars, weights)
+    if (rs.scorePct === null) {
+      unread.push({ name: sector?.name ?? null, etf: sector?.etf ?? null, status: 'insufficient-history' })
+      continue
+    }
+    const closes = bars.map((row) => row.close).filter(finite)
+    const ma200 = closes.length >= 200 ? closes.slice(-200).reduce((sum, value) => sum + value, 0) / 200 : null
+    const high = Math.max(...closes)
+    scored.push({
+      name: sector.name,
+      etf: sector.etf ?? null,
+      risk: sector.risk ?? null,
+      rsScorePct: rs.scorePct,
+      rsDetail: rs.detail,
+      atHigh: closes.at(-1) >= high * AT_HIGH_TOLERANCE,
+      aboveMa200: ma200 !== null ? closes.at(-1) > ma200 : null,
+      leaders: sector.leaders ?? [],
+    })
+  }
+  scored.sort((a, b) => b.rsScorePct - a.rsScorePct)
+  for (const [index, row] of scored.entries()) {
+    row.rank = index + 1
+    const previous = previousRanks[row.name]
+    row.rankChange = Number.isInteger(previous) ? previous - row.rank : null
+  }
+
+  const benchmarkCloses = benchmarkBars.map((row) => row.close).filter(finite)
+  const benchmarkMa200 = benchmarkCloses.length >= 200 ? benchmarkCloses.slice(-200).reduce((sum, value) => sum + value, 0) / 200 : null
+  if (benchmarkMa200 === null) diagnostics.push(diagnostic('regime_trend_unevaluated', 'unevaluated', 'The benchmark trend needs 200 bars; the regime is read without it rather than assumed', 'benchmarkBars'))
+  /**
+   * Two independent readings, kept apart. The trend is the benchmark against
+   * its own MA200; the character is who is leading. A single fused number would
+   * be the aggregate macro score this package refuses to hold.
+   */
+  const topThree = scored.slice(0, 3)
+  const votes = topThree.map((row) => row.risk).filter((risk) => risk === 'on' || risk === 'off')
+  const onVotes = votes.filter((risk) => risk === 'on').length
+  const offVotes = votes.filter((risk) => risk === 'off').length
+  const character = onVotes >= 2 ? 'risk-on' : offVotes >= 2 ? 'risk-off' : 'mixed'
+  const regime = {
+    benchmarkAboveMa200: benchmarkMa200 === null ? null : benchmarkCloses.at(-1) > benchmarkMa200,
+    leadershipCharacter: character,
+    leaders: topThree.map((row) => row.name),
+    isJudgementInput: true,
+  }
+
+  /**
+   * Rank alone is noise in a narrow market — third place in a lane where
+   * everything trails the benchmark is not leadership, so a top rank has to
+   * come with actual outperformance before it earns anyone's attention.
+   */
+  const researchQueue = []
+  for (const row of scored) {
+    const reasons = []
+    if (row.rank <= TOP_RESEARCH_RANK && row.rsScorePct > 0) reasons.push({ code: 'rs-rank', rank: row.rank })
+    if ((row.rankChange ?? 0) >= RANK_JUMP_FOR_RESEARCH) reasons.push({ code: 'rank-jump', rankChange: row.rankChange })
+    if (row.atHigh) reasons.push({ code: 'at-200d-high' })
+    if (reasons.length) {
+      researchQueue.push({
+        lane,
+        sector: row.name,
+        etf: row.etf,
+        rsScorePct: row.rsScorePct,
+        reasons,
+        question: 'Why is it leading, what would make the lead persist, and which second-order beneficiary is not priced yet?',
+      })
+    }
+  }
+
+  const baselineSignals = []
+  for (const row of topThree) {
+    for (const leader of row.leaders) {
+      const closes = (leader?.bars ?? []).map((entry) => entry.close).filter(finite)
+      if (closes.length < 200) {
+        diagnostics.push(diagnostic('baseline_leader_unverified', 'unevaluated', 'A leader without 200 bars cannot produce a baseline signal', 'sectors', { symbol: leader?.symbol ?? null }))
+        continue
+      }
+      const excess60 = returnOver(leader.bars, 60) - returnOver(benchmarkBars, 60)
+      if (!finite(excess60) || excess60 <= 0) continue
+      const setup = baselineSetup(closes)
+      if (setup) baselineSignals.push({ lane, sector: row.name, symbol: leader.symbol, setup, close: closes.at(-1), excess60Pct: round(excess60 * 100, 2), tradeable: false })
+    }
+  }
+
+  return {
+    data: {
+      lane,
+      regime,
+      sectors: [...scored, ...unread],
+      researchQueue,
+      baselineSignals,
+      meaning: 'research-priority-only',
+      baselineMeaning: 'measurement-only-never-traded',
+    },
+    diagnostics,
+  }
+}
+
+/**
+ * The dumb momentum bot the team is measured against: a leader at its 200-bar
+ * high, or one pulling back shallowly inside an intact uptrend.
+ */
+function baselineSetup(closes) {
+  const mean = (n) => closes.slice(-n).reduce((sum, value) => sum + value, 0) / n
+  if (closes.length < 200) return null
+  const close = closes.at(-1)
+  const ma20 = mean(20)
+  const ma50 = mean(50)
+  const ma200 = mean(200)
+  if (close >= Math.max(...closes) * AT_HIGH_TOLERANCE) return 'rs_breakout'
+  const offHigh60 = close / Math.max(...closes.slice(-60)) - 1
+  if (close > ma200 && ma50 > ma200 && close <= ma20 && close >= ma50 * 0.98 && offHigh60 >= -0.15 && offHigh60 <= -0.03) return 'rs_leader_pullback'
+  return null
 }

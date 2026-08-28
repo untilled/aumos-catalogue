@@ -1,6 +1,6 @@
 import { result, diagnostic } from './diagnostics.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
-import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate } from './scanners.mjs'
+import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
 import { sleeveNav, targetWeight, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing } from './sizing.mjs'
 import { coverageState, validateWatch } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
@@ -8,8 +8,11 @@ import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochb
 import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
-import { validateThesis, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap } from './methodology.mjs'
+import { validateThesis, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap, exitCheck } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
+import { harnessAudit, lessonAudit } from './audit.mjs'
+import { lensEnvelope, clusterBlock, timeStopPolicy, ruleVersions, policyLint } from './envelopes.mjs'
+import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport, controlArmLane } from './learning.mjs'
 import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence } from './schedule.mjs'
 
 const operations = {
@@ -27,6 +30,8 @@ const operations = {
   opportunityUniverse,
   trendState,
   blendedSectorStrength: (input) => blendedSectorStrength(input?.assetBars ?? [], input?.benchmarkBars ?? [], input?.weights),
+  sectorStrength,
+  regimeTag: (input, asOf) => regimeTag({ ...input, asOf }),
   sleeveNav,
   targetWeight,
   legacySizeSuggestion,
@@ -59,8 +64,22 @@ const operations = {
   trendGateForward,
   dcaMultiplierBacktest,
   oversoldStrata,
+  signalPaper: (input, asOf) => signalPaper({ ...input, asOf }),
+  paperAdmission: (input, asOf) => paperAdmission({ ...input, asOf }),
+  shadowTrack,
+  baselineTrack,
+  controlArmLane,
+  lensEnvelope,
+  clusterBlock: (input, asOf) => clusterBlock({ ...input, asOf }),
+  timeStopPolicy: (input, asOf) => timeStopPolicy({ ...input, asOf }),
+  ruleVersions,
+  policyLint,
+  harnessAudit: (input, asOf) => harnessAudit({ ...input, asOf }),
+  lessonAudit: (input, asOf) => lessonAudit({ ...input, asOf }),
+  verdictReport: (input, asOf) => verdictReport({ ...input, asOf }),
   validateThesis,
   thesisSentinel,
+  exitCheck: (input, asOf) => exitCheck({ ...input, asOf }),
   upsideRadar: (input, asOf) => upsideRadar({ ...input, asOf }),
   validateMemory: (input, asOf) => validateMemory({ ...input, asOf }),
   visibleMemoryRevision: (input, asOf) => visibleMemoryRevision({ ...input, asOf }),

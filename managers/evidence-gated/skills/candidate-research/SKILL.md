@@ -8,6 +8,52 @@ description: Research a candidate under its discovery lens, including why-cheap,
 Complete this before promoting a new single-name candidate. A scanner ranks what to investigate; it
 does not rank what to buy.
 
+## What a thesis has to carry
+
+`validateThesis` enforces this; the fields are named here so the contract is readable before it is
+refused. Six are required outright — a thesis missing one is not a thesis:
+
+`thesisId` · `asset` · `createdAt` · `coreClaim` · `horizonEnd` · `evidenceStatus`
+
+Six more decide whether it is **complete**. Each is a way of being wrong on the record:
+
+| gap field | what its absence hides |
+|---|---|
+| `variantView` | that the claim is the consensus, in which case the price already has it |
+| `consensusRefs` | what you are differing *from* — each ref dated, sourced, and captured after it was published |
+| `catalysts` | when the claim gets tested, as a window rather than a hope |
+| `invalidationTriggers` | what would make you drop it, decided before you are attached to it, each with a `checkBy` |
+| `expectedUpsidePct` | the number you can be wrong about |
+| `fairValueRange` | the low and the high, so the upside has something under it |
+
+⛔ Declaring `evidenceStatus: 'complete'` with any gap open is refused as `thesis_false_complete`.
+`incomplete` with gaps is fine and normal — the gaps are returned and stay visible. The refusal is
+for claiming to have finished the work while the record shows otherwise, which is the one state that
+would let an unfinished thesis be counted as a finished one.
+
+## Trigger vocabulary — one spelling, two sets
+
+Kebab-case everywhere, as in the `unit` and `lens` vocabularies. Underscore forms are accepted and
+normalized so no recorded thesis becomes unreadable, and using one says so.
+
+| | accepted kinds |
+|---|---|
+| thesis invalidation (`validateThesis`) | `price-below` · `price-above` · `metric` · `at-time` |
+| WATCH (`validateWatch`) | `at-time` · `price-below` · `price-above` · `weight-drift` |
+
+`at-time` is shared. It used to be spelled `time` on the thesis side and `at-time` on the WATCH
+side, which made one condition look like two; `time` is still accepted and normalized.
+
+The remaining difference is deliberate:
+
+- **`metric` is a thesis invalidation and not a WATCH.** A WATCH has to be evaluable by the wake
+  engine from published data; a thesis metric may need a filing that a person reads.
+- **`weight-drift` is a WATCH and not a thesis invalidation.** Drifting past a weight says something
+  about the portfolio, not about the claim.
+
+An event kind exists in neither: a producer-less `event: earnings` is refused in both places, because
+nothing publishes the fact that it happened at the moment it happens.
+
 ## Lens-specific reading
 
 ### Mean reversion
@@ -41,8 +87,23 @@ lens rather than pointing to the level where it stops qualifying.
 
 ### Core DCA
 
-Broad ETFs are cash-allocation decisions. Record allocation purpose, reserve cash after each
-tranche, date/price conditions and stop conditions. Do not fabricate a single-name variant view.
+Broad ETFs are cash-allocation decisions. Do not fabricate a single-name variant view — there is no
+variant view to have about owning the index, and inventing one is how a cash decision gets recorded
+as a stock pick.
+
+Five conditions, all of them numbers rather than intentions:
+
+| | |
+|---|---|
+| cash threshold | the first tranche executes only when cash and short bonds are at least `coreDca.minimumCashWeightForFirstTranche` of the book. Deploying from a thin cash position turns the reserve into the tranche |
+| tranche plan | T1/T2/T3 each with its size and its date-or-price condition. "We will add on weakness" is not a tranche |
+| reserve floor | the arithmetic showing `coreDca.reserveFloorWeight` still stands **after** the tranche, not before it |
+| stop conditions | four, named: a market break, a better opportunity, the cash floor breached, a hedge gate firing |
+| classification | recorded as cash deployment. **It does not count as a ready single-name BUY** — pooling the two makes the single-name sample look larger than it is |
+
+`monthlyTrancheMaxWeight` paces the deployment and `catchUpMonthlyMaxWeight` is the ceiling while
+catching up on a schedule that fell behind. Catching up accelerates placement; it never raises the
+target.
 
 ## Candidate record
 

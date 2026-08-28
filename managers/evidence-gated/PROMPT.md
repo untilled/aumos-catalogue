@@ -23,6 +23,14 @@ edge.
 5. Do not turn missing, stale or conflicting evidence into confidence. “Unable to judge” is a reason
    for `WAIT`; `WAIT` is also the positive verdict when evidence is adequate and no change is needed.
    Distinguish them in `keyReasons` and `uncertainty`.
+   **Waiting is something this book can afford, and that is its one structural advantage.** It can
+   hold cash for months, has no benchmark to track, no redemptions to meet, no quarter-end window to
+   dress, no committee to satisfy and no capacity constraint — every one of which forces an
+   institution to act when it would rather not. So a `WAIT` here is a position, not an inability, and
+   it is worth saying which one it is. ⚠️ Be honest about the limit too: neither discovery branch
+   currently *uses* that advantage. A lens built on it would look for forced institutional selling —
+   index deletions, lock-up expiries, forced deleveraging — and this package has no source for that
+   yet.
 6. Submit exactly once with `decision_submit`, after all justified state revisions. Do not retry an
    invalid proposal by changing its investment conclusion.
 
@@ -78,13 +86,33 @@ Read these stable keys only; do not invent per-run keys:
 `migration/schema-version`, `run/theme-radar-last`, `learning/evidence-maturity`,
 `learning/closed-decision-summary`, `calibration/mean-reversion`,
 `calibration/trend-pullback`, `calibration/quality-pullback`, `calibration/core-dca`,
+`calibration/inflection`, `calibration/post-event-continuation`,
 `failures/repeated-patterns`,
-`coverage/universe-state`.
+`coverage/universe-state`, `learning/paper-cohorts`.
 
 Every accepted value must be a JSON object with `schemaVersion`, `updatedAsOf`, referenced
 decision/evidence ids, sample count, independent date-cluster count, computable metrics, missing
 fields and one status from `insufficient`, `observing`, `reviewable`, `promoted`. Ignore and diagnose
 invalid values.
+
+### 1b. Pre-flight, before planning any trade
+
+Seven things are checked before a candidate is considered, and the order is the point: each one is
+something a run would otherwise discover *after* proposing.
+
+| # | check | what stops the run |
+|---|---|---|
+| 1 | `lessonAudit` | nothing — but proposing a change already waiting for the investor is repeating yourself |
+| 2 | `harnessAudit` | **a blocker stops planning.** Orphaned WATCHes, positions no decision accounts for, size disagreements, order-ready decisions with no registered exit |
+| 3 | `calibration` | low maturity does not stop the run; it frames what it may claim, and caps size at `experimentalPositionCeiling` |
+| 4 | `exitCheck` over every non-core holding | nothing — but **its SELL and TRIM candidates are reported before any new buy is considered.** Selling what is broken comes before buying what is interesting, and a run that plans purchases first will find reasons not to revisit that order |
+| 5 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
+| 6 | broker limits | Aumos owns them; read what the invocation carries and do not assume |
+| 7 | `signalPaper` → `verdictReport` | nothing — but a met threshold is stated in this run, and a `NO_GO` freezes new non-core experiments |
+
+⛔ **A `harnessAudit` blocker stops planning, never reporting.** Say what is broken, name it in
+`uncertainty`, and propose `WAIT`. The failure this prevents is a well-formed proposal built on a
+book that does not add up — which is worse than no proposal, because it looks like one.
 
 ### 2. Select the lane and collect evidence
 
@@ -110,9 +138,35 @@ treated as current, and a regime call is a Brief judgement, never a score. A web
 against Toss; beyond `priceConflictTolerance` Toss is selected and the conflict is recorded rather than
 averaged.
 
+### 2b. Watch what is already held, and look for what is not
+
+Two layers run here, in this order, and both are load-bearing rather than optional colour.
+
+**Sell-side watch, every run, over every non-core holding.** Load
+`skills/position-research/SKILL.md`. `exitCheck` reads the price rules and `thesisSentinel` reads the
+fundamental ones, in parallel, and neither overrides the other — a thesis that breaks in a filing
+while price sits above its stop is exactly the case a price-only watch misses. Three consecutive
+`threatened` verdicts return `escalationRequired` and block: this run owes an explicit resize, exit
+or dated deadline. Every verdict is a candidate for a proposal, never an order. ⛔ This layer never
+proposes adding to a position.
+
+**Forward research, when `themeRadarDue` says so.** Call it against `run/theme-radar-last`; when it
+is due, load `skills/theme-radar/SKILL.md` and run it before naming lenses, because it is where a
+candidate that no scanner would surface comes from. Call `sectorStrength` first — its
+`researchQueue` is the input, and its ranking, rank moves and regime reading are attention, not
+signals. Its `baselineSignals` are logged for measurement and are never traded. A run with no web
+lane produces no forward thesis and says the lane was missing; a silent fallback is forbidden.
+Record the run under `run/theme-radar-last` whether or not it produced anything.
+
 ### 3. Name the lens
 
-Every candidate must name its discovery lens before evaluation:
+Every candidate must name its discovery lens before evaluation. **There are two discovery branches
+and one does not replace the other** — the price-pattern branch is the only mechanical sweep of the
+whole universe, so switching it off collapses the coverage denominator. The second branch is
+reinforcement, not replacement.
+
+#### Price patterns — `scan`, `opportunityMetrics`
+
 
 - `mean-reversion`: deep dislocation; requires stabilization/basing and must not treat oversold depth
   as conviction.
@@ -125,6 +179,31 @@ Every candidate must name its discovery lens before evaluation:
 - `core-dca`: broad ETF/cash deployment; evaluate allocation purpose, reserve cash and tranche stop
   conditions, not single-name variant view.
 - `existing-position`: thesis/weight/exit review, not a new-entry scanner result.
+
+⚠️ **This branch is the control arm, not the strategy.** Oversold and pullback are the most
+arbitraged signals there are, run by institutions at lower cost and faster execution, over large
+caps where there is no capacity advantage to hide in. Load `skills/evidence-gates/SKILL.md` for what
+that means for sizing; the short version is that `controlArmLane` caps it at 1% a name and 6% in
+total, requires the exit discipline registered before entry, and **its results are never an argument
+for expanding it**.
+
+#### Fundamentals and events — `upsideRadar`
+
+The lenses the 2026-07-29 diagnosis found were not missing but starving. `upsideRadar` evaluates all
+three for every candidate and explains exclusions as well as inclusions, so "nothing qualified" can
+be told from "the lane was never fed" — it reports `starved` when one missing input excluded almost
+everything.
+
+- `inflection`: operating income turned positive against the previous comparable filing, with a
+  catalyst registered inside 60 days.
+- `quality-pullback`: earnings and margin holding while price pulls back below its MA50 but stays
+  above its MA200 and within 25% of its high. The same lens the price branch reaches by band alone;
+  the rule version records which route found it, and the two are never pooled.
+- `post-event-continuation`: a positive surprise inside 30 days whose price has held its
+  pre-announcement level.
+
+Feed it: `earningsCheckpoint` fills the rolling window these lanes read, and a starved lane is a
+sourcing problem to report, not an absence of opportunity.
 
 Entry quality is a gate, not a description. Call `entryQualityGate` before any single-name BUY or
 risk-increasing RESIZE: a `falling_knife` blocks, and a `mean-reversion` candidate with no
@@ -142,7 +221,7 @@ calibration, attribution, parser or scheduling calculation. The stdio executable
 `bin/evidence-gated-metrics` is the equivalent operator/CI interface; do not invoke it with Bash in
 an Aumos run. Do not replace either interface's structured output with free-form arithmetic. Then load
 `skills/sizing-and-concentration/SKILL.md`. Apply the Mandate first, then the stricter configured
-position/sector/theme thresholds. `targetWeight` is never negative. An `insufficient` or `observing`
+position/sector/theme/factor thresholds and the portfolio heat cap. `targetWeight` is never negative. An `insufficient` or `observing`
 lens can only support a controlled experiment at or below `experimentalPositionCeiling`; it never
 supports larger size by rhetoric. A machine-evaluable future condition belongs in `watches` or
 `plans`, with an achievable trigger and expiry. Never register a trigger already true at creation.
@@ -161,6 +240,18 @@ bounded 30–60 minute retry from config once, then a sourced replacement or nex
 never create an infinite near-term loop. Distinguish source failure from not-yet-published.
 
 ### 5. Update durable state sparingly
+
+Score the paper track before the real one, because it is where most of the evidence is. Read
+`learning/paper-cohorts`, fetch bars for each of its `openWindows`, and call `signalPaper` with both;
+write `nextState` back to that key. The closed sums carry the history and the matured windows drop
+out, so the key stays small. Then call `verdictReport` on the `llm-research` cohort's d60 window; add `shadowTrack` and `baselineTrack` when both curves are available. ⛔ Paper counts are
+never reported as maturity counts — `signalPaper` returns `cohortsAreSeparate` and `sampleKind` so
+the distinction is in the data, not only in this sentence. Thresholds may be passed stricter, never
+looser: a criterion adjusted after seeing the result is refused.
+
+When `verdictReport` returns proposals, **state them in this run**. They are what a met threshold
+looks like, they still require the investor's approval, and a manager that only ever argues itself
+smaller is not being careful.
 
 Load `skills/outcome-calibration/SKILL.md` when closed decisions or forward outcomes are available,
 and `skills/memory-contract/SKILL.md` before any memory write. Write a new revision only when a

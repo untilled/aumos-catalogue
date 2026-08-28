@@ -54,11 +54,11 @@ exceptions. “Aumos input/output” names the replacement owner and structured 
 | `gate-register` | PX | candidate,W,C → gate file | `_gates`, `_policy` | gate-v3 | proposed WATCH → validation JSON; reject already-met, unreported KPI and prose-only blocks; Aumos performs write | `watch` |
 | `gate-register-selftest` | PP | synthetic → none | none | gate-v3 | preserve trigger hygiene and policy assertions | `watch` |
 | `harness-app` | RT | all ledgers → HTML/server mutation | localhost server | UI-v1 | Aumos HOME/CALENDAR/portfolio UI; no renderer, server or config POST path | `owner-cutover` |
-| `harness-audit` | PX | P,T,W,D,O,C,X → X | `HARNESS_ROOT`, `_sectors` | audit-v3 | Aumos snapshots → semantic diagnostics; preserve orphan, mismatch, stale and unregistered-ready blockers, the portfolio heat cap (P4, blocks only when the run adds new non-core risk) and the new-single pacing warnings (P5, warn-only at every sample count); remove filesystem orchestration | `audit` |
+| `harness-audit` | PX | P,T,W,D,O,C,X → X | `HARNESS_ROOT`, `_sectors` | audit-v3 | Aumos snapshots → semantic diagnostics; preserve orphan, mismatch, stale and unregistered-ready blockers — a blocker stops planning, never reporting — the portfolio heat cap (P4, blocks only when the run adds new non-core risk) and the new-single pacing warnings (P5, warn-only at every sample count); remove filesystem orchestration | `audit` |
 | `harness-selftest` | PX | synthetic repo → none | subprocess/filesystem | audit-v3 | port only Aumos-relevant semantic assertions; retire legacy path/executable checks | `audit` |
 | `history-seed` | AR | imported H → H files | filesystem | history-v1 | source Evidence/history owner; no one-time local import in manager | `owner-cutover` |
 | `history-snapshot` | PX | vendor H → H files | Toss read | history-v2 | source bars → completeness, monotonicity and adjustment diagnostics; remove local append | `source-parsers` |
-| `lesson-audit` | PX | lessons,D,C → X | filesystem | learning-v1 | private memory + package/config revision → rule-proposal diagnostics; never auto-apply | `learning` |
+| `lesson-audit` | PX | lessons,D,C → X | filesystem | learning-v1 | private memory + package/config revision → pending/accepted/rejected counts and stale-pending diagnostics; an unrecognised status is refused rather than bucketed; never auto-apply | `learning` |
 | `lifecycle-selftest` | AR | synthetic O → none | none | issue-16 | Kernel order/fill conformance owns lifecycle invariants | `owner-cutover` |
 | `market-score-log` | AR | score → JSONL | filesystem | macro-v1 | Evidence/Brief/Decision owns dated regime judgement; no local log | `owner-cutover` |
 | `night-gate-check` | AR | W,E → notify | Toss read, notification | gate-v2 | Wake Engine price/at-time checks; preserve hard-block recheck via integration fixture | `owner-cutover` |
@@ -73,9 +73,9 @@ exceptions. “Aumos input/output” names the replacement owner and structured 
 | `performance-audit` | PP | D,T,H,C → X | filesystem | maturity-v2 | Decision/Track Record → evidence maturity/failure diagnostics; preserve complete closed-sample rule | `calibration` |
 | `performance-sync` | AR | P,D → Markdown mutation | Toss read | performance-v1 | Portfolio/Track Record view; retire Markdown synchronization | `owner-cutover` |
 | `pnl-selftest` | PP | synthetic fills/FX → none | none | issue-16 | preserve fee/tax/FX/net-return and missing-leg calculations | `outcome` |
-| `policy-lint` | PX | C → diagnostics | `_policy` | policy-v2 | config/Mandate snapshot → versioned semantic diagnostics; no policy-file ownership | `policy` |
+| `policy-lint` | PX | C → diagnostics | `_policy` | policy-v2 | config change + provenance → stricter/looser direction, immutability and approval diagnostics (`policyLint`). ⚠️ **The rule DSL is deliberately not ported**: `config.schema.json` bounds every value on both sides and refuses unknown keys, so a second condition language over the same values would be a second source of truth. What a schema cannot express — who approved a value, which may not move, and which change needs approval — is what came across | `policy` |
 | `policy-selftest` | PP | synthetic C → none | none | policy-v2 | preserve threshold origin, hard-block and no-auto-relax checks | `policy` |
-| `portfolio-html` | RT | P,T,D,W → HTML | filesystem/browser | UI-v1 | Aumos portfolio UI; retire renderer | `owner-cutover` |
+| `portfolio-html` | RT | P,T,D,W → HTML | filesystem/browser | UI-v1 | Aumos portfolio UI; retire renderer. ⚠️ The source tree's `docs/trading-harness-workflow.html` describes the file-contract pipeline this renderer served — `01_*.json` → `02_plan.json` → `03_execution.json` → `04_audit.md` — which this port replaced with one invocation producing one DecisionProposal, passing Evidence ids between steps. That document is **legacy and not shipped**; its file-contract table and operating checklist name paths that do not exist here | `owner-cutover` |
 | `portfolio-md` | RT | P,T,D,W → Markdown | Toss read/filesystem | UI-v1 | Aumos portfolio/Thesis/Decision views; retire renderer and snapshot write | `owner-cutover` |
 | `promotion-gate` | PP | paper D/H → X | filesystem | issue-12/prereg | Track Record → promotion diagnostics; preserve clusters, walk-forward, costs, bootstrap CI and BH-FDR | `promotion` |
 | `promotion-gate-selftest` | PP | synthetic → none | none | issue-12/prereg | preserve independence, OOS, CI, FDR and combined-gate assertions | `promotion` |
@@ -130,6 +130,59 @@ The executable accepts Aumos JSON snapshots on stdin and writes one JSON documen
 no credential, order, network, database, filesystem-ledger or personal-path access. Every result
 includes `ruleVersion`, `asOf`, units/currency/market where relevant, and explicit
 `missing`/`unevaluated` diagnostics rather than zero/false substitution.
+
+## The contract files the executables read (issue #70 §11)
+
+This matrix inventoried `bin/` and nothing else, and the thresholds a methodology is actually made
+of do not live in `bin/` — they live in `data/*.json`, which every one of those executables reads.
+Sixty-five programs were recorded with their disposition, rule version and golden fixture while the
+contract files they depend on were **out of scope: not ported, and not recorded as unported.** The
+absence had no entry, which is the failure mode this document exists to prevent.
+
+`AR` absorbed by Aumos · `PP` ported pure · `PX` ported with semantics changed · `RT` retired.
+
+| legacy data file | disposition | where it lives now |
+|---|---|---|
+| `lens_definitions.json` | PX | `lib/envelopes.mjs` `LENS_ENVELOPES` — one source the scanner reads, so the copy-and-check-drift idiom is unnecessary rather than unported |
+| `entry_gates.json` | PX | `clusterBlock` for the correlated-cluster hold; the rest is WATCH, which Aumos owns |
+| `exit_rules.json` | PX | `exitCheck` price rules + `timeStopPolicy` for the approved review-date promotion |
+| `sizing_policy.json` | PX | `config.schema.json` (`concentration`, `portfolioHeat`, `grandfather`, `experimentalPositionCeiling`), `entryQualityGate`, `newSinglePacing`, `controlArmLane` |
+| `allocation_policy.json` | PX | `config.coreDca` (cash threshold, reserve floor, tranche and catch-up ceilings); the targets themselves are the investor's Mandate |
+| `workspace_policy.json` | PX | `config.benchmarks`, `config.benchmarkHurdleAnnualPct`; `round_trip_cost_pct` is `promotionGate`'s cost model |
+| `prereg_policy.json` | PP | `verdictReport` pre-registered criteria — stricter-only at call time |
+| `rule_versions.json` | PP | `ruleVersions` registry, eleven axes |
+| `shadow_policy.json` · `real_sleeve_policy.json` | PP | `shadowTrack` thresholds and window |
+| `sector_map.json` · `sector_benchmarks.json` | RT | investor input to `sectorStrength`; a package-shipped sector map would be a claim about the investor's universe |
+| `symbol_sectors.json` | RT | rows carry their own `sector`; an override file is a second source of truth |
+| `screen_universe.json` · `universe_extensions.json` | AR | `coverageState({ scannerUniverses, extensions })` — Aumos owns the universe |
+| `triage_verdicts.json` · `analysis/triage.py` | RT | the axis-selection study behind `upsideRadar`; its conclusion is the lane definitions, and the study itself is history |
+| `radar_coverage_state.json` | PP | `upsideRadar.lanes` coverage and starvation, computed per run rather than stored |
+| `outcomes.jsonl` · `decisions.jsonl` · `exit_signal_log.jsonl` · `sentinel_log.jsonl` · `features.jsonl` | AR | Aumos owns the Decision journal, Track Record and Evidence; this package computes over them and keeps no ledger |
+| `signal_paper_log.jsonl` · `shadow_portfolio.jsonl` | PX | `learning/paper-cohorts` in private memory, as running sums plus an index of open measurement windows. ⚠️ **This was recorded as `AR` and that was wrong.** A paper call has no order and no fill, so it is not a Decision and the journal does not hold it; the runtime publishes no `thesis:write` and `thesis:read` grants no tool, so Thesis cannot either. Private memory is the only durable store served, and the cost — instance-scoped, invisible to any other manager on the book — is in `README.md` under Known limits |
+| `order_lifecycle.jsonl` · `order-limits.json` · `account_equity.jsonl` | AR | Aumos and the broker |
+| `history/` · `fundamentals/` · `mirror.sqlite` · `tradeos.sqlite` | AR | source data, fetched point-in-time through the source contract |
+| `schedule.json` · `watch_schedule.jsonl` · `night_gate_state.json` | AR | WATCH and the Wake Engine |
+| `config_changes.jsonl` · `notifications.jsonl` · `daily_check_log.jsonl` · `market_score_log.jsonl` · `parallel_run_log.jsonl` · `upside_radar_log.jsonl` · `proposed_sizing*.jsonl` | RT | run logs of a filesystem harness; a package that keeps no ledger has nothing to write them to |
+| `secrets/` · `*-credentials.json` | RT | never ported; the package declares `network.mode: deny` and holds no credential |
+
+## What the last column names, and what stands behind it
+
+The `golden fixture` column names a **coverage group**, not a file. Seven of the nineteen groups
+have a file of frozen numbers behind them in `fixtures/legacy-golden/`; the other twelve are
+verified by contract cases built inside `tools/verify-evidence-gated-allocator.mjs`. Reading the
+column as a filename made twelve groups look unported, and they are not — the two kinds of check
+answer different questions:
+
+| | what it holds | what it can be wrong about |
+|---|---|---|
+| frozen file — `core`, `scanner`, `promotion`, `outcomes`, `backtest`, `methodology`, `parity` | numbers measured once from the Python core, because that checkout is private | the port drifting away from a number the original produced |
+| in-file case | a contract this port has to keep, built from synthetic inputs | the port breaking a rule the methodology states |
+
+`fixtures/legacy-golden/group-coverage.json` registers which checks stand behind each group, and
+since #70 that registry has to be earned: `covers()` marks the assertions behind each case name,
+and the verifier fails when a registered name has no marker, a marker names an unregistered case,
+or a marker is followed by no assertion at all. Before that, `blendedSectorStrength` was registered
+under `scanner` while no test touched it, and nothing could have noticed.
 
 ## Golden parity against the Python core
 

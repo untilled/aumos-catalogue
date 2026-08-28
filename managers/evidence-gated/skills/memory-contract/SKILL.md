@@ -19,11 +19,37 @@ Use only:
 - `calibration/mean-reversion`
 - `calibration/trend-pullback`
 - `calibration/quality-pullback`
+- `calibration/inflection`
+- `calibration/post-event-continuation`
 - `calibration/core-dca`
 - `failures/repeated-patterns`
 - `coverage/universe-state`
+- `learning/paper-cohorts`
 
 Do not generate a key per run, asset or date.
+
+### The one key that carries rows, and why it is still not a ledger
+
+`learning/paper-cohorts` is the paper track's home, and it exists because nothing else could be one.
+A paper call has no order and no fill, so it is not a Decision and the Decision journal will not hold
+it; Aumos publishes no `thesis:write`, so Thesis cannot either. Without this key `signalPaper` scores
+whatever a run happens to hand it and the sample never accumulates — which is the second reason the
+promotion gate stayed shut.
+
+Its shape is what keeps it inside the rule above:
+
+- `closed` — running sums per cohort and horizon. A matured window folds into these and its row is
+  **dropped**, so the key does not grow with history.
+- `openWindows` — symbol, setup, rule version and the instant of registration. No prices, no prose,
+  no positions, no cash. It is an index of what is being measured; the observations stay in Evidence
+  and are re-read each run.
+
+That distinction is the whole of why this is not the hidden portfolio database the section above
+forbids. If a field would let you reconstruct the book from this key, it does not belong here.
+
+⚠️ **What it costs.** Private memory is namespaced by manager instance, so this track is invisible to
+any other manager on the same book and a new instance starts it over. That is a worse home than a
+shared record, and it is the only one the runtime serves.
 
 ## Read
 

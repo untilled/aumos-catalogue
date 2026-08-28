@@ -68,6 +68,69 @@
       "default": 10,
       "description": "Closed outcomes after which the new-single pacing warnings relax from unevaluated to advisory. Pacing never blocks at any count."
     },
+    "benchmarks": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "The named benchmark each kind of holding is measured against. This methodology is benchmark-relative end to end, so a denominator that changes between runs makes every active return incomparable — including the ones the promotion gate counts.",
+      "properties": {
+        "koreanEquity": { "type": "string", "pattern": "^[A-Z0-9.-]{1,20}$", "default": "069500" },
+        "usEquity": { "type": "string", "pattern": "^[A-Z0-9.-]{1,20}$", "default": "360750" },
+        "cashLike": { "type": "string", "pattern": "^[A-Z0-9.-]{1,20}$", "default": "153130" }
+      }
+    },
+    "benchmarkHurdleAnnualPct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 30,
+      "default": 7.67,
+      "description": "The annualized return the book has to clear to have been worth running rather than held passively. Distinct from minimumExpectedActiveReturn, which is a per-candidate gate: one asks whether this trade is worth doing, the other whether any of it was."
+    },
+    "grandfather": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "Existing exposure above a cap is tolerated while new exposure is not. Forcing an immediate sale to satisfy a cap that was raised or a position that grew is a trade the cap never asked for; the breach resolves through trims and growth in the rest of the book.",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "blocksNewNonCoreWhenBreached": { "type": "boolean", "default": true }
+      }
+    },
+    "coreDca": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "Broad-ETF deployment is a cash-allocation decision, not a single-name BUY, and is recorded as one.",
+      "properties": {
+        "minimumCashWeightForFirstTranche": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 0.9,
+          "default": 0.5,
+          "description": "Cash and short-bond weight required before the first tranche executes. Deploying from a thin cash position turns the reserve into the tranche."
+        },
+        "reserveFloorWeight": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 0.5,
+          "default": 0.15,
+          "description": "Cash weight that must survive every tranche. A plan whose arithmetic breaches this floor is not a plan, it is a hope about the next deposit."
+        },
+        "monthlyTrancheMaxWeight": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 0.2,
+          "default": 0.06
+        },
+        "catchUpMonthlyMaxWeight": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 0.2,
+          "default": 0.125,
+          "description": "Ceiling while catching up on a deployment schedule that fell behind. It accelerates placement; it never raises the target."
+        }
+      }
+    },
     "priceConflictTolerance": {
       "type": "number",
       "minimum": 0.005,
