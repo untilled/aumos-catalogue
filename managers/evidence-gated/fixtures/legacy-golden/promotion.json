@@ -8,7 +8,7 @@
     "clusterGapDays": 10,
     "returnsPct": [1.2, 0.8, 1.6],
     "markets": ["kr", "us"],
-    "regimes": ["risk-on", "neutral", "risk-off"]
+    "regimes": ["risk-on", "mixed", "risk-off"]
   },
   "request": {
     "operation": "promotionGate",

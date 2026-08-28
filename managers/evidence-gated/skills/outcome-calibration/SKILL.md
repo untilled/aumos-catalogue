@@ -15,6 +15,27 @@ same-horizon return, active return, thesis/process compliance and outcome availa
 Incomplete rows remain referenced under `missingFields` but do not increase complete sample count.
 Group dates into independent clusters using the five-day transitive rule in `evidence-gates`.
 
+## The regime a sample was gathered in
+
+Every sample carries the regime it was decided under, from one closed vocabulary: `risk-on`,
+`risk-off`, `mixed` — exactly what `sectorStrength` reads mechanically, so a Brief call and a sector
+reading can be compared instead of merely coexisting.
+
+The judgement stays with Brief. A regime call is a mixed quantitative and qualitative reading at one
+`asOf` and this package holds no macro score to make it with; `regimeTag` canonicalizes the call,
+attaches the Brief revision that made it, and **says so when Brief calls a regime the sector reading
+does not see.** The call stands — a person reading a policy statement can be right where a moving
+average is wrong — but the disagreement travels with the sample.
+
+⛔ **A regime is recorded at decision time and is not re-tagged.** Changing it later reshapes a
+sample after the fact, exactly as re-tagging a rule version would, and the promotion requirement it
+feeds would then be measuring a story rather than a history.
+
+Why it is a closed vocabulary rather than free text: the promotion gate requires three distinct
+regimes so that a sample gathered entirely in one market state cannot pass. Counting distinct
+strings made three spellings of one state satisfy it (`risk-on`, `risk_on`, `Risk On`) — the exact bias the requirement exists to
+reveal, hidden by the thing meant to reveal it.
+
 ## Metrics
 
 When fields permit, compute by lens and version:
@@ -26,8 +47,8 @@ When fields permit, compute by lens and version:
 - process compliance: thesis, challenge, stop/review and concentration rules;
 - outcome coverage and missingness.
 
-Do not mix lenses, rule versions, horizons, **benchmarks** or adjusted/unadjusted price bases merely
-to reach a threshold. The benchmark belongs on that list and was missing from it: this methodology is
+Do not mix lenses, rule versions, horizons, **benchmarks**, **regimes** or adjusted/unadjusted price
+bases merely to reach a threshold. The benchmark belongs on that list and was missing from it: this methodology is
 benchmark-relative end to end, so two active returns measured against different denominators are not
 two samples of anything. `config.benchmarks` fixes the denominator per kind of holding — Korean
 equity, US equity, cash-like — so it does not get re-decided each run. Report `relative-only` where active return is positive but gross return is negative.

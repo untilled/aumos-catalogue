@@ -236,6 +236,59 @@ export function entryQualityGate({ bars = [], lenses = [], noNewLow = {} }) {
   }
 }
 
+/**
+ * A Brief's regime call, canonicalized and given provenance.
+ *
+ * Brief owns the judgement and this does not overrule it — a person reading a
+ * central-bank statement can be right where a moving average is wrong. What it
+ * does is make the call sayable in one vocabulary, attach the revision that
+ * asserted it, and **state the disagreement** when Brief calls a regime the
+ * mechanical reading does not see.
+ *
+ * ⛔ And it refuses a retag. A regime recorded at decision time is what that
+ * decision was made under; changing it later reshapes a sample after the fact,
+ * exactly as re-tagging a rule version would.
+ */
+export function regimeTag({ asserted, mechanical = null, briefRevisionId = null, assertedAt = null, recorded = null, asOf } = {}) {
+  const diagnostics = []
+  const canonical = normalizeRegime(asserted)
+  if (canonical !== asserted && canonical !== null) {
+    diagnostics.push(diagnostic('regime_spelling_normalized', 'info', 'The regime vocabulary is kebab-case, as every other vocabulary here is; a variant spelling is normalized rather than counted as a different regime', 'asserted', { asserted, canonical }))
+  }
+  if (!REGIMES.has(canonical)) {
+    diagnostics.push(diagnostic('regime_outside_vocabulary', 'blocked', 'A regime tag must come from the published vocabulary; free text makes one market state look like several', 'asserted', { asserted: asserted ?? null, supported: [...REGIMES] }))
+    return { data: { regime: null, valid: false }, diagnostics }
+  }
+  if (!briefRevisionId) {
+    diagnostics.push(diagnostic('regime_unattributed', 'blocked', 'A regime call is a Brief judgement, so it carries the revision that made it', 'briefRevisionId'))
+  }
+  /**
+   * A disagreement is information, not an error. The mechanical reading is one
+   * input to the call and the call may still be right against it — but a run
+   * that silently overrides it leaves no trace of having done so.
+   */
+  const mechanicalCharacter = mechanical?.leadershipCharacter ?? null
+  const agrees = mechanicalCharacter === null ? null : mechanicalCharacter === canonical
+  if (agrees === false) {
+    diagnostics.push(diagnostic('regime_disagrees_with_reading', 'info', 'Brief calls a regime the sector reading does not see; the call stands and the disagreement is recorded with it', 'asserted', { asserted: canonical, mechanical: mechanicalCharacter, benchmarkAboveMa200: mechanical?.benchmarkAboveMa200 ?? null }))
+  }
+  if (recorded && recorded !== canonical) {
+    diagnostics.push(diagnostic('regime_retagged', 'blocked', 'This sample already carries a regime from the decision that made it; changing it now reshapes the sample after the fact', 'recorded', { recorded, asserted: canonical }))
+  }
+  return {
+    data: {
+      regime: canonical,
+      valid: !diagnostics.some((row) => row.severity === 'blocked'),
+      briefRevisionId,
+      assertedAt: assertedAt ?? asOf ?? null,
+      agreesWithReading: agrees,
+      mechanicalReading: mechanicalCharacter,
+      judgementOwner: 'brief',
+    },
+    diagnostics,
+  }
+}
+
 export function relativeStrength(assetBars, benchmarkBars, periods = [20, 60, 120]) {
   const output = {}
   for (const period of periods) {
@@ -399,6 +452,44 @@ export function blendedSectorStrength(assetBars, benchmarkBars, weights = [[60, 
   return { data: { scorePct: weight ? round(score / weight * 100, 3) : null, detail, weights: Object.fromEntries(weights.map(([period, value]) => [`d${period}`, value])) }, diagnostics: [] }
 }
 
+/**
+ * The regime vocabulary, closed. (issue #81)
+ *
+ * ⛔ This is not the package deciding the regime. `data-source-contract` is
+ * explicit that there is no aggregate macro score and that a regime call is a
+ * Brief judgement at one `asOf`; `validateMacro` returns `score: null` to say
+ * so in data rather than prose. That stands.
+ *
+ * What this fixes is narrower and was a real defect: `promotionGate` counted
+ * distinct **strings**, so the same market state written `risk_on`, `risk-on`
+ * and `Risk On` satisfied the three-regime requirement and opened
+ * `reviewReady` on a sample gathered entirely in one regime — which is the one
+ * thing that gate exists to prevent.
+ *
+ * The judgement stays with Brief. The vocabulary it must speak in is here, and
+ * it is exactly what `sectorStrength` reads mechanically, so the two can be
+ * compared.
+ */
+export const REGIMES = new Set(['risk-on', 'risk-off', 'mixed'])
+
+/**
+ * The same three states under other names, normalized rather than refused.
+ *
+ * `risk_on` is the port's own spelling, carried over from the source tree;
+ * `neutral` is what `fixtures/legacy-golden/promotion.json` called the third
+ * state. Kebab-case is canonical here because every other vocabulary in this
+ * package settled there — units, lenses, trigger kinds. A recorded tag in an
+ * older spelling stays readable and says which name is canonical.
+ */
+const REGIME_ALIASES = { risk_on: 'risk-on', risk_off: 'risk-off', neutral: 'mixed' }
+
+export function normalizeRegime(value) {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim().toLowerCase()
+  const collapsed = trimmed.replace(/\s+/g, '-')
+  return REGIME_ALIASES[trimmed] ?? REGIME_ALIASES[collapsed] ?? collapsed.replace(/_/g, '-')
+}
+
 const TOP_RESEARCH_RANK = 3
 const RANK_JUMP_FOR_RESEARCH = 3
 const AT_HIGH_TOLERANCE = 0.995
@@ -477,7 +568,7 @@ export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks
   const votes = topThree.map((row) => row.risk).filter((risk) => risk === 'on' || risk === 'off')
   const onVotes = votes.filter((risk) => risk === 'on').length
   const offVotes = votes.filter((risk) => risk === 'off').length
-  const character = onVotes >= 2 ? 'risk_on' : offVotes >= 2 ? 'risk_off' : 'mixed'
+  const character = onVotes >= 2 ? 'risk-on' : offVotes >= 2 ? 'risk-off' : 'mixed'
   const regime = {
     benchmarkAboveMa200: benchmarkMa200 === null ? null : benchmarkCloses.at(-1) > benchmarkMa200,
     leadershipCharacter: character,

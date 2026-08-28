@@ -970,7 +970,7 @@ const sectorLane = execute({
 covers('scanner/sector-rank-and-regime')
 assert.deepEqual(sectorLane.data.sectors.filter((row) => row.rank).map((row) => row.name), ['Semis', 'Software', 'Energy', 'Staples'], 'the lane is ranked, not merely scored')
 assert.equal(sectorLane.data.sectors.find((row) => row.name === 'Semis').rankChange, 3, 'the move since the previous run is what makes a rank a trigger')
-assert.equal(sectorLane.data.regime.leadershipCharacter, 'risk_on', 'the regime reads the character of who is leading')
+assert.equal(sectorLane.data.regime.leadershipCharacter, 'risk-on', 'the regime reads the character of who is leading, in the published vocabulary')
 assert.equal(sectorLane.data.regime.benchmarkAboveMa200, true)
 assert.equal(sectorLane.data.regime.isJudgementInput, true, 'the regime is an input to a Brief judgement, never a score this package holds')
 covers('scanner/research-queue')
@@ -1342,7 +1342,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 77)
+assert.equal(supportedOperations.length, 78)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -2051,6 +2051,77 @@ assert.ok(
 assert.equal(execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: policyBase } }).data.changeCount, 0)
 assert.ok(/rule DSL is deliberately not ported/.test(migrationText), 'the matrix states which half of the policy engine came across and which did not')
 assert.ok(/legacy and not shipped/.test(migrationText), 'and that the source tree workflow document describes a pipeline this port replaced')
+
+/**
+ * ── The regime a sample was gathered in (issue #81) ────────────────────────
+ *
+ * `promotionGate` counted distinct **strings**, so one market state written
+ * three ways satisfied the three-regime requirement and opened `reviewReady`
+ * on a sample gathered entirely in one regime — the exact bias the requirement
+ * exists to reveal, hidden by the thing meant to reveal it.
+ */
+covers('promotion/regime-vocabulary-closed')
+const regimeRows = (regimes) => {
+  const rows = []
+  const start = Date.parse('2026-01-01')
+  for (let cluster = 0; cluster < promotion.generator.clusterCount; cluster += 1) {
+    for (let index = 0; index < promotion.generator.rowsPerCluster; index += 1) {
+      rows.push({
+        cohort: 'promote',
+        signalDate: new Date(start + cluster * promotion.generator.clusterGapDays * 86_400_000).toISOString().slice(0, 10),
+        market: promotion.generator.markets[(cluster + index) % promotion.generator.markets.length],
+        regime: regimes[(cluster + index) % regimes.length],
+        ruleVersion: 'v1',
+        forward: { d20: { returnPct: 2.5, excessReturnPct: 1.5 } },
+      })
+    }
+  }
+  return rows
+}
+const spelledThreeWays = execute({ ...promotion.request, input: { ...promotion.request.input, rows: regimeRows(['risk-on', 'risk_on', 'Risk On']) } })
+assert.deepEqual(spelledThreeWays.data.versions[0].regimes, ['risk-on'], 'three spellings of one market state are one regime')
+assert.equal(spelledThreeWays.data.versions[0].gate.regimesOk, false, 'and a sample gathered in one regime does not pass the requirement that exists to catch it')
+const genuinelyThree = execute({ ...promotion.request, input: { ...promotion.request.input, rows: regimeRows(['risk-on', 'mixed', 'risk-off']) } })
+assert.equal(genuinelyThree.data.versions[0].gate.regimesOk, true, 'three actual regimes still pass')
+const inventedRegime = execute({ ...promotion.request, input: { ...promotion.request.input, rows: regimeRows(['risk-on', 'mixed', 'euphoria']) } })
+assert.equal(inventedRegime.status, 'blocked', 'a tag outside the vocabulary is refused, not counted as a regime of its own')
+assert.ok(inventedRegime.diagnostics.some((row) => row.code === 'regime_outside_vocabulary'))
+assert.ok(
+  execute({ ...promotion.request, input: { ...promotion.request.input, rows: regimeRows(['risk-on', 'mixed', 'risk-off']).map((row, index) => (index % 4 ? row : { ...row, regime: undefined })) } })
+    .diagnostics.some((code) => code.code === 'regime_untagged_samples'),
+  'untagged samples cannot show the bias the requirement exists to reveal, and say so',
+)
+
+covers('scanner/regime-tag-provenance')
+const tagged = execute({ operation: 'regimeTag', asOf: '2026-08-20T00:00:00Z', input: { asserted: 'risk_on', briefRevisionId: 'brief-7', mechanical: { leadershipCharacter: 'risk-on', benchmarkAboveMa200: true } } })
+assert.equal(tagged.data.regime, 'risk-on', 'the port spelling normalizes to the published one')
+assert.equal(tagged.data.agreesWithReading, true)
+assert.equal(tagged.data.judgementOwner, 'brief', 'the call belongs to Brief; this canonicalizes it and does not make it')
+assert.ok(tagged.diagnostics.some((row) => row.code === 'regime_spelling_normalized' && row.severity === 'info'))
+const disagreeing = execute({ operation: 'regimeTag', asOf: '2026-08-20T00:00:00Z', input: { asserted: 'risk-off', briefRevisionId: 'brief-7', mechanical: { leadershipCharacter: 'risk-on', benchmarkAboveMa200: true } } })
+assert.equal(disagreeing.data.valid, true, 'Brief may call a regime the sector reading does not see — a policy statement can be right where a moving average is wrong')
+assert.equal(disagreeing.data.agreesWithReading, false)
+assert.ok(disagreeing.diagnostics.some((row) => row.code === 'regime_disagrees_with_reading' && row.severity === 'info'), 'and the disagreement travels with the sample rather than disappearing')
+assert.equal(
+  execute({ operation: 'regimeTag', asOf: '2026-08-20T00:00:00Z', input: { asserted: 'euphoria', briefRevisionId: 'brief-7' } }).status,
+  'blocked',
+  'free text makes one market state look like several',
+)
+assert.ok(
+  execute({ operation: 'regimeTag', asOf: '2026-08-20T00:00:00Z', input: { asserted: 'risk-on' } })
+    .diagnostics.some((row) => row.code === 'regime_unattributed'),
+  'a regime call is a Brief judgement, so it names the revision that made it',
+)
+assert.ok(
+  execute({ operation: 'regimeTag', asOf: '2026-08-20T00:00:00Z', input: { asserted: 'risk-off', briefRevisionId: 'brief-9', recorded: 'risk-on' } })
+    .diagnostics.some((row) => row.code === 'regime_retagged'),
+  'a sample keeps the regime the decision was made under; changing it reshapes the sample after the fact',
+)
+const calibrationRegime = calibrationSkill.slice(calibrationSkill.indexOf('## The regime a sample was gathered in'), calibrationSkill.indexOf('## Metrics'))
+for (const regime of ['risk-on', 'risk-off', 'mixed']) {
+  assert.ok(calibrationRegime.includes(`\`${regime}\``), `the skill publishes the ${regime} tag the code accepts`)
+}
+assert.ok(/not re-tagged/i.test(calibrationRegime), 'and states that a recorded regime is not re-tagged')
 
 assertCoverageWasEarned()
 
