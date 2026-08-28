@@ -1,7 +1,7 @@
 import { result, diagnostic } from './diagnostics.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
-import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength } from './scanners.mjs'
-import { sleeveNav, targetWeight, legacySizeSuggestion, concentration, specialistBudget, globalAllocation } from './sizing.mjs'
+import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate } from './scanners.mjs'
+import { sleeveNav, targetWeight, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing } from './sizing.mjs'
 import { coverageState, validateWatch } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
 import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
@@ -31,6 +31,8 @@ const operations = {
   targetWeight,
   legacySizeSuggestion,
   concentration,
+  entryQualityGate,
+  newSinglePacing: (input, asOf) => newSinglePacing({ ...input, asOf }),
   specialistBudget,
   globalAllocation,
   coverage: coverageState,

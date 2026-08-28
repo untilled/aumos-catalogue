@@ -58,7 +58,7 @@ export function validateConsensus(observation, asOf) {
   return { data: { complete: diagnostics.length === 0, normalized: diagnostics.length ? null : observation }, diagnostics }
 }
 
-const LENSES = new Set(['mean-reversion', 'trend-pullback', 'core-dca', 'existing-position'])
+const LENSES = new Set(['mean-reversion', 'trend-pullback', 'quality-pullback', 'core-dca', 'existing-position'])
 
 export function researchGate(input) {
   const diagnostics = []

@@ -103,9 +103,14 @@ Toss를 택한 뒤 차이를 provenance로 남긴다. macro score는 없다: reg
 ## 학습과 검증
 
 평균회귀 과매도 깊이는 확신도가 아니다. 안정화/basing이 별도로 필요하다. 추세 눌림은 얕은
-낙폭이 정의이므로 추세 온전성·사업 품질·촉매·active edge로 판정한다. 신규 단일주 BUY는
-why-cheap, trap risk, variant view, benchmark alternative, 시나리오와 thesis challenge를 모두
-요구한다. 조건 미충족은 기계 판정 가능한 WATCH/plan으로 남긴다.
+낙폭이 정의이므로 추세 온전성·사업 품질·촉매·active edge로 판정한다. **quality pullback**은
+MA200 위에서 고점 대비 15~35% 조정된 구간 — 추세 눌림(-20%에서 끊긴다)과 평균회귀(MA200 위
+종목이 갖기 어려운 과매도 신호 2개를 요구한다) 사이에서 **싸질수록 커버리지에서 사라지던**
+밴드다. 신규 단일주 BUY는 why-cheap, trap risk, variant view, benchmark alternative, 시나리오와
+thesis challenge를 모두 요구한다. 진입 품질은 서술이 아니라 코드가 거절한다 — 낙하칼은
+차단되고, 추세 눌림 없이 홀로 선 평균회귀 후보는 확인된 basing/추세눌림 상태를 요구한다.
+리스크 상한은 비중 네 축(종목·섹터·테마·팩터)과, 그 어느 축도 재지 않는 **전 손절 동시 발동 시
+총손실**에 걸린다. 조건 미충족은 기계 판정 가능한 WATCH/plan으로 남긴다.
 
 Memory 값은 고정 key, schema version, `updatedAsOf`, Decision/Evidence id, sample 수, 독립 date
 cluster 수, metric, 결측 필드, maturity 상태를 가진 JSON object다. 같은 key 쓰기는 과거 row를

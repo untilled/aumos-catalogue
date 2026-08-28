@@ -18,6 +18,13 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    configured comes back unevaluated, never as a pass.
 3. Apply the stricter of Mandate and configured concentration thresholds. If classification is
    uncertain, use the more conservative applicable bucket and disclose it.
+3b. Apply portfolio heat — total loss if every stop fired at once, capped at
+   `concentration.portfolioHeat`. Weight caps do not measure it: two books with identical weights
+   have different heat when their stops sit in different places. Declare `stopLossPct` and `core` on
+   each row; core DCA and parked liquidity carry no stop and are excluded, and a non-core row with no
+   declared stop is unevaluated rather than zero risk. Over the cap, a run that adds new non-core risk
+   is blocked while a book already over on its holdings alone warns — the same grandfathering the
+   weight caps use.
 4. Apply evidence maturity. `insufficient` and `observing` lenses are capped at
    `experimentalPositionCeiling`; `reviewable` is still not promoted and cannot expand solely because
    its sample threshold was reached.
@@ -26,6 +33,15 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
 
 A cap breach blocks the proposed target; do not silently clamp and pretend the smaller number was the
 investment conclusion. Recalculate and explain the target that you actually endorse, or WAIT.
+
+## Pacing is a warning and stays one
+
+Call `newSinglePacing` whenever a run proposes a new non-core single name. Three patterns say the
+book is adding single names faster than it is learning from them: two or more in one session, another
+one while the previous new single is still unverified, and one on the day the sizing policy changed.
+None of them is evidence that this candidate is wrong, so none of them blocks — they are what the run
+says out loud before the investor approves it. They relax to advisory once the book has
+`reviewReadyClosedOutcomes` closed outcomes to learn from.
 
 ## Action mapping
 

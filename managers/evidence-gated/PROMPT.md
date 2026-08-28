@@ -77,7 +77,8 @@ Read these stable keys only; do not invent per-run keys:
 
 `migration/schema-version`, `run/theme-radar-last`, `learning/evidence-maturity`,
 `learning/closed-decision-summary`, `calibration/mean-reversion`,
-`calibration/trend-pullback`, `calibration/core-dca`, `failures/repeated-patterns`,
+`calibration/trend-pullback`, `calibration/quality-pullback`, `calibration/core-dca`,
+`failures/repeated-patterns`,
 `coverage/universe-state`.
 
 Every accepted value must be a JSON object with `schemaVersion`, `updatedAsOf`, referenced
@@ -117,9 +118,18 @@ Every candidate must name its discovery lens before evaluation:
   as conviction.
 - `trend-pullback`: an intact uptrend with a shallow pullback; judge trend integrity, business
   quality, catalyst and active edge rather than rejecting it for not being deeply oversold.
+- `quality-pullback`: a quality name above its MA200 but marked down 15–35% from its high, with RSI
+  between 30 and 50 — the band `trend-pullback` (which stops at -20%) and `mean-reversion` (which
+  needs two oversold signals a name above its MA200 rarely has) both drop. Judge whether the markdown
+  is a price the business does not deserve, not whether the trend is shallow.
 - `core-dca`: broad ETF/cash deployment; evaluate allocation purpose, reserve cash and tranche stop
   conditions, not single-name variant view.
 - `existing-position`: thesis/weight/exit review, not a new-entry scanner result.
+
+Entry quality is a gate, not a description. Call `entryQualityGate` before any single-name BUY or
+risk-increasing RESIZE: a `falling_knife` blocks, and a `mean-reversion` candidate with no
+`trend-pullback` beside it needs a confirmed pass state rather than an unconfirmed one. Absent scan
+history warns and never blocks — over-constraint is not caution.
 
 Load `skills/evidence-gates/SKILL.md` and `skills/candidate-research/SKILL.md` for any new or resized
 risk. Load `skills/thesis-challenge/SKILL.md` before any new single-name BUY or thesis promotion.

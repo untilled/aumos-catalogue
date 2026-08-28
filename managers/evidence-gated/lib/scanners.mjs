@@ -34,9 +34,34 @@ export function scanSymbol({ symbol, market, bars, held = false, pending = false
     healthyRsi: packet.rsi14 >= 35 && packet.rsi14 <= 55,
     notExtended: packet.ma200 !== null && packet.close <= packet.ma200 * 1.4,
   }
+  /**
+   * Lens C, the 5pp band the other two lenses drop between.
+   *
+   * `trend-pullback` takes `offHigh200` down to -20% and `mean-reversion` needs
+   * two oversold signals, which a name trading above its MA200 rarely has. So a
+   * quality name between -20% and -35% off its high falls out of both, and the
+   * only way back in is to drop far enough to break the MA200 — cheaper means
+   * less covered, which is the wrong sign. The Trading Harness measured the gap
+   * on 2026-07-28 (ASML at -20.8% off high, +14.0% over MA200, RSI 36.5, in
+   * neither lens) and the investor approved a separate lens on 2026-07-29 with
+   * implementation anchored to 2026-08-24 so the September promotion sample was
+   * not disturbed mid-flight.
+   *
+   * It is a separate lens rather than a widened `trend-pullback` band because
+   * "a shallow pullback inside an intact uptrend" is a different claim from
+   * "a quality name marked down a third"; merging them would put two claims in
+   * one calibration sample. Its samples accrue under its own memory key, so no
+   * existing row is retagged.
+   */
+  const qualityPullbackSignals = {
+    aboveMa200: packet.ma200 !== null && packet.close > packet.ma200,
+    deepPullback: packet.offHigh200 !== null && packet.offHigh200 >= -0.35 && packet.offHigh200 <= -0.15,
+    rsiBand: packet.rsi14 >= 30 && packet.rsi14 <= 50,
+  }
   const lenses = []
   if (meanCount >= 2) lenses.push('mean-reversion')
   if (Object.values(trendSignals).every(Boolean)) lenses.push('trend-pullback')
+  if (Object.values(qualityPullbackSignals).every(Boolean)) lenses.push('quality-pullback')
   const discoveryScore = round((meanCount / Math.max(knownMean.length, 1)) * 100, 2)
   return {
     candidate: {
@@ -49,7 +74,153 @@ export function scanSymbol({ symbol, market, bars, held = false, pending = false
       discoveryScore,
       discoveryScoreMeaning: 'research-priority-only',
       indicators: packet,
-      signals: { meanReversion: meanSignals, trendPullback: trendSignals },
+      signals: { meanReversion: meanSignals, trendPullback: trendSignals, qualityPullback: qualityPullbackSignals },
+    },
+    diagnostics,
+  }
+}
+
+/**
+ * Trading days since the window low was last set, on one series.
+ *
+ * Strict `<`, so a flat base sitting at the low counts as basing rather than as
+ * a fresh new low. The `no_new_low` condition below ties the other way. That
+ * asymmetry is deliberate and documented in the Trading Harness (2026-07-27):
+ * this value is descriptive, that one is a pre-purchase gate and takes the
+ * conservative side. Unifying either direction changes a judgement definition.
+ */
+function sessionsSinceNewLow(lows) {
+  if (!lows.length) return null
+  let runMin = lows[0]
+  let lastNew = 0
+  for (const [index, low] of lows.entries()) {
+    if (low < runMin) {
+      runMin = low
+      lastNew = index
+    }
+  }
+  return lows.length - 1 - lastNew
+}
+
+const BASING_MIN_SESSIONS = 5
+const RECENT_WINDOW_BARS = 60
+
+/**
+ * The entry-quality gate, ported with both of its approved dual lenses.
+ *
+ * The Trading Harness blocked `falling_knife` in code
+ * (`sizing_policy.risk_gates.entry_quality_gate`, approved 2026-07-10); this
+ * package had the rule in prose only, in `evidence-gates` and
+ * `candidate-research`. A prose gate does not refuse anything.
+ *
+ * Two later approvals hang off it, and both are the same shape — a lens that
+ * can be fooled, a second lens that catches it, and a refusal to silently pick
+ * the friendlier answer:
+ *
+ * - **eq-v2 (approved 2026-07-28).** Sessions-since-new-low measured over the
+ *   whole window goes mechanically large when the window low is nine months
+ *   old, which forced `basing` no matter how the name had traded since — a
+ *   false pass on a blocking gate. It is now measured over the window *and*
+ *   the last 60 bars and the stricter reading wins. `recentReversalUp` stays an
+ *   independent path: the defect was the window artifact, not the
+ *   capitulation-and-reversal idea.
+ * - **no_new_low dual lens (approved 2026-07-27).** An intraday spike low left
+ *   inside the lookback window can mask closes that are still setting fresh
+ *   lows. The verdict still comes from the intraday-low lens, unchanged, and
+ *   the close lens is reported beside it; a disagreement is surfaced loudly
+ *   rather than resolved in favour of "basing".
+ *
+ * Absent data never blocks. The harness rule is explicit that a name with no
+ * scan data degrades to a warning, so that over-constraint does not masquerade
+ * as caution.
+ */
+export function entryQualityGate({ bars = [], lenses = [], noNewLow = {} }) {
+  const diagnostics = []
+  const rows = bars.filter((bar) => finite(bar?.close))
+  const packet = indicatorPacket(rows)
+  if (!packet || rows.length < RECENT_WINDOW_BARS || packet.rsi14 === null) {
+    diagnostics.push(diagnostic('entry_quality_unverified', 'unevaluated', 'Entry quality cannot be read without scan history; absent data warns rather than blocks', 'bars', { count: rows.length }))
+    return { data: { state: null, passed: null, blocking: false }, diagnostics }
+  }
+  const lows = rows.map((bar) => (finite(bar.low) ? bar.low : bar.close))
+  const closes = rows.map((bar) => bar.close)
+  const above = packet.ma200 !== null && packet.close > packet.ma200
+  const golden = packet.ma50 !== null && packet.ma200 !== null && packet.ma50 > packet.ma200
+  const sessionsWindow = sessionsSinceNewLow(lows)
+  const sessionsRecent = sessionsSinceNewLow(lows.slice(-RECENT_WINDOW_BARS))
+  const sessionsEffective = Math.min(...[sessionsWindow, sessionsRecent].filter((value) => value !== null))
+  const last = rows.at(-1)
+  const range = finite(last.high) && finite(last.low) ? last.high - last.low : 0
+  const reversalUp = finite(last.open) && last.close > last.open && range > 0 && (last.close - last.low) / range >= 0.6
+
+  let state
+  if (above && golden) state = 'pullback_in_uptrend'
+  else if (!above && (sessionsEffective >= BASING_MIN_SESSIONS || reversalUp)) state = 'basing'
+  else if (!above) state = 'falling_knife'
+  else state = 'neutral'
+
+  /**
+   * eq-v1 would have read `basing` off the window alone. Kept so a report can
+   * say why a name that used to pass no longer does.
+   */
+  const eqV1WouldPassBasing = state === 'falling_knife' && sessionsWindow >= BASING_MIN_SESSIONS && sessionsRecent !== null && sessionsRecent < BASING_MIN_SESSIONS
+  if (eqV1WouldPassBasing) {
+    diagnostics.push(diagnostic('entry_quality_window_artifact', 'info', 'eq-v2 demotion: the window reading was basing but the last 60 bars are still near a new low', 'bars', { sessionsWindow, sessionsRecent }))
+  }
+
+  /**
+   * The pre-purchase lens: `<=`, so tying the window low counts as a new low.
+   */
+  const sessions = Number.isInteger(noNewLow?.sessions) && noNewLow.sessions > 0 ? noNewLow.sessions : 3
+  const lookback = Number.isInteger(noNewLow?.lookback) && noNewLow.lookback > 0 ? noNewLow.lookback : 200
+  let noNewLowResult = null
+  if (rows.length < sessions + 2) {
+    diagnostics.push(diagnostic('no_new_low_unverified', 'unevaluated', 'Not enough bars to read the no-new-low condition', 'bars'))
+  } else {
+    const newLowDays = (series) => {
+      const hits = []
+      for (let index = series.length - sessions; index < series.length; index += 1) {
+        const priorWindow = series.slice(Math.max(0, index - lookback), index)
+        if (priorWindow.length && series[index] <= Math.min(...priorWindow)) hits.push(rows[index].date ?? index)
+      }
+      return hits
+    }
+    const lowLensHits = newLowDays(lows)
+    const closeLensHits = newLowDays(closes)
+    const lensDisagreement = lowLensHits.length === 0 && closeLensHits.length > 0
+    noNewLowResult = { met: lowLensHits.length === 0, lowLensNewLowDays: lowLensHits, closeLensNewLowDays: closeLensHits, lensDisagreement, verdictLens: 'intraday-low', sessions, lookback }
+    if (lensDisagreement) {
+      diagnostics.push(diagnostic('no_new_low_lens_disagreement', 'info', 'The intraday-low lens reads no new low while closes are still setting them; an intraday spike low may be masking a falling knife. Re-check the basing call by hand', 'bars', { closeLensNewLowDays: closeLensHits }))
+    }
+  }
+
+  if (state === 'falling_knife') {
+    diagnostics.push(diagnostic('entry_quality_falling_knife', 'blocked', 'A falling knife is not an entry; below MA200 and still cutting lows', 'bars', { sessionsWindow, sessionsRecent }))
+  }
+  /**
+   * A mean-reversion signal with no trend-pullback beside it must have its
+   * entry quality confirmed rather than merely not-refuted (approved
+   * 2026-07-13). `neutral` is not a pass.
+   */
+  const meanReversionOnly = lenses.includes('mean-reversion') && !lenses.includes('trend-pullback')
+  if (meanReversionOnly && !['pullback_in_uptrend', 'basing'].includes(state)) {
+    diagnostics.push(diagnostic('mean_reversion_unconfirmed', 'blocked', 'A mean-reversion-only candidate needs a confirmed pass state, not an unconfirmed one', 'lenses', { state }))
+  }
+
+  return {
+    data: {
+      state,
+      passed: !diagnostics.some((row) => row.severity === 'blocked'),
+      blocking: state === 'falling_knife',
+      aboveMa200: above,
+      ma50AboveMa200: golden,
+      sessionsSinceNewLow: sessionsWindow,
+      sessionsSinceNewLow60: sessionsRecent,
+      sessionsSinceNewLowEffective: sessionsEffective,
+      recentReversalUp: reversalUp,
+      eqV1WouldPassBasing,
+      noNewLow: noNewLowResult,
+      ruleVersion: 'eq-v2',
     },
     diagnostics,
   }

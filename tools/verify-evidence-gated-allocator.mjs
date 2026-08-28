@@ -590,7 +590,7 @@ assert.ok(driftUnbaselined.diagnostics.some((row) => row.code === 'watch_baselin
 /**
  * `factor` is a measured concentration axis, not prose in `allocate`. (issue #70 §22)
  */
-const caps = { position: 0.1, sector: 0.2, theme: 0.15, factor: 0.15 }
+const caps = { position: 0.1, sector: 0.2, theme: 0.15, factor: 0.15, portfolioHeat: 0.06 }
 const crossSector = execute({
   operation: 'concentration',
   asOf: methodology.asOf,
@@ -634,6 +634,149 @@ for (const unit of ['percent', 'ratio', 'count', 'multiple', 'index-points', 'da
     `${unit} names its own scale and is not treated as money`,
   )
 }
+
+/**
+ * The approved entry-quality gate, in code rather than in prose. (issue #70 §2)
+ *
+ * Series are built so each case isolates one branch: a knife still cutting
+ * lows, the eq-v1 window artifact eq-v2 demotes, and an intraday spike low
+ * masking closes that are still setting fresh lows.
+ */
+const bar = (date, close, { low = close, high = close, open = close } = {}) => ({ date, open, high, low, close })
+const series = (values, start = Date.parse('2026-01-01T00:00:00Z')) =>
+  values.map((value, index) => bar(new Date(start + index * 86_400_000).toISOString().slice(0, 10), ...(Array.isArray(value) ? [value[0], value[1]] : [value])))
+
+const stillFalling = series(Array.from({ length: 220 }, (_, index) => 200 - index * 0.5))
+const knife = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: stillFalling, lenses: ['mean-reversion'] } })
+assert.equal(knife.data.state, 'falling_knife')
+assert.equal(knife.status, 'blocked', 'a falling knife is refused by the gate, not merely described by it')
+assert.ok(knife.diagnostics.some((row) => row.code === 'entry_quality_falling_knife'))
+
+const uptrend = series(Array.from({ length: 220 }, (_, index) => 100 + index * 0.5))
+const healthy = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: uptrend, lenses: ['trend-pullback'] } })
+assert.equal(healthy.data.state, 'pullback_in_uptrend')
+assert.equal(healthy.data.passed, true)
+
+/**
+ * eq-v2: a nine-month-old window low used to force `basing` no matter how the
+ * name had traded since. The last 60 bars now decide.
+ */
+const oldLowThenFalling = series([
+  ...Array.from({ length: 160 }, (_, index) => 100 + index * 0.5625),
+  ...Array.from({ length: 60 }, (_, index) => 190 - index),
+])
+const demoted = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: oldLowThenFalling, lenses: [] } })
+assert.ok(demoted.data.sessionsSinceNewLow >= 5, 'the full window reading is the one eq-v1 would have passed on')
+assert.equal(demoted.data.sessionsSinceNewLow60, 0, 'the last 60 bars are still setting new lows')
+assert.equal(demoted.data.state, 'falling_knife', 'eq-v2 takes the stricter of the two readings')
+assert.equal(demoted.data.eqV1WouldPassBasing, true, 'the demotion says why a name that used to pass no longer does')
+
+/**
+ * The no_new_low dual lens: the verdict stays on the intraday-low lens and the
+ * disagreement is surfaced rather than resolved in favour of basing.
+ */
+const spikeLow = series(Array.from({ length: 220 }, (_, index) => 200 - index * 0.4))
+  .map((row, index) => (index === 210 ? { ...row, low: row.low - 40 } : row))
+const disagree = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: spikeLow, lenses: [], noNewLow: { sessions: 3, lookback: 20 } } })
+assert.equal(disagree.data.noNewLow.met, true, 'the verdict still comes from the intraday-low lens, unchanged')
+assert.equal(disagree.data.noNewLow.verdictLens, 'intraday-low')
+assert.ok(disagree.data.noNewLow.closeLensNewLowDays.length > 0, 'closes are still setting fresh lows behind the spike')
+assert.equal(disagree.data.noNewLow.lensDisagreement, true)
+assert.ok(disagree.diagnostics.some((row) => row.code === 'no_new_low_lens_disagreement' && row.severity === 'info'), 'the disagreement is surfaced loudly, not silently resolved')
+
+/**
+ * A mean-reversion signal alone needs a confirmed pass state. (approved 2026-07-13)
+ */
+const neutralBars = series([
+  ...Array.from({ length: 190 }, (_, index) => 200 - index * 0.5),
+  ...Array.from({ length: 30 }, (_, index) => 105 + index * 3),
+])
+const neutral = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: neutralBars, lenses: ['mean-reversion'] } })
+assert.equal(neutral.data.aboveMa200, true)
+assert.equal(neutral.data.ma50AboveMa200, false, 'a name that has only just recovered over its MA200 has no golden cross yet')
+assert.equal(neutral.data.state, 'neutral', 'above MA200 without the golden cross is neither pullback nor basing')
+assert.ok(neutral.diagnostics.some((row) => row.code === 'mean_reversion_unconfirmed'), 'an unconfirmed state is not a pass for a mean-reversion-only candidate')
+assert.equal(
+  execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: neutralBars, lenses: ['mean-reversion', 'trend-pullback'] } })
+    .diagnostics.some((row) => row.code === 'mean_reversion_unconfirmed'),
+  false,
+  'the restriction is on mean-reversion alone, not on a candidate two lenses agree about',
+)
+
+assert.equal(
+  execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: stillFalling.slice(0, 10) } }).status,
+  'unevaluated',
+  'absent scan history warns rather than blocks; over-constraint is not caution',
+)
+
+/**
+ * Lens C — the 5pp band the other two lenses drop. (approved 2026-07-29,
+ * implementation anchored to 2026-08-24)
+ */
+const qualityRise = Array.from({ length: 180 }, (_, index) => 60 + index * 0.9)
+const qualityBars = series([
+  ...qualityRise,
+  // A choppy markdown, not a straight line: a monotone decline puts RSI at zero
+  // and would land in `mean-reversion` instead of the band under test.
+  ...Array.from({ length: 40 }, (_, index) => qualityRise.at(-1) - 1.5 * (index + 1) + (index % 2 ? 3 : -3)),
+])
+const scanned = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'GAP', market: 'us', bars: qualityBars } })
+assert.ok(scanned.data.indicators.offHigh200 <= -0.15 && scanned.data.indicators.offHigh200 >= -0.35, 'the fixture sits in the band both other lenses drop')
+assert.equal(scanned.data.signals.trendPullback.pullback, false, 'trend-pullback stops at -20% off high')
+assert.equal(scanned.data.signals.meanReversion.ma200Discount, false, 'a name above its MA200 does not carry the mean-reversion signals')
+assert.deepEqual(scanned.data.lenses, ['quality-pullback'], 'the gap band is covered by its own lens and by no other')
+assert.equal(execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'UP', market: 'us', bars: uptrend } }).data.lenses.includes('quality-pullback'), false, 'a name at its high is not a quality pullback')
+assert.equal(
+  execute({ operation: 'researchGate', asOf: methodology.asOf, input: { ...resizeResearch, lens: 'quality-pullback' } }).data.passed,
+  true,
+  'the new lens has a passing research path',
+)
+
+/**
+ * Portfolio heat — total loss if every stop fired, which no weight cap
+ * measures. (approved 2026-07-10, P4)
+ */
+const heatCaps = { position: 0.3, sector: 0.5, theme: 0.5, factor: 0.5, portfolioHeat: 0.06 }
+const hotPositions = [
+  { symbol: 'AAA', weight: 0.2, stopLossPct: 0.2 },
+  { symbol: 'BBB', weight: 0.2, stopLossPct: 0.15 },
+  { symbol: 'CORE', weight: 0.4, core: true },
+]
+const heatOnly = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, caps: heatCaps } })
+assert.equal(heatOnly.data.heat.holdingsOnly, 0.07, 'core DCA carries no stop and contributes no heat')
+assert.ok(heatOnly.diagnostics.some((row) => row.code === 'portfolio_heat_above_cap' && row.severity === 'unevaluated'), 'a book already over on its holdings warns; existing risk is grandfathered')
+const heatAdding = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, proposed: [{ symbol: 'CCC', weight: 0.05, stopLossPct: 0.2 }], caps: heatCaps } })
+assert.equal(heatAdding.status, 'blocked', 'adding new non-core risk above the cap is refused, not warned')
+assert.ok(heatAdding.diagnostics.some((row) => row.code === 'portfolio_heat_breach'))
+const heatCool = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'AAA', weight: 0.1, stopLossPct: 0.2 }], proposed: [{ symbol: 'CCC', weight: 0.05, stopLossPct: 0.2 }], caps: heatCaps } })
+assert.equal(heatCool.data.heat.withProposed, 0.03)
+assert.equal(heatCool.status, 'ok', 'heat under the cap is not an obstacle')
+assert.ok(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'AAA', weight: 0.1 }], caps: heatCaps } })
+    .diagnostics.some((row) => row.code === 'portfolio_heat_stop_missing'),
+  'a non-core row with no declared stop is unevaluated, never zero risk',
+)
+
+/**
+ * Pacing warns and never blocks. (approved 2026-07-10, P5)
+ */
+const pacing = execute({
+  operation: 'newSinglePacing',
+  asOf: methodology.asOf,
+  input: {
+    proposedNewSingles: [{ symbol: 'AAA' }, { symbol: 'BBB' }],
+    priorNewSingles: [{ symbol: 'ZZZ', verified: false }],
+    sizingPolicyUpdatedAt: methodology.asOf,
+    closedOutcomeCount: 0,
+  },
+})
+assert.deepEqual(pacing.data.warnings.map((row) => row.code).sort(), ['multiple-new-singles-one-session', 'prior-single-unverified', 'sizing-policy-changed-today'])
+assert.equal(pacing.status, 'unevaluated', 'pacing warns; it is never blocked')
+assert.equal(pacing.diagnostics.some((row) => row.severity === 'blocked'), false)
+const pacedRelaxed = execute({ operation: 'newSinglePacing', asOf: methodology.asOf, input: { proposedNewSingles: [{ symbol: 'AAA' }, { symbol: 'BBB' }], closedOutcomeCount: 12 } })
+assert.equal(pacedRelaxed.data.relaxed, true)
+assert.equal(pacedRelaxed.status, 'ok', 'a book with closed outcomes to learn from relaxes to advisory')
+assert.equal(execute({ operation: 'newSinglePacing', asOf: methodology.asOf, input: { proposedNewSingles: [{ symbol: 'AAA' }] } }).data.warnings.length, 0)
 
 /**
  * The manifest names the sources this package requires. (aumos #384)
