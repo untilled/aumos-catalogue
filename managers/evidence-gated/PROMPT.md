@@ -110,7 +110,7 @@ revision written after `asOf`, and never copy another manager's Brief into priva
 
 Read these stable keys only; do not invent per-run keys:
 
-`migration/schema-version`, `run/theme-radar-last`, `learning/evidence-maturity`,
+`migration/schema-version`, `run/theme-radar-last`, `run/watch-alerts`, `learning/evidence-maturity`,
 `learning/closed-decision-summary`, `calibration/mean-reversion`,
 `calibration/trend-pullback`, `calibration/quality-pullback`, `calibration/core-dca`,
 `calibration/inflection`, `calibration/post-event-continuation`,

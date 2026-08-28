@@ -889,6 +889,38 @@ assert.equal(driftBlind.data.status, 'unevaluable', 'with no quote at all the an
 assert.equal(driftBlind.data.needs, 'last-price', 'and it says what it would have needed')
 assert.ok(driftBlind.diagnostics.some((row) => row.code === 'watch_cadence_unavailable'), 'by name, so a reader afterwards can tell a missed check from a failed one')
 
+/**
+ * The dedupe state has a home, and the home has a bound.
+ *
+ * `alertedSessionKeys` is an input, so before this it was a list the caller had
+ * to keep somewhere and nothing said where. The original harness kept it in
+ * `data/night_gate_state.json`, per night; `run/watch-alerts` is that file with
+ * the state inside the memory contract, and the session bound is what keeps it
+ * from becoming the ledger `memory-contract` forbids.
+ */
+const foldAlerts = (input) => execute({ operation: 'watchAlertState', asOf: methodology.asOf, input })
+const firstAlert = foldAlerts({ previous: null, sessionDate: '2026-09-01', alerting: ['nvda-entry|2026-09-01'] })
+assert.equal(firstAlert.data.changed, true, 'a first alert in a session moves the aggregate, so a revision is worth writing')
+const sameSession = foldAlerts({ previous: firstAlert.data.nextState, sessionDate: '2026-09-01', alerting: ['nvda-entry|2026-09-01'] })
+assert.equal(sameSession.data.changed, false, 'and the same level brushed again does not — a revision records that an aggregate moved, not that a run happened')
+assert.deepEqual(sameSession.data.newlyAlerted, [], 'nothing new alerted')
+
+const nextSession = foldAlerts({ previous: firstAlert.data.nextState, sessionDate: '2026-09-02', alerting: ['nvda-entry|2026-09-02'] })
+assert.deepEqual(
+  nextSession.data.nextState.alerted,
+  ['nvda-entry|2026-09-02'],
+  "a new session replaces the previous session's list rather than appending — a key that accumulated every alert ever raised would grow without bound for a fact that stops mattering at the closing bell",
+)
+assert.ok(nextSession.diagnostics.some((row) => row.code === 'watch_alert_session_rolled'), 'and the roll is stated rather than silent')
+assert.equal(foldAlerts({ previous: null, alerting: [] }).status, 'unevaluated', 'without a session date the alerts of two days would merge, so there is no answer to give')
+
+const memoryContractSkill = await readFile(new URL('../skills/memory-contract/SKILL.md', fixtureRoot), 'utf8')
+assert.ok(memoryContractSkill.includes('`run/watch-alerts`'), 'the key is a published stable key, not one a run invents')
+assert.ok(
+  (await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')).includes('`run/watch-alerts`'),
+  'and the run skeleton reads it — a stable key no run opens is a key that never accumulates',
+)
+
 const sizingSkillText = await readFile(new URL('../skills/sizing-and-concentration/SKILL.md', fixtureRoot), 'utf8')
 for (const status of ['near', 'unevaluable', 'blocked']) {
   assert.ok(sizingSkillText.includes(`\`${status}\``), `the skill names the ${status} status; a status the core returns and no skill explains is one a run will not act on`)
@@ -1515,7 +1547,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 80)
+assert.equal(supportedOperations.length, 81)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),

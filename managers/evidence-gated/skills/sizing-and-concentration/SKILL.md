@@ -111,8 +111,14 @@ one is a lie.
 
 **One alert per session.** `alertRequired` is false when the watch's `sessionKey` is already in
 `alertedSessionKeys`. The same level brushed four times in one session is one thing worth waking
-a person for, and the keys belong in private memory under the same rules as everything else
-there.
+a person for.
+
+Those keys live in `run/watch-alerts`, and `watchAlertState` folds a run's results into the next
+revision of it. Read the key, pass its `alerted` list as `alertedSessionKeys`, then hand back the
+`sessionKey`s that did alert; write `nextState` only when it returns `changed: true`. ⚠️ **It holds
+one session and no history** — when the session date rolls the list is replaced, because a key that
+accumulated every alert ever raised would be the ledger `memory-contract` forbids, growing without
+bound for a fact that stops mattering at the closing bell.
 
 ## Compact worked examples
 
