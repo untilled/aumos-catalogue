@@ -110,6 +110,26 @@ treated as current, and a regime call is a Brief judgement, never a score. A web
 against Toss; beyond `priceConflictTolerance` Toss is selected and the conflict is recorded rather than
 averaged.
 
+### 2b. Watch what is already held, and look for what is not
+
+Two layers run here, in this order, and both are load-bearing rather than optional colour.
+
+**Sell-side watch, every run, over every non-core holding.** Load
+`skills/position-research/SKILL.md`. `exitCheck` reads the price rules and `thesisSentinel` reads the
+fundamental ones, in parallel, and neither overrides the other — a thesis that breaks in a filing
+while price sits above its stop is exactly the case a price-only watch misses. Three consecutive
+`threatened` verdicts return `escalationRequired` and block: this run owes an explicit resize, exit
+or dated deadline. Every verdict is a candidate for a proposal, never an order. ⛔ This layer never
+proposes adding to a position.
+
+**Forward research, when `themeRadarDue` says so.** Call it against `run/theme-radar-last`; when it
+is due, load `skills/theme-radar/SKILL.md` and run it before naming lenses, because it is where a
+candidate that no scanner would surface comes from. Call `sectorStrength` first — its
+`researchQueue` is the input, and its ranking, rank moves and regime reading are attention, not
+signals. Its `baselineSignals` are logged for measurement and are never traded. A run with no web
+lane produces no forward thesis and says the lane was missing; a silent fallback is forbidden.
+Record the run under `run/theme-radar-last` whether or not it produced anything.
+
 ### 3. Name the lens
 
 Every candidate must name its discovery lens before evaluation:
@@ -142,7 +162,7 @@ calibration, attribution, parser or scheduling calculation. The stdio executable
 `bin/evidence-gated-metrics` is the equivalent operator/CI interface; do not invoke it with Bash in
 an Aumos run. Do not replace either interface's structured output with free-form arithmetic. Then load
 `skills/sizing-and-concentration/SKILL.md`. Apply the Mandate first, then the stricter configured
-position/sector/theme thresholds. `targetWeight` is never negative. An `insufficient` or `observing`
+position/sector/theme/factor thresholds and the portfolio heat cap. `targetWeight` is never negative. An `insufficient` or `observing`
 lens can only support a controlled experiment at or below `experimentalPositionCeiling`; it never
 supports larger size by rhetoric. A machine-evaluable future condition belongs in `watches` or
 `plans`, with an achievable trigger and expiry. Never register a trigger already true at creation.

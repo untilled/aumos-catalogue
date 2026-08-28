@@ -188,3 +188,107 @@ export function migrationMap({ records = [], cutoverAt, schemaVersion = 1 }) {
   }
   return { data: { destinations, marker: { key: 'migration/schema-version', schemaVersion, cutoverAt }, backfillForwardTrackRecord: false, legacyModeAfterCutover: 'read-only' }, diagnostics }
 }
+
+const EXIT_SEVERITY = { stop_loss: 0, target_full: 0, trailing_stop: 0, time_stop: 0.2, trim: 1, thesis_invalidation: 1.5, trim_approach: 2, review: 3, thesis_review: 3.5 }
+const FULL_EXIT_KINDS = new Set(['stop_loss', 'target_full', 'trailing_stop', 'time_stop'])
+
+/**
+ * L2.5 — the sell-side watch, which had become a post-hoc measurement.
+ *
+ * `MIGRATION.md` maps `exit-check` to "SELL/TRIM/REVIEW diagnostics, preserving
+ * price and fundamental invalidation", and the `exit` coverage group named
+ * `forward-outcome`, `mfe-mae` and `failure-taxonomy` — three functions in
+ * `outcomes.mjs` that score a position after it closed. Attribution is not a
+ * watch. A thesis that breaks on fundamentals while price sits above the stop
+ * had nothing looking at it until the next scheduled review.
+ *
+ * Two lanes run in parallel and neither one overrides the other, which is the
+ * whole point of the design this is ported from:
+ *
+ * - **price** — stop, trim ladder, take-profit target, trailing stop, and the
+ *   time stop (the review date arrived and the position never got above its
+ *   entry, so the thesis had its window);
+ * - **fundamental** — `thesisSentinel`'s verdict and the sidecar deadlines:
+ *   horizon end, a catalyst window that closed without the catalyst, an
+ *   invalidation trigger whose own check-by date passed.
+ *
+ * ⛔ Every verdict is a *candidate*, never an order. Nothing here sizes, sells
+ * or bypasses the per-order approval Aumos owns; a `SELL` here is an input to a
+ * proposal the investor still approves one order at a time.
+ *
+ * A trim level set weeks ago can be stale by the time price reaches it, so
+ * approaching one within 5% raises `trim_approach` — re-validate the ladder's
+ * premise before it fires (approved 2026-07-11, L2.5c). It is advisory: the
+ * change it argues for is a rule proposal, never an automatic edit.
+ */
+export function exitCheck({ symbol = null, price, rules = {}, thesis = {}, sentinel = null, asOf } = {}) {
+  const diagnostics = []
+  const findings = []
+  const today = typeof asOf === 'string' ? asOf.slice(0, 10) : null
+  const past = (day) => typeof day === 'string' && today !== null && day.slice(0, 10) <= today
+  const add = (kind, message, detail = {}) => findings.push({ kind, symbol, message, ...detail })
+
+  if (!finite(price)) {
+    diagnostics.push(diagnostic('exit_price_unevaluated', 'unevaluated', 'Without a current price the price lane is unread; the fundamental lane still runs', 'price'))
+  } else {
+    const { stop, target, trailPct, peak, entry, reviewBy, trims = [] } = rules
+    if (finite(stop) && price <= stop) add('stop_loss', 'Price is at or below the stop; a full exit is the candidate', { level: stop, price })
+    if (finite(target) && price >= target) add('target_full', 'Price reached the take-profit target', { level: target, price })
+    if (finite(trailPct) && finite(peak)) {
+      const trigger = peak * (1 - trailPct)
+      if (price <= trigger) add('trailing_stop', 'Price is at or below the trailing stop', { level: round(trigger), price, peak })
+    }
+    for (const trim of trims) {
+      if (!finite(trim?.price) || trim?.fired) continue
+      if (price >= trim.price) add('trim', 'Price reached a trim rung', { level: trim.price, sellPct: trim.sellPct ?? null, price })
+      else if (price >= trim.price * 0.95) add('trim_approach', 'Price is within 5% of a trim rung; re-validate the ladder before it fires', { level: trim.price, sellPct: trim.sellPct ?? null, price })
+    }
+    if (reviewBy && past(reviewBy)) {
+      /**
+       * A calendar reminder and a thesis that had its window are different
+       * findings. "Never got above entry" is the narrow, stated proxy for the
+       * second — the benchmark-since-entry comparison the thesis text really
+       * asks for needs an entry date this input does not carry.
+       */
+      if (finite(entry) && price <= entry) add('time_stop', 'The review date arrived and the position never got above entry; it is an exit candidate', { level: entry, price, reviewBy, proxy: 'at-or-below-entry' })
+      else add('review', 'The review date arrived; the thesis needs eyes, not necessarily an exit', { reviewBy })
+    }
+  }
+
+  for (const trigger of thesis?.invalidationTriggers ?? []) {
+    if (trigger?.status && trigger.status !== 'open') continue
+    const fired = finite(price) && finite(trigger?.level) &&
+      ((trigger.kind === 'price_below' && price <= trigger.level) || (trigger.kind === 'price_above' && price >= trigger.level))
+    if (fired) add('thesis_invalidation', 'A thesis invalidation trigger is met; the claim must be re-verified before anything else', { triggerId: trigger.id ?? null, level: trigger.level, price })
+    else if (past(trigger?.checkBy)) add('thesis_review', 'An invalidation trigger passed its own check-by date without being evaluated', { triggerId: trigger.id ?? null, checkBy: trigger.checkBy })
+  }
+  if (past(thesis?.horizonEnd)) add('thesis_review', 'The thesis horizon ended; score it and record a hold/add/trim/exit checkpoint', { horizonEnd: thesis.horizonEnd })
+  for (const catalyst of thesis?.catalysts ?? []) {
+    if (catalyst?.occurred === undefined || catalyst?.occurred === null) {
+      if (past(catalyst?.windowEnd)) add('thesis_review', 'A catalyst window closed without the catalyst being scored', { event: catalyst.event ?? null, windowEnd: catalyst.windowEnd })
+    }
+  }
+  /**
+   * The fundamental lane's own verdict. `threatened` is a review candidate on
+   * its own — the price lane may be silent precisely because the market has not
+   * priced what the filing already says.
+   */
+  if (sentinel?.verdict === 'threatened') add('thesis_review', 'The fundamental sentinel reads threatened; bring the review forward rather than waiting for price', { verdict: sentinel.verdict })
+  if (sentinel?.escalationRequired) {
+    diagnostics.push(diagnostic('sentinel_escalation_pending', 'blocked', 'A repeated threatened verdict requires an explicit resize, exit or deadline decision in this run', 'sentinel'))
+  }
+
+  findings.sort((a, b) => (EXIT_SEVERITY[a.kind] ?? 9) - (EXIT_SEVERITY[b.kind] ?? 9))
+  const kinds = new Set(findings.map((row) => row.kind))
+  const action = [...kinds].some((kind) => FULL_EXIT_KINDS.has(kind)) || kinds.has('thesis_invalidation')
+    ? 'SELL'
+    : kinds.has('trim')
+      ? 'TRIM'
+      : kinds.has('review') || kinds.has('thesis_review') || kinds.has('trim_approach')
+        ? 'REVIEW'
+        : 'NONE'
+  if (action !== 'NONE') {
+    diagnostics.push(diagnostic('exit_candidate', action === 'REVIEW' ? 'info' : 'unevaluated', `Exit watch raised a ${action} candidate; it is an input to a proposal, never an order`, 'rules', { action, kinds: [...kinds] }))
+  }
+  return { data: { symbol, action, findings, priceLaneRead: finite(price), candidateOnly: true }, diagnostics }
+}

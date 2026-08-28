@@ -779,6 +779,133 @@ assert.equal(pacedRelaxed.status, 'ok', 'a book with closed outcomes to learn fr
 assert.equal(execute({ operation: 'newSinglePacing', asOf: methodology.asOf, input: { proposedNewSingles: [{ symbol: 'AAA' }] } }).data.warnings.length, 0)
 
 /**
+ * L1 — attention, not signals. (issue #70 §1)
+ *
+ * A blended RS score with nothing to rank it against decides nothing, which is
+ * all this package carried before. The lane ranking, the move since the last
+ * run, the regime and the research queue are what the research layer consumes.
+ */
+const lane = (rate, count = 220) => series(Array.from({ length: count }, (_, index) => 100 * (1 + rate) ** index))
+const sectorLane = execute({
+  operation: 'sectorStrength',
+  asOf: methodology.asOf,
+  input: {
+    lane: 'us',
+    benchmarkBars: lane(0.0004),
+    previousRanks: { Semis: 4, Staples: 1 },
+    sectors: [
+      { name: 'Semis', etf: 'SOXX', risk: 'on', bars: lane(0.0016), leaders: [{ symbol: 'LEAD', bars: lane(0.0018) }] },
+      { name: 'Software', etf: 'IGV', risk: 'on', bars: lane(0.0011) },
+      { name: 'Energy', etf: 'XLE', risk: 'on', bars: lane(0.0008) },
+      { name: 'Staples', etf: 'XLP', risk: 'off', bars: lane(-0.0002) },
+      { name: 'Unread', etf: 'XXX', bars: [] },
+    ],
+  },
+})
+assert.deepEqual(sectorLane.data.sectors.filter((row) => row.rank).map((row) => row.name), ['Semis', 'Software', 'Energy', 'Staples'], 'the lane is ranked, not merely scored')
+assert.equal(sectorLane.data.sectors.find((row) => row.name === 'Semis').rankChange, 3, 'the move since the previous run is what makes a rank a trigger')
+assert.equal(sectorLane.data.regime.leadershipCharacter, 'risk_on', 'the regime reads the character of who is leading')
+assert.equal(sectorLane.data.regime.benchmarkAboveMa200, true)
+assert.equal(sectorLane.data.regime.isJudgementInput, true, 'the regime is an input to a Brief judgement, never a score this package holds')
+assert.deepEqual(
+  sectorLane.data.researchQueue.map((row) => row.sector).sort(),
+  ['Energy', 'Semis', 'Software'],
+  'the top ranks that actually outperform are where the research layer is sent',
+)
+assert.ok(sectorLane.data.researchQueue.find((row) => row.sector === 'Semis').reasons.some((row) => row.code === 'rank-jump'))
+assert.equal(sectorLane.data.meaning, 'research-priority-only')
+assert.ok(sectorLane.data.baselineSignals.every((row) => row.tradeable === false), 'the bot baseline is a measuring stick and says so in the data')
+assert.equal(sectorLane.data.baselineSignals[0].setup, 'rs_breakout')
+assert.ok(sectorLane.diagnostics.some((row) => row.code === 'sector_series_unverified'), 'a sector that could not be read is named unread, never dropped')
+
+/**
+ * A negative-RS sector can still rank third in a narrow lane. Rank alone is not
+ * leadership, so it does not earn attention.
+ */
+const narrow = execute({
+  operation: 'sectorStrength',
+  asOf: methodology.asOf,
+  input: { lane: 'kr', benchmarkBars: lane(0.0016), sectors: [{ name: 'A', bars: lane(-0.0002) }, { name: 'B', bars: lane(-0.0003) }, { name: 'C', bars: lane(-0.0004) }] },
+})
+assert.deepEqual(narrow.data.researchQueue, [], 'in a lane where everything trails the benchmark, third place is not a research trigger')
+assert.equal(
+  execute({ operation: 'sectorStrength', asOf: methodology.asOf, input: { lane: 'us', sectors: [{ name: 'A', bars: lane(0.001) }] } }).status,
+  'unevaluated',
+  'without the benchmark the lane is unread rather than neutral',
+)
+
+/**
+ * L2.5 — the sell-side watch, which had been replaced by post-hoc attribution.
+ * (issue #70 §3)
+ */
+const held = { symbol: 'HELD', rules: { stop: 80, target: 150, entry: 100, reviewBy: '2027-01-01', trims: [{ price: 120, sellPct: 30 }] } }
+assert.equal(execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { ...held, price: 100 } }).data.action, 'NONE', 'an intact position raises nothing')
+assert.equal(execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { ...held, price: 79 } }).data.action, 'SELL')
+assert.equal(execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { ...held, price: 121 } }).data.action, 'TRIM')
+const approaching = execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { ...held, price: 115 } })
+assert.equal(approaching.data.action, 'REVIEW')
+assert.ok(approaching.data.findings.some((row) => row.kind === 'trim_approach'), 'a ladder rung within 5% is re-validated before it fires, not after')
+const trailing = execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { symbol: 'HELD', price: 88, rules: { trailPct: 0.2, peak: 120 } } })
+assert.equal(trailing.data.action, 'SELL')
+assert.equal(trailing.data.findings[0].kind, 'trailing_stop')
+
+/**
+ * The fundamental lane runs whether or not the price lane says anything — the
+ * case a price-only watch was missing entirely.
+ */
+const brokenThesis = execute({
+  operation: 'exitCheck',
+  asOf: methodology.asOf,
+  input: {
+    symbol: 'HELD',
+    price: 100,
+    rules: { stop: 80 },
+    thesis: { horizonEnd: '2026-08-01', catalysts: [{ event: 'earnings', windowEnd: '2026-07-31' }], invalidationTriggers: [{ id: 'inv-1', kind: 'metric', checkBy: '2026-08-10' }] },
+    sentinel: { verdict: 'threatened' },
+  },
+})
+assert.equal(brokenThesis.data.action, 'REVIEW', 'a thesis breaking on fundamentals is found while price is still above its stop')
+assert.deepEqual(
+  [...new Set(brokenThesis.data.findings.map((row) => row.kind))],
+  ['thesis_review'],
+  'horizon end, an unscored catalyst window, a passed check-by and a threatened sentinel all reach the same lane',
+)
+assert.equal(brokenThesis.data.findings.length, 4)
+const priceInvalidation = execute({
+  operation: 'exitCheck',
+  asOf: methodology.asOf,
+  input: { symbol: 'HELD', price: 70, rules: {}, thesis: { invalidationTriggers: [{ id: 'inv-1', kind: 'price_below', level: 75 }] } },
+})
+assert.equal(priceInvalidation.data.action, 'SELL', 'a met invalidation trigger is a full-exit candidate even with no stop configured')
+assert.equal(
+  execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { symbol: 'HELD', rules: { stop: 80 }, thesis: { horizonEnd: '2026-08-01' } } }).data.priceLaneRead,
+  false,
+  'a missing price unreads the price lane; the fundamental lane still runs',
+)
+assert.ok(
+  execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { ...held, price: 100, sentinel: { verdict: 'threatened', escalationRequired: true } } })
+    .diagnostics.some((row) => row.code === 'sentinel_escalation_pending' && row.severity === 'blocked'),
+  'a third consecutive threatened verdict forces an explicit decision in this run',
+)
+assert.ok(
+  [execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { ...held, price: 79 } }), priceInvalidation]
+    .every((row) => row.data.candidateOnly === true),
+  'every exit verdict is a candidate for a proposal, never an order',
+)
+
+/**
+ * The two research layers are skills, not schedule keys. (issue #70 §1)
+ */
+const prompt = await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')
+for (const skill of ['theme-radar', 'position-research']) {
+  const text = await readFile(new URL(`../skills/${skill}/SKILL.md`, fixtureRoot), 'utf8')
+  assert.ok(text.startsWith(`---\nname: ${skill}\n`), `${skill} declares its own name`)
+  assert.ok(prompt.includes(`skills/${skill}/SKILL.md`), `the run skeleton names ${skill}; a skill nothing loads is not a layer`)
+}
+assert.ok(prompt.includes('themeRadarDue'), 'the schedule key is wired to the workflow it wakes')
+assert.ok(prompt.includes('exitCheck') && prompt.includes('thesisSentinel'), 'the sell-side watch has a named call site')
+
+/**
  * The manifest names the sources this package requires. (aumos #384)
  */
 const passthrough = manifest.capabilities.find((row) => row.kind === 'source:passthrough')

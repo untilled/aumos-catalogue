@@ -1,6 +1,6 @@
 import { result, diagnostic } from './diagnostics.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
-import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate } from './scanners.mjs'
+import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength } from './scanners.mjs'
 import { sleeveNav, targetWeight, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing } from './sizing.mjs'
 import { coverageState, validateWatch } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
@@ -8,7 +8,7 @@ import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochb
 import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
-import { validateThesis, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap } from './methodology.mjs'
+import { validateThesis, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap, exitCheck } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence } from './schedule.mjs'
 
@@ -27,6 +27,7 @@ const operations = {
   opportunityUniverse,
   trendState,
   blendedSectorStrength: (input) => blendedSectorStrength(input?.assetBars ?? [], input?.benchmarkBars ?? [], input?.weights),
+  sectorStrength,
   sleeveNav,
   targetWeight,
   legacySizeSuggestion,
@@ -61,6 +62,7 @@ const operations = {
   oversoldStrata,
   validateThesis,
   thesisSentinel,
+  exitCheck: (input, asOf) => exitCheck({ ...input, asOf }),
   upsideRadar: (input, asOf) => upsideRadar({ ...input, asOf }),
   validateMemory: (input, asOf) => validateMemory({ ...input, asOf }),
   visibleMemoryRevision: (input, asOf) => visibleMemoryRevision({ ...input, asOf }),

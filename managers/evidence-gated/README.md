@@ -155,6 +155,8 @@ connections. The package stays unpublished while any release gate remains open.
 
 `PROMPT.md` contains only the invariant run skeleton. Conditional detail lives in:
 
+- `theme-radar`: forward research — where an idea comes from, and what a forward thesis must carry;
+- `position-research`: the sell-side watch on what is already held, price and fundamentals in parallel;
 - `evidence-gates`: sample independence, maturity and entry gates;
 - `data-source-contract`: endpoints, time boundaries and degradation;
 - `candidate-research`: lens-specific why-cheap/trap/variant/benchmark work;
@@ -224,6 +226,11 @@ and why, and the fixture asserts the difference so it cannot be undone silently.
   them under `optionalSkills` for exactly that reason. Until Aumos serves them, asset claims reach a
   run through the invocation payload and through Brief, and the package says so rather than implying
   a lookup it cannot make. `RunProvenance.unservedTools` is where a run records the difference.
+- The forward-research and sell-side layers are ported, but their track record is not. `theme-radar`
+  produces `thesis_call` paper positions and `sectorStrength` logs the two mechanical baselines they
+  are measured against; the comparison that answers "do the team's calls beat the index *and* the
+  bot?" needs months of closed windows before it says anything. Until then the research layer's edge
+  is a hypothesis, exactly as the baseline's is.
 - Source vendors relay their own response shapes; this manager, not Aumos, checks dates and freshness.
 - CLI web observations are not replay-canonical Evidence.
 - Calibration cannot promote or rewrite a methodology without a reviewed package/config change.

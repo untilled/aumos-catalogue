@@ -388,3 +388,158 @@ export function blendedSectorStrength(assetBars, benchmarkBars, weights = [[60, 
   }
   return { data: { scorePct: weight ? round(score / weight * 100, 3) : null, detail, weights: Object.fromEntries(weights.map(([period, value]) => [`d${period}`, value])) }, diagnostics: [] }
 }
+
+const TOP_RESEARCH_RANK = 3
+const RANK_JUMP_FOR_RESEARCH = 3
+const AT_HIGH_TOLERANCE = 0.995
+
+/**
+ * L1 — where the team should look, which is not what the team should buy.
+ *
+ * `blendedSectorStrength` above scores one sector against one benchmark. That
+ * number alone was all this package carried, and a score with nothing to rank
+ * it against decides nothing. The Trading Harness `bin/sector-strength` ranked
+ * the lane, tracked each sector's move since the previous run, read the regime
+ * off the benchmark and the character of the leaders, and emitted a
+ * `research_queue`. The queue is the input to the research layer; without it a
+ * schedule that says "wake up and research" has nowhere to send anyone.
+ *
+ * ⛔ Nothing here is a buy signal, and the output says so in `meaning` rather
+ * than only in prose. The design this is ported from is explicit that mechanical
+ * RS confirmed the 2026 semiconductor leadership only after the move had already
+ * happened; its job is to aim attention cheaply, not to take positions.
+ *
+ * The bot baseline is the second half of that demotion. `rs_leader_pullback` and
+ * `rs_breakout` are logged as paper signals so the question "do the team's picks
+ * beat a dumb momentum bot, and not merely the index?" has an answer. They are
+ * never traded, and `tradeable: false` travels with every row.
+ */
+export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks = {}, lane = null, weights } = {}) {
+  const diagnostics = []
+  if (benchmarkBars.length === 0) {
+    diagnostics.push(diagnostic('sector_benchmark_missing', 'unevaluated', 'Without the lane benchmark no relative strength is measurable; the lane is unread rather than neutral', 'benchmarkBars'))
+    return { data: { lane, regime: null, sectors: [], researchQueue: [], baselineSignals: [], meaning: 'research-priority-only' }, diagnostics }
+  }
+  const scored = []
+  const unread = []
+  for (const sector of sectors) {
+    const bars = sector?.bars ?? []
+    if (bars.length === 0) {
+      unread.push({ name: sector?.name ?? null, etf: sector?.etf ?? null, status: 'unverified' })
+      diagnostics.push(diagnostic('sector_series_unverified', 'unevaluated', 'A sector whose series could not be read is named as unread, never dropped silently', 'sectors', { name: sector?.name ?? null }))
+      continue
+    }
+    const { data: rs } = blendedSectorStrength(bars, benchmarkBars, weights)
+    if (rs.scorePct === null) {
+      unread.push({ name: sector?.name ?? null, etf: sector?.etf ?? null, status: 'insufficient-history' })
+      continue
+    }
+    const closes = bars.map((row) => row.close).filter(finite)
+    const ma200 = closes.length >= 200 ? closes.slice(-200).reduce((sum, value) => sum + value, 0) / 200 : null
+    const high = Math.max(...closes)
+    scored.push({
+      name: sector.name,
+      etf: sector.etf ?? null,
+      risk: sector.risk ?? null,
+      rsScorePct: rs.scorePct,
+      rsDetail: rs.detail,
+      atHigh: closes.at(-1) >= high * AT_HIGH_TOLERANCE,
+      aboveMa200: ma200 !== null ? closes.at(-1) > ma200 : null,
+      leaders: sector.leaders ?? [],
+    })
+  }
+  scored.sort((a, b) => b.rsScorePct - a.rsScorePct)
+  for (const [index, row] of scored.entries()) {
+    row.rank = index + 1
+    const previous = previousRanks[row.name]
+    row.rankChange = Number.isInteger(previous) ? previous - row.rank : null
+  }
+
+  const benchmarkCloses = benchmarkBars.map((row) => row.close).filter(finite)
+  const benchmarkMa200 = benchmarkCloses.length >= 200 ? benchmarkCloses.slice(-200).reduce((sum, value) => sum + value, 0) / 200 : null
+  if (benchmarkMa200 === null) diagnostics.push(diagnostic('regime_trend_unevaluated', 'unevaluated', 'The benchmark trend needs 200 bars; the regime is read without it rather than assumed', 'benchmarkBars'))
+  /**
+   * Two independent readings, kept apart. The trend is the benchmark against
+   * its own MA200; the character is who is leading. A single fused number would
+   * be the aggregate macro score this package refuses to hold.
+   */
+  const topThree = scored.slice(0, 3)
+  const votes = topThree.map((row) => row.risk).filter((risk) => risk === 'on' || risk === 'off')
+  const onVotes = votes.filter((risk) => risk === 'on').length
+  const offVotes = votes.filter((risk) => risk === 'off').length
+  const character = onVotes >= 2 ? 'risk_on' : offVotes >= 2 ? 'risk_off' : 'mixed'
+  const regime = {
+    benchmarkAboveMa200: benchmarkMa200 === null ? null : benchmarkCloses.at(-1) > benchmarkMa200,
+    leadershipCharacter: character,
+    leaders: topThree.map((row) => row.name),
+    isJudgementInput: true,
+  }
+
+  /**
+   * Rank alone is noise in a narrow market — third place in a lane where
+   * everything trails the benchmark is not leadership, so a top rank has to
+   * come with actual outperformance before it earns anyone's attention.
+   */
+  const researchQueue = []
+  for (const row of scored) {
+    const reasons = []
+    if (row.rank <= TOP_RESEARCH_RANK && row.rsScorePct > 0) reasons.push({ code: 'rs-rank', rank: row.rank })
+    if ((row.rankChange ?? 0) >= RANK_JUMP_FOR_RESEARCH) reasons.push({ code: 'rank-jump', rankChange: row.rankChange })
+    if (row.atHigh) reasons.push({ code: 'at-200d-high' })
+    if (reasons.length) {
+      researchQueue.push({
+        lane,
+        sector: row.name,
+        etf: row.etf,
+        rsScorePct: row.rsScorePct,
+        reasons,
+        question: 'Why is it leading, what would make the lead persist, and which second-order beneficiary is not priced yet?',
+      })
+    }
+  }
+
+  const baselineSignals = []
+  for (const row of topThree) {
+    for (const leader of row.leaders) {
+      const closes = (leader?.bars ?? []).map((entry) => entry.close).filter(finite)
+      if (closes.length < 200) {
+        diagnostics.push(diagnostic('baseline_leader_unverified', 'unevaluated', 'A leader without 200 bars cannot produce a baseline signal', 'sectors', { symbol: leader?.symbol ?? null }))
+        continue
+      }
+      const excess60 = returnOver(leader.bars, 60) - returnOver(benchmarkBars, 60)
+      if (!finite(excess60) || excess60 <= 0) continue
+      const setup = baselineSetup(closes)
+      if (setup) baselineSignals.push({ lane, sector: row.name, symbol: leader.symbol, setup, close: closes.at(-1), excess60Pct: round(excess60 * 100, 2), tradeable: false })
+    }
+  }
+
+  return {
+    data: {
+      lane,
+      regime,
+      sectors: [...scored, ...unread],
+      researchQueue,
+      baselineSignals,
+      meaning: 'research-priority-only',
+      baselineMeaning: 'measurement-only-never-traded',
+    },
+    diagnostics,
+  }
+}
+
+/**
+ * The dumb momentum bot the team is measured against: a leader at its 200-bar
+ * high, or one pulling back shallowly inside an intact uptrend.
+ */
+function baselineSetup(closes) {
+  const mean = (n) => closes.slice(-n).reduce((sum, value) => sum + value, 0) / n
+  if (closes.length < 200) return null
+  const close = closes.at(-1)
+  const ma20 = mean(20)
+  const ma50 = mean(50)
+  const ma200 = mean(200)
+  if (close >= Math.max(...closes) * AT_HIGH_TOLERANCE) return 'rs_breakout'
+  const offHigh60 = close / Math.max(...closes.slice(-60)) - 1
+  if (close > ma200 && ma50 > ma200 && close <= ma20 && close >= ma50 * 0.98 && offHigh60 >= -0.15 && offHigh60 <= -0.03) return 'rs_leader_pullback'
+  return null
+}
