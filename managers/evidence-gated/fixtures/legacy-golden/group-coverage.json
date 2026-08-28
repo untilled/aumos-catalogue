@@ -9,7 +9,7 @@
     "earnings": ["exact-bmo-amc-date-only", "actual-anchor"],
     "exit": ["exit-check-sell-trim-review", "exit-price-and-fundamental-lanes", "exit-candidate-never-order", "forward-outcome", "mfe-mae"],
     "learning": ["upside-radar", "memory-revision", "no-auto-method-change"],
-    "outcome": ["fill-net-return", "missing-cost-explicit", "failure-taxonomy"],
+    "outcome": ["fill-net-return", "missing-cost-explicit", "failure-taxonomy", "computed-vs-judged-axes", "execution-observation-only", "skill-code-taxonomy-agreement"],
     "owner-cutover": ["single-manager-three-flows", "flow-lane-ownership", "no-order-code", "canonical-owner-map"],
     "policy": ["config-schema-lint", "no-auto-relax", "price-conflict-tolerance-configurable"],
     "portfolio": ["krw-usd-sgov-nav", "fx-missing"],
