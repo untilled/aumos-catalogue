@@ -8,6 +8,29 @@ description: Research a candidate under its discovery lens, including why-cheap,
 Complete this before promoting a new single-name candidate. A scanner ranks what to investigate; it
 does not rank what to buy.
 
+## What a thesis has to carry
+
+`validateThesis` enforces this; the fields are named here so the contract is readable before it is
+refused. Six are required outright — a thesis missing one is not a thesis:
+
+`thesisId` · `asset` · `createdAt` · `coreClaim` · `horizonEnd` · `evidenceStatus`
+
+Six more decide whether it is **complete**. Each is a way of being wrong on the record:
+
+| gap field | what its absence hides |
+|---|---|
+| `variantView` | that the claim is the consensus, in which case the price already has it |
+| `consensusRefs` | what you are differing *from* — each ref dated, sourced, and captured after it was published |
+| `catalysts` | when the claim gets tested, as a window rather than a hope |
+| `invalidationTriggers` | what would make you drop it, decided before you are attached to it, each with a `checkBy` |
+| `expectedUpsidePct` | the number you can be wrong about |
+| `fairValueRange` | the low and the high, so the upside has something under it |
+
+⛔ Declaring `evidenceStatus: 'complete'` with any gap open is refused as `thesis_false_complete`.
+`incomplete` with gaps is fine and normal — the gaps are returned and stay visible. The refusal is
+for claiming to have finished the work while the record shows otherwise, which is the one state that
+would let an unfinished thesis be counted as a finished one.
+
 ## Trigger vocabulary — one spelling, two sets
 
 Kebab-case everywhere, as in the `unit` and `lens` vocabularies. Underscore forms are accepted and

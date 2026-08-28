@@ -1871,6 +1871,39 @@ for (const file of ['lens_definitions.json', 'entry_gates.json', 'exit_rules.jso
  * the config references — each one a place where a run could follow a skill
  * and be refused by the code.
  */
+covers('research/thesis-field-contract')
+const researchSkill = await readFile(new URL('../skills/candidate-research/SKILL.md', fixtureRoot), 'utf8')
+/**
+ * The contract `validateThesis` enforces is published where a run reads before
+ * it is refused, and the two lists are checked against the code rather than
+ * transcribed once and left.
+ */
+const thesisContract = researchSkill.slice(researchSkill.indexOf('## What a thesis has to carry'), researchSkill.indexOf('## Trigger vocabulary'))
+for (const field of ['thesisId', 'asset', 'createdAt', 'coreClaim', 'horizonEnd', 'evidenceStatus']) {
+  assert.ok(thesisContract.includes(`\`${field}\``), `the contract names the required field ${field}`)
+  const withoutIt = { ...methodology.thesis }
+  delete withoutIt[field]
+  assert.ok(
+    execute({ operation: 'validateThesis', asOf: methodology.asOf, input: withoutIt })
+      .diagnostics.some((row) => row.code === 'thesis_field_missing' || row.code === 'thesis_evidence_status_invalid'),
+    `${field} is required in code, not only in the table`,
+  )
+}
+const falseComplete = execute({ operation: 'validateThesis', asOf: methodology.asOf, input: { ...methodology.thesis, expectedUpsidePct: null } })
+assert.ok(falseComplete.diagnostics.some((row) => row.code === 'thesis_false_complete'), 'claiming complete with a gap open is the one state that would let unfinished work be counted as finished')
+assert.deepEqual(falseComplete.data.gaps, ['expectedUpsidePct'])
+const honestlyIncomplete = execute({ operation: 'validateThesis', asOf: methodology.asOf, input: { ...methodology.thesis, evidenceStatus: 'incomplete', expectedUpsidePct: null } })
+assert.equal(honestlyIncomplete.status, 'unevaluated', 'gaps declared as gaps are normal and stay visible')
+assert.equal(honestlyIncomplete.data.valid, true)
+for (const gap of ['variantView', 'consensusRefs', 'catalysts', 'invalidationTriggers', 'expectedUpsidePct', 'fairValueRange']) {
+  assert.ok(thesisContract.includes(`\`${gap}\``), `the contract names the gap field ${gap}`)
+}
+assert.ok(
+  execute({ operation: 'validateThesis', asOf: methodology.asOf, input: { ...methodology.thesis, invalidationTriggers: [{ id: 'inv-1', kind: 'price-below', checkBy: '2026-11-15' }] } })
+    .diagnostics.some((row) => row.code === 'invalidation_price_missing'),
+  'a price invalidation needs its level under the canonical spelling too, not only the retired one',
+)
+
 covers('audit/skill-code-enum-agreement', 'audit/configured-x-exists')
 const methodologySource = await readFile(new URL('../lib/methodology.mjs', fixtureRoot), 'utf8')
 const evidenceSource = await readFile(new URL('../lib/evidence.mjs', fixtureRoot), 'utf8')
@@ -1879,7 +1912,6 @@ const setLiteral = (source, name) => {
   nodeAssert.ok(start >= 0, `${name} is declared as a set literal`)
   return [...source.slice(start, source.indexOf('])', start)).matchAll(/'([a-z0-9-]+)'/g)].map((match) => match[1])
 }
-const researchSkill = await readFile(new URL('../skills/candidate-research/SKILL.md', fixtureRoot), 'utf8')
 const vocabularySection = researchSkill.slice(researchSkill.indexOf('## Trigger vocabulary'), researchSkill.indexOf('## Lens-specific reading'))
 for (const [name, section] of [['THESIS_TRIGGER_KINDS', vocabularySection], ['WATCH_TRIGGER_KINDS', vocabularySection]]) {
   for (const kind of setLiteral(methodologySource, name)) {
