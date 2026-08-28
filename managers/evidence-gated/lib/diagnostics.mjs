@@ -9,6 +9,19 @@ export const RULE_VERSION = 'ega-1.0.0'
  */
 export const MANAGER_ID = 'evidence-gated'
 
+/**
+ * The flows this manager dispatches, and the markets each sleeve owns.
+ *
+ * One vocabulary, here, because three things key off it and they were keying
+ * off three copies: `sizing.mjs` owns lane enforcement, `schedule.mjs` mints the
+ * per-market reviews, and `PROMPT.md` dispatches. A flow name added to one and
+ * not the others is a wake nothing answers — which is the failure #87 records,
+ * one layer down.
+ */
+export const SLEEVE_FLOW_MARKETS = { 'kr-sleeve': ['XKRX'], 'us-sleeve': ['XNAS', 'XNYS'] }
+export const ALLOCATOR_FLOW = 'allocate'
+export const DISPATCHABLE_FLOWS = [...Object.keys(SLEEVE_FLOW_MARKETS), ALLOCATOR_FLOW]
+
 export function finite(value) {
   return typeof value === 'number' && Number.isFinite(value)
 }

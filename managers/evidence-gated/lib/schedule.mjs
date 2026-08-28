@@ -1,4 +1,4 @@
-import { diagnostic, MANAGER_ID } from './diagnostics.mjs'
+import { diagnostic, MANAGER_ID, ALLOCATOR_FLOW, DISPATCHABLE_FLOWS } from './diagnostics.mjs'
 
 function partsAt(instant, timeZone) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -103,20 +103,35 @@ export function boundedRetry({ checkpointAt, asOf, attempt = 0, announcedReplace
   return { data: { at: new Date(anchor + retryMinutes * 60_000).toISOString(), reason: 'release-not-yet-published', attempt: attempt + 1 }, diagnostics }
 }
 
-export function classifyScheduledWake({ watchId, scheduledAt, asOf, consumedWatchIds = [], sourceStatus = 'available', releaseFound = false }, { lateToleranceMinutes = 5 } = {}) {
+export function classifyScheduledWake({ watchId, summary, scheduledAt, asOf, consumedWatchIds = [], sourceStatus = 'available', releaseFound = false }, { lateToleranceMinutes = 5 } = {}) {
   const diagnostics = []
   if (!watchId || !Number.isFinite(Date.parse(scheduledAt)) || !Number.isFinite(Date.parse(asOf))) {
     diagnostics.push(diagnostic('scheduled_wake_invalid', 'blocked', 'watchId, scheduledAt and asOf are required', 'input'))
     return { data: null, diagnostics }
   }
+  /**
+   * The flow rides along, because this is the call a run already makes.
+   *
+   * A wake that reached the orchestrator carrying only "you are due" is what
+   * made every wake run all three flows (#87). Resolving it here rather than in
+   * a second operation means the run cannot ask whether it is due without also
+   * being told what it was woken for.
+   *
+   * `watchId` stays the dedupe key and `summary` is where the flow is: the
+   * first is Aumos's `eventId`, unique per firing, and the second is the
+   * sentence the manager itself armed. Neither can do the other's job.
+   */
+  const wake = resolveWakeFlow({ summary, watchId })
+  diagnostics.push(...wake.diagnostics)
+  const flow = wake.data?.flow ?? null
   if (consumedWatchIds.includes(watchId)) {
     diagnostics.push(diagnostic('scheduled_wake_duplicate', 'blocked', 'A consumed WATCH cannot create a duplicate Decision', 'watchId'))
-    return { data: { disposition: 'deduplicated', submitDecision: false }, diagnostics }
+    return { data: { disposition: 'deduplicated', submitDecision: false, flow }, diagnostics }
   }
   const delayMinutes = (Date.parse(asOf) - Date.parse(scheduledAt)) / 60_000
   if (delayMinutes < 0) {
     diagnostics.push(diagnostic('scheduled_wake_early', 'blocked', 'An at-time WATCH is not due yet', 'asOf', { delayMinutes }))
-    return { data: { disposition: 'not-due', submitDecision: false, delayMinutes }, diagnostics }
+    return { data: { disposition: 'not-due', submitDecision: false, delayMinutes, flow }, diagnostics }
   }
   if (delayMinutes > lateToleranceMinutes) diagnostics.push(diagnostic('scheduled_wake_late_fire', 'info', 'Wake fired after its scheduled instant', 'asOf', { delayMinutes }))
   if (sourceStatus !== 'available') diagnostics.push(diagnostic('release_source_unavailable', 'unevaluated', 'Source outage is distinct from an unpublished release', 'sourceStatus', { sourceStatus }))
@@ -124,6 +139,7 @@ export function classifyScheduledWake({ watchId, scheduledAt, asOf, consumedWatc
     data: {
       disposition: sourceStatus !== 'available' ? 'source-degraded' : releaseFound ? 'actual-found' : 'release-missing',
       submitDecision: true,
+      flow,
       delayMinutes,
       lateFire: delayMinutes > lateToleranceMinutes,
       requiresRetry: sourceStatus === 'available' && !releaseFound,
@@ -192,11 +208,87 @@ export function nextReviewSequence({ krSessions = [], usSessions = [], globalRev
   /**
    * `owner` used to name the three pre-2026-08-27 packages; the flow is what
    * the orchestrator actually dispatches.
+   *
+   * ⚠️ **And it only became that in #87.** The field was minted here and read
+   * nowhere, so all three wakes arrived as an undistinguished `PORTFOLIO_REVIEW`
+   * and the orchestrator ran all three flows on each of them — three times the
+   * work, and each sleeve judged twice, once on a bar that had not closed yet.
+   * `intent` is what carries the flow across the gap. It is the only field a
+   * manager writes that survives the round trip — a plan has no id the manager
+   * can choose, and the event it raises has no plan id on it — so the wake comes
+   * back as an event `summary` with the intent inside, and `resolveWakeFlow`
+   * reads it out.
    */
   const sequence = [
     kr.data.next && { owner: MANAGER_ID, flow: 'kr-sleeve', task: 'PORTFOLIO_REVIEW', at: kr.data.next.reviewAt, session: kr.data.next },
     us.data.next && { owner: MANAGER_ID, flow: 'us-sleeve', task: 'PORTFOLIO_REVIEW', at: us.data.next.reviewAt, session: us.data.next },
-    globalAt && Date.parse(globalAt) > Date.parse(asOf) && { owner: MANAGER_ID, flow: 'allocate', task: 'PORTFOLIO_REVIEW', at: globalAt },
-  ].filter(Boolean).sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+    globalAt && Date.parse(globalAt) > Date.parse(asOf) && { owner: MANAGER_ID, flow: ALLOCATOR_FLOW, task: 'PORTFOLIO_REVIEW', at: globalAt },
+  ].filter(Boolean)
+    .map((row) => ({ ...row, intent: marketReviewIntent(row.flow, row.at) }))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
   return { data: { sequence }, diagnostics }
+}
+
+/** The marker that opens a market review's `intent`. */
+const MARKET_REVIEW_PREFIX = 'market-review'
+const MARKET_REVIEW_MARKER = /market-review:([a-z-]+):(\S+)/
+
+/**
+ * The `intent` a market review is armed with.
+ *
+ * ⚠️ **The manager cannot choose an id, and this is why the flow rides in the
+ * intent.** `watchProposalSchema` is `{ subject?, intent, trigger, expiresAt? }`
+ * — there is no id field to write — and the `AumosEvent` a fired plan produces
+ * is a strict object of `eventId`, `kind`, `subject`, `occurredAt`,
+ * `detectedAt`, `summary`, `materiality`, `evidenceIds`, with no plan id on it.
+ * The one thing the manager writes that survives the round trip is `intent`,
+ * which the wake engine composes into the event as
+ * `` `${verdict.reason} — watching for: ${intent}` ``. That composition is
+ * deliberate and recent — before it, the engine's own note says, an armed plan
+ * was "a **timer** rather than a note to self".
+ *
+ * So the marker goes first and the sentence follows it: the first half is for
+ * this package, the second is for the person reading PLANS.
+ *
+ * The scheduled instant is in the marker so a late or stale fire is
+ * distinguishable. It is **not** the dedupe key — `eventId` is, and it is
+ * Aumos's, unique per firing, and needs no help from a name.
+ */
+export function marketReviewIntent(flow, at) {
+  const sleeve = flow === ALLOCATOR_FLOW ? 'Cross-market allocation' : `${flow} review`
+  return `${MARKET_REVIEW_PREFIX}:${flow}:${at} — ${sleeve} after the close it is armed against`
+}
+
+/**
+ * Which flow a wake is for, read out of the event a fired plan raised.
+ *
+ * Pass the `plan-trigger` event's `summary`; the manager's own `intent` is
+ * inside it. A bare intent works too, which is what the arming side has.
+ *
+ * Returns `null` data for any wake this manager did not arm — a manual run, an
+ * asset review, an earnings checkpoint. That is not an error and carries no
+ * diagnostic: those wakes are real and the orchestrator's answer for them is to
+ * run every flow, which is what it did for everything before #87. What *is* a
+ * diagnostic is a market-review marker naming a flow nothing dispatches,
+ * because that is a wake nobody will answer.
+ */
+export function resolveWakeFlow({ summary, intent, watchId } = {}) {
+  const diagnostics = []
+  const text = [summary, intent, watchId].find((value) => typeof value === 'string' && value.includes(`${MARKET_REVIEW_PREFIX}:`))
+  if (text === undefined) return { data: null, diagnostics }
+  const match = MARKET_REVIEW_MARKER.exec(text)
+  if (match === null) {
+    diagnostics.push(diagnostic('wake_marker_unreadable', 'unevaluated', 'A market-review marker is present but not in the shape this package arms', 'summary', { text }))
+    return { data: null, diagnostics }
+  }
+  const [, flow, scheduledAt] = match
+  if (!DISPATCHABLE_FLOWS.includes(flow)) {
+    diagnostics.push(diagnostic('wake_flow_unknown', 'blocked', 'A market-review wake names a flow this manager does not dispatch', 'summary', { flow, dispatchable: DISPATCHABLE_FLOWS }))
+    return { data: null, diagnostics }
+  }
+  if (!Number.isFinite(Date.parse(scheduledAt))) {
+    diagnostics.push(diagnostic('wake_instant_unreadable', 'unevaluated', 'A market-review wake carries no readable scheduled instant', 'summary', { flow }))
+    return { data: { flow, scheduledAt: null }, diagnostics }
+  }
+  return { data: { flow, scheduledAt }, diagnostics }
 }

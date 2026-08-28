@@ -1,13 +1,14 @@
-import { diagnostic, finite, round, MANAGER_ID } from './diagnostics.mjs'
+import { diagnostic, finite, round, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW } from './diagnostics.mjs'
 
 /**
  * Lane ownership is keyed by flow, not by manager id.
  *
  * Keying it by manager id was what blocked every `specialistBudget` call made
- * with the id the manifest actually publishes.
+ * with the id the manifest actually publishes. ⚠️ The table itself moved to
+ * `diagnostics.mjs` (#87): `schedule.mjs` needs the same names to mint a wake
+ * the orchestrator can answer, and a second copy of a vocabulary is how the two
+ * halves come to disagree about what a flow is called.
  */
-const SLEEVE_FLOW_MARKETS = { 'kr-sleeve': ['XKRX'], 'us-sleeve': ['XNAS', 'XNYS'] }
-const ALLOCATOR_FLOW = 'allocate'
 
 export function sleeveNav({ cash = [], positions = [], fx = {} }) {
   const diagnostics = []

@@ -81,8 +81,23 @@ The roles are **subagents of this one manager**, dispatched in order.
 | `us-sleeve` | US research and the US sleeve, including policy-designated liquidity |
 | `allocate` | the won/dollar sleeve targets, FX, book-wide cash and concentration, and the cross-market `REBALANCE` |
 
-Sequential and not parallel: `allocate` prices the two sleeves against each other and
-cannot do that against a sleeve that is still deciding.
+**Most runs dispatch one of them, not all three.** Each flow has its own wake, timed to the
+market it owns:
+
+| wake | KST | what has just happened |
+|---|---|---|
+| `us-sleeve` | 05:45–06:45 | the US session closed and its bar is complete |
+| `allocate` | 08:00 | both markets are closed and the Korean one has not opened — the day's sleeve budgets are set here |
+| `kr-sleeve` | 16:00 | the Korean session closed and its bar is complete |
+
+A run reads which flow woke it and dispatches that one. When more than one runs — a manual
+run, an event review, or an `allocate` wake that finds a sleeve's conclusion older than that
+market's last close — they run in order and never in parallel: `allocate` prices the two
+sleeves against each other and cannot do that against a sleeve that is still deciding.
+
+A single-sleeve run may act inside its own sleeve's recorded budget. It may not propose the
+cross-market `REBALANCE`; a sleeve that never saw the other one cannot claim the shape of the
+whole book.
 
 ⛔ **Only the orchestrator submits, and exactly once.** A run seals one judgement and a
 second submission is refused, so a flow that submitted would seal a judgement the other two
@@ -96,6 +111,13 @@ differing only in four lines of prompt and their manifests — three copies of o
 methodology, free to drift, that an investor had to find and install three times. What is
 genuinely lost is per-sleeve scoring and per-sleeve approval: the track record's row and
 the approval gate are now one manager and one basket.
+
+⚠️ **Per-sleeve *dispatch* was lost too, and that was not intended.** Before the merge each
+market's wake belonged to a different manager, so a Korean wake ran the Korean package. After
+it, all three wakes reached the same manager and it ran all three flows on each of them —
+three times the work, with each sleeve judged twice a day, once on a bar that had not closed
+yet. The scheduler had kept the distinction the whole time; nothing read it. Fixed in
+[#87](https://github.com/untilled/aumos-catalogue/issues/87).
 
 ## How a run works
 
@@ -118,11 +140,13 @@ flowchart TB
         PRE["Pre-flight before any trade is planned"]:::judges
     end
 
-    subgraph FLOWS["2 · Three flows, in order"]
+    WHICH{"2 · Which flow was this wake for?"}:::judges
+
+    subgraph FLOWS["The three flows — one per wake, in order when several run"]
         direction TB
-        KR["kr-sleeve<br/>Korean research and sleeve"]:::judges
-        US["us-sleeve<br/>US research and sleeve"]:::judges
-        AL["allocate<br/>prices the two sleeves against each other"]:::judges
+        KR["kr-sleeve · 16:00 KST<br/>Korean research and sleeve"]:::judges
+        US["us-sleeve · 05:45 KST<br/>US research and sleeve"]:::judges
+        AL["allocate · 08:00 KST<br/>prices the two sleeves against each other"]:::judges
     end
 
     HOLD["2b · Watch what is already held<br/>price and fundamentals in parallel,<br/>sell-side only"]:::judges
@@ -145,8 +169,15 @@ flowchart TB
         ORD["Only then does an order exist"]:::person
     end
 
-    WAKE --> IN --> PRE --> KR --> US --> AL
-    AL --> HOLD --> LENS --> GATE
+    WAKE --> IN --> PRE --> WHICH
+    WHICH -- "kr-sleeve" --> KR
+    WHICH -- "us-sleeve" --> US
+    WHICH -- "allocate" --> AL
+    WHICH -- "no flow: manual or event — all three, in order" --> FLOWS
+    KR --> HOLD
+    US --> HOLD
+    AL --> HOLD
+    HOLD --> LENS --> GATE
     GATE -- "a gate is unmet" --> WATCH
     GATE -- "every gate cleared" --> SIZE --> ACT
     WATCH --> LEARN
