@@ -45,11 +45,35 @@ dispatch rather than packages somebody installs:
 | `us-sleeve` | XNAS/XNYS research and the US sleeve, including policy-designated SGOV liquidity |
 | `allocate`  | KRW/USD sleeve targets, total cash, FX, portfolio-wide concentration, cross-market opportunity cost |
 
-Run them **in order** — `kr-sleeve`, then `us-sleeve`, then `allocate` — with the Agent tool,
-using the subagents of the same name. Sequential and not parallel: `allocate` prices the two
-sleeves against each other and cannot do that against a sleeve that is still deciding. Skip a
-market flow only when the invocation's `task` cannot reach it (a single-asset `ASSET_REVIEW`
-in one market), and say so in `uncertainty`.
+**Dispatch what this wake asked for, not all three.** Call `resolveWakeFlow` on the WATCH id
+that woke this run — `classifyScheduledWake` returns the same `flow` if you are already
+calling it — and dispatch accordingly:
+
+| the wake's `flow` | dispatch |
+|---|---|
+| `kr-sleeve` | `kr-sleeve` only |
+| `us-sleeve` | `us-sleeve` only |
+| `allocate` | `allocate` only, unless a sleeve's Brief conclusion is older than that market's most recent close — then dispatch that sleeve first and say why in `uncertainty` |
+| none (manual run, event review, an earnings checkpoint) | all three, in order |
+
+⚠️ **A market review is armed at the moment that market's bar closes, and that is the whole
+point of dispatching by flow.** `nextReviewSequence` puts KR at the XKRX close plus buffer, US
+at the actual XNYS/XNAS close plus buffer, and `allocate` at 08:00 Asia/Seoul — which is after
+both closes and **before the Korean open**, so the sleeve budgets for the day are set on the
+US session that just finished. Running all three flows on every wake threw that away: the
+05:45 KST wake judged Korea on yesterday's bar, the 16:00 KST wake judged the US before its
+market had opened, and each sleeve was judged twice a day on data it had already read.
+
+When you do run more than one, run them **in order** — `kr-sleeve`, then `us-sleeve`, then
+`allocate` — with the Agent tool, using the subagents of the same name. Sequential and not
+parallel: `allocate` prices the two sleeves against each other and cannot do that against a
+sleeve that is still deciding. Skip a market flow when the invocation's `task` cannot reach it
+(a single-asset `ASSET_REVIEW` in one market), and say so in `uncertainty`.
+
+⛔ **A single-sleeve run does not propose a cross-market `REBALANCE`.** It may propose BUY,
+SELL or RESIZE inside its own sleeve's recorded budget, or WAIT/WATCH. Repairing the shape of
+the whole book is `allocate`'s, and a sleeve that never saw the other one cannot claim it.
+`skills/orchestrate/SKILL.md` carries the boundary.
 
 Load `skills/orchestrate/SKILL.md` before dispatching anything. ⚠️ **Every dispatch prompt
 names the tools that flow has**, from what this session was actually served — a flow that
@@ -77,6 +101,9 @@ Thesis, Brief and WATCH, which are the investor's records rather than a message 
 Read `task`, `portfolio`, `mandate`, `events`, `asOf`, `language` and config from the invocation.
 Do this **before** dispatching anything: `asOf` and `language` are what every flow is handed, and
 a flow that had to read the invocation itself would be a second reader of the same document.
+**`events` is also where the wake is** — a fired `at-time` WATCH arrives there with the id it
+was armed under, and that id is what §Orchestration resolves into a flow. A run that dispatches
+before reading it has already decided to run all three.
 Use `portfolio_read`, `thesis_read`, `brief_read`, `evidence_read` and `manager_memory_read` when
 available. Private memory is isolated by package instance/model and time: never request or infer a
 revision written after `asOf`, and never copy another manager's Brief into private memory.
@@ -230,6 +257,11 @@ For every regular run, ask the Toss market-calendar source for the next actual o
 re-arm one future `at-time` review: KR after XKRX close plus configured buffer, US after the actual
 XNYS/XNAS close plus buffer, Global at the next sourced 08:00 Asia/Seoul review after both available
 closes. Never add 24 hours or reuse a fixed UTC close across DST, holidays or early closes.
+
+**Arm each one under the `watchId` `nextReviewSequence` returns**, verbatim. It is
+`market-review:<flow>:<scheduled instant>`, and it is the only thing that tells the next run
+what it was woken for. An id you compose yourself, or a review armed without one, wakes a run
+that has to fall back to running all three flows.
 
 Known earnings are also `at-time` WATCH checkpoints, never `event: earnings`. Prefer official company
 IR/calendar, then official press release/exchange filing, then SEC/DART metadata, then a dated

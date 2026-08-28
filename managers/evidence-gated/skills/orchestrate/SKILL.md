@@ -5,11 +5,55 @@ description: How this manager runs its three market flows and assembles their an
 
 # Orchestrate
 
+## Which flows this run dispatches
+
+**Not all of them, most runs.** `resolveWakeFlow` reads the WATCH id that woke this run and
+returns the flow it was armed for; `classifyScheduledWake` returns the same `flow` alongside
+its due/duplicate/late verdict, so a run already making that call has the answer.
+
+| the wake's `flow` | dispatch | why |
+|---|---|---|
+| `kr-sleeve` | `kr-sleeve` | armed at the XKRX close plus buffer — Korea's bar has just closed and nothing else has |
+| `us-sleeve` | `us-sleeve` | armed at the actual XNYS/XNAS close plus buffer |
+| `allocate` | `allocate` | armed at 08:00 Asia/Seoul: after both closes, **before the Korean open**. Both sleeves have already run at their own closes and written their conclusions to Brief |
+| none | all three, in order | a manual run, an event review or an earnings checkpoint carries no flow, and running everything is the honest answer to "I do not know what woke me" |
+
+⚠️ **`allocate` has one fallback and it is not optional.** Before pricing the sleeves against
+each other, check each sleeve's Brief conclusion against that market's most recent close. A
+conclusion older than the close means that sleeve's wake was missed or failed, and `allocate`
+would otherwise set a budget on a sleeve nobody looked at. Dispatch the stale sleeve first,
+then allocate, and name the gap in `uncertainty`. Say which sleeve and how stale — a silent
+recovery is how a missed wake becomes a habit.
+
 ## The order, and why it is one
 
-`kr-sleeve` → `us-sleeve` → `allocate`. Sequential, because `allocate` sets both sleeves'
-budgets against each other and cannot price a sleeve that is still deciding. It is also what
-makes this manager one CLI rather than three: nothing here fans out.
+When more than one flow runs: `kr-sleeve` → `us-sleeve` → `allocate`. Sequential, because
+`allocate` sets both sleeves' budgets against each other and cannot price a sleeve that is
+still deciding. It is also what makes this manager one CLI rather than three: nothing here
+fans out.
+
+⚠️ **This used to be every run, and that was the defect.** The three wakes were minted with a
+`flow` apiece and nothing read it, so each of them ran all three flows: the 05:45 KST US wake
+also judged Korea on yesterday's bar, the 16:00 KST Korean wake also judged the US before its
+market opened, and `allocate` ran three times a day when only one of those three sat where it
+was meant to sit. Three times the work, and each sleeve judged twice on data it had already
+read. (#87)
+
+## What a single-sleeve run may propose
+
+⛔ **Not a cross-market `REBALANCE`.** A sleeve flow that never saw the other sleeve cannot
+claim the shape of the whole book. A `kr-sleeve` wake may reach:
+
+- `BUY`, `SELL` or `RESIZE` inside that sleeve's **recorded budget** — the one Brief carries
+  from the last `allocate`, not one this run invents;
+- `REBALANCE` **within one market**, when two or more positions in that sleeve move together
+  and the sleeve total does not change;
+- `WAIT` or `WATCH`.
+
+Repairing the sleeve split itself, the book's cash, FX, or a concentration that only exists
+when both sleeves are added together is `allocate`'s. A single-sleeve run that finds one says
+so in `uncertainty` and leaves it for the 08:00 wake — which is hours away, not days, and that
+is what the schedule is for.
 
 ## Dispatching a flow
 
@@ -73,9 +117,10 @@ A flow returns Evidence ids, proposed targets and its own `uncertainty`. Treat i
 
 ## One proposal
 
-`targets` carries every position this run moves, in both markets. `WAIT` when the assembled set
-is empty and the evidence was adequate; `WAIT` also when it was not, and the two are told apart
-in `keyReasons` and `uncertainty`.
+`targets` carries every position this run moves — in both markets when both sleeves ran, in one
+when this was a single-sleeve wake. `WAIT` when the assembled set is empty and the evidence was
+adequate; `WAIT` also when it was not, and the two are told apart in `keyReasons` and
+`uncertainty`.
 
 ⛔ **A flow never calls `decision_submit`.** `hooks/hooks.json` refuses it, and the refusal is
 the second line of defence: the first is that the flows are told not to, here and in each of

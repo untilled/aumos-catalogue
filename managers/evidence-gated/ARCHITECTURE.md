@@ -113,6 +113,7 @@ gate remains open.
 
 `PROMPT.md` contains only the invariant run skeleton. Conditional detail lives in:
 
+- `orchestrate`: which flow this wake is for, what a single-sleeve run may propose, and how a flow is dispatched;
 - `theme-radar`: forward research — where an idea comes from, and what a forward thesis must carry;
 - `position-research`: the sell-side watch on what is already held, price and fundamentals in parallel;
 - `evidence-gates`: sample independence, maturity and entry gates;
