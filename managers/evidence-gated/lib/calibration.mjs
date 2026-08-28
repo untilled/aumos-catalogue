@@ -1,4 +1,5 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
+import { REGIMES, normalizeRegime } from './scanners.mjs'
 
 export function independentDateClusters(dates, gapDays = 5) {
   const unique = [...new Set((dates ?? []).filter((value) => typeof value === 'string' && Number.isFinite(Date.parse(value))))].sort()
@@ -165,7 +166,25 @@ export function promotionGate({ rows = [], horizon = 'd20', seed = 0, resamples 
     const average = (items) => items.length ? round(items.reduce((sum, item) => sum + item.value, 0) / items.length, 3) : null
     const train = ordered.slice(0, split)
     const test = ordered.slice(split)
-    const regimes = [...new Set(cohort.map((row) => row.regime).filter(Boolean))].sort()
+    /**
+     * ⚠️ This counted distinct **strings**, so `risk_on`, `risk-on` and
+     * `Risk On` were three regimes and a sample gathered entirely in one
+     * satisfied the requirement that exists to prevent exactly that. (issue #81)
+     *
+     * Only vocabulary-valid tags count now, and an unrecognised one is
+     * diagnosed rather than quietly counted as a regime of its own.
+     */
+    const taggedRegimes = cohort.map((row) => row.regime).filter(Boolean)
+    const normalized = taggedRegimes.map((regime) => ({ given: regime, canonical: normalizeRegime(regime) }))
+    const regimes = [...new Set(normalized.filter((row) => REGIMES.has(row.canonical)).map((row) => row.canonical))].sort()
+    const unrecognised = [...new Set(normalized.filter((row) => !REGIMES.has(row.canonical)).map((row) => row.given))]
+    if (unrecognised.length) {
+      diagnostics.push(diagnostic('regime_outside_vocabulary', 'blocked', 'A sample carries a regime tag outside the published vocabulary; it is not counted, because free text makes one market state look like several', 'rows', { ruleVersion, unrecognised, supported: [...REGIMES] }))
+    }
+    const untagged = cohort.length - taggedRegimes.length
+    if (untagged) {
+      diagnostics.push(diagnostic('regime_untagged_samples', 'unevaluated', 'Samples with no regime tag cannot show the bias the regime requirement exists to reveal', 'rows', { ruleVersion, untagged }))
+    }
     const gate = {
       samplesOk: cohort.length >= minimum.samples,
       regimesOk: regimes.length >= minimum.regimes,

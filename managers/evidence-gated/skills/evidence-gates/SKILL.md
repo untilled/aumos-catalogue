@@ -44,6 +44,11 @@ baselines `sectorStrength` logs. Beating the index while losing to a momentum bo
 and a bucket whose excess is positive while its absolute return is negative is marked `relativeOnly`
 rather than counted as a win.
 
+A sample also carries the regime it was decided under, from the closed vocabulary in
+`outcome-calibration`. Three distinct regimes are required for promotion precisely so a record built
+in one market state cannot pass as evidence of an edge, and a tag outside the vocabulary is refused
+rather than counted — free text makes one state look like several.
+
 Cluster sample dates in ascending order. A date joins the current cluster when it is at most five
 calendar days after that cluster's latest date; otherwise it opens a new cluster. Chaining is
 transitive. Store both `sampleCount` and `independentDateClusterCount`.
