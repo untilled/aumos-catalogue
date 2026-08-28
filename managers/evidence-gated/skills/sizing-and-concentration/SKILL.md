@@ -11,10 +11,20 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
 
 1. Apply `mandate.constraints`: allowed asset classes/markets, excluded symbols, leverage/shorting,
    cash floor and position limits. Cash is part of total portfolio value.
-2. Compute current and proposed position, sector and theme weights using total portfolio value as the
-   denominator. Only actual holdings consume exposure; a Thesis, WATCH or paper candidate does not.
+2. Compute current and proposed position, sector, theme and factor weights using total portfolio
+   value as the denominator. Only actual holdings consume exposure; a Thesis, WATCH or paper
+   candidate does not. A factor is a shared loss path that crosses sectors — declare it on the row as
+   `factors` so a cross-sector complex cannot pass under a sector cap. An axis whose cap is not
+   configured comes back unevaluated, never as a pass.
 3. Apply the stricter of Mandate and configured concentration thresholds. If classification is
    uncertain, use the more conservative applicable bucket and disclose it.
+3b. Apply portfolio heat — total loss if every stop fired at once, capped at
+   `concentration.portfolioHeat`. Weight caps do not measure it: two books with identical weights
+   have different heat when their stops sit in different places. Declare `stopLossPct` and `core` on
+   each row; core DCA and parked liquidity carry no stop and are excluded, and a non-core row with no
+   declared stop is unevaluated rather than zero risk. Over the cap, a run that adds new non-core risk
+   is blocked while a book already over on its holdings alone warns — the same grandfathering the
+   weight caps use.
 4. Apply evidence maturity. `insufficient` and `observing` lenses are capped at
    `experimentalPositionCeiling`; `reviewable` is still not promoted and cannot expand solely because
    its sample threshold was reached.
@@ -23,6 +33,15 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
 
 A cap breach blocks the proposed target; do not silently clamp and pretend the smaller number was the
 investment conclusion. Recalculate and explain the target that you actually endorse, or WAIT.
+
+## Pacing is a warning and stays one
+
+Call `newSinglePacing` whenever a run proposes a new non-core single name. Three patterns say the
+book is adding single names faster than it is learning from them: two or more in one session, another
+one while the previous new single is still unverified, and one on the day the sizing policy changed.
+None of them is evidence that this candidate is wrong, so none of them blocks — they are what the run
+says out loud before the investor approves it. They relax to advisory once the book has
+`reviewReadyClosedOutcomes` closed outcomes to learn from.
 
 ## Action mapping
 
@@ -41,8 +60,15 @@ condition already true is invalid: evaluate it now or choose the actual unresolv
 date anchor for a scheduled filing/event. Only use a metric the named source/company really reports.
 The trigger must be reachable within the lens that created it.
 
-Expiry defaults to `watchExpiryDays`. On expiry, force review; do not silently renew. A plan is a
-precommitment to reconsider, not permission to trade.
+Expiry defaults to `watchExpiryDays`, and `validateWatch` applies it: an absent `expiresAt` is
+derived from `asOf` and returned as `expiresAt` with `expirySource: 'default'`, an expiry already
+past blocks as `watch_expired`, and an `at-time` trigger later than its own expiry blocks as
+`watch_expiry_before_trigger` because it can never fire. On expiry, force review; do not silently
+renew. A plan is a precommitment to reconsider, not permission to trade.
+
+A `weight-drift` WATCH is checked for already-met on the same terms as a price WATCH, so it carries
+`threshold` (the drift that fires it) and `baselineWeight` (the weight it was registered against).
+Without the baseline the condition is unevaluated rather than assumed unresolved.
 
 ## Compact worked examples
 

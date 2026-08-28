@@ -76,7 +76,8 @@ and point-in-time for that claim, or leave the gate unresolved.
 A vendor price and a web figure for the same asset are exactly that kind of conflict. Call
 `crossCheckPrice`: within tolerance the reading stands, and beyond it Toss is selected, the web number
 is not averaged in, and the difference is retained as provenance in reasoning and Evidence. The
-configured tolerance is 5% by default, the Trading Harness threshold this rule is ported from.
+configured tolerance is `priceConflictTolerance`, 5% by default, the Trading Harness threshold this
+rule is ported from.
 
 ## Web observations are typed, dated and non-canonical
 
@@ -91,7 +92,7 @@ Every quoted figure is normalized before it is used, through `validateConsensus`
 | field | rule |
 |---|---|
 | `metric` | the named line item, not a paraphrase |
-| `value` with `unit` | `unit` names the dimension; anything not a percent, ratio, count, multiple, index level, day or share count is money and also needs `currency` |
+| `value` with `unit` | `unit` names the dimension, spelled exactly: `percent`, `ratio`, `count`, `multiple`, `index-points`, `days`, `shares`, `basis-points`. Anything else is money and also needs `currency` — including a prose spelling of one of these, which is not recognised |
 | `period` | the fiscal period the figure describes |
 | `sourceUrl` | the page the figure was read from |
 | `publishedAt` | when the source published it; never after `capturedAt`, never after `asOf` |

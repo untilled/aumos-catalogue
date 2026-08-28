@@ -15,7 +15,22 @@ does not rank what to buy.
 Deep oversold, moving-average discount or low proximity measures dislocation depth, not confidence.
 Require a separate stabilization state such as basing, capitulation plus reversal, or another
 predeclared price-quality condition. Ask whether earnings power or the balance sheet structurally
-changed. A falling knife does not become safer because its score rose.
+changed. A falling knife does not become safer because its score rose — and it does not need you to
+agree, because `entryQualityGate` blocks it. That gate also refuses a mean-reversion candidate with
+no `trend-pullback` beside it unless its state is a confirmed `basing` or `pullback_in_uptrend`;
+`neutral` is not a pass. Read the two dual-lens readings it returns rather than the verdict alone:
+`eqV1WouldPassBasing` says the window reading disagrees with the last 60 bars, and
+`noNewLow.lensDisagreement` says an intraday spike low may be masking closes that are still setting
+fresh lows. Either one is a hand re-check, not a number to average away.
+
+### Quality pullback
+
+A quality name above its MA200, 15–35% off its high, RSI 30–50. This is the band the other two
+lenses drop: `trend-pullback` stops at -20%, and a name above its MA200 rarely carries the two
+oversold signals `mean-reversion` needs. The question is whether the markdown is a price the business
+does not deserve — a variant view on quality, not on trend shallowness or on dislocation depth. It is
+a separate lens rather than a widened `trend-pullback` band because those are different claims, and
+its calibration samples accrue under `calibration/quality-pullback` so neither sample is retagged.
 
 ### Trend pullback
 

@@ -154,10 +154,12 @@ assert.deepEqual(
   scannerGolden.expected.meanSignals,
 )
 
-assert.equal(topology.managers.length, 3, 'package has KR, US and Global managers')
-assert.equal(new Set(topology.managers.map((row) => row.privateMemoryScope)).size, 3, 'manager memory scopes are isolated')
-assert.deepEqual(topology.emptyMemoryDecisions.map((row) => row.valid), [true, true, true], 'all managers decide from empty memory')
-assert.equal(topology.managers.filter((row) => row.mayCrossMarketRebalance).length, 1, 'only Global may cross-market rebalance')
+assert.equal(topology.managerId, manifest.id, 'topology names the one published manager id')
+assert.equal(topology.flows.length, 3, 'package runs KR, US and allocator flows')
+assert.deepEqual(topology.flows.map((row) => row.id), ['kr-sleeve', 'us-sleeve', 'allocate'], 'flow ids are the subagent names')
+assert.equal(new Set(topology.flows.map((row) => row.privateMemoryScope)).size, 3, 'flow memory scopes are isolated')
+assert.deepEqual(topology.emptyMemoryDecisions.map((row) => row.valid), [true, true, true], 'all flows decide from empty memory')
+assert.equal(topology.flows.filter((row) => row.mayCrossMarketRebalance).length, 1, 'only the allocator flow may cross-market rebalance')
 assert.equal(
   topology.simultaneousCandidates.specialistMaximumCombinedWeight,
   topology.simultaneousCandidates.krBriefBudgetRemaining + topology.simultaneousCandidates.usBriefBudgetRemaining,
@@ -268,9 +270,9 @@ const benchmarkRows = backtestRows.map((row, index) => ({ ...row, close: 100 * 1
 const strata = execute({ operation: 'oversoldStrata', asOf: '2026-12-31T00:00:00Z', input: { assets: [{ market: 'us', bars: backtestRows }], benchmarks: { us: benchmarkRows } } })
 assert.equal(strata.data.symbolsUsed, backtest.expected.symbolsUsed)
 
-const krBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-kr', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.4 } })
+const krBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.4 } })
 assert.equal(krBudget.status, 'blocked', 'specialist cannot spend beyond its Brief sleeve')
-const urgentExit = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-us', market: 'XNAS', currentSleeveWeight: 0.4, sleeveBudgetWeight: 0.4, requestedTargetWeight: 0.2, emergencyExit: true } })
+const urgentExit = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'us-sleeve', market: 'XNAS', currentSleeveWeight: 0.4, sleeveBudgetWeight: 0.4, requestedTargetWeight: 0.2, emergencyExit: true } })
 assert.equal(urgentExit.data.allowed, true, 'urgent exit does not wait for Global')
 const globalBudget = execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'kr-sleeve', weight: 0.4 }, { key: 'us-sleeve', weight: 0.5 }, { key: 'cash', weight: 0.1 }] } })
 assert.equal(globalBudget.status, 'ok')
@@ -532,6 +534,249 @@ const copiedMemory = execute({ operation: 'validateMemory', asOf: researchAsOf, 
 assert.equal(copiedMemory.status, 'blocked', 'private memory may not carry copied source prose')
 assert.equal(copiedMemory.data.accepted, false)
 assert.ok(copiedMemory.diagnostics.some((row) => row.code === 'memory_raw_source_copied'))
+
+/**
+ * One manager, three flows — the pre-2026-08-27 package ids are gone. (issue #70 §5)
+ */
+const realIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: manifest.id, flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+assert.equal(realIdBudget.data.allowed, true, 'the published manager id is the one specialistBudget accepts')
+const staleIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-kr', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+assert.ok(staleIdBudget.diagnostics.some((row) => row.code === 'manager_id_unknown'), 'a retired package id is rejected rather than silently owning a lane')
+const wrongLane = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XNAS', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+assert.ok(wrongLane.diagnostics.some((row) => row.code === 'specialist_market_not_owned'), 'a sleeve flow still cannot allocate outside its market')
+assert.equal(
+  execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'cash', weight: 1 }] } }).data.owner,
+  manifest.id,
+  'the allocator result is owned by the published manager, not a retired package',
+)
+const reviewSequence = execute({
+  operation: 'nextReviewSequence',
+  asOf: globalIntegration.asOf,
+  input: {
+    krSessions: [{ date: '2026-09-01', openLocal: '09:00', closeLocal: '15:30', timeZone: 'Asia/Seoul', isOpen: true }],
+    usSessions: [{ date: '2026-09-01', openLocal: '09:30', closeLocal: '16:00', timeZone: 'America/New_York', isOpen: true }],
+    globalReview: { date: '2026-09-02', time: '09:00', timeZone: 'Asia/Seoul' },
+  },
+})
+assert.deepEqual(new Set(reviewSequence.data.sequence.map((row) => row.owner)), new Set([manifest.id]), 'every scheduled review is owned by the one manager')
+assert.deepEqual(reviewSequence.data.sequence.map((row) => row.flow).sort(), ['allocate', 'kr-sleeve', 'us-sleeve'], 'reviews are dispatched to the three flows')
+
+/**
+ * A risk-increasing RESIZE is the `existing-position` lens, and `evidence-gates`
+ * sends it through this gate. (issue #70 §24)
+ */
+const resizeResearch = { lens: 'existing-position', priceDeclineReason: 'temporary', opportunityCase: 'recovery', trapRisks: ['structural-risk'], variantView: 'different', benchmarkAlternative: { expectedReturn: 0.03 }, scenarios: { bear: { probability: 0.2, return: -0.2 }, base: { probability: 0.5, return: 0.12 }, bull: { probability: 0.3, return: 0.3 } }, minimumExpectedActiveReturn: 0.02, challengeVerdict: 'cleared', sourceFresh: true, sourceConflict: false }
+assert.equal(execute({ operation: 'researchGate', asOf: methodology.asOf, input: resizeResearch }).data.passed, true, 'the RESIZE lens the skills name has a passing path')
+assert.equal(execute({ operation: 'researchGate', asOf: methodology.asOf, input: { ...resizeResearch, lens: 'vibes' } }).status, 'blocked', 'an unnamed lens is still rejected')
+
+/**
+ * A revisit promise expires, and a drift promise is checked for already-met.
+ * (issue #70 §23)
+ */
+const derivedExpiry = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-08-21T00:00:00Z' }, current: {}, config: { watchExpiryDays: 30 } } })
+assert.equal(derivedExpiry.data.expirySource, 'default', 'an undeclared expiry is derived from watchExpiryDays rather than left absent')
+assert.equal(derivedExpiry.data.expiresAt, '2026-09-19T00:00:00.000Z')
+const expiredWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'price-below', threshold: 50, expiresAt: '2026-08-01T00:00:00Z' }, current: { price: 90 } } })
+assert.ok(expiredWatch.diagnostics.some((row) => row.code === 'watch_expired'), 'an expired WATCH forces review instead of renewing itself')
+const unreachableWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-11-01T00:00:00Z', expiresAt: '2026-09-01T00:00:00Z' }, current: {} } })
+assert.ok(unreachableWatch.diagnostics.some((row) => row.code === 'watch_expiry_before_trigger'), 'a trigger later than its own expiry can never fire')
+const driftMet = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'weight-drift', threshold: 0.02, baselineWeight: 0.06 }, current: { weight: 0.09 } } })
+assert.ok(driftMet.diagnostics.some((row) => row.code === 'watch_already_met'), 'a drift condition already true is invalid, exactly like a price condition')
+const driftOpen = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'weight-drift', threshold: 0.03, baselineWeight: 0.06 }, current: { weight: 0.07 } } })
+assert.equal(driftOpen.data.valid, true, 'an unresolved drift condition is a valid promise')
+const driftUnbaselined = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'weight-drift', threshold: 0.03 }, current: { weight: 0.07 } } })
+assert.ok(driftUnbaselined.diagnostics.some((row) => row.code === 'watch_baseline_missing'), 'a drift promise without its baseline is unevaluated, not assumed open')
+
+/**
+ * `factor` is a measured concentration axis, not prose in `allocate`. (issue #70 §22)
+ */
+const caps = { position: 0.1, sector: 0.2, theme: 0.15, factor: 0.15, portfolioHeat: 0.06 }
+const crossSector = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: {
+    positions: [
+      { symbol: 'AAA', weight: 0.06, sector: 'semiconductors', themes: ['ai'], factors: ['ai-capex'] },
+      { symbol: 'BBB', weight: 0.06, sector: 'software', themes: ['cloud'], factors: ['ai-capex'] },
+    ],
+    proposed: [{ symbol: 'CCC', weight: 0.05, sector: 'utilities', themes: ['power'], factors: ['ai-capex'] }],
+    caps,
+  },
+})
+assert.equal(crossSector.data.exposures.factor['ai-capex'], 0.17)
+assert.deepEqual(crossSector.data.breaches.map((row) => row.kind), ['factor'], 'a shared loss path across three sectors breaches only the factor cap')
+assert.ok(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'AAA', weight: 0.06, factors: ['ai-capex'] }], caps: { position: 0.1, sector: 0.2, theme: 0.15 } } })
+    .diagnostics.some((row) => row.code === 'concentration_cap_missing' && row.path === 'caps.factor'),
+  'an unconfigured factor cap comes back unevaluated, never as a pass',
+)
+
+/**
+ * `priceConflictTolerance` is a configuration key the documents can honestly
+ * call configured. (issue #70 §26)
+ */
+const schema = JSON.parse(await readFile(new URL('../config.schema.json', fixtureRoot), 'utf8'))
+assert.equal(schema.properties.priceConflictTolerance.default, 0.05, 'the documented 5% default is in the schema')
+assert.ok(schema.properties.concentration.properties.factor, 'the factor cap is configurable')
+const strictTolerance = execute({ operation: 'crossCheckPrice', asOf: researchAsOf, input: { ...research.priceCrossCheck.agreeing, config: { priceConflictTolerance: 0.001 } } })
+assert.ok(strictTolerance.diagnostics.some((row) => row.code === 'price_source_conflict'), 'a stricter configured tolerance actually tightens the check')
+
+/**
+ * The `unit` vocabulary the contract skill prints is the vocabulary the code
+ * accepts. (issue #70 §27)
+ */
+const contractSkill = await readFile(new URL('../skills/data-source-contract/SKILL.md', fixtureRoot), 'utf8')
+for (const unit of ['percent', 'ratio', 'count', 'multiple', 'index-points', 'days', 'shares', 'basis-points']) {
+  assert.ok(contractSkill.includes(`\`${unit}\``), `the contract skill names the ${unit} unit the code accepts`)
+  const observation = { metric: 'x', value: 1, unit, period: 'FY2026', sourceUrl: 'https://example.test', publishedAt: '2026-08-01T00:00:00Z', capturedAt: '2026-08-02T00:00:00Z', type: 'actual' }
+  assert.ok(
+    !execute({ operation: 'validateConsensus', asOf: methodology.asOf, input: observation }).diagnostics.some((row) => row.code === 'consensus_currency_missing'),
+    `${unit} names its own scale and is not treated as money`,
+  )
+}
+
+/**
+ * The approved entry-quality gate, in code rather than in prose. (issue #70 §2)
+ *
+ * Series are built so each case isolates one branch: a knife still cutting
+ * lows, the eq-v1 window artifact eq-v2 demotes, and an intraday spike low
+ * masking closes that are still setting fresh lows.
+ */
+const bar = (date, close, { low = close, high = close, open = close } = {}) => ({ date, open, high, low, close })
+const series = (values, start = Date.parse('2026-01-01T00:00:00Z')) =>
+  values.map((value, index) => bar(new Date(start + index * 86_400_000).toISOString().slice(0, 10), ...(Array.isArray(value) ? [value[0], value[1]] : [value])))
+
+const stillFalling = series(Array.from({ length: 220 }, (_, index) => 200 - index * 0.5))
+const knife = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: stillFalling, lenses: ['mean-reversion'] } })
+assert.equal(knife.data.state, 'falling_knife')
+assert.equal(knife.status, 'blocked', 'a falling knife is refused by the gate, not merely described by it')
+assert.ok(knife.diagnostics.some((row) => row.code === 'entry_quality_falling_knife'))
+
+const uptrend = series(Array.from({ length: 220 }, (_, index) => 100 + index * 0.5))
+const healthy = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: uptrend, lenses: ['trend-pullback'] } })
+assert.equal(healthy.data.state, 'pullback_in_uptrend')
+assert.equal(healthy.data.passed, true)
+
+/**
+ * eq-v2: a nine-month-old window low used to force `basing` no matter how the
+ * name had traded since. The last 60 bars now decide.
+ */
+const oldLowThenFalling = series([
+  ...Array.from({ length: 160 }, (_, index) => 100 + index * 0.5625),
+  ...Array.from({ length: 60 }, (_, index) => 190 - index),
+])
+const demoted = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: oldLowThenFalling, lenses: [] } })
+assert.ok(demoted.data.sessionsSinceNewLow >= 5, 'the full window reading is the one eq-v1 would have passed on')
+assert.equal(demoted.data.sessionsSinceNewLow60, 0, 'the last 60 bars are still setting new lows')
+assert.equal(demoted.data.state, 'falling_knife', 'eq-v2 takes the stricter of the two readings')
+assert.equal(demoted.data.eqV1WouldPassBasing, true, 'the demotion says why a name that used to pass no longer does')
+
+/**
+ * The no_new_low dual lens: the verdict stays on the intraday-low lens and the
+ * disagreement is surfaced rather than resolved in favour of basing.
+ */
+const spikeLow = series(Array.from({ length: 220 }, (_, index) => 200 - index * 0.4))
+  .map((row, index) => (index === 210 ? { ...row, low: row.low - 40 } : row))
+const disagree = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: spikeLow, lenses: [], noNewLow: { sessions: 3, lookback: 20 } } })
+assert.equal(disagree.data.noNewLow.met, true, 'the verdict still comes from the intraday-low lens, unchanged')
+assert.equal(disagree.data.noNewLow.verdictLens, 'intraday-low')
+assert.ok(disagree.data.noNewLow.closeLensNewLowDays.length > 0, 'closes are still setting fresh lows behind the spike')
+assert.equal(disagree.data.noNewLow.lensDisagreement, true)
+assert.ok(disagree.diagnostics.some((row) => row.code === 'no_new_low_lens_disagreement' && row.severity === 'info'), 'the disagreement is surfaced loudly, not silently resolved')
+
+/**
+ * A mean-reversion signal alone needs a confirmed pass state. (approved 2026-07-13)
+ */
+const neutralBars = series([
+  ...Array.from({ length: 190 }, (_, index) => 200 - index * 0.5),
+  ...Array.from({ length: 30 }, (_, index) => 105 + index * 3),
+])
+const neutral = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: neutralBars, lenses: ['mean-reversion'] } })
+assert.equal(neutral.data.aboveMa200, true)
+assert.equal(neutral.data.ma50AboveMa200, false, 'a name that has only just recovered over its MA200 has no golden cross yet')
+assert.equal(neutral.data.state, 'neutral', 'above MA200 without the golden cross is neither pullback nor basing')
+assert.ok(neutral.diagnostics.some((row) => row.code === 'mean_reversion_unconfirmed'), 'an unconfirmed state is not a pass for a mean-reversion-only candidate')
+assert.equal(
+  execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: neutralBars, lenses: ['mean-reversion', 'trend-pullback'] } })
+    .diagnostics.some((row) => row.code === 'mean_reversion_unconfirmed'),
+  false,
+  'the restriction is on mean-reversion alone, not on a candidate two lenses agree about',
+)
+
+assert.equal(
+  execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: stillFalling.slice(0, 10) } }).status,
+  'unevaluated',
+  'absent scan history warns rather than blocks; over-constraint is not caution',
+)
+
+/**
+ * Lens C — the 5pp band the other two lenses drop. (approved 2026-07-29,
+ * implementation anchored to 2026-08-24)
+ */
+const qualityRise = Array.from({ length: 180 }, (_, index) => 60 + index * 0.9)
+const qualityBars = series([
+  ...qualityRise,
+  // A choppy markdown, not a straight line: a monotone decline puts RSI at zero
+  // and would land in `mean-reversion` instead of the band under test.
+  ...Array.from({ length: 40 }, (_, index) => qualityRise.at(-1) - 1.5 * (index + 1) + (index % 2 ? 3 : -3)),
+])
+const scanned = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'GAP', market: 'us', bars: qualityBars } })
+assert.ok(scanned.data.indicators.offHigh200 <= -0.15 && scanned.data.indicators.offHigh200 >= -0.35, 'the fixture sits in the band both other lenses drop')
+assert.equal(scanned.data.signals.trendPullback.pullback, false, 'trend-pullback stops at -20% off high')
+assert.equal(scanned.data.signals.meanReversion.ma200Discount, false, 'a name above its MA200 does not carry the mean-reversion signals')
+assert.deepEqual(scanned.data.lenses, ['quality-pullback'], 'the gap band is covered by its own lens and by no other')
+assert.equal(execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'UP', market: 'us', bars: uptrend } }).data.lenses.includes('quality-pullback'), false, 'a name at its high is not a quality pullback')
+assert.equal(
+  execute({ operation: 'researchGate', asOf: methodology.asOf, input: { ...resizeResearch, lens: 'quality-pullback' } }).data.passed,
+  true,
+  'the new lens has a passing research path',
+)
+
+/**
+ * Portfolio heat — total loss if every stop fired, which no weight cap
+ * measures. (approved 2026-07-10, P4)
+ */
+const heatCaps = { position: 0.3, sector: 0.5, theme: 0.5, factor: 0.5, portfolioHeat: 0.06 }
+const hotPositions = [
+  { symbol: 'AAA', weight: 0.2, stopLossPct: 0.2 },
+  { symbol: 'BBB', weight: 0.2, stopLossPct: 0.15 },
+  { symbol: 'CORE', weight: 0.4, core: true },
+]
+const heatOnly = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, caps: heatCaps } })
+assert.equal(heatOnly.data.heat.holdingsOnly, 0.07, 'core DCA carries no stop and contributes no heat')
+assert.ok(heatOnly.diagnostics.some((row) => row.code === 'portfolio_heat_above_cap' && row.severity === 'unevaluated'), 'a book already over on its holdings warns; existing risk is grandfathered')
+const heatAdding = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, proposed: [{ symbol: 'CCC', weight: 0.05, stopLossPct: 0.2 }], caps: heatCaps } })
+assert.equal(heatAdding.status, 'blocked', 'adding new non-core risk above the cap is refused, not warned')
+assert.ok(heatAdding.diagnostics.some((row) => row.code === 'portfolio_heat_breach'))
+const heatCool = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'AAA', weight: 0.1, stopLossPct: 0.2 }], proposed: [{ symbol: 'CCC', weight: 0.05, stopLossPct: 0.2 }], caps: heatCaps } })
+assert.equal(heatCool.data.heat.withProposed, 0.03)
+assert.equal(heatCool.status, 'ok', 'heat under the cap is not an obstacle')
+assert.ok(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'AAA', weight: 0.1 }], caps: heatCaps } })
+    .diagnostics.some((row) => row.code === 'portfolio_heat_stop_missing'),
+  'a non-core row with no declared stop is unevaluated, never zero risk',
+)
+
+/**
+ * Pacing warns and never blocks. (approved 2026-07-10, P5)
+ */
+const pacing = execute({
+  operation: 'newSinglePacing',
+  asOf: methodology.asOf,
+  input: {
+    proposedNewSingles: [{ symbol: 'AAA' }, { symbol: 'BBB' }],
+    priorNewSingles: [{ symbol: 'ZZZ', verified: false }],
+    sizingPolicyUpdatedAt: methodology.asOf,
+    closedOutcomeCount: 0,
+  },
+})
+assert.deepEqual(pacing.data.warnings.map((row) => row.code).sort(), ['multiple-new-singles-one-session', 'prior-single-unverified', 'sizing-policy-changed-today'])
+assert.equal(pacing.status, 'unevaluated', 'pacing warns; it is never blocked')
+assert.equal(pacing.diagnostics.some((row) => row.severity === 'blocked'), false)
+const pacedRelaxed = execute({ operation: 'newSinglePacing', asOf: methodology.asOf, input: { proposedNewSingles: [{ symbol: 'AAA' }, { symbol: 'BBB' }], closedOutcomeCount: 12 } })
+assert.equal(pacedRelaxed.data.relaxed, true)
+assert.equal(pacedRelaxed.status, 'ok', 'a book with closed outcomes to learn from relaxes to advisory')
+assert.equal(execute({ operation: 'newSinglePacing', asOf: methodology.asOf, input: { proposedNewSingles: [{ symbol: 'AAA' }] } }).data.warnings.length, 0)
 
 /**
  * The manifest names the sources this package requires. (aumos #384)

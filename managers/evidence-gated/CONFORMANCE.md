@@ -62,7 +62,8 @@ The current Aumos checkout was exercised with Claude Code 2.1.241 and Node 22.22
   `driver status: completed`, a sealed schema-valid `WAIT` and a valid Decision hash chain. The
   invocation intentionally lacked `config.managerId`; the package correctly refused to infer a role,
   called no market source and named `manager_identity_missing` as uncertainty.
-- A role-selected fixture invocation with `managerId: evidence-gated-us` read invocation, portfolio,
+- A role-selected fixture invocation with `managerId: evidence-gated-us` — a pre-cutover package id;
+  that lane is now the `us-sleeve` flow under the single `evidence-gated` id — read invocation, portfolio,
   Brief and private memory, made three point-in-time source calls, wrote one shared Brief revision and
   submitted one schema-valid `WATCH`. The temporary launcher timed out after submission because it
   did not install the lifecycle's decision-completion hook; the Decision itself was present after

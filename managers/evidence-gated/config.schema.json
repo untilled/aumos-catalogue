@@ -44,8 +44,36 @@
           "minimum": 0.05,
           "maximum": 0.3,
           "default": 0.15
+        },
+        "factor": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 0.3,
+          "default": 0.15,
+          "description": "Cap on one shared loss path across sectors — the cross-sector complex a sector cap cannot see. Positions declare their factors; an undeclared factor is unevaluated, never zero."
+        },
+        "portfolioHeat": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 0.15,
+          "default": 0.06,
+          "description": "Cap on total loss if every stop fired at once, as a fraction of the account. Weight caps do not measure it. Core DCA and parked liquidity carry no stop and are excluded; a non-core row with no declared stop is unevaluated, never zero."
         }
       }
+    },
+    "reviewReadyClosedOutcomes": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 50,
+      "default": 10,
+      "description": "Closed outcomes after which the new-single pacing warnings relax from unevaluated to advisory. Pacing never blocks at any count."
+    },
+    "priceConflictTolerance": {
+      "type": "number",
+      "minimum": 0.005,
+      "maximum": 0.2,
+      "default": 0.05,
+      "description": "Relative difference between the vendor price and a web figure that still counts as agreement. Beyond it the vendor reading is selected and the conflict is retained rather than averaged."
     },
     "minimumLensSamples": {
       "type": "integer",

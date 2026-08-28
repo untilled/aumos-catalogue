@@ -18,6 +18,7 @@ Use only:
 - `learning/closed-decision-summary`
 - `calibration/mean-reversion`
 - `calibration/trend-pullback`
+- `calibration/quality-pullback`
 - `calibration/core-dca`
 - `failures/repeated-patterns`
 - `coverage/universe-state`

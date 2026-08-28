@@ -44,9 +44,14 @@ approval gate are now one manager and one basket. `untilled/aumos#489` argues th
 
 ## What makes it different
 
-A scanner score is discovery, not edge. Mean reversion and trend pullback are evaluated as different
-lenses. A new single-name BUY requires why-cheap, structural trap risk, a falsifiable variant view,
-benchmark alternative and adversarial thesis challenge. Conditions that are not met become
+A scanner score is discovery, not edge. Mean reversion, trend pullback and quality pullback are
+evaluated as different lenses — the last one is the 15–35%-off-high band above the MA200 that the
+other two drop between them, where a quality name gets *less* covered the cheaper it becomes. A new
+single-name BUY requires why-cheap, structural trap risk, a falsifiable variant view, benchmark
+alternative and adversarial thesis challenge. Entry quality is refused in code rather than described:
+a falling knife blocks, and a mean-reversion candidate standing alone needs a confirmed basing or
+pullback state. Risk is capped on four weight axes — position, sector, theme and factor — and on
+total loss if every stop fired at once, which none of the weight axes measures. Conditions that are not met become
 machine-evaluable WATCH/plan entries rather than prose that disappears. Closed Aumos outcomes update
 per-lens maturity and calibration in instance-private memory. Low maturity permits a small controlled
 experiment when every research gate is complete; it never licenses confident sizing.
@@ -116,7 +121,7 @@ snippet is not point-in-time evidence, and disagreeing aggregators are recorded 
 than averaged. Macro and policy readings — VIX, put/call, sentiment, breadth, index level and moving
 averages, central-bank and industry policy — need an observation time and a source tier, an official
 publisher outranks an aggregator restatement, and an undated reading is refused rather than treated as
-current. A web price is cross-checked against Toss; beyond the configured 5% tolerance Toss is the
+current. A web price is cross-checked against Toss; beyond `priceConflictTolerance`, 5% by default, Toss is the
 selected price and the difference is kept as provenance. There is no macro score: a regime call is a
 Brief judgement at one `asOf`, not a number this package can hold.
 
