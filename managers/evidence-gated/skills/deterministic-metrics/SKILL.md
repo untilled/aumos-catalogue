@@ -199,6 +199,7 @@ named field is the difference between a gate that runs and a gate that blocks or
 | `regimeTag` | `briefRevisionId`, and `mechanical` from `sectorStrength.regime` | The call is Brief's and must say which revision made it. Without the mechanical reading the disagreement cannot be stated — which is the whole reason to pass it. |
 | `outcomeClassification` | `executionAttributableToDecision` when the fill differed from the plan; `judgedFailures` for the judged axis | Without the flag a poor fill is an observation, not a methodology failure — which is the reading `outcome-calibration` mandates. An unrecognised judged reason is refused, never absorbed. |
 | `crossCheckPrice` | `config.priceConflictTolerance` | The 5% the documents call configured. Passing `tolerance` directly still overrides it. |
+| `nextReviewSequence` | `config.schedule.krCloseBufferMinutes` and `usCloseBufferMinutes` | The buffers `PROMPT.md` calls configured. ⚠️ Nothing passed them until #91 and the two literals in the code were what ran, so a number on the install screen governed nothing. Passing `buffers.kr` / `buffers.us` directly still overrides. |
 
 Bootstrap output uses the package-owned `mulberry32-v1` PRNG when `seed` is supplied. This is an
 explicit Node-port reproducibility rule: changing the PRNG is a methodology-version change, not a

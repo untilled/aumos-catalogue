@@ -721,6 +721,43 @@ assert.deepEqual(reviewSequence.data.sequence.map((row) => row.flow).sort(), ['a
  * deterministic core emits and the prompt never names is a value with no
  * reader, and that is not a state a fixture can see from one side.
  */
+/**
+ * A config key the investor can set actually sets something. (issue #91)
+ *
+ * `schedule.krCloseBufferMinutes` and `usCloseBufferMinutes` were declared in
+ * `config.schema.json` from the day the three packages became one and read
+ * nowhere: the two literals in `nextReviewSequence` were the only values that
+ * ever ran, the schema's defaults (60/60) disagreed with them (30/45), and
+ * `PROMPT.md` called the buffer "configured" throughout. A number on the
+ * install screen that governs nothing is worse than an absent setting, because
+ * the investor believes they made a choice.
+ *
+ * The second assertion is the general one, and it is the reason this is not
+ * just two more fixtures: **every key the schedule block declares has to appear
+ * in `lib/`.** Four of the six already did; the guard exists so the seventh
+ * cannot arrive orphaned.
+ */
+covers('schedule/configured-buffers-reach-the-calculation')
+const sessionsForBuffers = {
+  krSessions: [{ date: '2026-09-01', openLocal: '09:00', closeLocal: '15:30', timeZone: 'Asia/Seoul', isOpen: true }],
+  usSessions: [{ date: '2026-09-01', openLocal: '09:30', closeLocal: '16:00', timeZone: 'America/New_York', isOpen: true }],
+  globalReview: { date: '2026-09-02', time: '08:00', timeZone: 'Asia/Seoul' },
+}
+const reviewAt = (input, flow) => execute({ operation: 'nextReviewSequence', asOf: globalIntegration.asOf, input: { ...sessionsForBuffers, ...input } }).data.sequence.find((row) => row.flow === flow).at
+
+const schemaSchedule = JSON.parse(await readFile(new URL('../config.schema.json', fixtureRoot), 'utf8')).properties.schedule.properties
+const defaultKr = reviewAt({}, 'kr-sleeve')
+const defaultUs = reviewAt({}, 'us-sleeve')
+assert.equal(reviewAt({ config: { schedule: { krCloseBufferMinutes: schemaSchedule.krCloseBufferMinutes.default } } }, 'kr-sleeve'), defaultKr, "the schema's declared default is the one the code falls back to — two numbers for one setting is how the install screen comes to describe a run that never happened")
+assert.equal(reviewAt({ config: { schedule: { usCloseBufferMinutes: schemaSchedule.usCloseBufferMinutes.default } } }, 'us-sleeve'), defaultUs, 'and the same on the US side, where the two disagreed by fifteen minutes')
+assert.notEqual(reviewAt({ config: { schedule: { krCloseBufferMinutes: 90 } } }, 'kr-sleeve'), defaultKr, 'a configured buffer moves the review; before #91 it moved nothing')
+assert.equal(reviewAt({ config: { schedule: { krCloseBufferMinutes: 90 } }, buffers: { kr: 30 } }, 'kr-sleeve'), defaultKr, 'and a directly passed buffer still overrides config, as it does for priceConflictTolerance')
+
+const scheduleLib = await readFile(new URL('../lib/schedule.mjs', fixtureRoot), 'utf8')
+for (const key of Object.keys(schemaSchedule)) {
+  assert.ok(scheduleLib.includes(key), `config.schema.json declares schedule.${key} and something reads it — a setting the investor can move that moves nothing is a choice they did not really make`)
+}
+
 covers('schedule/wake-flow-dispatch')
 /**
  * The wake engine composes a fired plan's event summary as
