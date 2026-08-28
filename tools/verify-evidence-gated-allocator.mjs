@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict'
+import nodeAssert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated/lib/index.mjs'
@@ -40,6 +40,89 @@ const usSchedule = JSON.parse(await readFile(new URL('us/schedule.json', fixture
 const globalIntegration = JSON.parse(await readFile(new URL('global/integration.json', fixtureRoot), 'utf8'))
 const research = JSON.parse(await readFile(new URL('research-contract.json', fixtureRoot), 'utf8'))
 
+/**
+ * ── Coverage names that have to be earned (issue #70 §4) ───────────────────
+ *
+ * `group-coverage.json` said which checks stand behind each migration group,
+ * and this file checked two things about it: that the group names matched
+ * `MIGRATION.md`, and that no list was empty. Neither asks whether the named
+ * check *runs*. `blendedSectorStrength` was registered under `scanner` while
+ * being touched by no test at all, and nothing could have noticed — the
+ * registry was prose in a JSON file.
+ *
+ * So `covers()` marks the assertions that stand behind a case name, and two
+ * checks at the end of this file make the registry earn itself:
+ *
+ *  1. every registered case is marked, and every marked case is registered —
+ *     set equality, so a name cannot be added to either side alone;
+ *  2. at least one assertion actually executed under each mark, counted by
+ *     wrapping `assert` rather than trusted.
+ *
+ * ⚠️ **What it does not check** is that the assertion is about the right
+ * thing. A marker over an unrelated assertion still passes. It bounds the
+ * failure to "wrong check" and closes off "no check", which is the one that
+ * was happening.
+ */
+let assertionsRun = 0
+const assert = new Proxy(nodeAssert, {
+  apply(target, thisArg, args) {
+    assertionsRun += 1
+    return Reflect.apply(target, thisArg, args)
+  },
+  get(target, property) {
+    const value = target[property]
+    if (typeof value !== 'function') return value
+    return (...args) => {
+      assertionsRun += 1
+      return value.apply(target, args)
+    }
+  },
+})
+
+const marks = []
+/**
+ * Each argument is `group/case`. One call may name several — the manifest
+ * boundary scan really does stand behind `audit/package-boundary-scan` and
+ * `owner-cutover/no-order-code` at once — but **one call is one marker**, so
+ * every marker still has to be followed by an assertion of its own. Writing
+ * two calls back to back does not let the second one lend its assertions to
+ * the first; that hole was found by deleting a case's assertions and watching
+ * it stay green.
+ */
+function covers(...addresses) {
+  marks.push({
+    addresses: addresses.map((address) => {
+      const [group, ...rest] = address.split('/')
+      nodeAssert.equal(rest.length, 1, `covers() takes group/case, got ${address}`)
+      return { group, case: rest[0] }
+    }),
+    assertionsBefore: assertionsRun,
+  })
+}
+
+function assertCoverageWasEarned() {
+  const registered = groupCoverage.groups
+  const marked = {}
+  for (const mark of marks) for (const entry of mark.addresses) (marked[entry.group] ??= new Set()).add(entry.case)
+  for (const [group, cases] of Object.entries(registered)) {
+    nodeAssert.deepEqual(
+      [...(marked[group] ?? [])].sort(),
+      [...cases].sort(),
+      `${group} exercises exactly the cases it registers — a registered name with no covers() marker is a claim nothing stands behind`,
+    )
+  }
+  for (const group of Object.keys(marked)) {
+    nodeAssert.ok(registered[group], `covers() names a group that ${'`group-coverage.json`'} does not register: ${group}`)
+  }
+  for (const [index, mark] of marks.entries()) {
+    const until = marks[index + 1]?.assertionsBefore ?? assertionsRun
+    nodeAssert.ok(
+      until > mark.assertionsBefore,
+      `${mark.addresses.map((entry) => `${entry.group}/${entry.case}`).join(', ')} has a covers() marker with no assertion after it`,
+    )
+  }
+}
+
 function assertSubset(actual, expected, path = 'data') {
   for (const [key, value] of Object.entries(expected)) {
     const next = `${path}.${key}`
@@ -58,6 +141,7 @@ const visibleRevision = ({ instance, model, asOf }) =>
     )
     .sort((a, b) => b.revision - a.revision)[0]?.revision ?? null
 
+covers('audit/memory-contract')
 assert.equal(memory.runs[0].expectedReadRevision, null, 'run A starts with empty memory')
 assert.equal(memory.runs[0].validWithoutPriorMemory, true, 'empty memory still permits a decision')
 assert.equal(
@@ -65,6 +149,7 @@ assert.equal(
   memory.runs[1].expectedReadRevision,
   'run B reads run A revision',
 )
+covers('learning/memory-revision')
 assert.equal(memory.revisions.length, 2, 'same key keeps both revisions')
 assert.notEqual(memory.revisions[0].revision, memory.revisions[1].revision, 'revisions are append-only')
 assert.equal(visibleRevision(memory.replay), memory.replay.expectedRevision, 'replay excludes future revision')
@@ -108,6 +193,7 @@ const primary = source.conflictCase.sources.find((row) => row.primaryForClaim)
 assert.equal(primary.id, source.conflictCase.expectedResolution, 'primary source resolves claim conflict')
 assert.equal(source.conflictCase.mustNotAverage, true, 'conflicting categorical facts are not averaged')
 
+covers('source-parsers/adjustment-conflict')
 const bases = new Set(source.adjustmentCase.series.map((row) => row.adjustment))
 const adjustmentBlocked = bases.size > 1 && !source.adjustmentCase.corporateActionReconciled
 assert.equal(adjustmentBlocked, source.adjustmentCase.expectedBlocked, 'mixed price bases block returns')
@@ -117,7 +203,26 @@ for (const row of source.degradationCases) {
   else assert.equal(row.expectedAction, 'CONTINUE')
 }
 
+/**
+ * The frozen numeric goldens. Each fixture case is registered under the group
+ * whose `MIGRATION.md` row owns it, so a fixture that stops running takes its
+ * coverage claim down with it.
+ */
+const GOLDEN_COVERAGE = {
+  'attribution-additive-identity': 'attribution/attribution-additive-identity',
+  'twr-with-start-of-day-flow': 'attribution/twr-with-start-of-day-flow',
+  'annualized-money-weighted-return': 'attribution/annualized-money-weighted-return',
+  'categorical-brier': 'calibration/categorical-brier',
+  'independent-date-cluster-chain-link': 'calibration/independent-date-clusters',
+  'legacy-heuristic-sizing': 'sizing/legacy-sizing',
+  'kelly-is-gated-below-20-samples': 'sizing/legacy-sizing',
+  'new-york-dst-spring': 'schedule/dst-holiday-early-close',
+  'new-york-dst-fall': 'schedule/dst-holiday-early-close',
+}
 for (const fixture of golden.cases) {
+  const registration = GOLDEN_COVERAGE[fixture.name]
+  nodeAssert.ok(registration, `golden case ${fixture.name} names the coverage group it stands behind`)
+  covers(registration)
   const output = execute(fixture.request)
   assert.notEqual(output.status, 'blocked', `${fixture.name} is executable`)
   assertSubset(output.data, fixture.expected, fixture.name)
@@ -142,6 +247,7 @@ const scannerOutput = execute({
   ...scannerGolden.request,
   input: { ...scannerGolden.request.input, bars },
 })
+covers('scanner/buy-radar')
 assert.equal(scannerOutput.status, 'ok', 'legacy scanner fixture executes')
 assert.deepEqual(scannerOutput.data.lenses, scannerGolden.expected.lenses)
 assert.equal(scannerOutput.data.indicators.close, scannerGolden.expected.close)
@@ -154,6 +260,7 @@ assert.deepEqual(
   scannerGolden.expected.meanSignals,
 )
 
+covers('owner-cutover/single-manager-three-flows')
 assert.equal(topology.managerId, manifest.id, 'topology names the one published manager id')
 assert.equal(topology.flows.length, 3, 'package runs KR, US and allocator flows')
 assert.deepEqual(topology.flows.map((row) => row.id), ['kr-sleeve', 'us-sleeve', 'allocate'], 'flow ids are the subagent names')
@@ -181,6 +288,7 @@ for (let cluster = 0; cluster < promotion.generator.clusterCount; cluster += 1) 
   }
 }
 const promotionOutput = execute({ ...promotion.request, input: { ...promotion.request.input, rows: promotionRows } })
+covers('promotion/cluster-bootstrap', 'promotion/walk-forward', 'promotion/bh-fdr')
 assert.equal(promotionOutput.status, 'ok', 'promotion gate executes without prose or I/O')
 assert.equal(promotionOutput.data.totalMaturePromote, promotion.expected.totalMaturePromote)
 assert.equal(promotionOutput.data.versions[0].sampleCount, promotion.expected.sampleCount)
@@ -190,7 +298,14 @@ assert.equal(promotionOutput.data.versions[0].gate.reviewReady, promotion.expect
 assert.deepEqual(promotionOutput.data.costModelPct, promotion.expected.costModelPct)
 assert.ok(promotionOutput.data.versions[0].bootstrapClusterCiCostAdjusted, 'cluster bootstrap CI is present')
 
+const OUTCOME_COVERAGE = {
+  'kr-complete-cost-round-trip': 'outcome/fill-net-return',
+  'missing-us-fx-is-explicit': 'outcome/missing-cost-explicit',
+}
 for (const fixture of outcomes.cases) {
+  const registration = OUTCOME_COVERAGE[fixture.name]
+  nodeAssert.ok(registration, `outcome case ${fixture.name} names the coverage group it stands behind`)
+  covers(registration)
   const output = execute(fixture.request)
   if (fixture.expected.status) {
     assert.equal(output.status, fixture.expected.status, fixture.name)
@@ -198,6 +313,7 @@ for (const fixture of outcomes.cases) {
   } else assertSubset(output.data, fixture.expected, fixture.name)
 }
 
+covers('source-parsers/sec-dart-asof')
 const dartOutput = execute({ operation: 'normalizeDartFilings', asOf: krSource.asOf, input: krSource.dart })
 assert.deepEqual(dartOutput.data.rows.map((row) => row.receiptNumber), krSource.expected.retainedReceiptNumbers, 'future DART filing is excluded')
 assert.equal(dartOutput.data.rows.filter((row) => row.isPreliminaryEarnings).length, krSource.expected.preliminaryCount)
@@ -221,6 +337,7 @@ const dartFinancials = execute({ operation: 'normalizeDartFinancials', asOf: krS
 assert.equal(dartFinancials.data.rows.length, 1, 'future DART financial rows are excluded')
 assert.equal(dartFinancials.data.rows[0].currentAmount, 123456)
 
+covers('earnings/exact-bmo-amc-date-only')
 for (const fixture of usSchedule.cases) {
   const output = execute({ operation: 'earningsCheckpoint', asOf: fixture.observation.capturedAt, input: { observation: fixture.observation, marketSession: fixture.session, config: fixture.config } })
   assert.equal(output.data.at, fixture.expectedAt, fixture.name)
@@ -231,9 +348,11 @@ const holidayReview = execute({
   input: { sessions: [usSchedule.closedSession, usSchedule.nextOpenSession], bufferMinutes: 45 },
 })
 assert.equal(holidayReview.data.next.reviewAt, usSchedule.expectedNextReviewAt, 'closed session is skipped')
+covers('schedule/late-missing-duplicate-outage')
 const drift = execute({ operation: 'scheduleDrift', asOf: '2026-08-20T00:00:00Z', input: { previous: { at: '2026-08-21T20:30:00Z', sourceUrl: 'https://ir.example.test/old', capturedAt: '2026-08-01T00:00:00Z' }, current: { at: '2026-08-22T20:30:00Z', sourceUrl: 'https://ir.example.test/new', capturedAt: '2026-08-19T00:00:00Z' } } })
 assert.equal(drift.data.changed, true)
 assert.equal(drift.data.staleWakeDisposition, 'verify-stale-then-rearm-without-trade')
+covers('watch/bounded-retry')
 const retry = execute({ operation: 'boundedRetry', asOf: '2026-08-20T00:00:00Z', input: { checkpointAt: '2026-08-19T23:50:00Z', attempt: 0, config: { retryMinutes: 45, maxRetries: 2 } } })
 assert.equal(retry.data.at, '2026-08-20T00:45:00.000Z')
 assert.equal(retry.data.attempt, 1)
@@ -249,6 +368,7 @@ for (const [name, fixture] of Object.entries(globalIntegration.wakes)) {
   if (name === 'duplicate') assert.equal(output.data.submitDecision, false, 'duplicate wake cannot submit')
   else assert.equal(output.data.submitDecision, true, `${name} wake remains observable through one Decision`)
 }
+covers('schedule/theme-radar-due')
 for (const fixture of Object.values(globalIntegration.themeRadar)) {
   const output = execute({ operation: 'themeRadarDue', asOf: globalIntegration.asOf, input: fixture })
   assert.equal(output.data.due, fixture.expectedDue)
@@ -261,25 +381,31 @@ const backtestRows = Array.from({ length: backtest.generator.count }, (_, index)
   date: new Date(Date.parse(backtest.generator.start) + index * 86_400_000).toISOString().slice(0, 10),
   close: backtest.generator.baseClose * (1 + backtest.generator.dailyReturn) ** index,
 }))
+covers('backtest/trend-gate-forward')
 const gateBacktest = execute({ operation: 'trendGateForward', asOf: '2026-12-31T00:00:00Z', input: { series: backtestRows } })
 assert.equal(gateBacktest.data.classifiableDays, backtest.expected.classifiableDays)
 assert.equal(Object.keys(gateBacktest.data.stats).some((key) => key.endsWith(':d20')), backtest.expected.hasD20Bucket)
+covers('backtest/dca-multiplier')
 const dcaBacktest = execute({ operation: 'dcaMultiplierBacktest', asOf: '2026-12-31T00:00:00Z', input: { series: backtestRows } })
 assert.equal(dcaBacktest.data.months > 0, backtest.expected.dcaHasMonths)
 const benchmarkRows = backtestRows.map((row, index) => ({ ...row, close: 100 * 1.0005 ** index }))
+covers('backtest/oversold-strata')
 const strata = execute({ operation: 'oversoldStrata', asOf: '2026-12-31T00:00:00Z', input: { assets: [{ market: 'us', bars: backtestRows }], benchmarks: { us: benchmarkRows } } })
 assert.equal(strata.data.symbolsUsed, backtest.expected.symbolsUsed)
 
+covers('sizing/specialist-budget')
 const krBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.4 } })
 assert.equal(krBudget.status, 'blocked', 'specialist cannot spend beyond its Brief sleeve')
 const urgentExit = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'us-sleeve', market: 'XNAS', currentSleeveWeight: 0.4, sleeveBudgetWeight: 0.4, requestedTargetWeight: 0.2, emergencyExit: true } })
 assert.equal(urgentExit.data.allowed, true, 'urgent exit does not wait for Global')
+covers('sizing/global-denominator')
 const globalBudget = execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'kr-sleeve', weight: 0.4 }, { key: 'us-sleeve', weight: 0.5 }, { key: 'cash', weight: 0.1 }] } })
 assert.equal(globalBudget.status, 'ok')
 assert.equal(globalBudget.data.residualCashWeight, 0)
 const doubleSpend = execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'kr-sleeve', weight: 0.6 }, { key: 'us-sleeve', weight: 0.6 }] } })
 assert.equal(doubleSpend.status, 'blocked', 'one global denominator prevents cash double spend')
 
+covers('research/thesis-metadata')
 const thesis = execute({ operation: 'validateThesis', asOf: methodology.asOf, input: methodology.thesis })
 assert.equal(thesis.status, 'ok', 'complete thesis metadata is machine-valid')
 assert.equal(thesis.data.complete, true)
@@ -292,10 +418,12 @@ const validMemory = execute({ operation: 'validateMemory', asOf: methodology.asO
 assert.equal(validMemory.data.accepted, true)
 const futureMemory = execute({ operation: 'validateMemory', asOf: methodology.asOf, input: { value: methodology.memory.future } })
 assert.equal(futureMemory.data.accepted, false, 'future memory is ignored')
+covers('owner-cutover/canonical-owner-map')
 const mapped = execute({ operation: 'migrationMap', asOf: methodology.asOf, input: { records: methodology.migration, cutoverAt: methodology.asOf } })
 assert.equal(mapped.status, 'ok')
 assert.deepEqual(Object.values(mapped.data.destinations).map((rows) => rows.length), [1, 1, 1, 1, 1])
 assert.equal(mapped.data.backfillForwardTrackRecord, false)
+covers('learning/upside-radar', 'scanner/upside-radar')
 const upside = execute({ operation: 'upsideRadar', asOf: methodology.asOf, input: { candidates: methodology.upside } })
 assert.deepEqual(upside.data.ranked.map((row) => row.asset), ['SYNTH-A'])
 assert.deepEqual(upside.data.unranked.map((row) => row.asset), ['SYNTH-MISSING'])
@@ -304,10 +432,18 @@ assert.equal(upside.data.unranked[0].axes.valuation.status, 'unknown', 'missing 
 
 const executableMatrix = migrationText.split('## Executables')[1].split('## Shared helpers')[0]
 const migrationRows = executableMatrix.split('\n').filter((line) => /^\| `[^`]+` \| (AR|PP|PX|RT) \|/.test(line))
+covers('audit/migration-matrix-structure')
 assert.equal(migrationRows.length, 65, 'migration matrix inventories exactly 65 Python entry points')
 const migrationGroups = new Set(migrationRows.map((line) => line.split('|').at(-2).trim().replaceAll('`', '')))
 assert.deepEqual([...migrationGroups].sort(), Object.keys(groupCoverage.groups).sort(), 'every migration fixture group is registered')
 for (const [group, checks] of Object.entries(groupCoverage.groups)) assert.ok(checks.length, `${group} has a concrete verification basis`)
+/**
+ * ⚠️ Those two lines are the whole of what the registry used to be checked
+ * for: the group name matches the matrix, and the list is not empty. Neither
+ * asks whether the named check runs. `assertCoverageWasEarned()` at the end of
+ * this file is what asks.
+ */
+covers('audit/package-boundary-scan', 'owner-cutover/no-order-code')
 assert.equal(manifest.network.mode, 'deny', 'manager package cannot access the network directly')
 assert.equal(manifest.engines.aumos, '>=0.3.0', 'runtime requires the current invocation and package-MCP contracts')
 assert.equal(manifest.capabilities.some((row) => /order|broker|database/i.test(row.kind)), false, 'manager package declares no order/broker/database capability')
@@ -386,21 +522,28 @@ assert.deepEqual(
   'MCP text and structured outputs are identical',
 )
 
+covers('coverage/universe-union', 'coverage/uncovered-zero')
 const completeCoverage = execute({ operation: 'coverage', asOf: methodology.asOf, input: { scannerUniverses: [['A', 'B'], ['A', 'B']], extensions: ['C'], holdings: ['A'], dispositions: [{ symbol: 'B' }, { symbol: 'C' }], asOf: methodology.asOf } })
 assert.equal(completeCoverage.data.complete, true)
 assert.deepEqual(completeCoverage.data.uncovered, [])
+covers('portfolio/krw-usd-sgov-nav')
 const sleeve = execute({ operation: 'sleeveNav', asOf: methodology.asOf, input: { cash: [{ currency: 'KRW', amount: 1000000 }, { currency: 'USD', amount: 100 }], positions: [{ symbol: 'SGOV', currency: 'USD', marketValue: 200 }], fx: { USDKRW: 1300 } } })
 assert.equal(sleeve.data.usdLiquidity, 300)
 assert.equal(sleeve.data.globalNavKrw, 1390000)
+covers('research/research-gate', 'research/challenge-block')
 const researchGateRun = execute({ operation: 'researchGate', asOf: methodology.asOf, input: { lens: 'mean-reversion', priceDeclineReason: 'temporary', opportunityCase: 'recovery', trapRisks: ['structural-risk'], variantView: 'different', benchmarkAlternative: { expectedReturn: 0.03 }, scenarios: { bear: { probability: 0.2, return: -0.2 }, base: { probability: 0.5, return: 0.12 }, bull: { probability: 0.3, return: 0.3 } }, minimumExpectedActiveReturn: 0.02, challengeVerdict: 'cleared', sourceFresh: true, sourceConflict: false } })
 assert.equal(researchGateRun.data.passed, true)
+covers('watch/future-at-time')
 const futureWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-08-21T00:00:00Z' }, current: {} } })
 assert.equal(futureWatch.data.valid, true)
+covers('watch/producerless-event-rejected')
 const eventWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'event', event: 'earnings' }, current: {} } })
 assert.equal(eventWatch.status, 'blocked')
+covers('earnings/actual-anchor')
 const actual = execute({ operation: 'earningsActual', asOf: methodology.asOf, input: { preview: { consensus: { operatingIncome: 100 } }, actual: { operatingIncome: 110 }, filing: { announcedAt: '2026-08-19T20:05:00Z', sourceUrl: 'https://ir.example.test/release', sourceType: 'press-release' } } })
 assert.equal(actual.data.actualConfirmed, true)
 assert.equal(actual.data.comparisons.operatingIncome.consensusSurprisePct, 10)
+covers('outcome/failure-taxonomy')
 const classification = execute({ operation: 'outcomeClassification', asOf: methodology.asOf, input: { grossReturnPct: 5, activeReturnPct: -1, benchmarkReturnPct: 6, thesisCompliance: 'followed', riskCompliance: 'followed', executionQuality: 'good' } })
 assert.equal(classification.data.failureType, 'benchmark_failure')
 const krBlockedLane = execute({ operation: 'laneCoverage', asOf: methodology.asOf, input: { lane: 'kr', intent: 'new-fundamental-buy', sources: { toss: { status: 'fresh' }, 'open-dart': { status: 'missing' } } } })
@@ -538,6 +681,7 @@ assert.ok(copiedMemory.diagnostics.some((row) => row.code === 'memory_raw_source
 /**
  * One manager, three flows — the pre-2026-08-27 package ids are gone. (issue #70 §5)
  */
+covers('owner-cutover/flow-lane-ownership')
 const realIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: manifest.id, flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
 assert.equal(realIdBudget.data.allowed, true, 'the published manager id is the one specialistBudget accepts')
 const staleIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-kr', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
@@ -565,6 +709,7 @@ assert.deepEqual(reviewSequence.data.sequence.map((row) => row.flow).sort(), ['a
  * A risk-increasing RESIZE is the `existing-position` lens, and `evidence-gates`
  * sends it through this gate. (issue #70 §24)
  */
+covers('research/resize-lens')
 const resizeResearch = { lens: 'existing-position', priceDeclineReason: 'temporary', opportunityCase: 'recovery', trapRisks: ['structural-risk'], variantView: 'different', benchmarkAlternative: { expectedReturn: 0.03 }, scenarios: { bear: { probability: 0.2, return: -0.2 }, base: { probability: 0.5, return: 0.12 }, bull: { probability: 0.3, return: 0.3 } }, minimumExpectedActiveReturn: 0.02, challengeVerdict: 'cleared', sourceFresh: true, sourceConflict: false }
 assert.equal(execute({ operation: 'researchGate', asOf: methodology.asOf, input: resizeResearch }).data.passed, true, 'the RESIZE lens the skills name has a passing path')
 assert.equal(execute({ operation: 'researchGate', asOf: methodology.asOf, input: { ...resizeResearch, lens: 'vibes' } }).status, 'blocked', 'an unnamed lens is still rejected')
@@ -573,13 +718,16 @@ assert.equal(execute({ operation: 'researchGate', asOf: methodology.asOf, input:
  * A revisit promise expires, and a drift promise is checked for already-met.
  * (issue #70 §23)
  */
+covers('watch/expiry-forced-review')
 const derivedExpiry = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-08-21T00:00:00Z' }, current: {}, config: { watchExpiryDays: 30 } } })
 assert.equal(derivedExpiry.data.expirySource, 'default', 'an undeclared expiry is derived from watchExpiryDays rather than left absent')
 assert.equal(derivedExpiry.data.expiresAt, '2026-09-19T00:00:00.000Z')
 const expiredWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'price-below', threshold: 50, expiresAt: '2026-08-01T00:00:00Z' }, current: { price: 90 } } })
 assert.ok(expiredWatch.diagnostics.some((row) => row.code === 'watch_expired'), 'an expired WATCH forces review instead of renewing itself')
+covers('watch/expiry-before-trigger')
 const unreachableWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-11-01T00:00:00Z', expiresAt: '2026-09-01T00:00:00Z' }, current: {} } })
 assert.ok(unreachableWatch.diagnostics.some((row) => row.code === 'watch_expiry_before_trigger'), 'a trigger later than its own expiry can never fire')
+covers('watch/already-met', 'watch/drift-already-met')
 const driftMet = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'weight-drift', threshold: 0.02, baselineWeight: 0.06 }, current: { weight: 0.09 } } })
 assert.ok(driftMet.diagnostics.some((row) => row.code === 'watch_already_met'), 'a drift condition already true is invalid, exactly like a price condition')
 const driftOpen = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'weight-drift', threshold: 0.03, baselineWeight: 0.06 }, current: { weight: 0.07 } } })
@@ -591,6 +739,7 @@ assert.ok(driftUnbaselined.diagnostics.some((row) => row.code === 'watch_baselin
  * `factor` is a measured concentration axis, not prose in `allocate`. (issue #70 §22)
  */
 const caps = { position: 0.1, sector: 0.2, theme: 0.15, factor: 0.15, portfolioHeat: 0.06 }
+covers('sizing/factor-concentration')
 const crossSector = execute({
   operation: 'concentration',
   asOf: methodology.asOf,
@@ -615,6 +764,7 @@ assert.ok(
  * `priceConflictTolerance` is a configuration key the documents can honestly
  * call configured. (issue #70 §26)
  */
+covers('policy/price-conflict-tolerance-configurable')
 const schema = JSON.parse(await readFile(new URL('../config.schema.json', fixtureRoot), 'utf8'))
 assert.equal(schema.properties.priceConflictTolerance.default, 0.05, 'the documented 5% default is in the schema')
 assert.ok(schema.properties.concentration.properties.factor, 'the factor cap is configurable')
@@ -625,6 +775,7 @@ assert.ok(strictTolerance.diagnostics.some((row) => row.code === 'price_source_c
  * The `unit` vocabulary the contract skill prints is the vocabulary the code
  * accepts. (issue #70 §27)
  */
+covers('audit/skill-code-unit-vocabulary')
 const contractSkill = await readFile(new URL('../skills/data-source-contract/SKILL.md', fixtureRoot), 'utf8')
 for (const unit of ['percent', 'ratio', 'count', 'multiple', 'index-points', 'days', 'shares', 'basis-points']) {
   assert.ok(contractSkill.includes(`\`${unit}\``), `the contract skill names the ${unit} unit the code accepts`)
@@ -647,6 +798,7 @@ const series = (values, start = Date.parse('2026-01-01T00:00:00Z')) =>
   values.map((value, index) => bar(new Date(start + index * 86_400_000).toISOString().slice(0, 10), ...(Array.isArray(value) ? [value[0], value[1]] : [value])))
 
 const stillFalling = series(Array.from({ length: 220 }, (_, index) => 200 - index * 0.5))
+covers('scanner/entry-quality-gate')
 const knife = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: stillFalling, lenses: ['mean-reversion'] } })
 assert.equal(knife.data.state, 'falling_knife')
 assert.equal(knife.status, 'blocked', 'a falling knife is refused by the gate, not merely described by it')
@@ -665,6 +817,7 @@ const oldLowThenFalling = series([
   ...Array.from({ length: 160 }, (_, index) => 100 + index * 0.5625),
   ...Array.from({ length: 60 }, (_, index) => 190 - index),
 ])
+covers('scanner/eq-v2-window-artifact')
 const demoted = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: oldLowThenFalling, lenses: [] } })
 assert.ok(demoted.data.sessionsSinceNewLow >= 5, 'the full window reading is the one eq-v1 would have passed on')
 assert.equal(demoted.data.sessionsSinceNewLow60, 0, 'the last 60 bars are still setting new lows')
@@ -677,6 +830,7 @@ assert.equal(demoted.data.eqV1WouldPassBasing, true, 'the demotion says why a na
  */
 const spikeLow = series(Array.from({ length: 220 }, (_, index) => 200 - index * 0.4))
   .map((row, index) => (index === 210 ? { ...row, low: row.low - 40 } : row))
+covers('watch/no-new-low-dual-lens')
 const disagree = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: spikeLow, lenses: [], noNewLow: { sessions: 3, lookback: 20 } } })
 assert.equal(disagree.data.noNewLow.met, true, 'the verdict still comes from the intraday-low lens, unchanged')
 assert.equal(disagree.data.noNewLow.verdictLens, 'intraday-low')
@@ -691,6 +845,7 @@ const neutralBars = series([
   ...Array.from({ length: 190 }, (_, index) => 200 - index * 0.5),
   ...Array.from({ length: 30 }, (_, index) => 105 + index * 3),
 ])
+covers('scanner/mean-reversion-unconfirmed')
 const neutral = execute({ operation: 'entryQualityGate', asOf: methodology.asOf, input: { bars: neutralBars, lenses: ['mean-reversion'] } })
 assert.equal(neutral.data.aboveMa200, true)
 assert.equal(neutral.data.ma50AboveMa200, false, 'a name that has only just recovered over its MA200 has no golden cross yet')
@@ -720,6 +875,7 @@ const qualityBars = series([
   // and would land in `mean-reversion` instead of the band under test.
   ...Array.from({ length: 40 }, (_, index) => qualityRise.at(-1) - 1.5 * (index + 1) + (index % 2 ? 3 : -3)),
 ])
+covers('scanner/quality-pullback-lens')
 const scanned = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'GAP', market: 'us', bars: qualityBars } })
 assert.ok(scanned.data.indicators.offHigh200 <= -0.15 && scanned.data.indicators.offHigh200 >= -0.35, 'the fixture sits in the band both other lenses drop')
 assert.equal(scanned.data.signals.trendPullback.pullback, false, 'trend-pullback stops at -20% off high')
@@ -742,6 +898,7 @@ const hotPositions = [
   { symbol: 'BBB', weight: 0.2, stopLossPct: 0.15 },
   { symbol: 'CORE', weight: 0.4, core: true },
 ]
+covers('audit/portfolio-heat')
 const heatOnly = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, caps: heatCaps } })
 assert.equal(heatOnly.data.heat.holdingsOnly, 0.07, 'core DCA carries no stop and contributes no heat')
 assert.ok(heatOnly.diagnostics.some((row) => row.code === 'portfolio_heat_above_cap' && row.severity === 'unevaluated'), 'a book already over on its holdings warns; existing risk is grandfathered')
@@ -760,6 +917,7 @@ assert.ok(
 /**
  * Pacing warns and never blocks. (approved 2026-07-10, P5)
  */
+covers('audit/new-single-pacing')
 const pacing = execute({
   operation: 'newSinglePacing',
   asOf: methodology.asOf,
@@ -802,11 +960,13 @@ const sectorLane = execute({
     ],
   },
 })
+covers('scanner/sector-rank-and-regime')
 assert.deepEqual(sectorLane.data.sectors.filter((row) => row.rank).map((row) => row.name), ['Semis', 'Software', 'Energy', 'Staples'], 'the lane is ranked, not merely scored')
 assert.equal(sectorLane.data.sectors.find((row) => row.name === 'Semis').rankChange, 3, 'the move since the previous run is what makes a rank a trigger')
 assert.equal(sectorLane.data.regime.leadershipCharacter, 'risk_on', 'the regime reads the character of who is leading')
 assert.equal(sectorLane.data.regime.benchmarkAboveMa200, true)
 assert.equal(sectorLane.data.regime.isJudgementInput, true, 'the regime is an input to a Brief judgement, never a score this package holds')
+covers('scanner/research-queue')
 assert.deepEqual(
   sectorLane.data.researchQueue.map((row) => row.sector).sort(),
   ['Energy', 'Semis', 'Software'],
@@ -814,6 +974,7 @@ assert.deepEqual(
 )
 assert.ok(sectorLane.data.researchQueue.find((row) => row.sector === 'Semis').reasons.some((row) => row.code === 'rank-jump'))
 assert.equal(sectorLane.data.meaning, 'research-priority-only')
+covers('scanner/bot-baseline-never-traded')
 assert.ok(sectorLane.data.baselineSignals.every((row) => row.tradeable === false), 'the bot baseline is a measuring stick and says so in the data')
 assert.equal(sectorLane.data.baselineSignals[0].setup, 'rs_breakout')
 assert.ok(sectorLane.diagnostics.some((row) => row.code === 'sector_series_unverified'), 'a sector that could not be read is named unread, never dropped')
@@ -838,6 +999,7 @@ assert.equal(
  * L2.5 — the sell-side watch, which had been replaced by post-hoc attribution.
  * (issue #70 §3)
  */
+covers('exit/exit-check-sell-trim-review')
 const held = { symbol: 'HELD', rules: { stop: 80, target: 150, entry: 100, reviewBy: '2027-01-01', trims: [{ price: 120, sellPct: 30 }] } }
 assert.equal(execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { ...held, price: 100 } }).data.action, 'NONE', 'an intact position raises nothing')
 assert.equal(execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { ...held, price: 79 } }).data.action, 'SELL')
@@ -853,6 +1015,7 @@ assert.equal(trailing.data.findings[0].kind, 'trailing_stop')
  * The fundamental lane runs whether or not the price lane says anything — the
  * case a price-only watch was missing entirely.
  */
+covers('exit/exit-price-and-fundamental-lanes')
 const brokenThesis = execute({
   operation: 'exitCheck',
   asOf: methodology.asOf,
@@ -887,6 +1050,7 @@ assert.ok(
     .diagnostics.some((row) => row.code === 'sentinel_escalation_pending' && row.severity === 'blocked'),
   'a third consecutive threatened verdict forces an explicit decision in this run',
 )
+covers('exit/exit-candidate-never-order')
 assert.ok(
   [execute({ operation: 'exitCheck', asOf: methodology.asOf, input: { ...held, price: 79 } }), priceInvalidation]
     .every((row) => row.data.candidateOnly === true),
@@ -896,6 +1060,7 @@ assert.ok(
 /**
  * The two research layers are skills, not schedule keys. (issue #70 §1)
  */
+covers('schedule/theme-radar-workflow-wired')
 const prompt = await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')
 for (const skill of ['theme-radar', 'position-research']) {
   const text = await readFile(new URL(`../skills/${skill}/SKILL.md`, fixtureRoot), 'utf8')
@@ -914,6 +1079,7 @@ assert.ok(prompt.includes('exitCheck') && prompt.includes('thesisSentinel'), 'th
  * and one of the skill's own rules — execution is an observation, not a
  * methodology failure — was contradicted by the code it described.
  */
+covers('outcome/skill-code-taxonomy-agreement')
 const calibrationSkill = await readFile(new URL('../skills/outcome-calibration/SKILL.md', fixtureRoot), 'utf8')
 /**
  * ⚠️ Each list is checked against **its own section**, not against the whole
@@ -947,6 +1113,7 @@ assert.ok(outcomesSource.includes("'execution_observation_only'"), 'the reading 
 /**
  * And the rule itself, not only the vocabulary.
  */
+covers('outcome/computed-vs-judged-axes', 'outcome/execution-observation-only')
 const brokerSlippage = { grossReturnPct: 8, activeReturnPct: 2, thesisCompliance: 'followed', riskCompliance: 'followed', executionQuality: 'poor' }
 const observed = execute({ operation: 'outcomeClassification', asOf: methodology.asOf, input: brokerSlippage })
 assert.equal(observed.data.failureType, 'good_process_good_outcome', 'a broker fill this manager cannot place does not make the methodology fail')
@@ -995,5 +1162,213 @@ const parityFailures = comparePort(parity)
 for (const failure of parityFailures) console.error(`  FAIL ${failure}`)
 assert.equal(parityFailures.length, 0, 'the port still matches the frozen legacy numeric core')
 assert.ok(parity.cases.every((row) => row.legacyMeasured !== undefined), 'every parity case carries a measured legacy output')
+
+/**
+ * ── Cases the registry claimed and nothing checked (issue #70 §4) ──────────
+ *
+ * `assertCoverageWasEarned()` was added before these existed and named them
+ * one at a time: `calibration-maturity`, `opportunity-five-axis`, `trend`,
+ * `fx-missing`, `forward-outcome`, `mfe-mae`, `config-schema-lint`,
+ * `no-auto-relax` and `no-auto-method-change` were all registered under a
+ * group while being touched by no assertion at all. That is the failure the
+ * issue reported about `blendedSectorStrength`, and it was nine wide.
+ */
+covers('calibration/calibration-maturity')
+const maturitySamples = (count) => Array.from({ length: count }, (_, index) => ({
+  date: new Date(Date.parse('2026-01-01') + index * 30 * 86_400_000).toISOString().slice(0, 10),
+  activeReturn: index % 2 ? 0.03 : -0.01,
+}))
+assert.equal(execute({ operation: 'calibration', asOf: methodology.asOf, input: { samples: maturitySamples(3) } }).data.status, 'insufficient')
+assert.equal(execute({ operation: 'calibration', asOf: methodology.asOf, input: { samples: maturitySamples(6) } }).data.status, 'observing')
+const reviewable = execute({ operation: 'calibration', asOf: methodology.asOf, input: { samples: maturitySamples(12) } })
+assert.equal(reviewable.data.status, 'reviewable')
+assert.ok(
+  ['insufficient', 'observing', 'reviewable'].includes(reviewable.data.status),
+  'maturity tops out at reviewable — the calculation cannot hand itself a promotion',
+)
+assert.ok(
+  execute({ operation: 'calibration', asOf: methodology.asOf, input: { samples: [...maturitySamples(12), { date: '2026-06-01' }] } })
+    .diagnostics.some((row) => row.code === 'calibration_incomplete_samples'),
+  'an incomplete row does not pad the sample count toward a threshold',
+)
+
+covers('learning/no-auto-method-change')
+/**
+ * The maturity ladder stops one rung below `promoted`, in the code and not
+ * only in prose: no sample count reaches it, because promotion is a reviewed
+ * package/config change and this core cannot make one.
+ */
+for (const count of [12, 40, 200]) {
+  assert.notEqual(
+    execute({ operation: 'calibration', asOf: methodology.asOf, input: { samples: maturitySamples(count) } }).data.status,
+    'promoted',
+    'no sample count promotes a lens; promotion needs an approved package/config revision',
+  )
+}
+assert.equal(promotionOutput.data.versions[0].gate.promoted, undefined, 'the promotion gate reports readiness, never a promotion')
+assert.ok('reviewReady' in promotionOutput.data.versions[0].gate, 'what it reports is that a human review may now happen')
+
+covers('scanner/opportunity-five-axis')
+const oversoldBars = Array.from({ length: 220 }, (_, index) => {
+  const close = index < 160 ? 200 : 200 - (index - 159) * 1.4
+  return { timestamp: new Date(Date.parse('2026-01-01') + index * 86_400_000).toISOString(), open: close, high: close + 1, low: close - 1, close, volume: index > 210 ? 900_000 : 100_000 }
+})
+const fiveAxis = execute({ operation: 'opportunityMetrics', asOf: methodology.asOf, input: { symbol: 'DEEP', market: 'us', sector: 'semis', bars: oversoldBars } })
+assert.ok(fiveAxis.data.technicalSignals.includes('rsi-below-30'))
+assert.ok(fiveAxis.data.volumeSignals.includes('volume-at-least-2x'))
+/**
+ * Two of the five axes score mechanically and three do not, which is the
+ * ported rule rather than an omission: earnings, valuation and sentiment are
+ * verified by hand, and the original refuses to hand them automatic points.
+ * The scores cap at 30 and 25, so the remaining 45 are never granted here.
+ */
+assert.ok(fiveAxis.data.technicalScore <= 30 && fiveAxis.data.volumeScore <= 25)
+for (const forbidden of ['earningsScore', 'valuationScore', 'sentimentScore']) {
+  assert.equal(fiveAxis.data[forbidden], undefined, `${forbidden} is verified by hand; the scanner grants it no automatic points`)
+}
+assert.equal(
+  execute({ operation: 'opportunityMetrics', asOf: methodology.asOf, input: { symbol: 'SHORT', market: 'us', bars: oversoldBars.slice(0, 10) } }).status,
+  'unevaluated',
+  'too little history is unevaluated, never a zero score',
+)
+
+covers('scanner/trend')
+const trendBars = (values) => values.map((close, index) => ({ timestamp: new Date(Date.parse('2026-01-01') + index * 86_400_000).toISOString(), open: close, high: close, low: close, close, volume: 1000 }))
+const uptrendSeries = trendBars(Array.from({ length: 220 }, (_, index) => 100 + index * 0.5))
+const brokenSeries = trendBars(Array.from({ length: 220 }, (_, index) => 200 - index * 0.5))
+const extendedUptrend = execute({ operation: 'trendState', asOf: methodology.asOf, input: { symbol: 'UP', bars: uptrendSeries } })
+assert.equal(extendedUptrend.data.state, 'UPTREND')
+assert.equal(extendedUptrend.data.extended, true, 'a name 31% over its MA200 is extended')
+assert.equal(extendedUptrend.data.trancheGuidance, 'small_or_wait', 'extension caps the tranche even while the trend is intact')
+assert.equal(
+  extendedUptrend.data.meaning,
+  'drawdown-control-not-return-edge',
+  'the gate says what it is for — the multiplier controls drawdown and is not a return edge',
+)
+const brokenTrend = execute({ operation: 'trendState', asOf: methodology.asOf, input: { symbol: 'DOWN', bars: brokenSeries } })
+assert.equal(brokenTrend.data.state, 'BROKEN')
+assert.equal(brokenTrend.data.trancheGuidance, 'stop', 'a broken trend stops the tranche rather than sizing it smaller')
+assert.equal(
+  execute({ operation: 'trendState', asOf: methodology.asOf, input: { symbol: 'SHORT', bars: uptrendSeries.slice(0, 50) } }).data.state,
+  'insufficient_data',
+  'without 200 bars the gate says so instead of guessing a state',
+)
+
+covers('portfolio/fx-missing')
+const missingFx = execute({ operation: 'sleeveNav', asOf: methodology.asOf, input: { cash: [{ currency: 'KRW', amount: 1_000_000 }, { currency: 'USD', amount: 100 }], positions: [] } })
+assert.equal(missingFx.data.globalNavKrw, null, 'without FX the two sleeves have no common denominator and none is invented')
+assert.equal(missingFx.status, 'unevaluated')
+assert.ok(missingFx.diagnostics.some((row) => row.code.includes('fx')), 'the missing rate is named rather than defaulted to 1')
+
+covers('exit/forward-outcome', 'exit/mfe-mae')
+const forwardBars = trendBars(Array.from({ length: 70 }, (_, index) => (index < 10 ? 100 : 100 + (index - 10) * 0.5)))
+const forwardBenchmark = trendBars(Array.from({ length: 70 }, () => 100))
+const forward = execute({
+  operation: 'forwardOutcome',
+  asOf: methodology.asOf,
+  input: { bars: forwardBars, benchmarkBars: forwardBenchmark, signalAt: forwardBars[10].timestamp, horizons: [5, 20, 60] },
+})
+assert.deepEqual(Object.keys(forward.data.forward), ['d5', 'd20', 'd60'], 'the three declared horizons are all reported')
+assert.ok(forward.data.forward.d20.returnPct > 0)
+assert.ok(forward.data.forward.d20.benchmarkExcessPct > 0, 'excess is measured against the benchmark, not assumed')
+assert.equal(forward.data.forward.d20.sectorExcessPct, null, 'no sector series means no sector excess, never a zero')
+assert.ok(forward.data.excursion.mfePct >= 0 && forward.data.excursion.maePct <= 0, 'MFE and MAE bracket the path')
+assert.ok(
+  execute({ operation: 'forwardOutcome', asOf: methodology.asOf, input: { bars: forwardBars.slice(0, 40), signalAt: forwardBars[10].timestamp } })
+    .diagnostics.some((row) => row.code === 'forward_window_immature'),
+  'an unmatured window is named immature rather than scored short',
+)
+assert.equal(
+  execute({ operation: 'forwardOutcome', asOf: methodology.asOf, input: { bars: forwardBars, signalAt: forwardBars[0].timestamp } }).status,
+  'unevaluated',
+  'a signal with no bar before it has no base to measure from',
+)
+
+covers('policy/config-schema-lint', 'policy/no-auto-relax')
+/**
+ * Configuration may make this manager stricter and cannot waive a gate. That
+ * is a claim about the schema, so it is checked against the schema: every
+ * threshold is bounded on both sides, and nothing unknown may be added.
+ */
+assert.equal(configSchema.additionalProperties, false, 'an unknown config key is refused, not absorbed')
+const boundedNumbers = (node, path = 'config') => {
+  for (const [name, property] of Object.entries(node.properties ?? {})) {
+    const here = `${path}.${name}`
+    if (['number', 'integer'].includes(property.type)) {
+      assert.ok(Number.isFinite(property.minimum), `${here} has a floor a config cannot go under`)
+      assert.ok(Number.isFinite(property.maximum), `${here} has a ceiling a config cannot go over`)
+      assert.ok(property.minimum < property.maximum, `${here} has a usable range`)
+      assert.ok(property.default >= property.minimum && property.default <= property.maximum, `${here} defaults inside its own bounds`)
+    }
+    if (property.type === 'object') {
+      assert.equal(property.additionalProperties, false, `${here} refuses unknown keys too`)
+      boundedNumbers(property, here)
+    }
+  }
+}
+boundedNumbers(configSchema)
+for (const gate of ['minimumExpectedActiveReturn', 'minimumLensSamples', 'minimumIndependentDateClusters']) {
+  assert.ok(configSchema.properties[gate].minimum > 0, `${gate} cannot be configured down to nothing`)
+}
+assert.ok(
+  /stricter/i.test(configSchema.description) && /cannot waive/i.test(configSchema.description),
+  'the schema states the rule its bounds enforce',
+)
+
+/**
+ * ── Every operation has a published name (issue #70 §18) ───────────────────
+ *
+ * 44 of the 64 appeared in no skill and no prompt. The only way to learn one
+ * was to call a wrong name and read the `operation_unknown` diagnostic, while
+ * all three flow skills instruct the run not to go looking. So the table in
+ * `deterministic-metrics` is checked in both directions: an operation missing
+ * from it is unreachable, and a name in it that no longer exists is a call
+ * that will fail at runtime.
+ */
+const supportedOperations = execute({ operation: null, asOf: methodology.asOf }).diagnostics[0].details.supported
+const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKILL.md', fixtureRoot), 'utf8')
+/**
+ * ⚠️ Read from the operations section only. Searching the file matched the
+ * "inputs that are not guessable" table too, which repeats ten names in the
+ * same row shape — 74 rows for 64 operations, with no set difference to show
+ * for it. Scope the read; the same mistake, a third time.
+ */
+const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
+const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
+assert.equal(supportedOperations.length, 64)
+assert.deepEqual(
+  [...tabledOperations].sort(),
+  [...supportedOperations].sort(),
+  'the operation table and the registered operations agree in both directions',
+)
+assert.equal(new Set(tabledOperations).size, tabledOperations.length, 'no operation is listed twice')
+
+/**
+ * ── Which groups have a frozen fixture, and which do not (issue #70 §4) ────
+ *
+ * `MIGRATION.md`'s last column names a coverage **group**, and seven of the
+ * nineteen have a file of frozen numbers behind them in `legacy-golden/`. The
+ * matrix read as though each name were a file, so twelve looked missing. They
+ * are not missing; they are verified by cases built in this file, which is
+ * why every one of them is registered in `group-coverage.json` and now has to
+ * be earned. The distinction is stated here so neither reading is available:
+ * a frozen file is a number measured from the Python core, an in-file case is
+ * a contract this port has to keep.
+ */
+const frozenGroups = ['scanner', 'promotion', 'outcome', 'backtest', 'attribution', 'calibration', 'sizing']
+for (const group of frozenGroups) {
+  assert.ok(groupCoverage.groups[group], `${group} is a registered group`)
+}
+const fixtureFiles = ['core', 'scanner', 'promotion', 'outcomes', 'backtest', 'methodology', 'parity']
+for (const file of fixtureFiles) {
+  assert.ok(existsSync(new URL(`legacy-golden/${file}.json`, fixtureRoot)), `legacy-golden/${file}.json is the frozen source for its group`)
+}
+assert.equal(
+  Object.keys(groupCoverage.groups).length - frozenGroups.length,
+  12,
+  'twelve groups are verified by in-file contract cases rather than by a frozen numeric file, and every one of them is registered and earned above',
+)
+
+assertCoverageWasEarned()
 
 console.log(`evidence-gated contract fixtures passed (${parity.cases.length} legacy-parity cases)`)

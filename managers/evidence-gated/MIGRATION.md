@@ -131,6 +131,25 @@ no credential, order, network, database, filesystem-ledger or personal-path acce
 includes `ruleVersion`, `asOf`, units/currency/market where relevant, and explicit
 `missing`/`unevaluated` diagnostics rather than zero/false substitution.
 
+## What the last column names, and what stands behind it
+
+The `golden fixture` column names a **coverage group**, not a file. Seven of the nineteen groups
+have a file of frozen numbers behind them in `fixtures/legacy-golden/`; the other twelve are
+verified by contract cases built inside `tools/verify-evidence-gated-allocator.mjs`. Reading the
+column as a filename made twelve groups look unported, and they are not — the two kinds of check
+answer different questions:
+
+| | what it holds | what it can be wrong about |
+|---|---|---|
+| frozen file — `core`, `scanner`, `promotion`, `outcomes`, `backtest`, `methodology`, `parity` | numbers measured once from the Python core, because that checkout is private | the port drifting away from a number the original produced |
+| in-file case | a contract this port has to keep, built from synthetic inputs | the port breaking a rule the methodology states |
+
+`fixtures/legacy-golden/group-coverage.json` registers which checks stand behind each group, and
+since #70 that registry has to be earned: `covers()` marks the assertions behind each case name,
+and the verifier fails when a registered name has no marker, a marker names an unregistered case,
+or a marker is followed by no assertion at all. Before that, `blendedSectorStrength` was registered
+under `scanner` while no test touched it, and nothing could have noticed.
+
 ## Golden parity against the Python core
 
 The dispositions above say what each executable's rules became. This section says how that claim is
