@@ -80,7 +80,7 @@ first one to go wrong.
 |---|---|---|---|
 | `price-below` · `price-above` | `intraday` | a last price | a level is touched or it is not, and a live price answers that |
 | `at-time` | `clock` | nothing | an instant is an instant whatever the session is doing |
-| `weight-drift` | `daily-close` | a completed bar | weight is price × quantity over the book, so an intraday drift reading is a reading of intraday noise |
+| `weight-drift` | `intraday` | a last price | Aumos's Wake Engine fires a drift trigger off a live quote, on the same tick as the price triggers — an evaluator that refused that reading would refuse every drift wake it was sent |
 
 Five statuses, and the last two are the ones that were missing:
 
@@ -96,10 +96,18 @@ Five statuses, and the last two are the ones that were missing:
   report it as `not-met`.** That is the difference between "the basing did not confirm" and "I
   never looked", and collapsing them is how a run claims a check it did not run.
 
-⚠️ **A met price WATCH is not an entry.** `entryConfirmationPending` is returned true when the
-`met` came off a live price, because entry quality — basing, `no_new_low`, the MA200 state — is
-`entryQualityGate`'s and needs a bar that has closed. A run woken by a touched level goes and
-looks; it does not treat the touch as the confirmation.
+⚠️ **A met WATCH read off a live price is not a number to act on.** `confirmationPending` is
+returned true whenever the `met` came off a live reading. For a price watch what is still owed is
+entry quality — basing, `no_new_low`, the MA200 state — which is `entryQualityGate`'s and needs a
+bar that has closed. For a drift watch it is the weight itself, which moves for the rest of the
+session. A run woken by a touched level goes and looks; it does not treat the touch as the
+confirmation.
+
+⚠️ **`unevaluable` is still reachable, and it is where the honesty lives.** It fires when the run
+has no usable reading at all — a price watch with no quote, a drift watch on a machine with no
+market credentials. Aumos's own Wake Engine draws the same line: with no quote it reports the
+trigger `unevaluated` rather than "not fired", because those are different facts and the second
+one is a lie.
 
 **One alert per session.** `alertRequired` is false when the watch's `sessionKey` is already in
 `alertedSessionKeys`. The same level brushed four times in one session is one thing worth waking

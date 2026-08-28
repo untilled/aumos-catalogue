@@ -811,7 +811,7 @@ const scoreWatch = (input) => execute({ operation: 'evaluateWatch', asOf: method
 
 const touched = scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 195 } })
 assert.equal(touched.data.status, 'met', 'a level touched on a live price is met — this is the condition the original evaluated intraday, and the only one it did')
-assert.equal(touched.data.entryConfirmationPending, true, 'and a met price WATCH is a reason to look, never a confirmed entry: basing and the MA200 state need a bar that has closed')
+assert.equal(touched.data.confirmationPending, true, 'and a met price WATCH is a reason to look, never a confirmed entry: basing and the MA200 state need a bar that has closed')
 assert.equal(touched.data.alertRequired, true, 'the first touch in a session wakes somebody')
 assert.equal(
   scoreWatch({ watch: priceWatch, observation: { ...intradayObservation, price: 195 }, alertedSessionKeys: [touched.data.sessionKey] }).data.alertRequired,
@@ -831,21 +831,26 @@ assert.equal(
   'but a block never lowers not-met — the report still has to say the level is not there, which is the original `active_block` rule verbatim',
 )
 
+/**
+ * ⚠️ Drift is `intraday`, and this block asserted the opposite until the
+ * runtime was read. Aumos's Wake Engine evaluates a `weight-drift` trigger on a
+ * live quote, on the same tick as the price triggers — so an evaluator that
+ * called that `unevaluable` would refuse to score every drift wake it was sent.
+ */
 const driftWatch = { id: 'kospi-drift', kind: 'weight-drift', threshold: 0.05, baselineWeight: 0.2 }
 const driftIntraday = scoreWatch({ watch: driftWatch, observation: { kind: 'last-price', weight: 0.27, sessionDate: '2026-09-01' } })
-assert.equal(driftIntraday.data.status, 'unevaluable', 'a daily-close condition looked at from an intraday run is unevaluable, not not-met — reporting the second is claiming a check that never ran')
-assert.equal(driftIntraday.data.needs, 'completed-bar', 'and it says what it would have needed')
-assert.ok(driftIntraday.diagnostics.some((row) => row.code === 'watch_cadence_unavailable'), 'by name, so a reader afterwards can tell a missed check from a failed one')
+assert.equal(driftIntraday.data.status, 'met', 'a drift read off a live quote is scored, because that is the reading the wake engine fired on')
+assert.equal(driftIntraday.data.confirmationPending, true, 'and it is a reason to look rather than a weight to act on — it moves for the rest of the session')
 assert.equal(
-  scoreWatch({ watch: driftWatch, observation: { kind: 'completed-bar', weight: 0.27, sessionDate: '2026-09-01' } }).data.status,
-  'met',
-  'the same drift on a completed bar is evaluated normally',
-)
-assert.equal(
-  scoreWatch({ watch: driftWatch, observation: { kind: 'completed-bar', weight: 0.242, sessionDate: '2026-09-01' } }).data.status,
+  scoreWatch({ watch: driftWatch, observation: { kind: 'last-price', weight: 0.242, sessionDate: '2026-09-01' } }).data.status,
   'near',
-  'and a drift inside the configured fraction of its threshold is near',
+  'a drift inside the configured fraction of its threshold is near',
 )
+
+const driftBlind = scoreWatch({ watch: driftWatch, observation: { kind: 'clock' } })
+assert.equal(driftBlind.data.status, 'unevaluable', 'with no quote at all the answer is unevaluable, not not-met — reporting the second is claiming a check that never ran, and the wake engine draws the same line by reporting `unevaluated` rather than `not fired` when a quote is missing')
+assert.equal(driftBlind.data.needs, 'last-price', 'and it says what it would have needed')
+assert.ok(driftBlind.diagnostics.some((row) => row.code === 'watch_cadence_unavailable'), 'by name, so a reader afterwards can tell a missed check from a failed one')
 
 const sizingSkillText = await readFile(new URL('../skills/sizing-and-concentration/SKILL.md', fixtureRoot), 'utf8')
 for (const status of ['near', 'unevaluable', 'blocked']) {

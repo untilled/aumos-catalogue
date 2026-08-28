@@ -48,6 +48,19 @@ market opened, and `allocate` ran three times a day when only one of those three
 was meant to sit. Three times the work, and each sleeve judged twice on data it had already
 read. (#87)
 
+## A wake always ends in a submission
+
+⛔ **There is no "ran and said nothing".** `ManagerRunOutcomeKind` is `decided`,
+`invalid-proposal`, `no-proposal`, `refused`, `unsound` — and `no-proposal` means no JSON could
+be recovered at all, a failure row in the Forward Track Record. A run that deliberately submits
+nothing is scored the same as one that crashed.
+
+So a run woken by a touched price level, where entry quality still needs a bar that has closed,
+**submits a `WAIT`** — one whose `keyReasons` say it was woken by that level, what the live
+reading was, that the confirmation is pending on a closed bar, and what it re-armed. That is
+invariant 5's second sentence applied to this case: *"unable to judge" is a reason for `WAIT`*,
+and it is told apart from the `WAIT` that means no change is needed.
+
 ## What a single-sleeve run may propose
 
 ⛔ **Not a cross-market `REBALANCE`.** A sleeve flow that never saw the other sleeve cannot

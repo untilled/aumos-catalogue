@@ -119,11 +119,20 @@ export const WATCH_EVALUATION = {
   /** A clock, not a bar. The instant is the instant whatever the session is doing. */
   'at-time': { cadence: 'clock', observation: 'clock' },
   /**
-   * Weight is price × quantity over the book, so an intraday drift reading is a
-   * reading of intraday noise. This package judges on adjusted daily bars
-   * everywhere else and there is no reason for the exception here.
+   * ⚠️ **Intraday, and this entry said `daily-close` until the runtime was
+   * read.** The argument for the close was that weight is price × quantity over
+   * the book, so an intraday drift reading is a reading of intraday noise. It is
+   * a fair argument and it is not this package's to make: Aumos's Wake Engine
+   * evaluates a `weight-drift` trigger on a live quote — re-pricing that one
+   * position and folding the change into the book's own total — on the same
+   * tick as the price triggers. A manager whose evaluator called that
+   * `unevaluable` would refuse to score every drift wake it was ever sent.
+   *
+   * The noise is answered where it actually belongs, by `confirmationPending`:
+   * a drift met on a live reading is a reason to look, and the RESIZE that may
+   * follow is sized on a bar that has closed.
    */
-  'weight-drift': { cadence: 'daily-close', observation: 'completed-bar' },
+  'weight-drift': { cadence: 'intraday', observation: 'last-price' },
 }
 
 /** What a run can see, and therefore which cadences it may evaluate. */
@@ -155,10 +164,11 @@ const NEAR_DEFAULTS = { priceRatio: 0.03, driftFraction: 0.8, timeDays: 7 }
  *    one thing worth waking a person for. `data/night_gate_state.json` held
  *    that; `alertedSessionKeys` is the same idea with the state outside.
  *
- * ⚠️ **A met price WATCH is not an entry.** It is `entryConfirmationPending`,
- * which is the original's own words — *"게이트 충족은 자동 발주가 아니라
- * '하네스 실행 요망' 신호다."* Entry quality still needs `entryQualityGate` on
- * a completed bar, and an intraday run does not have one.
+ * ⚠️ **A met WATCH read off a live price is not a number to act on.** It is
+ * `confirmationPending`, which is the original's own words — *"게이트 충족은
+ * 자동 발주가 아니라 '하네스 실행 요망' 신호다."* Entry quality still needs
+ * `entryQualityGate` on a completed bar, and a drift still moves for the rest
+ * of the session.
  */
 export function evaluateWatch({ watch, observation = {}, blocks = [], alertedSessionKeys = [], asOf, config = {} } = {}) {
   const diagnostics = []
@@ -245,8 +255,17 @@ export function evaluateWatch({ watch, observation = {}, blocks = [], alertedSes
       cadence: rule.cadence,
       needs: rule.observation,
       observedWith: observationKind,
-      /** Met on an intraday reading is a reason to look, never a confirmed entry. */
-      entryConfirmationPending: status === 'met' && observationKind === 'last-price' && rule.cadence === 'intraday',
+      /**
+       * Met on a live reading is a reason to look, never a number to act on.
+       *
+       * For a price watch what is still owed is entry quality — basing,
+       * `no_new_low`, the MA200 state — which `entryQualityGate` computes on a
+       * closed bar. For a drift watch it is the weight itself, which moves for
+       * the rest of the session. Both are the same sentence the original
+       * harness wrote about its own night path: a met gate is a *"run the
+       * harness"* signal, not an order.
+       */
+      confirmationPending: status === 'met' && observationKind === 'last-price' && rule.cadence === 'intraday',
       alertRequired: status === 'met' && !alreadyAlerted,
       sessionKey,
       ...details,
