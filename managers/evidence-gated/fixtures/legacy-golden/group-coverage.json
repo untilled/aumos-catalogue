@@ -2,7 +2,7 @@
   "spec": "EvidenceGatedMigrationCoverage/1",
   "groups": {
     "attribution": ["attribution-additive-identity", "twr-with-start-of-day-flow", "annualized-money-weighted-return"],
-    "audit": ["memory-contract", "migration-matrix-structure", "package-boundary-scan"],
+    "audit": ["memory-contract", "migration-matrix-structure", "package-boundary-scan", "skill-code-unit-vocabulary"],
     "backtest": ["trend-gate-forward", "dca-multiplier", "oversold-strata"],
     "calibration": ["categorical-brier", "independent-date-clusters", "calibration-maturity"],
     "coverage": ["universe-union", "uncovered-zero"],
@@ -10,15 +10,15 @@
     "exit": ["forward-outcome", "mfe-mae", "failure-taxonomy"],
     "learning": ["upside-radar", "memory-revision", "no-auto-method-change"],
     "outcome": ["fill-net-return", "missing-cost-explicit"],
-    "owner-cutover": ["three-manager-topology", "no-order-code", "canonical-owner-map"],
-    "policy": ["config-schema-lint", "no-auto-relax"],
+    "owner-cutover": ["single-manager-three-flows", "flow-lane-ownership", "no-order-code", "canonical-owner-map"],
+    "policy": ["config-schema-lint", "no-auto-relax", "price-conflict-tolerance-configurable"],
     "portfolio": ["krw-usd-sgov-nav", "fx-missing"],
     "promotion": ["cluster-bootstrap", "walk-forward", "bh-fdr"],
-    "research": ["thesis-metadata", "research-gate", "challenge-block"],
+    "research": ["thesis-metadata", "research-gate", "challenge-block", "resize-lens"],
     "scanner": ["buy-radar", "opportunity-five-axis", "trend", "sector-strength", "upside-radar"],
     "schedule": ["dst-holiday-early-close", "late-missing-duplicate-outage", "theme-radar"],
-    "sizing": ["legacy-sizing", "specialist-budget", "global-denominator"],
+    "sizing": ["legacy-sizing", "specialist-budget", "global-denominator", "factor-concentration"],
     "source-parsers": ["sec-dart-asof", "adjustment-conflict"],
-    "watch": ["future-at-time", "already-met", "producerless-event-rejected", "bounded-retry"]
+    "watch": ["future-at-time", "already-met", "producerless-event-rejected", "bounded-retry", "expiry-forced-review", "expiry-before-trigger", "drift-already-met"]
   }
 }

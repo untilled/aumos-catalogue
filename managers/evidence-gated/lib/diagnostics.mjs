@@ -1,5 +1,14 @@
 export const RULE_VERSION = 'ega-1.0.0'
 
+/**
+ * The one manager id this package publishes.
+ *
+ * It was three (`evidence-gated-kr`, `-us`, `-global`) until 2026-08-27; the
+ * market roles are now subagent flows of a single manager, so anything that
+ * used to key behaviour off a package id keys it off `MANAGER_ID` plus a flow.
+ */
+export const MANAGER_ID = 'evidence-gated'
+
 export function finite(value) {
   return typeof value === 'number' && Number.isFinite(value)
 }

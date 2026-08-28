@@ -22,9 +22,9 @@
   "migration": [
     { "legacyId": "claim-1", "kind": "asset-claim", "asset": "SYNTH" },
     { "legacyId": "brief-1", "kind": "book-conclusion" },
-    { "legacyId": "gate-1", "kind": "live-gate", "owner": "evidence-gated-us" },
+    { "legacyId": "gate-1", "kind": "live-gate", "owner": "us-sleeve" },
     { "legacyId": "evidence-1", "kind": "raw-evidence" },
-    { "legacyId": "learning-1", "kind": "aggregate-learning", "owner": "evidence-gated-us" }
+    { "legacyId": "learning-1", "kind": "aggregate-learning", "owner": "us-sleeve" }
   ],
   "upside": [
     {

@@ -116,7 +116,7 @@ snippet is not point-in-time evidence, and disagreeing aggregators are recorded 
 than averaged. Macro and policy readings — VIX, put/call, sentiment, breadth, index level and moving
 averages, central-bank and industry policy — need an observation time and a source tier, an official
 publisher outranks an aggregator restatement, and an undated reading is refused rather than treated as
-current. A web price is cross-checked against Toss; beyond the configured 5% tolerance Toss is the
+current. A web price is cross-checked against Toss; beyond `priceConflictTolerance`, 5% by default, Toss is the
 selected price and the difference is kept as provenance. There is no macro score: a regime call is a
 Brief judgement at one `asOf`, not a number this package can hold.
 

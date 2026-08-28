@@ -106,7 +106,7 @@ three separate observations, each carrying metric, value with unit and currency,
 readings — VIX, put/call, sentiment, breadth, index level and moving averages, central-bank and
 industry policy — need an `observedAt` and a source tier; an undated reading is refused rather than
 treated as current, and a regime call is a Brief judgement, never a score. A web price is cross-checked
-against Toss; beyond the configured tolerance Toss is selected and the conflict is recorded rather than
+against Toss; beyond `priceConflictTolerance` Toss is selected and the conflict is recorded rather than
 averaged.
 
 ### 3. Name the lens

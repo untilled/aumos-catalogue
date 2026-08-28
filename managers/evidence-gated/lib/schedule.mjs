@@ -1,4 +1,4 @@
-import { diagnostic } from './diagnostics.mjs'
+import { diagnostic, MANAGER_ID } from './diagnostics.mjs'
 
 function partsAt(instant, timeZone) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -189,10 +189,14 @@ export function nextReviewSequence({ krSessions = [], usSessions = [], globalRev
     ? zonedDateTimeToUtc(globalReview.date, globalReview.time, globalReview.timeZone)
     : null
   if (!globalAt || Date.parse(globalAt) <= Date.parse(asOf)) diagnostics.push(diagnostic('global_review_invalid', 'unevaluated', 'Future Global review date/time/timezone is required', 'globalReview'))
+  /**
+   * `owner` used to name the three pre-2026-08-27 packages; the flow is what
+   * the orchestrator actually dispatches.
+   */
   const sequence = [
-    kr.data.next && { owner: 'evidence-gated-kr', task: 'PORTFOLIO_REVIEW', at: kr.data.next.reviewAt, session: kr.data.next },
-    us.data.next && { owner: 'evidence-gated-us', task: 'PORTFOLIO_REVIEW', at: us.data.next.reviewAt, session: us.data.next },
-    globalAt && Date.parse(globalAt) > Date.parse(asOf) && { owner: 'evidence-gated-global', task: 'PORTFOLIO_REVIEW', at: globalAt },
+    kr.data.next && { owner: MANAGER_ID, flow: 'kr-sleeve', task: 'PORTFOLIO_REVIEW', at: kr.data.next.reviewAt, session: kr.data.next },
+    us.data.next && { owner: MANAGER_ID, flow: 'us-sleeve', task: 'PORTFOLIO_REVIEW', at: us.data.next.reviewAt, session: us.data.next },
+    globalAt && Date.parse(globalAt) > Date.parse(asOf) && { owner: MANAGER_ID, flow: 'allocate', task: 'PORTFOLIO_REVIEW', at: globalAt },
   ].filter(Boolean).sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
   return { data: { sequence }, diagnostics }
 }

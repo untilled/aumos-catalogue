@@ -1,8 +1,9 @@
 {
   "spec": "EvidenceGatedTopology/1",
-  "managers": [
+  "managerId": "evidence-gated",
+  "flows": [
     {
-      "id": "evidence-gated-kr",
+      "id": "kr-sleeve",
       "markets": ["XKRX"],
       "privateMemoryScope": "instance-kr",
       "sleeve": "KR",
@@ -10,7 +11,7 @@
       "mayUrgentExitOwnMarket": true
     },
     {
-      "id": "evidence-gated-us",
+      "id": "us-sleeve",
       "markets": ["XNAS", "XNYS"],
       "privateMemoryScope": "instance-us",
       "sleeve": "US",
@@ -18,7 +19,7 @@
       "mayUrgentExitOwnMarket": true
     },
     {
-      "id": "evidence-gated-global",
+      "id": "allocate",
       "markets": ["XKRX", "XNAS", "XNYS"],
       "privateMemoryScope": "instance-global",
       "sleeve": "GLOBAL",
@@ -29,9 +30,9 @@
   "publicState": ["Evidence", "Thesis", "Brief", "WATCH", "Portfolio"],
   "privateState": ["manager-memory"],
   "emptyMemoryDecisions": [
-    { "managerId": "evidence-gated-kr", "action": "WAIT", "valid": true },
-    { "managerId": "evidence-gated-us", "action": "WAIT", "valid": true },
-    { "managerId": "evidence-gated-global", "action": "WAIT", "valid": true }
+    { "flow": "kr-sleeve", "action": "WAIT", "valid": true },
+    { "flow": "us-sleeve", "action": "WAIT", "valid": true },
+    { "flow": "allocate", "action": "WAIT", "valid": true }
   ],
   "simultaneousCandidates": {
     "availableGlobalCashWeight": 0.08,

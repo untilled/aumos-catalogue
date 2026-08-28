@@ -1,4 +1,13 @@
-import { diagnostic, finite, round } from './diagnostics.mjs'
+import { diagnostic, finite, round, MANAGER_ID } from './diagnostics.mjs'
+
+/**
+ * Lane ownership is keyed by flow, not by manager id.
+ *
+ * Keying it by manager id was what blocked every `specialistBudget` call made
+ * with the id the manifest actually publishes.
+ */
+const SLEEVE_FLOW_MARKETS = { 'kr-sleeve': ['XKRX'], 'us-sleeve': ['XNAS', 'XNYS'] }
+const ALLOCATOR_FLOW = 'allocate'
 
 export function sleeveNav({ cash = [], positions = [], fx = {} }) {
   const diagnostics = []
@@ -125,7 +134,7 @@ export function legacySizeSuggestion(input) {
 export function concentration({ positions = [], proposed = [], caps = {} }) {
   const diagnostics = []
   const rows = [...positions, ...proposed]
-  const totals = { position: new Map(), sector: new Map(), theme: new Map() }
+  const totals = { position: new Map(), sector: new Map(), theme: new Map(), factor: new Map() }
   for (const row of rows) {
     if (!finite(row?.weight) || row.weight < 0) {
       diagnostics.push(diagnostic('weight_invalid', 'blocked', 'All weights must be non-negative', 'positions'))
@@ -134,6 +143,14 @@ export function concentration({ positions = [], proposed = [], caps = {} }) {
     totals.position.set(row.symbol, (totals.position.get(row.symbol) ?? 0) + row.weight)
     if (row.sector) totals.sector.set(row.sector, (totals.sector.get(row.sector) ?? 0) + row.weight)
     for (const theme of row.themes ?? []) totals.theme.set(theme, (totals.theme.get(theme) ?? 0) + row.weight)
+    /**
+     * A factor is a shared loss path that cuts across sectors — the AI-capex
+     * complex the harness capped separately because a sector cap never sees it.
+     * `allocate` and `thesis-challenge` both name this axis; without it the
+     * question "does an existing holding create the same loss path?" has no
+     * measured answer.
+     */
+    for (const factor of row.factors ?? []) totals.factor.set(factor, (totals.factor.get(factor) ?? 0) + row.weight)
   }
   const breaches = []
   for (const [kind, map] of Object.entries(totals)) {
@@ -147,19 +164,20 @@ export function concentration({ positions = [], proposed = [], caps = {} }) {
     }
   }
   if (breaches.length) diagnostics.push(diagnostic('concentration_breach', 'blocked', 'Proposed portfolio breaches concentration', 'proposed', { breaches }))
-  return { data: { breaches, exposures: Object.fromEntries(Object.entries(totals).map(([kind, map]) => [kind, Object.fromEntries(map)])) }, diagnostics }
+  return { data: { breaches, exposures: Object.fromEntries(Object.entries(totals).map(([kind, map]) => [kind, Object.fromEntries([...map].map(([key, weight]) => [key, round(weight)]))])) }, diagnostics }
 }
 
-export function specialistBudget({ managerId, market, currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight, emergencyExit = false }) {
+export function specialistBudget({ managerId = MANAGER_ID, flow, market, currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight, emergencyExit = false }) {
   const diagnostics = []
-  const owners = { 'evidence-gated-kr': ['XKRX'], 'evidence-gated-us': ['XNAS', 'XNYS'] }
-  if (!owners[managerId]?.includes(market)) diagnostics.push(diagnostic('specialist_market_not_owned', 'blocked', 'Specialist cannot allocate outside its market lane', 'market', { managerId, market }))
+  if (managerId !== MANAGER_ID) diagnostics.push(diagnostic('manager_id_unknown', 'blocked', 'This package publishes one manager id', 'managerId', { managerId, expected: MANAGER_ID }))
+  if (!SLEEVE_FLOW_MARKETS[flow]) diagnostics.push(diagnostic('flow_unknown', 'blocked', 'A sleeve flow is required; the allocator flow does not take a sleeve budget', 'flow', { flow, supported: Object.keys(SLEEVE_FLOW_MARKETS) }))
+  else if (!SLEEVE_FLOW_MARKETS[flow].includes(market)) diagnostics.push(diagnostic('specialist_market_not_owned', 'blocked', 'Sleeve flow cannot allocate outside its market lane', 'market', { flow, market }))
   if (![currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight].every(finite)) diagnostics.push(diagnostic('sleeve_budget_missing', 'unevaluated', 'Current sleeve, Brief budget and requested target are required', 'input'))
   if ([currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight].filter(finite).some((value) => value < 0)) diagnostics.push(diagnostic('sleeve_weight_negative', 'blocked', 'Sleeve weights cannot be negative', 'input'))
   const increase = finite(requestedTargetWeight) && finite(currentSleeveWeight) ? requestedTargetWeight - currentSleeveWeight : null
   if (!emergencyExit && finite(requestedTargetWeight) && finite(sleeveBudgetWeight) && requestedTargetWeight > sleeveBudgetWeight) diagnostics.push(diagnostic('specialist_sleeve_budget_exceeded', 'blocked', 'Specialist must ask Global for cross-market budget', 'requestedTargetWeight', { sleeveBudgetWeight }))
   if (emergencyExit && finite(increase) && increase > 0) diagnostics.push(diagnostic('emergency_exit_cannot_increase', 'blocked', 'Emergency invalidation bypass only permits SELL/RESIZE down', 'requestedTargetWeight'))
-  return { data: { managerId, market, allowed: !diagnostics.some((row) => row.severity === 'blocked'), increaseWeight: round(increase), withinBriefBudget: finite(requestedTargetWeight) && finite(sleeveBudgetWeight) ? requestedTargetWeight <= sleeveBudgetWeight : null, emergencyExit }, diagnostics }
+  return { data: { managerId, flow: flow ?? null, market, allowed: !diagnostics.some((row) => row.severity === 'blocked'), increaseWeight: round(increase), withinBriefBudget: finite(requestedTargetWeight) && finite(sleeveBudgetWeight) ? requestedTargetWeight <= sleeveBudgetWeight : null, emergencyExit }, diagnostics }
 }
 
 export function globalAllocation({ targets = [], availableWeight = 1, currentWeights = {} }) {
@@ -175,5 +193,5 @@ export function globalAllocation({ targets = [], availableWeight = 1, currentWei
   }
   if (allocated > availableWeight + 1e-9) diagnostics.push(diagnostic('global_cash_double_spend', 'blocked', 'Combined targets exceed the one global budget denominator', 'targets', { allocated, availableWeight }))
   const deltas = Object.fromEntries(targets.map((target) => [target.key, finite(target.weight) ? round(target.weight - (currentWeights[target.key] ?? 0)) : null]))
-  return { data: { targets, allocatedWeight: round(allocated), residualCashWeight: finite(availableWeight) ? round(availableWeight - allocated) : null, deltas, owner: 'evidence-gated-global', proposalAction: 'REBALANCE' }, diagnostics }
+  return { data: { targets, allocatedWeight: round(allocated), residualCashWeight: finite(availableWeight) ? round(availableWeight - allocated) : null, deltas, owner: MANAGER_ID, flow: ALLOCATOR_FLOW, proposalAction: 'REBALANCE' }, diagnostics }
 }

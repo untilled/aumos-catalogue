@@ -34,7 +34,7 @@ const operations = {
   specialistBudget,
   globalAllocation,
   coverage: coverageState,
-  validateWatch: (input, asOf) => validateWatch(input?.watch, input?.current, asOf),
+  validateWatch: (input, asOf) => validateWatch(input?.watch, input?.current, asOf, input?.config),
   validateConsensus: (input, asOf) => validateConsensus(input, asOf),
   researchGate,
   crossCheckPrice,

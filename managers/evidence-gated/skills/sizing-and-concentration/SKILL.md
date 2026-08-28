@@ -11,8 +11,11 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
 
 1. Apply `mandate.constraints`: allowed asset classes/markets, excluded symbols, leverage/shorting,
    cash floor and position limits. Cash is part of total portfolio value.
-2. Compute current and proposed position, sector and theme weights using total portfolio value as the
-   denominator. Only actual holdings consume exposure; a Thesis, WATCH or paper candidate does not.
+2. Compute current and proposed position, sector, theme and factor weights using total portfolio
+   value as the denominator. Only actual holdings consume exposure; a Thesis, WATCH or paper
+   candidate does not. A factor is a shared loss path that crosses sectors — declare it on the row as
+   `factors` so a cross-sector complex cannot pass under a sector cap. An axis whose cap is not
+   configured comes back unevaluated, never as a pass.
 3. Apply the stricter of Mandate and configured concentration thresholds. If classification is
    uncertain, use the more conservative applicable bucket and disclose it.
 4. Apply evidence maturity. `insufficient` and `observing` lenses are capped at
@@ -41,8 +44,15 @@ condition already true is invalid: evaluate it now or choose the actual unresolv
 date anchor for a scheduled filing/event. Only use a metric the named source/company really reports.
 The trigger must be reachable within the lens that created it.
 
-Expiry defaults to `watchExpiryDays`. On expiry, force review; do not silently renew. A plan is a
-precommitment to reconsider, not permission to trade.
+Expiry defaults to `watchExpiryDays`, and `validateWatch` applies it: an absent `expiresAt` is
+derived from `asOf` and returned as `expiresAt` with `expirySource: 'default'`, an expiry already
+past blocks as `watch_expired`, and an `at-time` trigger later than its own expiry blocks as
+`watch_expiry_before_trigger` because it can never fire. On expiry, force review; do not silently
+renew. A plan is a precommitment to reconsider, not permission to trade.
+
+A `weight-drift` WATCH is checked for already-met on the same terms as a price WATCH, so it carries
+`threshold` (the drift that fires it) and `baselineWeight` (the weight it was registered against).
+Without the baseline the condition is unevaluated rather than assumed unresolved.
 
 ## Compact worked examples
 

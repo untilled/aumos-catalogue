@@ -44,8 +44,22 @@
           "minimum": 0.05,
           "maximum": 0.3,
           "default": 0.15
+        },
+        "factor": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 0.3,
+          "default": 0.15,
+          "description": "Cap on one shared loss path across sectors — the cross-sector complex a sector cap cannot see. Positions declare their factors; an undeclared factor is unevaluated, never zero."
         }
       }
+    },
+    "priceConflictTolerance": {
+      "type": "number",
+      "minimum": 0.005,
+      "maximum": 0.2,
+      "default": 0.05,
+      "description": "Relative difference between the vendor price and a web figure that still counts as agreement. Beyond it the vendor reading is selected and the conflict is retained rather than averaged."
     },
     "minimumLensSamples": {
       "type": "integer",

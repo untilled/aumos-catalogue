@@ -58,6 +58,8 @@ export function validateConsensus(observation, asOf) {
   return { data: { complete: diagnostics.length === 0, normalized: diagnostics.length ? null : observation }, diagnostics }
 }
 
+const LENSES = new Set(['mean-reversion', 'trend-pullback', 'core-dca', 'existing-position'])
+
 export function researchGate(input) {
   const diagnostics = []
   const required = ['lens', 'priceDeclineReason', 'opportunityCase', 'trapRisks', 'variantView', 'benchmarkAlternative', 'scenarios']
@@ -66,8 +68,16 @@ export function researchGate(input) {
       diagnostics.push(diagnostic('research_field_missing', 'blocked', `Research field ${key} is required`, key))
     }
   }
-  if (!['mean-reversion', 'trend-pullback', 'core-dca'].includes(input?.lens)) {
-    diagnostics.push(diagnostic('lens_invalid', 'blocked', 'Candidate discovery lens is required', 'lens'))
+  /**
+   * The four lenses PROMPT §3 names, not three.
+   *
+   * `evidence-gates` routes every risk-increasing `RESIZE` through this gate,
+   * and a risk-increasing resize of a holding is by definition the
+   * `existing-position` lens. Leaving it out blocked the one path the skill
+   * explicitly sends here.
+   */
+  if (!LENSES.has(input?.lens)) {
+    diagnostics.push(diagnostic('lens_invalid', 'blocked', 'Candidate discovery lens is required', 'lens', { supported: [...LENSES] }))
   }
   const scenarios = input?.scenarios ?? {}
   const cases = ['bear', 'base', 'bull'].map((name) => scenarios[name])
@@ -88,7 +98,17 @@ export function researchGate(input) {
   return { data: { passed: diagnostics.every((item) => item.severity !== 'blocked'), expectedReturn: round(expectedReturn), activeReturn: round(activeReturn) }, diagnostics }
 }
 
-export function crossCheckPrice({ tossPrice, webPrice, tolerance = 0.05 }) {
+/**
+ * `priceConflictTolerance` is a real configuration key, not prose.
+ *
+ * README, PROMPT and `data-source-contract` all say "the configured tolerance",
+ * and `config.schema.json` is `additionalProperties: false`, so before this the
+ * investor could not set the value the documents promised. The default stays
+ * the Trading Harness 5%.
+ */
+export function crossCheckPrice({ tossPrice, webPrice, tolerance, config }) {
+  const configured = config?.priceConflictTolerance
+  tolerance = [tolerance, configured, 0.05].find((value) => finite(value) && value > 0)
   const diagnostics = []
   if (!finite(tossPrice) || !finite(webPrice) || tossPrice <= 0 || webPrice <= 0) {
     diagnostics.push(diagnostic('price_crosscheck_missing', 'unevaluated', 'Both positive Toss and web prices are required', 'prices'))

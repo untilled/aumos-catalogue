@@ -154,10 +154,12 @@ assert.deepEqual(
   scannerGolden.expected.meanSignals,
 )
 
-assert.equal(topology.managers.length, 3, 'package has KR, US and Global managers')
-assert.equal(new Set(topology.managers.map((row) => row.privateMemoryScope)).size, 3, 'manager memory scopes are isolated')
-assert.deepEqual(topology.emptyMemoryDecisions.map((row) => row.valid), [true, true, true], 'all managers decide from empty memory')
-assert.equal(topology.managers.filter((row) => row.mayCrossMarketRebalance).length, 1, 'only Global may cross-market rebalance')
+assert.equal(topology.managerId, manifest.id, 'topology names the one published manager id')
+assert.equal(topology.flows.length, 3, 'package runs KR, US and allocator flows')
+assert.deepEqual(topology.flows.map((row) => row.id), ['kr-sleeve', 'us-sleeve', 'allocate'], 'flow ids are the subagent names')
+assert.equal(new Set(topology.flows.map((row) => row.privateMemoryScope)).size, 3, 'flow memory scopes are isolated')
+assert.deepEqual(topology.emptyMemoryDecisions.map((row) => row.valid), [true, true, true], 'all flows decide from empty memory')
+assert.equal(topology.flows.filter((row) => row.mayCrossMarketRebalance).length, 1, 'only the allocator flow may cross-market rebalance')
 assert.equal(
   topology.simultaneousCandidates.specialistMaximumCombinedWeight,
   topology.simultaneousCandidates.krBriefBudgetRemaining + topology.simultaneousCandidates.usBriefBudgetRemaining,
@@ -268,9 +270,9 @@ const benchmarkRows = backtestRows.map((row, index) => ({ ...row, close: 100 * 1
 const strata = execute({ operation: 'oversoldStrata', asOf: '2026-12-31T00:00:00Z', input: { assets: [{ market: 'us', bars: backtestRows }], benchmarks: { us: benchmarkRows } } })
 assert.equal(strata.data.symbolsUsed, backtest.expected.symbolsUsed)
 
-const krBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-kr', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.4 } })
+const krBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.4 } })
 assert.equal(krBudget.status, 'blocked', 'specialist cannot spend beyond its Brief sleeve')
-const urgentExit = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-us', market: 'XNAS', currentSleeveWeight: 0.4, sleeveBudgetWeight: 0.4, requestedTargetWeight: 0.2, emergencyExit: true } })
+const urgentExit = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'us-sleeve', market: 'XNAS', currentSleeveWeight: 0.4, sleeveBudgetWeight: 0.4, requestedTargetWeight: 0.2, emergencyExit: true } })
 assert.equal(urgentExit.data.allowed, true, 'urgent exit does not wait for Global')
 const globalBudget = execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'kr-sleeve', weight: 0.4 }, { key: 'us-sleeve', weight: 0.5 }, { key: 'cash', weight: 0.1 }] } })
 assert.equal(globalBudget.status, 'ok')
@@ -532,6 +534,106 @@ const copiedMemory = execute({ operation: 'validateMemory', asOf: researchAsOf, 
 assert.equal(copiedMemory.status, 'blocked', 'private memory may not carry copied source prose')
 assert.equal(copiedMemory.data.accepted, false)
 assert.ok(copiedMemory.diagnostics.some((row) => row.code === 'memory_raw_source_copied'))
+
+/**
+ * One manager, three flows — the pre-2026-08-27 package ids are gone. (issue #70 §5)
+ */
+const realIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: manifest.id, flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+assert.equal(realIdBudget.data.allowed, true, 'the published manager id is the one specialistBudget accepts')
+const staleIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-kr', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+assert.ok(staleIdBudget.diagnostics.some((row) => row.code === 'manager_id_unknown'), 'a retired package id is rejected rather than silently owning a lane')
+const wrongLane = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XNAS', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+assert.ok(wrongLane.diagnostics.some((row) => row.code === 'specialist_market_not_owned'), 'a sleeve flow still cannot allocate outside its market')
+assert.equal(
+  execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'cash', weight: 1 }] } }).data.owner,
+  manifest.id,
+  'the allocator result is owned by the published manager, not a retired package',
+)
+const reviewSequence = execute({
+  operation: 'nextReviewSequence',
+  asOf: globalIntegration.asOf,
+  input: {
+    krSessions: [{ date: '2026-09-01', openLocal: '09:00', closeLocal: '15:30', timeZone: 'Asia/Seoul', isOpen: true }],
+    usSessions: [{ date: '2026-09-01', openLocal: '09:30', closeLocal: '16:00', timeZone: 'America/New_York', isOpen: true }],
+    globalReview: { date: '2026-09-02', time: '09:00', timeZone: 'Asia/Seoul' },
+  },
+})
+assert.deepEqual(new Set(reviewSequence.data.sequence.map((row) => row.owner)), new Set([manifest.id]), 'every scheduled review is owned by the one manager')
+assert.deepEqual(reviewSequence.data.sequence.map((row) => row.flow).sort(), ['allocate', 'kr-sleeve', 'us-sleeve'], 'reviews are dispatched to the three flows')
+
+/**
+ * A risk-increasing RESIZE is the `existing-position` lens, and `evidence-gates`
+ * sends it through this gate. (issue #70 §24)
+ */
+const resizeResearch = { lens: 'existing-position', priceDeclineReason: 'temporary', opportunityCase: 'recovery', trapRisks: ['structural-risk'], variantView: 'different', benchmarkAlternative: { expectedReturn: 0.03 }, scenarios: { bear: { probability: 0.2, return: -0.2 }, base: { probability: 0.5, return: 0.12 }, bull: { probability: 0.3, return: 0.3 } }, minimumExpectedActiveReturn: 0.02, challengeVerdict: 'cleared', sourceFresh: true, sourceConflict: false }
+assert.equal(execute({ operation: 'researchGate', asOf: methodology.asOf, input: resizeResearch }).data.passed, true, 'the RESIZE lens the skills name has a passing path')
+assert.equal(execute({ operation: 'researchGate', asOf: methodology.asOf, input: { ...resizeResearch, lens: 'vibes' } }).status, 'blocked', 'an unnamed lens is still rejected')
+
+/**
+ * A revisit promise expires, and a drift promise is checked for already-met.
+ * (issue #70 §23)
+ */
+const derivedExpiry = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-08-21T00:00:00Z' }, current: {}, config: { watchExpiryDays: 30 } } })
+assert.equal(derivedExpiry.data.expirySource, 'default', 'an undeclared expiry is derived from watchExpiryDays rather than left absent')
+assert.equal(derivedExpiry.data.expiresAt, '2026-09-19T00:00:00.000Z')
+const expiredWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'price-below', threshold: 50, expiresAt: '2026-08-01T00:00:00Z' }, current: { price: 90 } } })
+assert.ok(expiredWatch.diagnostics.some((row) => row.code === 'watch_expired'), 'an expired WATCH forces review instead of renewing itself')
+const unreachableWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-11-01T00:00:00Z', expiresAt: '2026-09-01T00:00:00Z' }, current: {} } })
+assert.ok(unreachableWatch.diagnostics.some((row) => row.code === 'watch_expiry_before_trigger'), 'a trigger later than its own expiry can never fire')
+const driftMet = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'weight-drift', threshold: 0.02, baselineWeight: 0.06 }, current: { weight: 0.09 } } })
+assert.ok(driftMet.diagnostics.some((row) => row.code === 'watch_already_met'), 'a drift condition already true is invalid, exactly like a price condition')
+const driftOpen = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'weight-drift', threshold: 0.03, baselineWeight: 0.06 }, current: { weight: 0.07 } } })
+assert.equal(driftOpen.data.valid, true, 'an unresolved drift condition is a valid promise')
+const driftUnbaselined = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'weight-drift', threshold: 0.03 }, current: { weight: 0.07 } } })
+assert.ok(driftUnbaselined.diagnostics.some((row) => row.code === 'watch_baseline_missing'), 'a drift promise without its baseline is unevaluated, not assumed open')
+
+/**
+ * `factor` is a measured concentration axis, not prose in `allocate`. (issue #70 §22)
+ */
+const caps = { position: 0.1, sector: 0.2, theme: 0.15, factor: 0.15 }
+const crossSector = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: {
+    positions: [
+      { symbol: 'AAA', weight: 0.06, sector: 'semiconductors', themes: ['ai'], factors: ['ai-capex'] },
+      { symbol: 'BBB', weight: 0.06, sector: 'software', themes: ['cloud'], factors: ['ai-capex'] },
+    ],
+    proposed: [{ symbol: 'CCC', weight: 0.05, sector: 'utilities', themes: ['power'], factors: ['ai-capex'] }],
+    caps,
+  },
+})
+assert.equal(crossSector.data.exposures.factor['ai-capex'], 0.17)
+assert.deepEqual(crossSector.data.breaches.map((row) => row.kind), ['factor'], 'a shared loss path across three sectors breaches only the factor cap')
+assert.ok(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'AAA', weight: 0.06, factors: ['ai-capex'] }], caps: { position: 0.1, sector: 0.2, theme: 0.15 } } })
+    .diagnostics.some((row) => row.code === 'concentration_cap_missing' && row.path === 'caps.factor'),
+  'an unconfigured factor cap comes back unevaluated, never as a pass',
+)
+
+/**
+ * `priceConflictTolerance` is a configuration key the documents can honestly
+ * call configured. (issue #70 §26)
+ */
+const schema = JSON.parse(await readFile(new URL('../config.schema.json', fixtureRoot), 'utf8'))
+assert.equal(schema.properties.priceConflictTolerance.default, 0.05, 'the documented 5% default is in the schema')
+assert.ok(schema.properties.concentration.properties.factor, 'the factor cap is configurable')
+const strictTolerance = execute({ operation: 'crossCheckPrice', asOf: researchAsOf, input: { ...research.priceCrossCheck.agreeing, config: { priceConflictTolerance: 0.001 } } })
+assert.ok(strictTolerance.diagnostics.some((row) => row.code === 'price_source_conflict'), 'a stricter configured tolerance actually tightens the check')
+
+/**
+ * The `unit` vocabulary the contract skill prints is the vocabulary the code
+ * accepts. (issue #70 §27)
+ */
+const contractSkill = await readFile(new URL('../skills/data-source-contract/SKILL.md', fixtureRoot), 'utf8')
+for (const unit of ['percent', 'ratio', 'count', 'multiple', 'index-points', 'days', 'shares', 'basis-points']) {
+  assert.ok(contractSkill.includes(`\`${unit}\``), `the contract skill names the ${unit} unit the code accepts`)
+  const observation = { metric: 'x', value: 1, unit, period: 'FY2026', sourceUrl: 'https://example.test', publishedAt: '2026-08-01T00:00:00Z', capturedAt: '2026-08-02T00:00:00Z', type: 'actual' }
+  assert.ok(
+    !execute({ operation: 'validateConsensus', asOf: methodology.asOf, input: observation }).diagnostics.some((row) => row.code === 'consensus_currency_missing'),
+    `${unit} names its own scale and is not treated as money`,
+  )
+}
 
 /**
  * The manifest names the sources this package requires. (aumos #384)
