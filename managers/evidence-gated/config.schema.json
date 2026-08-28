@@ -257,13 +257,15 @@
           "type": "integer",
           "minimum": 10,
           "maximum": 180,
-          "default": 60
+          "default": 30,
+          "description": "Minutes after the XKRX close before the Korean sleeve's review fires. Reaches nextReviewSequence as buffers.kr. \u26a0\ufe0f The default was 60 here and 30 in the code until #91, and the code was what ran \u2014 nothing passed this key to anything. The behaviour is kept and the declaration corrected to match it, rather than the other way round, because 30/45 is what every document describing this schedule was written against."
         },
         "usCloseBufferMinutes": {
           "type": "integer",
           "minimum": 10,
           "maximum": 240,
-          "default": 60
+          "default": 45,
+          "description": "Minutes after the actual XNYS/XNAS close before the US sleeve's review fires. Reaches nextReviewSequence as buffers.us. Longer than the Korean one, and no note records why \u2014 the asymmetry is inherited rather than argued, and is left as it was instead of being flattened on a guess."
         }
       }
     }

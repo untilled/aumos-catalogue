@@ -264,7 +264,9 @@ a reason not to act, never a reason to stop reporting where the price is.
 For every regular run, ask the Toss market-calendar source for the next actual open session and
 re-arm one future `at-time` review: KR after XKRX close plus configured buffer, US after the actual
 XNYS/XNAS close plus buffer, Global at the next sourced 08:00 Asia/Seoul review after both available
-closes. Never add 24 hours or reuse a fixed UTC close across DST, holidays or early closes.
+closes. **Pass the invocation's config to `nextReviewSequence`** — `schedule.krCloseBufferMinutes`
+and `usCloseBufferMinutes` are the investor's, and a run that omits them silently substitutes the
+package's own defaults for a number the install screen said was theirs. Never add 24 hours or reuse a fixed UTC close across DST, holidays or early closes.
 
 **Arm each one under the `watchId` `nextReviewSequence` returns**, verbatim. It is
 `market-review:<flow>:<scheduled instant>`, and it is the only thing that tells the next run

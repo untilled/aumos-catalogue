@@ -192,10 +192,26 @@ export function themeRadarDue({ lastRunAt = null, asOf, intervalDays = 3, disloc
   return { data: { due: ageDays >= intervalDays, reason: ageDays >= intervalDays ? 'interval-elapsed' : 'not-due', ageDays }, diagnostics }
 }
 
-export function nextReviewSequence({ krSessions = [], usSessions = [], globalReview = {}, asOf, buffers = {} }) {
+export function nextReviewSequence({ krSessions = [], usSessions = [], globalReview = {}, asOf, buffers = {}, config = {} }) {
   const diagnostics = []
-  const kr = nextMarketReview({ sessions: krSessions, asOf, bufferMinutes: buffers.kr ?? 30 })
-  const us = nextMarketReview({ sessions: usSessions, asOf, bufferMinutes: buffers.us ?? 45 })
+  /**
+   * The investor's configured buffer reaches the calculation.
+   *
+   * ⚠️ **It did not until #91.** `config.schema.json` declared
+   * `schedule.krCloseBufferMinutes` and `usCloseBufferMinutes`, nothing passed
+   * them here, and the two literals below were the only values that ever ran —
+   * so a number on the install screen governed nothing, and `PROMPT.md`'s
+   * "plus configured buffer" was a claim the package did not keep.
+   *
+   * `buffers` still overrides, which is the same shape `crossCheckPrice` has
+   * for `priceConflictTolerance`: config is the investor's default, a directly
+   * passed value is this call's.
+   */
+  const schedule = config?.schedule ?? {}
+  const krBuffer = buffers.kr ?? schedule.krCloseBufferMinutes ?? 30
+  const usBuffer = buffers.us ?? schedule.usCloseBufferMinutes ?? 45
+  const kr = nextMarketReview({ sessions: krSessions, asOf, bufferMinutes: krBuffer })
+  const us = nextMarketReview({ sessions: usSessions, asOf, bufferMinutes: usBuffer })
   diagnostics.push(...kr.diagnostics, ...us.diagnostics)
   const globalAt = globalReview.date && globalReview.time && globalReview.timeZone
     ? zonedDateTimeToUtc(globalReview.date, globalReview.time, globalReview.timeZone)
