@@ -22,7 +22,7 @@ the JSON remains the canonical explanation.
 
 ## The operations
 
-All 76, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
+All 77, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
 calling it wrong is not a discovery path — every flow skill tells you not to go looking, so the
 names have to be here. A name absent from this table is a name you cannot call.
 
@@ -146,6 +146,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `clusterBlock` | whether a correlated event cluster holds promotion, and when it clears |
 | `timeStopPolicy` | review date reached with the catalyst unrealized and the benchmark ahead → exit candidate |
 | `ruleVersions` | the eleven versioned axes, what is current, and whether these rows may be pooled |
+| `policyLint` | whether a configuration change is stricter, who approved it, and whether it may move at all |
 
 ### Pre-flight — asked before planning, not after proposing
 
@@ -190,6 +191,7 @@ named field is the difference between a gate that runs and a gate that blocks or
 | `timeStopPolicy` | `catalystRealized`, `returnSinceEntryPct`, `benchmarkReturnSinceEntryPct`, and `core`/`parkedLiquidity` to exclude allocation holdings | Both halves are required: either one missing leaves the promotion unresolved rather than declined. |
 | `clusterBlock` | `clusters[].prints` and the `intent` | The end date is derived from the last print rather than trusted — a window copied from a sibling cluster ends a day early. The block applies to promotion only. |
 | `ruleVersions` | `registry` keyed by axis, and the `axis` these rows belong to | Without the axis the registry can say what is current but not whether these rows are stale. |
+| `policyLint` | `provenance` keyed by the same dotted path as the config (`concentration.position`), carrying `approvedBy`/`immutable` | Value ranges belong to `config.schema.json`; this owns provenance, immutability and direction. A loosening is refused, not flagged. |
 | `outcomeClassification` | `executionAttributableToDecision` when the fill differed from the plan; `judgedFailures` for the judged axis | Without the flag a poor fill is an observation, not a methodology failure — which is the reading `outcome-calibration` mandates. An unrecognised judged reason is refused, never absorbed. |
 | `crossCheckPrice` | `config.priceConflictTolerance` | The 5% the documents call configured. Passing `tolerance` directly still overrides it. |
 

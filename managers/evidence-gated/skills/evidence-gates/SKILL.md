@@ -99,7 +99,7 @@ For a new single-name BUY require all of the following:
 - `why cheap`, temporary-versus-structural assessment and trap risks;
 - falsifiable variant view and invalidation;
 - bear/base/bull scenario inputs whose probabilities sum to 100;
-- positive probability-weighted return and expected active return at least the configured minimum;
+- positive probability-weighted return and expected active return at least `minimumExpectedActiveReturn`;
 - named benchmark alternative and reason the single name is preferable;
 - thesis challenge without `high_risk_unresolved`;
 - fresh, non-conflicting evidence and an intact adjusted/unadjusted price basis;

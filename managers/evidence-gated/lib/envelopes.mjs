@@ -258,3 +258,101 @@ export function ruleVersions({ registry = {}, rows = [], axis = null } = {}) {
   }
   return { data: { axes: RULE_VERSION_AXES, declared, versionsInRows, current, stale, poolable: versionsInRows.length <= 1 }, diagnostics }
 }
+
+/**
+ * ── The part of a policy engine a schema cannot hold (issue #70 §2) ────────
+ *
+ * `MIGRATION.md` mapped `policy-lint` to `PX` with a golden `policy` fixture,
+ * and there was no operation and no fixture — the matrix overclaimed. The
+ * honest question was which half of `_policy.py` is genuinely missing.
+ *
+ * Most of it is not. The rule DSL evaluated conditions over a config, and
+ * `config.schema.json` already bounds every value on both sides and refuses
+ * unknown keys; the Mandate owns what the investor may set. A second condition
+ * language over the same values would be a second source of truth.
+ *
+ * What a schema cannot express is **provenance**: who approved a value and
+ * when, which values may not move at all, and which changes need approval
+ * before they take effect. A range check cannot tell a tightening from a
+ * loosening, and cannot tell either from a value the investor never approved.
+ * So that is what this holds, and nothing else.
+ *
+ * ⛔ Loosening is refused rather than flagged. Every threshold here exists
+ * because something went wrong once, and the moment to argue about one is
+ * before it binds, not while it is refusing a trade.
+ */
+const POLICY_DIRECTIONS = {
+  minimumExpectedActiveReturn: 'higher-is-stricter',
+  minimumLensSamples: 'higher-is-stricter',
+  minimumIndependentDateClusters: 'higher-is-stricter',
+  benchmarkHurdleAnnualPct: 'higher-is-stricter',
+  watchExpiryDays: 'lower-is-stricter',
+  experimentalPositionCeiling: 'lower-is-stricter',
+  priceConflictTolerance: 'lower-is-stricter',
+  'concentration.position': 'lower-is-stricter',
+  'concentration.sector': 'lower-is-stricter',
+  'concentration.theme': 'lower-is-stricter',
+  'concentration.factor': 'lower-is-stricter',
+  'concentration.portfolioHeat': 'lower-is-stricter',
+  'coreDca.reserveFloorWeight': 'higher-is-stricter',
+  'coreDca.minimumCashWeightForFirstTranche': 'higher-is-stricter',
+  'coreDca.monthlyTrancheMaxWeight': 'lower-is-stricter',
+  'coreDca.catchUpMonthlyMaxWeight': 'lower-is-stricter',
+}
+
+function flatten(node, prefix = '') {
+  const out = {}
+  for (const [key, value] of Object.entries(node ?? {})) {
+    const path = prefix ? `${prefix}.${key}` : key
+    if (value && typeof value === 'object' && !Array.isArray(value)) Object.assign(out, flatten(value, path))
+    else out[path] = value
+  }
+  return out
+}
+
+export function policyLint({ current = {}, proposed = {}, provenance = {} } = {}) {
+  const diagnostics = []
+  const before = flatten(current)
+  const after = flatten(proposed)
+  const changes = []
+  for (const path of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (before[path] === after[path]) continue
+    const record = provenance[path] ?? {}
+    const direction = POLICY_DIRECTIONS[path] ?? null
+    let effect = 'unclassified'
+    if (direction && finite(before[path]) && finite(after[path])) {
+      const stricter = direction === 'higher-is-stricter' ? after[path] > before[path] : after[path] < before[path]
+      effect = stricter ? 'stricter' : 'looser'
+    }
+    const change = { path, from: before[path] ?? null, to: after[path] ?? null, effect, immutable: record.immutable === true, approvedBy: record.approvedBy ?? null, approvedAt: record.approvedAt ?? null, sourceFile: record.sourceFile ?? null }
+    changes.push(change)
+    if (record.immutable === true) {
+      diagnostics.push(diagnostic('policy_immutable_changed', 'blocked', 'This value is declared immutable; changing it is a package revision, not a configuration', path, change))
+      continue
+    }
+    if (effect === 'looser') {
+      diagnostics.push(diagnostic('policy_auto_relax', 'blocked', 'Configuration may make this manager stricter and never looser; the moment to argue about a threshold is before it binds, not while it is refusing a trade', path, change))
+      continue
+    }
+    if (!record.approvedBy) {
+      diagnostics.push(diagnostic('policy_requires_approval', 'unevaluated', 'A threshold change carries who approved it and when; an unattributed change is unresolved rather than applied', path, change))
+    }
+    if (effect === 'unclassified') {
+      diagnostics.push(diagnostic('policy_direction_undeclared', 'unevaluated', 'No direction is declared for this key, so stricter cannot be told from looser', path, change))
+    }
+  }
+  const missingProvenance = Object.keys(provenance).filter((path) => !(path in before) && !(path in after))
+  for (const path of missingProvenance) {
+    diagnostics.push(diagnostic('policy_provenance_orphan', 'unevaluated', 'Provenance is recorded for a key no configuration carries', `provenance.${path}`))
+  }
+  return {
+    data: {
+      changes,
+      changeCount: changes.length,
+      accepted: !diagnostics.some((row) => row.severity === 'blocked'),
+      directions: POLICY_DIRECTIONS,
+      note: 'value ranges belong to config.schema.json; this owns provenance, immutability and direction',
+    },
+    diagnostics,
+  }
+}

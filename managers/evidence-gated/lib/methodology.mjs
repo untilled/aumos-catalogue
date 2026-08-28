@@ -1,6 +1,51 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
 
-const TRIGGER_KINDS = new Set(['price_below', 'price_above', 'metric', 'time'])
+/**
+ * ── One trigger vocabulary, two shapes that mean different things (§25) ────
+ *
+ * `validateThesis` accepted `price_below` and `validateWatch` accepted
+ * `price-below`, for the same condition, and no skill listed either set. A run
+ * that learned one spelling was refused by the other function.
+ *
+ * The spelling is now kebab-case everywhere, matching the `unit` and `lens`
+ * vocabularies; the snake_case forms are still accepted and normalized so no
+ * recorded thesis becomes unreadable, and using one raises an `info` saying
+ * which name is canonical.
+ *
+ * ⚠️ The two sets are still **not identical**, and that is deliberate rather
+ * than leftover:
+ *
+ * - `metric` is a thesis invalidation and not a WATCH, because a WATCH must be
+ *   evaluable by the wake engine from published data and a thesis metric may
+ *   need a filing read by a person.
+ * - `weight-drift` is a WATCH and not a thesis invalidation, because drifting
+ *   past a weight says something about the portfolio, not about the claim.
+ *
+ * Everything else is shared, `at-time` included — it used to be spelled `time`
+ * on the thesis side, which made one condition look like two.
+ *
+ * Both facts are published in `candidate-research` rather than left to be
+ * discovered by a refusal.
+ */
+export const TRIGGER_ALIASES = {
+  price_below: 'price-below',
+  price_above: 'price-above',
+  at_time: 'at-time',
+  weight_drift: 'weight-drift',
+  /**
+   * `time` and `at-time` were the same condition under two names — the second
+   * half of the same inconsistency as the underscores. One name now.
+   */
+  time: 'at-time',
+}
+export const THESIS_TRIGGER_KINDS = new Set(['price-below', 'price-above', 'metric', 'at-time'])
+export const WATCH_TRIGGER_KINDS = new Set(['at-time', 'price-below', 'price-above', 'weight-drift'])
+
+export function normalizeTriggerKind(kind) {
+  return TRIGGER_ALIASES[kind] ?? kind
+}
+
+const TRIGGER_KINDS = THESIS_TRIGGER_KINDS
 const MATURITY = new Set(['insufficient', 'observing', 'reviewable', 'promoted'])
 
 export function validateThesis(input) {
@@ -22,11 +67,15 @@ export function validateThesis(input) {
   })
   const invalidations = []
   for (const [index, row] of (input?.invalidationTriggers ?? []).entries()) {
-    if (!TRIGGER_KINDS.has(row?.kind)) {
-      diagnostics.push(diagnostic('invalidation_kind_invalid', 'blocked', 'Invalidation must be price, metric or time; producer-less event is forbidden', `invalidationTriggers[${index}].kind`))
+    const kind = normalizeTriggerKind(row?.kind)
+    if (kind !== row?.kind) {
+      diagnostics.push(diagnostic('trigger_kind_alias', 'info', 'The canonical spelling is kebab-case, as in every other vocabulary here; the underscore form is accepted and normalized', `invalidationTriggers[${index}].kind`, { given: row?.kind, canonical: kind }))
+    }
+    if (!TRIGGER_KINDS.has(kind)) {
+      diagnostics.push(diagnostic('invalidation_kind_invalid', 'blocked', 'Invalidation must be price, metric or time; producer-less event is forbidden', `invalidationTriggers[${index}].kind`, { supported: [...TRIGGER_KINDS] }))
       continue
     }
-    if (['price_below', 'price_above'].includes(row.kind) && !finite(row.level)) diagnostics.push(diagnostic('invalidation_price_missing', 'blocked', 'Price invalidation needs a numeric level', `invalidationTriggers[${index}].level`))
+    if (['price-below', 'price-above'].includes(kind) && !finite(row.level)) diagnostics.push(diagnostic('invalidation_price_missing', 'blocked', 'Price invalidation needs a numeric level', `invalidationTriggers[${index}].level`))
     if (!Number.isFinite(Date.parse(row.checkBy))) diagnostics.push(diagnostic('invalidation_deadline_missing', 'unevaluated', 'Invalidation needs a checkBy deadline', `invalidationTriggers[${index}].checkBy`))
     else invalidations.push(row)
   }
@@ -342,8 +391,9 @@ export function exitCheck({ symbol = null, price, rules = {}, thesis = {}, senti
 
   for (const trigger of thesis?.invalidationTriggers ?? []) {
     if (trigger?.status && trigger.status !== 'open') continue
+    const kind = normalizeTriggerKind(trigger?.kind)
     const fired = finite(price) && finite(trigger?.level) &&
-      ((trigger.kind === 'price_below' && price <= trigger.level) || (trigger.kind === 'price_above' && price >= trigger.level))
+      ((kind === 'price-below' && price <= trigger.level) || (kind === 'price-above' && price >= trigger.level))
     if (fired) add('thesis_invalidation', 'A thesis invalidation trigger is met; the claim must be re-verified before anything else', { triggerId: trigger.id ?? null, level: trigger.level, price })
     else if (past(trigger?.checkBy)) add('thesis_review', 'An invalidation trigger passed its own check-by date without being evaluated', { triggerId: trigger.id ?? null, checkBy: trigger.checkBy })
   }

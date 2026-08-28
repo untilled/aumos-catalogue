@@ -76,6 +76,14 @@ is the methodology's failure; slippage the broker took is not. Absent the flag, 
 charged to the methodology, and the observation is still returned and still diagnosed rather than
 disappearing with the grade.
 
+## The hurdle the whole book has to clear
+
+Per-candidate gates ask whether *this* trade is worth doing. `benchmarkHurdleAnnualPct` asks the
+other question: annualized, has any of it been worth running rather than held passively? Report the
+book against it alongside `baselineTrack`, and report it when the answer is no — a methodology that
+only measures its own decisions against each other can be internally consistent and still behind the
+index for years.
+
 Update `learning/evidence-maturity`, `learning/closed-decision-summary`, the applicable
 `calibration/*` key and `failures/repeated-patterns` only when an outcome changes an aggregate. Store
 the Decision/Evidence ids that support each update. A repeated failure may produce a rule proposal,
