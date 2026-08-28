@@ -45,9 +45,9 @@ dispatch rather than packages somebody installs:
 | `us-sleeve` | XNAS/XNYS research and the US sleeve, including policy-designated SGOV liquidity |
 | `allocate`  | KRW/USD sleeve targets, total cash, FX, portfolio-wide concentration, cross-market opportunity cost |
 
-**Dispatch what this wake asked for, not all three.** Call `resolveWakeFlow` on the WATCH id
-that woke this run — `classifyScheduledWake` returns the same `flow` if you are already
-calling it — and dispatch accordingly:
+**Dispatch what this wake asked for, not all three.** Call `resolveWakeFlow` on the `summary`
+of the `plan-trigger` event in `events` — `classifyScheduledWake` returns the same `flow` if you
+are already calling it — and dispatch accordingly:
 
 | the wake's `flow` | dispatch |
 |---|---|
@@ -258,10 +258,12 @@ re-arm one future `at-time` review: KR after XKRX close plus configured buffer, 
 XNYS/XNAS close plus buffer, Global at the next sourced 08:00 Asia/Seoul review after both available
 closes. Never add 24 hours or reuse a fixed UTC close across DST, holidays or early closes.
 
-**Arm each one under the `watchId` `nextReviewSequence` returns**, verbatim. It is
-`market-review:<flow>:<scheduled instant>`, and it is the only thing that tells the next run
-what it was woken for. An id you compose yourself, or a review armed without one, wakes a run
-that has to fall back to running all three flows.
+**Arm each one with the `intent` `nextReviewSequence` returns**, verbatim. ⚠️ **The intent is
+the only channel there is.** A watch carries `subject`, `intent`, `trigger` and `expiresAt` and
+no id you may choose, and the event a fired plan raises carries no plan id either — what it
+carries is a `summary` composed as `<what fired> — watching for: <your intent>`. So the intent
+is what tells the next run which flow it was woken for. A review armed with your own wording,
+or with the marker dropped, wakes a run that has to fall back to running all three flows.
 
 Known earnings are also `at-time` WATCH checkpoints, never `event: earnings`. Prefer official company
 IR/calendar, then official press release/exchange filing, then SEC/DART metadata, then a dated

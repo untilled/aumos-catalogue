@@ -7,9 +7,18 @@ description: How this manager runs its three market flows and assembles their an
 
 ## Which flows this run dispatches
 
-**Not all of them, most runs.** `resolveWakeFlow` reads the WATCH id that woke this run and
-returns the flow it was armed for; `classifyScheduledWake` returns the same `flow` alongside
-its due/duplicate/late verdict, so a run already making that call has the answer.
+**Not all of them, most runs.** `resolveWakeFlow` reads the `summary` of the `plan-trigger`
+event that woke this run and returns the flow it was armed for; `classifyScheduledWake` returns
+the same `flow` alongside its due/duplicate/late verdict, so a run already making that call has
+the answer.
+
+⚠️ **The flow rides in the watch's `intent`, because nothing else survives the trip.** A watch
+the manager arms is `{ subject?, intent, trigger, expiresAt? }` — no id it may choose — and the
+`AumosEvent` a fired plan raises carries `eventId`, `kind`, `subject`, `occurredAt`,
+`detectedAt`, `summary`, `materiality` and `evidenceIds`, with no plan id on it. The wake engine
+composes the summary as `<what fired> — watching for: <the intent>`, which is the one place the
+manager's own words come back. Arm the intent `nextReviewSequence` returns and the marker is
+already in it.
 
 | the wake's `flow` | dispatch | why |
 |---|---|---|
