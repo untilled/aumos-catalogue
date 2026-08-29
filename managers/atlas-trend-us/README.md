@@ -184,6 +184,8 @@ its answer is uncomfortable.
 
 ## Notes
 
+**Choosing between the three Atlas Trend packages** — what each buys, what each needs, and where they overlap — is set out in [the catalogue's manager index](../README.md). Read it before running this one alongside `atlas-trend-kr`: that package's US-equity role holds a Korea-listed S&P 500 fund, so on one book the exposure arrives twice at a size neither package chose.
+
 Two limits of the data are real and are stated rather than papered over. **Premium and
 discount to NAV are not available** from the source this package reads — which is why the
 universe is restricted to funds where that gap is measured in basis points. And the

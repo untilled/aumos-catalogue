@@ -3,7 +3,7 @@
   "id": "atlas-trend-kr",
   "publisher": "aumos",
   "name": "Atlas Trend KR",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Time-series momentum across a fixed basket of Korea-listed ETFs, in won. Holds only what is trending in its own price, sizes what it holds by realised volatility, and parks in CD-rate funds when nothing is. One monthly rebalance, or nothing.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",

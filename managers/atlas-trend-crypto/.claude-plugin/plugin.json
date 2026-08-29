@@ -1,5 +1,5 @@
 {
   "name": "atlas-trend-crypto",
-  "version": "0.1.0",
-  "description": "Time-series momentum on crypto spot, in dollars. One or two assets and cash, because a basket of coins is one position wearing ten names."
+  "version": "0.1.1",
+  "description": "Time-series momentum on crypto spot, in dollars. One or two assets and cash, because a basket of coins is one position wearing ten names. Holds only while the trend is up, sizes the exposure by realised volatility, and goes to cash when it is not. One monthly review, or nothing."
 }

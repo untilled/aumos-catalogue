@@ -209,6 +209,8 @@ its answer is uncomfortable.
 
 ## Notes
 
+**Choosing between the three Atlas Trend packages** — what each buys, what each needs, and where they overlap — is set out in [the catalogue's manager index](../README.md). Read it before running this one alongside `atlas-trend-us`: this package's US-equity role holds a Korea-listed S&P 500 fund and that one holds US equity directly, so on one book the exposure arrives twice at a size neither package chose.
+
 Three data limits are real and stated rather than papered over.
 
 **No distribution data exists.** Not at either vendor and not in any Korean public API we
