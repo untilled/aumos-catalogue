@@ -1,5 +1,5 @@
 {
   "name": "undervalued-now",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "description": "One paragraph, no capabilities, and its own web and shell. A benchmark of the model rather than of a methodology — the prompt is the question, and the forward return is the answer."
 }

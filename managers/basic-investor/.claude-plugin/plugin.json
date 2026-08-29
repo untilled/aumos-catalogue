@@ -1,5 +1,5 @@
 {
   "name": "basic-investor",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "description": "FinRobot's Data-CoT → Concept-CoT → Thesis-CoT, extended with Portfolio Context and a Decision stage. The reference ManagerPackage."
 }

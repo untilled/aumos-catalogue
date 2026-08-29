@@ -102,6 +102,14 @@ jobs:
       # judges a translation, because a script cannot.
       - run: npm run check:docs
 
+      # `runtime-files-are-present` in the vendored lint checks that
+      # `.claude-plugin/plugin.json` exists; this checks that what is in it
+      # agrees with `aumos.json`. It sits here rather than beside `check:pins`
+      # because it judges the submission — a package PR should see its result,
+      # and the paragraph below explains why anything after `check:pins` does
+      # not run on one.
+      - run: npm run check:plugin
+
       # `evidence-gated` ships a deterministic core rather than asking
       # a model to do arithmetic, and the two things that keeps honest are only
       # true while somebody checks them: that the fixtures still describe what
