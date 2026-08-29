@@ -3,7 +3,7 @@
   "id": "basic-investor",
   "publisher": "aumos",
   "name": "Basic Investor",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "FinRobot's Data-CoT → Concept-CoT → Thesis-CoT, extended with Portfolio Context and a Decision stage. The reference ManagerPackage.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",

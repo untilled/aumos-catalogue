@@ -1,5 +1,5 @@
 {
   "name": "prudent-allocator",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong."
 }
