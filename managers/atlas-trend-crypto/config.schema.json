@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Atlas Trend Crypto instance configuration",
+  "description": "Reaches the manager as ManagerInvocation.config. These are the constants of the methodology, exposed because an investor's risk appetite is theirs and not the author's — but the shape of the method is not configurable from here: the horizons are fixed, the ensemble rule is fixed, and nothing in this file can loosen the Mandate or the TimeGate. Every value here is also written into PROMPT.md, because an invocation may carry no config block at all. There is no maxAssetWeight and no correlation setting: this methodology holds one or two assets and does not pretend to allocate between them.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "historyDays": {
+      "type": "integer",
+      "minimum": 400,
+      "maximum": 1500,
+      "default": 420,
+      "description": "Calendar days of daily candles behind every horizon. The floor is 400 rather than 365 because the twelve-month horizon needs a candle on or before t0 minus twelve months, so the window has to reach past that date with margin. Coinbase answers at most 300 candles a call, so this window is always at least two calls."
+    },
+    "includeEther": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether ETH-USD is scored alongside BTC-USD as a second asset. Off by default. Measured over 750 sessions the two run at a correlation near 0.8, so the second asset adds roughly a third of a bet rather than a whole one — and when it is on, the two are scored separately and each is held or not on its own signal. There is no weighting between them: each takes half the risk budget when eligible."
+    },
+    "volatilityWindowDays": {
+      "type": "integer",
+      "minimum": 20,
+      "maximum": 252,
+      "default": 63,
+      "description": "Days of returns behind realised volatility. Crypto trades every day, so this is 63 calendar days rather than 63 sessions of a five-day week."
+    },
+    "targetVolatility": {
+      "type": "number",
+      "minimum": 0.05,
+      "maximum": 1,
+      "default": 0.25,
+      "description": "Annualised volatility the exposure is scaled toward. Higher than the equity siblings' 0.10 because an asset that runs at 40-80% would otherwise be scaled to a rounding error; a 0.10 target against a 60% asset is a 17% position. This is the setting that does the most work in this package."
+    },
+    "maxExposure": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 1,
+      "default": 1,
+      "description": "A ceiling on total crypto exposure, applied after the volatility scaling. The default of 1 means the volatility target alone decides. An investor who wants this fund never to be more than half in the market sets it here rather than by holding cash outside the book."
+    },
+    "rebalanceBand": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.3,
+      "default": 0.05,
+      "description": "The no-trade band. Wider than the equity siblings' 0.03 because the volatility scaling moves the target weight far more here — a 0.03 band against an asset whose volatility swings between 40% and 90% would trade every month for reasons that are not signal."
+    }
+  }
+}
