@@ -156,6 +156,8 @@ It reads no filings, no news and no on-chain data. It proposes and never trades.
 
 ## Notes
 
+**Choosing between the three Atlas Trend packages** — what each buys, what each needs, and why this one carries less machinery than the other two — is set out in [the catalogue's manager index](../README.md). This package overlaps with neither sibling.
+
 The measurement behind the no-basket decision is recorded in the catalogue's issue #42, with the
 data sources and the method, so it can be re-run and disagreed with.
 
