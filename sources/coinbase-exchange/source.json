@@ -1,0 +1,26 @@
+{
+  "spec": "SourceSpec/1",
+  "id": "coinbase-exchange",
+  "version": "0.1.0",
+  "vendor": "coinbase-exchange",
+  "caveat": "Coinbase Exchange's public market data, relayed unread. No key is asked for because none is needed — these paths are open, and nothing here can reach an account. A candle row is `[time, low, high, open, close, volume]`: low and high come before open and close, which is not the order most vendors use, and rows arrive newest first. Buckets start at 00:00 UTC and a 24-hour market has no close, so which bucket counts as finished is the caller's convention to state. At most 300 candles answer one call. `ticker`, `stats`, `book` and `trades` take no date and are always now.",
+  "hosts": ["api.exchange.coinbase.com"],
+  "headers": {
+    "accept": "application/json"
+  },
+  "endpoints": [
+    { "host": "api.exchange.coinbase.com", "path": "/time", "query": [] },
+    { "host": "api.exchange.coinbase.com", "path": "/currencies", "query": [] },
+    { "host": "api.exchange.coinbase.com", "path": "/products", "query": [] },
+    { "host": "api.exchange.coinbase.com", "path": "/products/{symbol}", "query": [] },
+    {
+      "host": "api.exchange.coinbase.com",
+      "path": "/products/{symbol}/candles",
+      "query": ["granularity", "start", "end"]
+    },
+    { "host": "api.exchange.coinbase.com", "path": "/products/{symbol}/ticker", "query": [] },
+    { "host": "api.exchange.coinbase.com", "path": "/products/{symbol}/stats", "query": [] },
+    { "host": "api.exchange.coinbase.com", "path": "/products/{symbol}/book", "query": ["level"] },
+    { "host": "api.exchange.coinbase.com", "path": "/products/{symbol}/trades", "query": ["limit"] }
+  ]
+}

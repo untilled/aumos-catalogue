@@ -12,6 +12,7 @@
     ],
     "sources": [
       "alpaca",
+      "coinbase-exchange",
       "fsc-securities-product",
       "open-dart",
       "openbb-fmp",
