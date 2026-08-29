@@ -13,7 +13,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/ai-hedge-fund-value",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "description": "A port of ai-hedge-fund's deep-value pod: Graham, Buffett and Munger read the same point-in-time fundamentals independently, and one reconciliation weighs their convictions. Graham's view counts double, as the source's own strategy file specifies.",
       "version": "0.2.3",
@@ -59,10 +59,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/atlas-trend-kr",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "description": "Time-series momentum across a fixed basket of Korea-listed ETFs, in won. Holds only what is trending in its own price, sizes what it holds by realised volatility, and parks in CD-rate funds when nothing is. One monthly rebalance, or nothing.",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "metadata": {
         "name": "Atlas Trend KR",
         "publisher": "aumos",
@@ -100,10 +100,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/atlas-trend-us",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
-      "version": "0.1.3",
+      "version": "0.2.0",
       "metadata": {
         "name": "Atlas Trend US",
         "publisher": "aumos",
@@ -143,7 +143,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/basic-investor",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "description": "FinRobot's Data-CoT → Concept-CoT → Thesis-CoT, extended with Portfolio Context and a Decision stage. The reference ManagerPackage.",
       "version": "0.2.2",
@@ -185,7 +185,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/earnings-drift-watcher",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "description": "Judges one thing only: whether the market has finished reacting to a reported surprise. Compares the reported figure against what was expected, then against how far the price has already travelled, and mostly concludes that it is too late.",
       "version": "0.2.2",
@@ -224,10 +224,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/evidence-gated",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "description": "One evidence-gated methodology run as three market flows: a Korean sleeve, a US sleeve, and the allocator that sets their budgets and proposes the cross-market rebalance. The flows are subagents of one manager; only the orchestrator submits.",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "metadata": {
         "name": "Evidence-Gated Allocator",
         "publisher": "aumos",
@@ -280,7 +280,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/prudent-allocator",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong.",
       "version": "0.2.2",
@@ -325,7 +325,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/undervalued-now",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "description": "One paragraph, no capabilities, and its own web and shell. A benchmark of the model rather than of a methodology — the prompt is the question, and the forward return is the answer.",
       "version": "0.2.2",
