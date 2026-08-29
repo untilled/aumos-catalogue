@@ -2,6 +2,7 @@
   "aumos": {
     "managers": [
       "ai-hedge-fund-value",
+      "atlas-trend-crypto",
       "atlas-trend-kr",
       "atlas-trend-us",
       "basic-investor",

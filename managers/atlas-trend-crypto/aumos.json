@@ -1,0 +1,63 @@
+{
+  "manifestVersion": 1,
+  "id": "atlas-trend-crypto",
+  "publisher": "aumos",
+  "name": "Atlas Trend Crypto",
+  "version": "0.1.0",
+  "description": "Time-series momentum on crypto spot, in dollars. One or two assets and cash, because a basket of coins is one position wearing ten names. Holds only while the trend is up, sizes the exposure by realised volatility, and goes to cash when it is not. One monthly review, or nothing.",
+  "readme": "./README.md",
+  "prompt": "./PROMPT.md",
+  "runtimes": ["claude"],
+  "license": "MIT",
+  "engines": {
+    "aumos": ">=0.3.15"
+  },
+  "ampVersion": 1,
+  "cadence": {
+    "days": 30
+  },
+  "contributes": {
+    "managers": [
+      {
+        "id": "atlas-trend-crypto",
+        "name": "Atlas Trend Crypto",
+        "description": "Scores BTC — and optionally ETH — on an ensemble of 1, 3, 6 and 12-month dollar returns, holds it only while that ensemble is positive, and scales the exposure to a volatility target. Everything not held is cash, not a stablecoin. Deliberately carries no inverse-volatility weighting or correlation scaling: the crypto universe has an effective breadth near one, and machinery that implies otherwise would be describing diversification this market does not have.",
+        "tasks": ["PORTFOLIO_REVIEW"],
+        "assetClasses": ["crypto", "cash"],
+        "markets": ["CBSE"]
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "source:passthrough",
+      "reason": "Daily dollar candles for one or two spot pairs, and the product record that says whether the pair is still trading. Coinbase's own answer, unread by Aumos, and quoted in dollars rather than in a stablecoin so that no peg sits inside the trend.",
+      "sources": ["coinbase-exchange"]
+    },
+    {
+      "kind": "portfolio:read",
+      "reason": "The proposal is a weight for the whole book, so the book as it stands is the only thing that says whether that weight is already held. Without it every run would propose a trade."
+    },
+    {
+      "kind": "brief:read",
+      "reason": "Whether this book is currently out of the market, and since when. A trend system's behaviour depends on where it already is, and in a two-state system that fact is the whole state."
+    },
+    {
+      "kind": "brief:write",
+      "reason": "To record entering or leaving that state, once, when it changes — so the next run and the other managers on this book can read it instead of inferring it from weights."
+    }
+  ],
+  "requires": {
+    "skills": ["source_request"],
+    "optionalSkills": ["portfolio_read", "brief_read", "brief_write"]
+  },
+  "network": {
+    "mode": "deny"
+  },
+  "config": {
+    "schema": "config.schema.json"
+  },
+  "memory": {
+    "persistent": false
+  }
+}
