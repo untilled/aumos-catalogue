@@ -3,19 +3,17 @@
   "id": "atlas-trend-crypto",
   "publisher": "aumos",
   "name": "Atlas Trend Crypto",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Time-series momentum on crypto spot, in dollars. One or two assets and cash, because a basket of coins is one position wearing ten names. Holds only while the trend is up, sizes the exposure by realised volatility, and goes to cash when it is not. One monthly review, or nothing.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
   "runtimes": ["claude"],
   "license": "MIT",
   "engines": {
-    "aumos": ">=0.3.15"
+    "aumos": ">=0.3.17"
   },
   "ampVersion": 1,
-  "cadence": {
-    "days": 30
-  },
+  "schedule": [{ "cron": "30 0 L * *", "timeZone": "UTC" }],
   "contributes": {
     "managers": [
       {
