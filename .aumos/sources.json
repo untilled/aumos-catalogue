@@ -12,7 +12,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/alpaca",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "version": "0.3.0",
       "metadata": {
@@ -92,13 +92,91 @@
       }
     },
     {
+      "name": "coinbase-exchange",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/untilled/aumos-catalogue",
+        "path": "sources/coinbase-exchange",
+        "ref": "main",
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
+      },
+      "version": "0.1.0",
+      "metadata": {
+        "publisher": "aumos",
+        "vendor": "coinbase-exchange",
+        "port": "library",
+        "fidelity": "none",
+        "hosts": [
+          "api.exchange.coinbase.com"
+        ],
+        "credentials": [],
+        "endpoints": [
+          {
+            "host": "api.exchange.coinbase.com",
+            "path": "/time",
+            "query": []
+          },
+          {
+            "host": "api.exchange.coinbase.com",
+            "path": "/currencies",
+            "query": []
+          },
+          {
+            "host": "api.exchange.coinbase.com",
+            "path": "/products",
+            "query": []
+          },
+          {
+            "host": "api.exchange.coinbase.com",
+            "path": "/products/{symbol}",
+            "query": []
+          },
+          {
+            "host": "api.exchange.coinbase.com",
+            "path": "/products/{symbol}/candles",
+            "query": [
+              "granularity",
+              "start",
+              "end"
+            ]
+          },
+          {
+            "host": "api.exchange.coinbase.com",
+            "path": "/products/{symbol}/ticker",
+            "query": []
+          },
+          {
+            "host": "api.exchange.coinbase.com",
+            "path": "/products/{symbol}/stats",
+            "query": []
+          },
+          {
+            "host": "api.exchange.coinbase.com",
+            "path": "/products/{symbol}/book",
+            "query": [
+              "level"
+            ]
+          },
+          {
+            "host": "api.exchange.coinbase.com",
+            "path": "/products/{symbol}/trades",
+            "query": [
+              "limit"
+            ]
+          }
+        ],
+        "publishedAt": "2026-08-29T00:00:00.000Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJDb2luYmFzZSBFeGNoYW5nZSI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwMDUyRkYiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxNyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiLz48cmVjdCB4PSIyNSIgeT0iMjUiIHdpZHRoPSIxNCIgaGVpZ2h0PSIxNCIgcng9IjMiIGZpbGw9IiNmZmYiLz48L3N2Zz4K"
+      }
+    },
+    {
       "name": "fsc-securities-product",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/fsc-securities-product",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "version": "0.1.0",
       "metadata": {
@@ -220,7 +298,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/open-dart",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "version": "0.1.0",
       "metadata": {
@@ -298,7 +376,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/openbb-fmp",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "version": "0.3.2",
       "metadata": {
@@ -335,7 +413,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/sec-edgar",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "version": "0.3.2",
       "metadata": {
@@ -376,7 +454,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/toss",
         "ref": "main",
-        "sha": "3f9dfce3925f4606258efc01469221346585b58a"
+        "sha": "07567157ab05a35014bf3a1ec448383806d272d4"
       },
       "version": "0.2.0",
       "metadata": {
