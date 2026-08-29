@@ -35,15 +35,19 @@
       "type": "string",
       "minLength": 1
     },
-    "cadence": {
+    "schedule": {
       "type": "object",
       "properties": {
-        "days": {
-          "type": "number",
-          "exclusiveMinimum": 0
+        "cron": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeZone": {
+          "type": "string",
+          "minLength": 1
         }
       },
-      "required": ["days"],
+      "required": ["cron", "timeZone"],
       "additionalProperties": false
     },
     "translations": {
