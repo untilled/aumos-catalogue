@@ -31,6 +31,54 @@ function addMinutes(instant, minutes) {
   return new Date(Date.parse(instant) + minutes * 60_000).toISOString()
 }
 
+/**
+ * The weekdays a market review recurs on. Monday to Friday, and that is the
+ * whole of what a rule may claim.
+ *
+ * A cron field cannot say *trading day* — the objection #356 raised against
+ * cron and the one that survives into a rule that only draws — so the rule
+ * says the part that is always true and the armed instant carries the part
+ * that needs a calendar. Weekends are not a holiday lookup: no exchange this
+ * package trades opens on one, so dropping them costs nothing and removes
+ * about a hundred wrong marks a year from the investor's calendar.
+ */
+const TRADING_WEEKDAYS = '1-5'
+
+/**
+ * The recurrence a review nominally falls on, as `{ cron, timeZone }`.
+ *
+ * ⚠️ **This arms nothing.** Aumos wakes on the `at` instant beside it, which is
+ * computed from the sourced session and is exact. The rule exists so the
+ * investor's PLANS calendar can draw the months this manager has not judged yet
+ * — a grid that is blank after the next appointment reads as a manager with
+ * nothing planned — and it is drawn as a faint forecast because cron does not
+ * know a holiday, a half-day or a delayed open.
+ *
+ * Derived from the same two numbers the exact instant used — the session's
+ * local close and the investor's buffer — rather than written as a literal, so
+ * a configured buffer moves the forecast and the appointment together. A buffer
+ * that pushed the review past local midnight would move it onto a weekday the
+ * cron fields cannot name, and rather than draw the wrong day this returns
+ * null: the calendar loses a forecast and keeps the armed instant.
+ */
+function marketReviewRule(closeLocal, bufferMinutes, timeZone) {
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(closeLocal ?? '') || !timeZone) return null
+  if (!Number.isFinite(bufferMinutes)) return null
+  const [closeHour, closeMinute] = closeLocal.split(':').map(Number)
+  const total = closeHour * 60 + closeMinute + bufferMinutes
+  if (total < 0 || total >= 24 * 60) return null
+  const hour = Math.floor(total / 60)
+  const minute = total % 60
+  return { cron: `${minute} ${hour} * * ${TRADING_WEEKDAYS}`, timeZone }
+}
+
+/** The same, for the allocator's fixed wall-clock review. */
+function globalReviewRule(time, timeZone) {
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(time ?? '') || !timeZone) return null
+  const [hour, minute] = time.split(':').map(Number)
+  return { cron: `${minute} ${hour} * * ${TRADING_WEEKDAYS}`, timeZone }
+}
+
 export function nextMarketReview({ sessions = [], asOf, bufferMinutes = 30 }) {
   const diagnostics = []
   const candidates = []
@@ -236,9 +284,9 @@ export function nextReviewSequence({ krSessions = [], usSessions = [], globalRev
    * reads it out.
    */
   const sequence = [
-    kr.data.next && { owner: MANAGER_ID, flow: 'kr-sleeve', task: 'PORTFOLIO_REVIEW', at: kr.data.next.reviewAt, session: kr.data.next },
-    us.data.next && { owner: MANAGER_ID, flow: 'us-sleeve', task: 'PORTFOLIO_REVIEW', at: us.data.next.reviewAt, session: us.data.next },
-    globalAt && Date.parse(globalAt) > Date.parse(asOf) && { owner: MANAGER_ID, flow: ALLOCATOR_FLOW, task: 'PORTFOLIO_REVIEW', at: globalAt },
+    kr.data.next && { owner: MANAGER_ID, flow: 'kr-sleeve', task: 'PORTFOLIO_REVIEW', at: kr.data.next.reviewAt, session: kr.data.next, rule: marketReviewRule(kr.data.next.closeLocal, krBuffer, kr.data.next.timeZone) },
+    us.data.next && { owner: MANAGER_ID, flow: 'us-sleeve', task: 'PORTFOLIO_REVIEW', at: us.data.next.reviewAt, session: us.data.next, rule: marketReviewRule(us.data.next.closeLocal, usBuffer, us.data.next.timeZone) },
+    globalAt && Date.parse(globalAt) > Date.parse(asOf) && { owner: MANAGER_ID, flow: ALLOCATOR_FLOW, task: 'PORTFOLIO_REVIEW', at: globalAt, rule: globalReviewRule(globalReview.time, globalReview.timeZone) },
   ].filter(Boolean)
     .map((row) => ({ ...row, intent: marketReviewIntent(row.flow, row.at) }))
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))

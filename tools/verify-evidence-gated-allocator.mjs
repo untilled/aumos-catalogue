@@ -445,7 +445,7 @@ for (const [group, checks] of Object.entries(groupCoverage.groups)) assert.ok(ch
  */
 covers('audit/package-boundary-scan', 'owner-cutover/no-order-code')
 assert.equal(manifest.network.mode, 'deny', 'manager package cannot access the network directly')
-assert.equal(manifest.engines.aumos, '>=0.3.0', 'runtime requires the current invocation and package-MCP contracts')
+assert.equal(manifest.engines.aumos, '>=0.3.15', 'runtime requires the current invocation and package-MCP contracts, and — since the cadence this package states — an Aumos whose `at-time` trigger accepts `rule`. The trigger is a strict object on both sides, so an older build refuses the whole proposal rather than ignoring one key: the floor is what keeps a run from failing as `invalid-proposal` on a machine that cannot read it')
 assert.equal(manifest.capabilities.some((row) => /order|broker|database/i.test(row.kind)), false, 'manager package declares no order/broker/database capability')
 /**
  * ⚠️ **Two assertions stood here and the collection split retired them.**
@@ -757,6 +757,68 @@ const scheduleLib = await readFile(new URL('../lib/schedule.mjs', fixtureRoot), 
 for (const key of Object.keys(schemaSchedule)) {
   assert.ok(scheduleLib.includes(key), `config.schema.json declares schedule.${key} and something reads it — a setting the investor can move that moves nothing is a choice they did not really make`)
 }
+
+covers('schedule/stated-cadence-draws-the-calendar')
+/**
+ * The cadence the scheduler states beside the instant it armed.
+ *
+ * A run arms one review per flow, so PLANS held at most three future days and
+ * the month after them was blank — and a calendar that is empty ahead of the
+ * next judgement is read as a manager with nothing planned. Aumos takes an
+ * optional `{ cron, timeZone }` on an `at-time` trigger to draw past the
+ * appointment; this is the half that produces one.
+ *
+ * ⚠️ **The rule must never become the schedule.** It wakes nothing — `at` does
+ * — and the assertions below are mostly about keeping the two apart: the rule
+ * agrees with `at` on the hour, moves when the investor's buffer moves, and is
+ * withheld rather than guessed when it cannot be derived. The reason the
+ * agreement is asserted rather than assumed is that a rule hardcoded as a
+ * literal would pass every other check here while silently ignoring a
+ * configured buffer, which is exactly the shape #91 found.
+ */
+const ruleFor = (flow, input = {}) =>
+  execute({ operation: 'nextReviewSequence', asOf: globalIntegration.asOf, input: { ...sessionsForBuffers, ...input } }).data.sequence.find((row) => row.flow === flow).rule
+
+/** The wall-clock `HH:MM` an instant lands on in a zone — what cron writes. */
+const localHourMinute = (instant, timeZone) => {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(instant))
+  const read = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]))
+  return `${read.hour}:${read.minute}`
+}
+
+for (const flow of ['kr-sleeve', 'us-sleeve', 'allocate']) {
+  const rule = ruleFor(flow)
+  const at = reviewAt({}, flow)
+  assert.ok(rule && typeof rule.cron === 'string' && typeof rule.timeZone === 'string', `${flow} states a cadence beside the instant it armed — without one the calendar is blank after the next appointment`)
+  const [minute, hour, dayOfMonth, month, weekday] = rule.cron.split(' ')
+  assert.equal(rule.cron.split(' ').length, 5, 'five fields, which is the whole of what Aumos parses')
+  assert.equal(`${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`, localHourMinute(at, rule.timeZone), `${flow}'s rule names the same wall-clock time its armed instant lands on — a rule that disagrees with the appointment beside it draws a forecast of a schedule this manager does not keep`)
+  assert.equal(`${dayOfMonth} ${month}`, '* *', 'a market review recurs on a weekday rather than on a date')
+  assert.equal(weekday, '1-5', 'weekends are dropped, which is the only holiday knowledge a cron field can honestly carry — about a hundred wrong marks a year removed without a calendar lookup')
+}
+
+assert.equal(ruleFor('kr-sleeve').timeZone, 'Asia/Seoul', 'the rule is written in the market\'s own zone, so a DST shift moves it and a fixed UTC hour cannot drift')
+assert.equal(ruleFor('us-sleeve').timeZone, 'America/New_York', 'and the US review in New York, where the close actually is')
+
+/**
+ * A configured buffer moves the forecast too, which is #91's finding applied to
+ * the second reader. A literal would have passed everything above.
+ */
+assert.notEqual(ruleFor('kr-sleeve', { config: { schedule: { krCloseBufferMinutes: 90 } } }).cron, ruleFor('kr-sleeve').cron, 'a configured buffer moves the drawn cadence, not only the armed instant — otherwise the calendar forecasts a schedule the investor has already changed')
+assert.equal(ruleFor('kr-sleeve', { config: { schedule: { krCloseBufferMinutes: 90 } } }).cron, '0 17 * * 1-5', 'and it moves by the buffer it was given: a 15:30 close plus ninety minutes is 17:00 in Seoul')
+
+/**
+ * The one case a rule is withheld rather than guessed.
+ *
+ * Past local midnight the review lands on a different weekday, and no cron
+ * field can say *the day after a weekday*. Drawing it a day early would put a
+ * forecast on a day nothing happens; null loses the forecast and keeps the
+ * armed instant, which is the trade this package makes everywhere it cannot
+ * evaluate something.
+ */
+const midnightCrossing = ruleFor('kr-sleeve', { config: { schedule: { krCloseBufferMinutes: 600 } } })
+assert.equal(midnightCrossing, null, 'a buffer that carries the review past local midnight yields no rule at all — a forecast on the wrong weekday is worse than no forecast')
+assert.ok(reviewAt({ config: { schedule: { krCloseBufferMinutes: 600 } } }, 'kr-sleeve'), 'and the armed instant survives it, because the rule was never what woke anything')
 
 covers('schedule/wake-flow-dispatch')
 /**
