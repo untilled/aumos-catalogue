@@ -82,7 +82,7 @@ kept as provenance. There is no macro score: a regime call is a Brief judgement 
 
 ## Memory contract
 
-The package uses fourteen stable keys documented in `skills/memory-contract/SKILL.md`. Values
+The package uses fifteen stable keys documented in `skills/memory-contract/SKILL.md`. Values
 are JSON objects with schema version, update instant, supporting Decision/Evidence ids,
 sample/independent cluster counts, computable metrics, missing fields and maturity status.
 Writes reuse a key and create a new revision only when an aggregate changes. A historical
@@ -192,6 +192,16 @@ fixture asserts the difference so it cannot be undone silently.
   Until Aumos serves them, asset claims reach a run through the invocation payload and
   through Brief, and the package says so rather than implying a lookup it cannot make.
   `RunProvenance.unservedTools` is where a run records the difference.
+- **A manager can arm a WATCH and cannot read one back.** The grant map publishes
+  `portfolio_read`, `brief_read`/`brief_write`, `memory_read`/`memory_write` and `source_request`,
+  and carries no watch or plan capability at all — not even a declared-but-empty one like
+  `thesis:read`. WATCHes leave in a `DecisionProposal` and there is no return path, so a run cannot
+  tell whether it is arming a review it already armed. Since #87 that costs more than it did: every
+  wake dispatches one flow, so two `kr-sleeve` reviews half an hour apart each run the Korean
+  sleeve and each seal a judgement. `run/armed-reviews` and `reconcileArmedReviews` are the bridge
+  — the manager writes down what it armed — and a bridge is what they are: private memory is scoped
+  to this instance, so a new instance starts blind and the record can drift from what Aumos holds.
+  ([#97](https://github.com/untilled/aumos-catalogue/issues/97))
 - **The paper track lives in instance-private memory, because nothing else can hold it.**
   A paper call has no order and no fill, so it is not a Decision; the runtime publishes no
   `thesis:write` and `thesis:read` grants no tool. `learning/paper-cohorts` therefore

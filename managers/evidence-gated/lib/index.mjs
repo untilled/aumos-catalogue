@@ -13,7 +13,7 @@ import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCo
 import { harnessAudit, lessonAudit } from './audit.mjs'
 import { lensEnvelope, clusterBlock, timeStopPolicy, ruleVersions, policyLint } from './envelopes.mjs'
 import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport, controlArmLane } from './learning.mjs'
-import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence, resolveWakeFlow } from './schedule.mjs'
+import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence, resolveWakeFlow, reconcileArmedReviews } from './schedule.mjs'
 
 const operations = {
   indicators(input, asOf) {
@@ -104,6 +104,7 @@ const operations = {
   themeRadarDue: (input, asOf) => themeRadarDue({ ...input, asOf }),
   nextReviewSequence: (input, asOf) => nextReviewSequence({ ...input, asOf }),
   resolveWakeFlow,
+  reconcileArmedReviews: (input, asOf) => reconcileArmedReviews({ ...input, asOf }),
 }
 
 export function execute(request) {

@@ -737,6 +737,50 @@ assert.deepEqual(reviewSequence.data.sequence.map((row) => row.flow).sort(), ['a
  * in `lib/`.** Four of the six already did; the guard exists so the seventh
  * cannot arrive orphaned.
  */
+/**
+ * The two dispatch rows a run wrote before this document did, and the re-arm
+ * that has no read path. (issues #96, #97)
+ *
+ * A real run arrived with a `harnessAudit` blocker and no flow. `PROMPT.md`
+ * said to dispatch all three; the run declined, correctly, and recorded three
+ * reasons in `uncertainty` that **no rule here sanctioned**. It waived a rule in
+ * the safe direction and said so — which is the package working, and is also
+ * exactly the failure mode it names everywhere else. So the rules are prose
+ * now, and prose is what this block checks.
+ *
+ * The re-arm half is different: a manager can arm a WATCH and cannot read one
+ * back, so `reconcileArmedReviews` is what stops a second review waking the same
+ * sleeve twice in a day. That is machinery, and it is asserted as machinery.
+ */
+covers('schedule/dispatch-gaps-and-rearm-dedupe')
+const dispatchProse = `${await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')}\n${await readFile(new URL('../skills/orchestrate/SKILL.md', fixtureRoot), 'utf8')}`
+for (const [needle, why] of [
+  ['pre-flight blocked', 'a blocked run must be told not to dispatch — a flow spends a subagent producing targets the run discards'],
+  ['mid-session', 'a wake with no flow can land while a market is open, and a sleeve judged then is judged on a bar that has not closed'],
+]) {
+  assert.ok(dispatchProse.includes(needle), `the dispatch rules cover "${needle}": ${why}`)
+}
+
+const rearmSequence = [{ flow: 'kr-sleeve', at: '2026-08-31T07:00:00.000Z' }, { flow: 'us-sleeve', at: '2026-08-28T20:45:00.000Z' }]
+const rearmAsOf = '2026-08-28T18:00:00.000Z'
+const firstArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: null, sequence: rearmSequence } })
+assert.deepEqual(firstArm.data.toArm.map((row) => row.flow), ['kr-sleeve', 'us-sleeve'], 'with nothing recorded, every review in the sequence is armed')
+
+const secondArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: firstArm.data.nextState, sequence: rearmSequence } })
+assert.deepEqual(secondArm.data.toArm, [], 'a review already armed for that flow and instant is not armed again — since #87 a duplicate wake dispatches the sleeve a second time and seals a second judgement on the same day')
+assert.deepEqual(secondArm.data.duplicateFlows, ['kr-sleeve', 'us-sleeve'], 'and it names which ones')
+
+const movedArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: firstArm.data.nextState, sequence: [{ flow: 'kr-sleeve', at: '2026-08-31T07:30:00.000Z' }] } })
+assert.ok(movedArm.diagnostics.some((row) => row.code === 'review_superseded'), 'a review that moved leaves the old one out there — with no read path it cannot be withdrawn, and pretending it replaced itself is the assumption this key exists to refuse')
+assert.deepEqual(movedArm.data.toArm.map((row) => row.at), ['2026-08-31T07:30:00.000Z'], 'the new instant is still armed')
+
+const expiredArm = execute({ operation: 'reconcileArmedReviews', asOf: '2026-09-01T00:00:00.000Z', input: { previous: firstArm.data.nextState, sequence: rearmSequence } })
+assert.deepEqual(expiredArm.data.toArm.map((row) => row.flow), ['kr-sleeve', 'us-sleeve'], 'a recorded review whose instant has passed no longer blocks a re-arm — it has already fired')
+
+const memoryKeysSkill = await readFile(new URL('../skills/memory-contract/SKILL.md', fixtureRoot), 'utf8')
+assert.ok(memoryKeysSkill.includes('`run/armed-reviews`'), 'the key is published rather than invented by a run')
+assert.ok(dispatchProse.includes('run/armed-reviews'), 'and the run skeleton reads it before arming — a dedupe nothing consults is not one')
+
 covers('schedule/configured-buffers-reach-the-calculation')
 const sessionsForBuffers = {
   krSessions: [{ date: '2026-09-01', openLocal: '09:00', closeLocal: '15:30', timeZone: 'Asia/Seoul', isOpen: true }],
@@ -1609,7 +1653,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 81)
+assert.equal(supportedOperations.length, 82)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
