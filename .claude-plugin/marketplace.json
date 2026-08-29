@@ -62,7 +62,7 @@
         "sha": "3028f8cc3d4305bb5c84332143dd267e7404ffa1"
       },
       "description": "Time-series momentum on crypto spot, in dollars. One or two assets and cash, because a basket of coins is one position wearing ten names. Holds only while the trend is up, sizes the exposure by realised volatility, and goes to cash when it is not. One monthly review, or nothing.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "metadata": {
         "name": "Atlas Trend Crypto",
         "publisher": "aumos",
@@ -103,7 +103,7 @@
         "sha": "3028f8cc3d4305bb5c84332143dd267e7404ffa1"
       },
       "description": "Time-series momentum across a fixed basket of Korea-listed ETFs, in won. Holds only what is trending in its own price, sizes what it holds by realised volatility, and parks in CD-rate funds when nothing is. One monthly rebalance, or nothing.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "metadata": {
         "name": "Atlas Trend KR",
         "publisher": "aumos",
@@ -144,7 +144,7 @@
         "sha": "3028f8cc3d4305bb5c84332143dd267e7404ffa1"
       },
       "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "metadata": {
         "name": "Atlas Trend US",
         "publisher": "aumos",
@@ -268,7 +268,7 @@
         "sha": "3028f8cc3d4305bb5c84332143dd267e7404ffa1"
       },
       "description": "One evidence-gated methodology run as three market flows: a Korean sleeve, a US sleeve, and the allocator that sets their budgets and proposes the cross-market rebalance. The flows are subagents of one manager; only the orchestrator submits.",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "metadata": {
         "name": "Evidence-Gated Allocator",
         "publisher": "aumos",
