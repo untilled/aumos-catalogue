@@ -13,7 +13,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/ai-hedge-fund-value",
         "ref": "main",
-        "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
+        "sha": "ebc10152acb826f2b3798967bb012a146da019bb"
       },
       "description": "A port of ai-hedge-fund's deep-value pod: Graham, Buffett and Munger read the same point-in-time fundamentals independently, and one reconciliation weighs their convictions. Graham's view counts double, as the source's own strategy file specifies.",
       "version": "0.2.4",
@@ -59,7 +59,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/atlas-trend-crypto",
         "ref": "main",
-        "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
+        "sha": "ebc10152acb826f2b3798967bb012a146da019bb"
       },
       "description": "Time-series momentum on crypto spot, in dollars. One or two assets and cash, because a basket of coins is one position wearing ten names. Holds only while the trend is up, sizes the exposure by realised volatility, and goes to cash when it is not. One monthly review, or nothing.",
       "version": "0.1.2",
@@ -100,10 +100,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/atlas-trend-kr",
         "ref": "main",
-        "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
+        "sha": "ebc10152acb826f2b3798967bb012a146da019bb"
       },
       "description": "Time-series momentum across a fixed basket of Korea-listed ETFs, in won. Holds only what is trending in its own price, sizes what it holds by realised volatility, and parks in CD-rate funds when nothing is. One monthly rebalance, or nothing.",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "metadata": {
         "name": "Atlas Trend KR",
         "publisher": "aumos",
@@ -120,14 +120,16 @@
         ],
         "capabilities": [
           "source:passthrough",
+          "connection:passthrough",
           "portfolio:read",
           "brief:read",
           "brief:write"
         ],
         "requiresSkills": [
-          "source_request"
+          "source_request",
+          "connection_request"
         ],
-        "enginesAumos": ">=0.2.6",
+        "enginesAumos": ">=0.3.18",
         "provenance": null,
         "homepage": null,
         "publishedAt": "2026-08-27T00:00:00.000Z",
@@ -141,10 +143,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/atlas-trend-us",
         "ref": "main",
-        "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
+        "sha": "ebc10152acb826f2b3798967bb012a146da019bb"
       },
       "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "metadata": {
         "name": "Atlas Trend US",
         "publisher": "aumos",
@@ -162,15 +164,15 @@
           "PORTFOLIO_REVIEW"
         ],
         "capabilities": [
-          "source:passthrough",
+          "connection:passthrough",
           "portfolio:read",
           "brief:read",
           "brief:write"
         ],
         "requiresSkills": [
-          "source_request"
+          "connection_request"
         ],
-        "enginesAumos": ">=0.2.6",
+        "enginesAumos": ">=0.3.18",
         "provenance": null,
         "homepage": null,
         "publishedAt": "2026-08-23T08:41:17.204Z",
@@ -184,7 +186,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/basic-investor",
         "ref": "main",
-        "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
+        "sha": "ebc10152acb826f2b3798967bb012a146da019bb"
       },
       "description": "FinRobot's Data-CoT → Concept-CoT → Thesis-CoT, extended with Portfolio Context and a Decision stage. The reference ManagerPackage.",
       "version": "0.2.3",
@@ -226,7 +228,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/earnings-drift-watcher",
         "ref": "main",
-        "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
+        "sha": "ebc10152acb826f2b3798967bb012a146da019bb"
       },
       "description": "Judges one thing only: whether the market has finished reacting to a reported surprise. Compares the reported figure against what was expected, then against how far the price has already travelled, and mostly concludes that it is too late.",
       "version": "0.2.3",
@@ -265,10 +267,10 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/evidence-gated",
         "ref": "main",
-        "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
+        "sha": "ebc10152acb826f2b3798967bb012a146da019bb"
       },
       "description": "One evidence-gated methodology run as three market flows: a Korean sleeve, a US sleeve, and the allocator that sets their budgets and proposes the cross-market rebalance. The flows are subagents of one manager; only the orchestrator submits.",
-      "version": "0.4.3",
+      "version": "0.4.4",
       "metadata": {
         "name": "Evidence-Gated Allocator",
         "publisher": "aumos",
@@ -297,12 +299,14 @@
           "brief:write",
           "manager-memory:read",
           "manager-memory:write",
-          "source:passthrough"
+          "source:passthrough",
+          "connection:passthrough"
         ],
         "requiresSkills": [
-          "source_request"
+          "source_request",
+          "connection_request"
         ],
-        "enginesAumos": ">=0.3.0",
+        "enginesAumos": ">=0.3.18",
         "provenance": {
           "sourceRepo": "https://github.com/morethanmin/trading-harness",
           "commit": "7702b19a04678b833c90ba1f6323e74232795155",
@@ -321,7 +325,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/prudent-allocator",
         "ref": "main",
-        "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
+        "sha": "ebc10152acb826f2b3798967bb012a146da019bb"
       },
       "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong.",
       "version": "0.2.3",
@@ -366,7 +370,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "managers/undervalued-now",
         "ref": "main",
-        "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
+        "sha": "ebc10152acb826f2b3798967bb012a146da019bb"
       },
       "description": "One paragraph, no capabilities, and its own web and shell. A benchmark of the model rather than of a methodology — the prompt is the question, and the forward return is the answer.",
       "version": "0.2.3",
