@@ -1,5 +1,5 @@
 {
   "name": "atlas-trend-us",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing."
 }

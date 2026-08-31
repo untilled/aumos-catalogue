@@ -202,26 +202,26 @@ ledger, credential, network, database or order access.
 | | |
 |---|---|
 | **Markets** | Korean and US equities, ETFs and cash. Long-only |
-| **Data sources** | a complete US single-name lane installs `toss`, `sec-edgar` and `alpaca`. A complete Korean single-name fundamental lane additionally requires `open-dart`, published in this catalogue alongside this package. `openbb-fmp` is optional and only supplements long price history |
+| **Connections and data sources** | a complete US single-name lane links Toss and Alpaca to this fund and installs `sec-edgar`. A complete Korean single-name fundamental lane additionally requires `open-dart`, published in this catalogue alongside this package. `openbb-fmp` is optional and only supplements long price history |
 | **The book** | live positions, cash and fills, which stay owned by Aumos and the broker connector — not by this package |
 | **Settings** | thresholds the methodology compares against, including the price-conflict tolerance (5% by default). None of them can loosen your Mandate |
 | **Your approval** | **it proposes and never trades.** Quantities, order type, limits, approval and execution are Aumos's, and a person approves every order |
 
-**What a missing source costs, stated before a run discovers it.** The manifest names
-`toss`, `sec-edgar`, `alpaca` and `open-dart`, so the install screen can say which of them
-this machine lacks.
+**What a missing input costs, stated before a run discovers it.** The manifest names Toss and
+Alpaca as broker connections and `sec-edgar` and `open-dart` as data sources, so the install screen
+can say which of them this fund or machine lacks.
 
 | missing | continues | blocked |
 |---|---|---|
-| `toss` market source | existing evidence and thesis review | new price signal and target calculation |
+| Toss connection | existing evidence and thesis review | new price signal and target calculation |
 | `sec-edgar` | the Korean and ETF lane | a new US fundamental BUY or promotion |
-| `alpaca` news/actions | SEC and Toss review | a new judgement needing news or action confirmation |
+| Alpaca connection | SEC and Toss review | a new judgement needing news or action confirmation |
 | `open-dart` | Korean ETF and price/weight management | a new Korean single-name fundamental BUY or promotion |
 | CLI web | core, exit and weight management | theme radar, variant view, consensus difference, policy and macro claims |
 
-A machine that has not installed a source is **a machine that has not installed a source**
-— not a capability nobody has. Where the lane is blocked, the answer is an
-unable-to-judge WAIT that says which one.
+A fund without a required connection, or a machine without a required source, is missing a named
+input — not a capability nobody has. Where the lane is blocked, the answer is an unable-to-judge
+WAIT that says which one.
 
 ## What it is bad at
 

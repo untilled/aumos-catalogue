@@ -1,6 +1,6 @@
 ---
 name: atlas-kr-windows
-description: "The source_request calls Atlas Trend KR makes in Stage 1 — 토스증권 candles for the adjusted won signal and 금융위원회 getETFPriceInfo for NAV, index, size and turnover — and the traps each vendor has. Read this before requesting any window."
+description: "The connection_request and source_request calls Atlas Trend KR makes in Stage 1 — 토스증권 candles through the investor's connection for the adjusted won signal and 금융위원회 getETFPriceInfo for NAV, index, size and turnover — and the traps each vendor has. Read this before requesting any window."
 ---
 
 # Two windows, two vendors, and what each one gets wrong
@@ -8,11 +8,14 @@ description: "The source_request calls Atlas Trend KR makes in Stage 1 — 토�
 This document carries **the shape of the calls and the behaviour of the vendors**. What to do with
 the answers is in `PROMPT.md`, and `PROMPT.md` governs wherever the two meet.
 
-`source_request`'s description carries an **`Allowed:` list** of every `source path ?parameters` on
-this machine. Read it and work from it — a guessed path is refused, and a refusal looks like the
+The two relay tools each carry an **`Allowed:` list**. `connection_request` lists read-only paths
+available through this fund's broker connections; `source_request` lists paths from installed data
+sources. Read both and work from them — a guessed path is refused, and a refusal looks like the
 vendor being down.
 
 ## 1. The signal — 토스증권
+
+Call `connection_request` with `source: "toss"`:
 
 ```
 toss /api/v1/candles ?symbol=<6-digit code>
@@ -36,6 +39,8 @@ toss /api/v1/candles ?symbol=<6-digit code>
   presence of a bar.
 
 ## 2. The instrument — 금융위원회 증권상품시세정보
+
+Call `source_request` with `source: "fsc-securities-product"`:
 
 ```
 fsc-securities-product /1160100/service/GetSecuritiesProductInfoService/getETFPriceInfo

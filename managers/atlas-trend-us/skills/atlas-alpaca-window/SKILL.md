@@ -1,6 +1,6 @@
 ---
 name: atlas-alpaca-window
-description: "The two source_request calls Atlas Trend makes in Stage 1, and the four Alpaca behaviours that each have a wrong answer looking like a right one — which feed to name, what the adjustment is measured from, what limit counts, and why snapshots cannot be asked at a past asOf. Read this before requesting the daily bar window."
+description: "The two connection_request calls Atlas Trend makes in Stage 1 through the investor's Alpaca connection, and the four Alpaca behaviours that each have a wrong answer looking like a right one — which feed to name, what the adjustment is measured from, what limit counts, and why snapshots cannot be asked at a past asOf. Read this before requesting the daily bar window."
 ---
 
 # The window, and the four ways this vendor is not what it looks like
@@ -8,9 +8,11 @@ description: "The two source_request calls Atlas Trend makes in Stage 1, and the
 This document carries **the shape of the calls and the behaviour of the vendor**. What to do
 with the answer is in `PROMPT.md`, and `PROMPT.md` governs wherever the two meet.
 
-`source_request`'s description carries an **`Allowed:` list** of every
-`source path ?parameters` on this machine. Read it and work from it — a guessed path is
-refused, and a refusal looks like the vendor being down.
+`connection_request`'s description carries an **`Allowed:` list** of every
+`connector path ?parameters` available through this fund's broker connections. Read it and work
+from it — a guessed path is refused, and a refusal looks like the vendor being down. Use `alpaca`
+as the request's `source`; the field keeps the common relay shape even though the credential now
+comes from the connection rather than a data-source document.
 
 ## 1. One window
 

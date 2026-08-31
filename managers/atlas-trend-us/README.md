@@ -149,7 +149,7 @@ screen. **If you want this run monthly, check that interval when you install it.
 | | |
 |---|---|
 | **Market** | US-listed ETFs, in dollars |
-| **Data source** | `alpaca`, at version 0.3.0 or later. Earlier versions do not carry the corporate actions endpoint this package uses to check the vendor's own dividend adjustment |
+| **Broker connection** | Alpaca, linked to this fund. The same login relays bars and corporate actions; no separate `alpaca` data-source document or second copy of its keys is needed |
 | **What a key costs** | free with any Alpaca account |
 | **One setting to get right** | `feed` — use `delayed_sip` unless you hold a market data subscription, in which case `sip`. `iex` is available and is not recommended: it is one exchange's prints, and its daily close is not the closing price of anything |
 | **Other settings** | the risk target, the per-fund cap, the no-trade band and whether property is included are all yours to set; the horizons and the voting rule are not configurable, because they are the methodology |

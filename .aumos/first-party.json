@@ -12,13 +12,11 @@
       "undervalued-now"
     ],
     "sources": [
-      "alpaca",
       "coinbase-exchange",
       "fsc-securities-product",
       "open-dart",
       "openbb-fmp",
-      "sec-edgar",
-      "toss"
+      "sec-edgar"
     ]
   }
 }

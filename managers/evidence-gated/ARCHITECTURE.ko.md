@@ -26,31 +26,32 @@
 
 ## 데이터 아키텍처와 설치 정책
 
-Toss broker connector와 `toss` 소스는 다르다. connector는 계좌 상태와 실행을 소유하고, 소스는
-공개 시장 엔드포인트를 중계한다. 완전한 US 단일종목 레인은 `toss`·`sec-edgar`·`alpaca`를 설치한다.
-`openbb-fmp`는 선택이고 장기 가격 이력을 보충할 때만 쓴다. 완전한 KR 단일종목 펀더멘털 레인은
+Toss·Alpaca 시장 엔드포인트는 이 펀드에 이미 연결된 로그인을 통해 중계된다. 자격증명은 그 연결에
+남고 데이터 소스로 다시 입력하지 않는다. 완전한 US 단일종목 레인은 두 연결을 붙이고 `sec-edgar`를
+설치한다. `openbb-fmp`는 선택이고 장기 가격 이력을 보충할 때만 쓴다. 완전한 KR 단일종목 펀더멘털 레인은
 이 패키지와 함께 이 카탈로그에 게시된 `open-dart`를 추가로 요구한다. 설치되지 않은 곳에서는 KR
 ETF와 기존 보유의 가격/비중 관리는 펀더멘털 불확실성을 진술한 채 돌 수 있지만, 신규 KR 단일종목
 펀더멘털 BUY나 thesis 승격은 판단 불가 WAIT다 — 아무도 갖지 못한 기능이 아니라, 이 기계가 소스를
 설치하지 않은 것이다.
 
-모든 소스 호출은 invocation의 `asOf`를 받는다. 매니저는 그 이후 row를 폐기하고, 시장 가용성으로
+모든 릴레이 호출은 invocation의 `asOf`를 받는다. Aumos가 Toss·Alpaca 요청의 선언된 경계
+파라미터를 그 실행에 맞추고, 매니저는 그대로 돌아온 답에서 그 이후 row를 다시 폐기하며 시장 가용성으로
 신선도를 잰다: SEC는 `filed`, OpenDART는 접수 시각/번호, 뉴스·기업행위는 공개·공시 시각, 가격은
 bar 시각. 항상 현재 상태를 돌려주는 스냅샷은 replay 소스가 아니다. adjusted와 unadjusted 계열을
 절대 섞지 않고, 불연속은 기업행위로 설명한다.
 
 | 누락 | 계속 가능 | 차단 |
 |---|---|---|
-| `toss` market source | 기존 Evidence/Thesis 검토 | 신규 가격 신호와 목표 계산 |
+| Toss 연결 | 기존 Evidence/Thesis 검토 | 신규 가격 신호와 목표 계산 |
 | `sec-edgar` | KR/ETF 레인 | 신규 US 펀더멘털 BUY/승격 |
-| `alpaca` news/actions | SEC/Toss 검토 | 뉴스·기업행위 확인이 필요한 신규 판단 |
+| Alpaca 연결 | SEC/Toss 검토 | 뉴스·기업행위 확인이 필요한 신규 판단 |
 | `open-dart` | KR ETF와 가격/비중 관리 | 신규 KR 단일종목 펀더멘털 BUY/승격 |
 | CLI web | core/exit/비중 관리 | theme radar, variant view, 컨센서스 차이, 정책·매크로 주장 |
 
-매니페스트가 `source:passthrough` 권한에 `toss`·`sec-edgar`·`alpaca`·`open-dart`를 이름으로
-댄다. 그래서 설치 화면이 실행이 발견하기 전에 이 기계에 무엇이 없는지 말할 수 있다. `openbb-fmp`는
-선택이라 적지 않았다. 소스를 이름 대는 것이 게이트웨이를 좁히지는 않는다 — 실행은 여전히 기계에
-설치된 모든 소스를 본다.
+매니페스트가 `connection:passthrough` 권한에 Toss·Alpaca를, `source:passthrough` 권한에
+`sec-edgar`·`open-dart`를 이름 댄다. 그래서 설치 화면이 실행이 발견하기 전에 이 펀드에 어느 연결이,
+이 기계에 어느 소스가 없는지 말할 수 있다. `openbb-fmp`는 선택이라 적지 않았다. 소스를 이름 대는
+것이 소스 게이트웨이를 좁히지는 않는다 — 실행은 여전히 기계에 설치된 모든 소스를 본다.
 
 OpenDART의 동작 셋은 매니저의 몫이다. Aumos가 읽지 않고 중계하기 때문이다: `corpCode.xml`은
 ZIP으로 답하고(대신 `list.json`의 `corp_code`/`stock_code`를 읽는다), 오류가 HTTP 200의 `status`
@@ -167,7 +168,8 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   주장은 invocation 페이로드와 Brief로 실행에 닿고, 패키지는 하지 못하는 조회를 하는 척하는 대신
   그렇게 말한다. `RunProvenance.unservedTools`가 그 차이를 기록하는 자리다.
 - **매니저는 WATCH를 걸 수는 있고 읽을 수는 없다.** 권한→도구 맵은 `portfolio_read`,
-  `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request`를 내놓고, watch나 plan
+  `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request`, `connection_request`를
+  내놓고, watch나 plan
   권한은 아예 없다 — `thesis:read`처럼 선언만 되고 빈 목록인 것조차 아니다. WATCH는
   `DecisionProposal`로 나가기만 하고 돌아오는 길이 없어서, 실행은 자기가 이미 건 검토를 다시
   거는 중인지 알 수 없다. #87 이후로 그 비용이 커졌다: 웨이크마다 플로우 하나를 디스패치하므로,

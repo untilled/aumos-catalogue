@@ -105,7 +105,8 @@ Your tools are the Aumos gateway's, already attached to this session:
   mcp__aumos__portfolio_read   mcp__aumos__thesis_read     mcp__aumos__evidence_read
   mcp__aumos__brief_read       mcp__aumos__brief_write
   mcp__aumos__manager_memory_read   mcp__aumos__manager_memory_write
-  mcp__aumos__source_request   (the only way to reach a data vendor)
+  mcp__aumos__source_request       (installed data-source documents)
+  mcp__aumos__connection_request   (read-only paths on this fund's broker connections)
 and this package's own server:
   mcp__evidence-gated-metrics__calculate
 Do not go looking for others and do not use Bash, WebFetch or WebSearch to find them.
@@ -115,8 +116,9 @@ Do not go looking for others and do not use Bash, WebFetch or WebSearch to find 
 session and a flow that calls it takes the run down; `hooks/guard-submit.mjs` refuses it.
 
 ⚠️ **A tool the gateway did not build is not on the list either.** `source_request` exists only
-when this machine has data sources installed, so a flow told about a tool that is not there
-searches for it — the same stall by another road. Name what you were actually served.
+when this machine has data sources installed, and `connection_request` only when this fund has an
+eligible broker connection. A flow told about a tool that is not there searches for it — the same
+stall by another road. Name what you were actually served.
 
 ⛔ **Do not hand a flow your private memory.** The namespace is this instance and the flows
 share it; a flow that was told what a calibration key says will write about it in prose, and

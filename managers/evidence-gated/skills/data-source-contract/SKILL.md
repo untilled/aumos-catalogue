@@ -1,22 +1,23 @@
 ---
 name: data-source-contract
-description: Route Toss, SEC EDGAR, Alpaca, optional OpenBB/FMP and web research while enforcing point-in-time, freshness and graceful-degradation rules.
+description: Route Toss and Alpaca through broker connections, SEC EDGAR, OpenDART and optional OpenBB/FMP through data sources, plus web research, while enforcing point-in-time, freshness and graceful-degradation rules.
 ---
 
 # Data-source contract
 
-Read `source_request`'s `Allowed:` list before the first request. Never guess a path, and never
-discover a required source only after doing work that assumes it exists. Pass the invocation's exact
-`asOf` on every call even when a vendor endpoint also needs its own end date.
+Read both relay tools' `Allowed:` lists before the first request. `connection_request` reaches the
+read-only market paths of a broker already connected to this fund; `source_request` reaches an
+installed data-source document. Never guess a path, and never discover a required connection or
+source only after doing work that assumes it exists. Pass the invocation's exact `asOf` on every
+call even when a vendor endpoint also needs its own end date.
 
 ## Responsibility and endpoints
 
 | provider | catalogue endpoints used here | time meaning |
 |---|---|---|
-| Toss broker connector | portfolio, cash, fills, order/approval path | Kernel-owned; never call through `source_request` |
-| `toss` source | `/api/v1/candles`, `/prices`, `/orderbook`, `/trades`, `/stocks`, warnings, flows, FX, calendars, rankings, indicators | live vendor payload; bound queries with `before`/`until`/`dateTime`, then discard later rows |
+| Toss connection | portfolio, cash, fills and order/approval are Kernel-owned; `connection_request` exposes only its fixed read-only market list: `/api/v1/candles`, `/prices`, `/orderbook`, `/trades`, `/stocks`, warnings, flows, FX, calendars, rankings, indicators | live vendor payload; Aumos bounds declared `before`/`until`/`dateTime` parameters to the run, then this manager still discards later rows from the unchanged answer |
 | `sec-edgar` | ticker mapping and `/api/xbrl/companyfacts/{symbol}` | each fact unit is available at its `filed` date, not fiscal period end |
-| `alpaca` | bars, news, corporate actions | set `end` at `asOf`; snapshots are always current and never canonical replay evidence |
+| Alpaca connection | `connection_request` bars, news and corporate actions | set `end` at `asOf`; Aumos bounds that request parameter, while snapshots remain current and never canonical replay evidence |
 | `openbb-fmp` | `/api/v1/equity/price/historical` only | optional long history; set `end_date`, record provider and adjustment |
 | `open-dart` | `/api/corpCode.xml`, `/api/company.json`, `/api/list.json`, `/api/fnlttSinglAcntAll.json`, `/api/fnlttSinglAcnt.json` | the **receipt** is the moment: `rcept_no` begins with the receipt date and `rcept_dt` repeats it; a business year is not a disclosure date |
 | CLI web | IR, consensus, policy, macro, industry/theme context | supplementary and non-canonical; retain URL/access time and disclose replay gap |
@@ -48,13 +49,15 @@ corporate actions, and block price-derived returns or targets when the basis can
 
 ## Required and optional installation policy
 
-The core install requires the `source_request` gateway. The usable lane depends on sources present:
+The core install requires the relay gateway. The usable lane depends on broker connections and data
+sources present:
 
-- `toss`: required for new price signals and target calculations; without it, review existing
-  Evidence/Thesis only.
+- Toss connection: required for new price signals and target calculations; without it, review
+  existing Evidence/Thesis only. A market-data-only Toss login is sufficient; no brokerage account
+  has to be attached.
 - `sec-edgar`: required for new US fundamental BUY or thesis promotion.
-- `alpaca`: required when current news or a corporate action is material to the judgement. Without
-  it, SEC/Toss review may continue but that new judgement is blocked.
+- Alpaca connection: required when current news or a corporate action is material to the judgement.
+  Without it, SEC/Toss review may continue but that new judgement is blocked.
 - `open-dart`: required for new Korean single-name fundamental BUY or promotion. Where it is not
   installed, those outcomes are unable-to-judge WAIT — the source exists in the catalogue, so this is
   a machine that has not installed it rather than a capability nobody has.
@@ -64,9 +67,9 @@ The core install requires the `source_request` gateway. The usable lane depends 
 
 | missing | may continue | must block |
 |---|---|---|
-| Toss market source | existing Evidence and Thesis review | new price signal or target calculation |
+| Toss connection | existing Evidence and Thesis review | new price signal or target calculation |
 | SEC EDGAR | Korean ETF and price/weight lanes | new US fundamental BUY/promotion |
-| Alpaca news/actions | SEC fundamentals and Toss prices | a judgement that requires news/action confirmation |
+| Alpaca connection | SEC fundamentals and Toss prices | a judgement that requires news/action confirmation |
 | `open-dart` | Korean ETF and existing-position price/weight management with stated uncertainty | new Korean single-name fundamental BUY/promotion |
 | CLI web | core, exit and weight management | theme radar, variant view, consensus-difference and policy/macro claims |
 

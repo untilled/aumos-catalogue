@@ -36,19 +36,29 @@
       "minLength": 1
     },
     "schedule": {
-      "type": "object",
-      "properties": {
-        "cron": {
-          "type": "string",
-          "minLength": 1
+      "minItems": 1,
+      "maxItems": 8,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cron": {
+            "type": "string",
+            "minLength": 1
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          }
         },
-        "timeZone": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "required": ["cron", "timeZone"],
-      "additionalProperties": false
+        "required": ["cron", "timeZone"],
+        "additionalProperties": false
+      }
     },
     "translations": {
       "type": "object",
@@ -224,18 +234,27 @@
               "portfolio:read",
               "thesis:read",
               "evidence:read",
+              "market:read",
               "skill:invoke",
               "manager-memory:read",
               "manager-memory:write",
               "brief:read",
               "brief:write",
-              "source:passthrough"
+              "source:passthrough",
+              "connection:passthrough"
             ]
           },
           "reason": {
             "type": "string"
           },
           "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "connectors": {
             "type": "array",
             "items": {
               "type": "string",

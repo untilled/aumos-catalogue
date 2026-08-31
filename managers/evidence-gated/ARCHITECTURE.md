@@ -26,17 +26,18 @@ package instance/model. Different instances and models do not share it.
 
 ## Data architecture and installation policy
 
-The Toss broker connector is not the `toss` source. The connector owns account state and
-execution; the source relays public market endpoints. A complete US single-name lane
-installs `toss`, `sec-edgar` and `alpaca`. `openbb-fmp` is optional and only supplements
-long price history. A complete Korean single-name fundamental lane additionally requires
+Toss and Alpaca market endpoints are relayed through the connections already linked to this fund;
+their credentials remain with those logins and are not entered again as data sources. A complete US
+single-name lane links both connections and installs `sec-edgar`. `openbb-fmp` is optional and only
+supplements long price history. A complete Korean single-name fundamental lane additionally requires
 `open-dart`, published in this catalogue alongside this package. Where it is not
 installed, Korean ETF and existing-position price/weight management can run with
 fundamental uncertainty stated, but a new Korean single-name fundamental BUY or thesis
 promotion is an unable-to-judge WAIT — a machine that has not installed the source, rather
 than a capability nobody has.
 
-Every source call receives invocation `asOf`. The manager discards later rows and measures
+Every relay call receives invocation `asOf`. Aumos bounds the declared Toss and Alpaca request
+parameters to that run; the manager still discards later rows from each unchanged vendor answer and measures
 freshness from market availability: SEC `filed`, OpenDART receipt time/number,
 publication/announcement time for news/actions, and bar timestamp. Snapshots that always
 return current state are not replay sources. Adjusted and unadjusted series are never
@@ -44,17 +45,17 @@ mixed and corporate actions are used to explain discontinuities.
 
 | missing | continues | blocked |
 |---|---|---|
-| `toss` market source | existing Evidence/Thesis review | new price signal and target calculation |
+| Toss connection | existing Evidence/Thesis review | new price signal and target calculation |
 | `sec-edgar` | Korean/ETF lane | new US fundamental BUY/promotion |
-| `alpaca` news/actions | SEC/Toss review | a new judgement requiring news/action confirmation |
+| Alpaca connection | SEC/Toss review | a new judgement requiring news/action confirmation |
 | `open-dart` | Korean ETF and price/weight management | new Korean single-name fundamental BUY/promotion |
 | CLI web | core/exit/weight management | theme radar, variant view, consensus-difference and policy/macro claims |
 
-The manifest names `toss`, `sec-edgar`, `alpaca` and `open-dart` on its
-`source:passthrough` capability, so the install screen can say which of them this machine
-is missing before a run discovers it. `openbb-fmp` is not named because it is optional.
-Naming a source does not narrow the gateway — a run still sees every source installed on
-the machine.
+The manifest names Toss and Alpaca on `connection:passthrough`, and `sec-edgar` and `open-dart`
+on `source:passthrough`, so the install screen can say which connection this fund lacks and which
+source this machine lacks before a run discovers it. `openbb-fmp` is not named because it is
+optional. Naming a source does not narrow the source gateway — a run still sees every source
+installed on the machine.
 
 Three OpenDART behaviours are the manager's to handle, because Aumos relays unread:
 `corpCode.xml` answers with a ZIP (read `corp_code`/`stock_code` off `list.json`
@@ -193,7 +194,8 @@ fixture asserts the difference so it cannot be undone silently.
   through Brief, and the package says so rather than implying a lookup it cannot make.
   `RunProvenance.unservedTools` is where a run records the difference.
 - **A manager can arm a WATCH and cannot read one back.** The grant map publishes
-  `portfolio_read`, `brief_read`/`brief_write`, `memory_read`/`memory_write` and `source_request`,
+  `portfolio_read`, `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request` and
+  `connection_request`,
   and carries no watch or plan capability at all — not even a declared-but-empty one like
   `thesis:read`. WATCHes leave in a `DecisionProposal` and there is no return path, so a run cannot
   tell whether it is arming a review it already armed. Since #87 that costs more than it did: every

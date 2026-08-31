@@ -1455,10 +1455,23 @@ assert.equal(
 )
 
 /**
- * The manifest names the sources this package requires. (aumos #384)
+ * The manifest names document credentials and broker-login credentials on their
+ * separate capabilities. (aumos #384, #575, #576)
  */
 const passthrough = manifest.capabilities.find((row) => row.kind === 'source:passthrough')
-assert.deepEqual(passthrough.sources, ['toss', 'sec-edgar', 'alpaca', 'open-dart'], 'the passthrough capability names its required sources')
+const connectionPassthrough = manifest.capabilities.find(
+  (row) => row.kind === 'connection:passthrough',
+)
+assert.deepEqual(
+  passthrough.sources,
+  ['sec-edgar', 'open-dart'],
+  'the source passthrough capability names only document-backed vendors',
+)
+assert.deepEqual(
+  connectionPassthrough.connectors,
+  ['toss', 'alpaca'],
+  'the connection passthrough capability names the broker logins that relay market data',
+)
 assert.ok(
   passthrough.sources.every((id) => existsSync(new URL(`../sources/${id}/source.json`, import.meta.url))),
   'every named source is a document in this catalogue, not an id nobody publishes',
@@ -1466,6 +1479,12 @@ assert.ok(
 assert.ok(
   manifest.capabilities.every((row) => row.kind === 'source:passthrough' || row.sources === undefined),
   'no other capability carries a sources list',
+)
+assert.ok(
+  manifest.capabilities.every(
+    (row) => row.kind === 'connection:passthrough' || row.connectors === undefined,
+  ),
+  'no other capability carries a connectors list',
 )
 
 /**
