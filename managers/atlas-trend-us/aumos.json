@@ -3,7 +3,7 @@
   "id": "atlas-trend-us",
   "publisher": "aumos",
   "name": "Atlas Trend US",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
@@ -12,10 +12,15 @@
   ],
   "license": "MIT",
   "engines": {
-    "aumos": ">=0.3.17"
+    "aumos": ">=0.3.18"
   },
   "ampVersion": 1,
-  "schedule": [{ "cron": "0 22 LW * *", "timeZone": "UTC" }],
+  "schedule": [
+    {
+      "cron": "0 22 LW * *",
+      "timeZone": "UTC"
+    }
+  ],
   "contributes": {
     "managers": [
       {
@@ -39,13 +44,6 @@
   },
   "capabilities": [
     {
-      "kind": "source:passthrough",
-      "reason": "Daily total-return bars for a fixed basket of ETFs, and the corporate actions over the same window — the second is what lets this manager check the dividend adjustment the first one claims rather than trust it. Both are the vendor's answer, unread by Aumos.",
-      "sources": [
-        "alpaca"
-      ]
-    },
-    {
       "kind": "portfolio:read",
       "reason": "The proposal is a set of weights for the whole book, so the book as it stands is the only thing that says whether those weights are already held. Without it every run would propose a trade."
     },
@@ -56,6 +54,12 @@
     {
       "kind": "brief:write",
       "reason": "To record entering or leaving that state, once, when it changes — so the next run and the other managers on this book can read it instead of inferring it from weights."
+    },
+    {
+      "kind": "connection:passthrough",
+      "connectors": [
+        "alpaca"
+      ]
     }
   ],
   "requires": {

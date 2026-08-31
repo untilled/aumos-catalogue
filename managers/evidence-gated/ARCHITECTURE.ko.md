@@ -167,7 +167,8 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   주장은 invocation 페이로드와 Brief로 실행에 닿고, 패키지는 하지 못하는 조회를 하는 척하는 대신
   그렇게 말한다. `RunProvenance.unservedTools`가 그 차이를 기록하는 자리다.
 - **매니저는 WATCH를 걸 수는 있고 읽을 수는 없다.** 권한→도구 맵은 `portfolio_read`,
-  `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request`를 내놓고, watch나 plan
+  `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request`, `connection_request`를
+  내놓고, watch나 plan
   권한은 아예 없다 — `thesis:read`처럼 선언만 되고 빈 목록인 것조차 아니다. WATCH는
   `DecisionProposal`로 나가기만 하고 돌아오는 길이 없어서, 실행은 자기가 이미 건 검토를 다시
   거는 중인지 알 수 없다. #87 이후로 그 비용이 커졌다: 웨이크마다 플로우 하나를 디스패치하므로,

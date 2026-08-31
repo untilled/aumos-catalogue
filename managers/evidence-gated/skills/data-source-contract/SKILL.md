@@ -11,12 +11,18 @@ discover a required source only after doing work that assumes it exists. Pass th
 
 ## Responsibility and endpoints
 
-| provider | catalogue endpoints used here | time meaning |
-|---|---|---|
-| Toss broker connector | portfolio, cash, fills, order/approval path | Kernel-owned; never call through `source_request` |
-| `toss` source | `/api/v1/candles`, `/prices`, `/orderbook`, `/trades`, `/stocks`, warnings, flows, FX, calendars, rankings, indicators | live vendor payload; bound queries with `before`/`until`/`dateTime`, then discard later rows |
-| `sec-edgar` | ticker mapping and `/api/xbrl/companyfacts/{symbol}` | each fact unit is available at its `filed` date, not fiscal period end |
-| `alpaca` | bars, news, corporate actions | set `end` at `asOf`; snapshots are always current and never canonical replay evidence |
+**Two tools, and which one you use is decided by where the credential lives.** 토스 and Alpaca are
+**logins the investor already made**, so their calls go through `connection_request` and you are
+handed no key; SEC EDGAR and 금융감독원 are documents with keys of their own, so their calls go
+through `source_request`. A vendor whose login this fund does not hold has no tool at all — that is
+a different thing from a call that failed.
+
+| provider | tool | catalogue endpoints used here | time meaning |
+|---|---|---|---|
+| Toss broker connector | — | portfolio, cash, fills, order/approval path | Kernel-owned; never call through either tool |
+| 토스 login | `connection_request` | `/api/v1/candles`, `/prices`, `/orderbook`, `/trades`, `/stocks`, warnings, flows, FX, calendars, rankings, indicators | the host bounds `before`/`until`/`dateTime` at `asOf` for you; a window may come back shorter than asked and never longer |
+| `sec-edgar` | `source_request` | ticker mapping and `/api/xbrl/companyfacts/{symbol}` | each fact unit is available at its `filed` date, not fiscal period end |
+| Alpaca login | `connection_request` | bars, news, corporate actions | `end` is filled at `asOf` if you leave it out; snapshots are always current and never canonical replay evidence |
 | `openbb-fmp` | `/api/v1/equity/price/historical` only | optional long history; set `end_date`, record provider and adjustment |
 | `open-dart` | `/api/corpCode.xml`, `/api/company.json`, `/api/list.json`, `/api/fnlttSinglAcntAll.json`, `/api/fnlttSinglAcnt.json` | the **receipt** is the moment: `rcept_no` begins with the receipt date and `rcept_dt` repeats it; a business year is not a disclosure date |
 | CLI web | IR, consensus, policy, macro, industry/theme context | supplementary and non-canonical; retain URL/access time and disclose replay gap |
@@ -50,11 +56,12 @@ corporate actions, and block price-derived returns or targets when the basis can
 
 The core install requires the `source_request` gateway. The usable lane depends on sources present:
 
-- `toss`: required for new price signals and target calculations; without it, review existing
-  Evidence/Thesis only.
+- **토스 login**: required for new price signals and target calculations; without it, review existing
+  Evidence/Thesis only. ⚠️ What is missing is a **connection**, not a source — the investor connects
+  it where accounts are connected, and an account is not required for prices.
 - `sec-edgar`: required for new US fundamental BUY or thesis promotion.
-- `alpaca`: required when current news or a corporate action is material to the judgement. Without
-  it, SEC/Toss review may continue but that new judgement is blocked.
+- **Alpaca login**: required when current news or a corporate action is material to the judgement.
+  Without it, SEC/Toss review may continue but that new judgement is blocked.
 - `open-dart`: required for new Korean single-name fundamental BUY or promotion. Where it is not
   installed, those outcomes are unable-to-judge WAIT — the source exists in the catalogue, so this is
   a machine that has not installed it rather than a capability nobody has.
@@ -64,9 +71,9 @@ The core install requires the `source_request` gateway. The usable lane depends 
 
 | missing | may continue | must block |
 |---|---|---|
-| Toss market source | existing Evidence and Thesis review | new price signal or target calculation |
+| 토스 login | existing Evidence and Thesis review | new price signal or target calculation |
 | SEC EDGAR | Korean ETF and price/weight lanes | new US fundamental BUY/promotion |
-| Alpaca news/actions | SEC fundamentals and Toss prices | a judgement that requires news/action confirmation |
+| Alpaca login (news/actions) | SEC fundamentals and Toss prices | a judgement that requires news/action confirmation |
 | `open-dart` | Korean ETF and existing-position price/weight management with stated uncertainty | new Korean single-name fundamental BUY/promotion |
 | CLI web | core, exit and weight management | theme radar, variant view, consensus-difference and policy/macro claims |
 

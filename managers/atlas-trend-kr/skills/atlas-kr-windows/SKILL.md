@@ -1,6 +1,6 @@
 ---
 name: atlas-kr-windows
-description: "The source_request calls Atlas Trend KR makes in Stage 1 — 토스증권 candles for the adjusted won signal and 금융위원회 getETFPriceInfo for NAV, index, size and turnover — and the traps each vendor has. Read this before requesting any window."
+description: "The two calls Atlas Trend KR makes in Stage 1 — 토스증권 candles for the adjusted won signal and 금융위원회 getETFPriceInfo for NAV, index, size and turnover — and the traps each vendor has. Read this before requesting any window."
 ---
 
 # Two windows, two vendors, and what each one gets wrong
@@ -8,9 +8,19 @@ description: "The source_request calls Atlas Trend KR makes in Stage 1 — 토�
 This document carries **the shape of the calls and the behaviour of the vendors**. What to do with
 the answers is in `PROMPT.md`, and `PROMPT.md` governs wherever the two meet.
 
-`source_request`'s description carries an **`Allowed:` list** of every `source path ?parameters` on
-this machine. Read it and work from it — a guessed path is refused, and a refusal looks like the
-vendor being down.
+**Two tools, and which one you use is decided by where the credential lives.** 토스증권 is a
+**login this fund is already connected to**, so its calls go through `connection_request`; 금융위원회
+is a document with a key of its own, so its calls go through `source_request`. Both descriptions
+carry an **`Allowed:` list** of every `path ?parameters` this run may ask for. Read it and work from
+it — a guessed path is refused, and a refusal looks like the vendor being down.
+
+⚠️ **You are handed no credential for 토스 and you choose no vendor.** The host signs the call with
+the login the investor made; if this fund holds none, `connection_request` is simply absent — which
+is a different thing from a call that failed, so say which one happened.
+
+⚠️ **The upper bound is filled in for you.** Leave `before` out and the host writes this run's
+`asOf` into it; pass one that is later and it is trimmed. Paging backwards is unaffected — the
+`nextBefore` the vendor hands back is always at or before that bound, so hand it straight back.
 
 ## 1. The signal — 토스증권
 
