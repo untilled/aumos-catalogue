@@ -193,7 +193,8 @@ fixture asserts the difference so it cannot be undone silently.
   through Brief, and the package says so rather than implying a lookup it cannot make.
   `RunProvenance.unservedTools` is where a run records the difference.
 - **A manager can arm a WATCH and cannot read one back.** The grant map publishes
-  `portfolio_read`, `brief_read`/`brief_write`, `memory_read`/`memory_write` and `source_request`,
+  `portfolio_read`, `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request` and
+  `connection_request`,
   and carries no watch or plan capability at all — not even a declared-but-empty one like
   `thesis:read`. WATCHes leave in a `DecisionProposal` and there is no return path, so a run cannot
   tell whether it is arming a review it already armed. Since #87 that costs more than it did: every

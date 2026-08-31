@@ -103,7 +103,7 @@
         "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
       },
       "description": "Time-series momentum across a fixed basket of Korea-listed ETFs, in won. Holds only what is trending in its own price, sizes what it holds by realised volatility, and parks in CD-rate funds when nothing is. One monthly rebalance, or nothing.",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "metadata": {
         "name": "Atlas Trend KR",
         "publisher": "aumos",
@@ -122,12 +122,13 @@
           "source:passthrough",
           "portfolio:read",
           "brief:read",
-          "brief:write"
+          "brief:write",
+          "connection:passthrough"
         ],
         "requiresSkills": [
           "source_request"
         ],
-        "enginesAumos": ">=0.2.6",
+        "enginesAumos": ">=0.3.18",
         "provenance": null,
         "homepage": null,
         "publishedAt": "2026-08-27T00:00:00.000Z",
@@ -144,7 +145,7 @@
         "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
       },
       "description": "Time-series momentum across a fixed basket of US-listed global ETFs. Holds only what is trending in its own price, sizes what it holds by realised volatility, and goes to T-bills when nothing is. One monthly rebalance, or nothing.",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "metadata": {
         "name": "Atlas Trend US",
         "publisher": "aumos",
@@ -162,15 +163,15 @@
           "PORTFOLIO_REVIEW"
         ],
         "capabilities": [
-          "source:passthrough",
           "portfolio:read",
           "brief:read",
-          "brief:write"
+          "brief:write",
+          "connection:passthrough"
         ],
         "requiresSkills": [
           "source_request"
         ],
-        "enginesAumos": ">=0.2.6",
+        "enginesAumos": ">=0.3.18",
         "provenance": null,
         "homepage": null,
         "publishedAt": "2026-08-23T08:41:17.204Z",
@@ -268,7 +269,7 @@
         "sha": "e0b0fdefd90b467dc9e435b8f0023ce80ceb68a5"
       },
       "description": "One evidence-gated methodology run as three market flows: a Korean sleeve, a US sleeve, and the allocator that sets their budgets and proposes the cross-market rebalance. The flows are subagents of one manager; only the orchestrator submits.",
-      "version": "0.4.3",
+      "version": "0.4.4",
       "metadata": {
         "name": "Evidence-Gated Allocator",
         "publisher": "aumos",
@@ -297,12 +298,13 @@
           "brief:write",
           "manager-memory:read",
           "manager-memory:write",
-          "source:passthrough"
+          "source:passthrough",
+          "connection:passthrough"
         ],
         "requiresSkills": [
           "source_request"
         ],
-        "enginesAumos": ">=0.3.0",
+        "enginesAumos": ">=0.3.18",
         "provenance": {
           "sourceRepo": "https://github.com/morethanmin/trading-harness",
           "commit": "7702b19a04678b833c90ba1f6323e74232795155",

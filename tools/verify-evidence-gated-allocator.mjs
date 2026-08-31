@@ -445,7 +445,7 @@ for (const [group, checks] of Object.entries(groupCoverage.groups)) assert.ok(ch
  */
 covers('audit/package-boundary-scan', 'owner-cutover/no-order-code')
 assert.equal(manifest.network.mode, 'deny', 'manager package cannot access the network directly')
-assert.equal(manifest.engines.aumos, '>=0.3.17', 'runtime requires the current invocation and package-MCP contracts, and — since untilled/aumos#540 — an Aumos that reads `schedule` as a **list**. ⚠️ The floor moved from `>=0.3.15` for a sharper reason than the one it replaced: `schedule` is a key 0.3.16 already knows and reads as a single object, so a list is not an unknown key that gets stripped — it is a known key of the wrong shape, and the **whole manifest** is refused. An older build drops this package from its catalogue without the author being told (#233 measured that failure). The `rule` floor this line used to state is gone with the field: nothing reads a plan\'s `rule` any more, and AMP still accepts it precisely so an older-schema package is not refused')
+assert.equal(manifest.engines.aumos, '>=0.3.18', 'runtime requires the current invocation and package-MCP contracts, and — since untilled/aumos#576 — an Aumos whose capability enum has `connection:passthrough` in it. ⚠️ The floor moved from `>=0.3.17` for the **same** reason it moved the time before, one field over: `capabilities[].kind` is a closed enum, so a value an older build does not know is not an unknown key that gets stripped — the **whole manifest** is refused and this package drops out of that build\'s catalogue with nobody told. It was `>=0.3.17` because of untilled/aumos#540 and an Aumos that reads `schedule` as a **list**. ⚠️ The floor moved from `>=0.3.15` for a sharper reason than the one it replaced: `schedule` is a key 0.3.16 already knows and reads as a single object, so a list is not an unknown key that gets stripped — it is a known key of the wrong shape, and the **whole manifest** is refused. An older build drops this package from its catalogue without the author being told (#233 measured that failure). The `rule` floor this line used to state is gone with the field: nothing reads a plan\'s `rule` any more, and AMP still accepts it precisely so an older-schema package is not refused')
 assert.equal(manifest.capabilities.some((row) => /order|broker|database/i.test(row.kind)), false, 'manager package declares no order/broker/database capability')
 /**
  * ⚠️ **Two assertions stood here and the collection split retired them.**
@@ -1455,10 +1455,20 @@ assert.equal(
 )
 
 /**
- * The manifest names the sources this package requires. (aumos #384)
+ * The manifest names what this package reaches, and **which of two kinds each one
+ * is**. (aumos #384; split by aumos #576)
+ *
+ * The split is not cosmetic and is the whole of why this file asserts both halves:
+ * a vendor moves between them when the credential does. 토스 and Alpaca are logins
+ * the investor connected — the manager is handed no key and the host signs — while
+ * SEC EDGAR and 금융감독원 are documents this machine files a key for. Asserting only
+ * the total would let a vendor slide from the second list to the first without
+ * anybody noticing that a key stopped being asked for.
  */
 const passthrough = manifest.capabilities.find((row) => row.kind === 'source:passthrough')
-assert.deepEqual(passthrough.sources, ['toss', 'sec-edgar', 'alpaca', 'open-dart'], 'the passthrough capability names its required sources')
+assert.deepEqual(passthrough.sources, ['sec-edgar', 'open-dart'], 'the passthrough capability names the documents this package requires')
+const connections = manifest.capabilities.find((row) => row.kind === 'connection:passthrough')
+assert.deepEqual(connections.connectors, ['toss', 'alpaca'], 'the connection capability names the logins this package requires')
 assert.ok(
   passthrough.sources.every((id) => existsSync(new URL(`../sources/${id}/source.json`, import.meta.url))),
   'every named source is a document in this catalogue, not an id nobody publishes',
