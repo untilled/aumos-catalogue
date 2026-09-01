@@ -193,7 +193,14 @@ function portfolioHeat({ positions, proposed, cap, grandfather, diagnostics }) {
     withProposed > held ||
     proposed.some((row) => !row?.core && finite(row?.weight) && !finite(row?.stopLossPct) && row.weight > (heldWeight.get(row?.symbol) ?? 0))
   const carried = grandfather.enabled && held > cap
-  if (withProposed > cap && (!carried || (addsNonCoreRisk && grandfather.blocksNewNonCoreWhenBreached))) {
+  /**
+   * ⛔ The same ordering the weight caps use: a run that lowers measured heat
+   * and adds no risk is never the thing refused, whatever the tolerance says.
+   * `addsNonCoreRisk` still has to be false — trimming a stopped name while
+   * buying a stop-less one lowers *measured* heat and raises the real thing.
+   */
+  const reducesRisk = withProposed < held && !addsNonCoreRisk
+  if (withProposed > cap && !reducesRisk && (!carried || (addsNonCoreRisk && grandfather.blocksNewNonCoreWhenBreached))) {
     diagnostics.push(diagnostic('portfolio_heat_breach', 'blocked', 'Total loss if every stop fired is above the cap, and this run adds more of it', 'proposed', { withProposed: round(withProposed), cap }))
   } else if (held > cap) {
     diagnostics.push(diagnostic('portfolio_heat_above_cap', 'unevaluated', 'Held positions alone are above the heat cap; existing risk is grandfathered but new risk is not', 'positions', { holdingsOnly: round(held), cap }))
@@ -285,9 +292,25 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
       })
     }
   }
-  const created = breaches.filter((row) => !row.grandfathered)
+  /**
+   * ⚠️ **The direction is read before the tolerance.** `enabled: false` is a
+   * request not to tolerate a breach; it is never a request to refuse the trim
+   * that resolves one. Reading the tolerance first put the inversion #109 is
+   * named after straight back into the gate — a reduction of an over-cap axis
+   * came out `concentration_breach: blocked`, in a response that carried
+   * `riskReducingAlwaysAllowed: true` beside it.
+   *
+   * ⛔ Inaction is not a reduction, and neither is a swap. The axis total has
+   * to fall **strictly**, so a standing breach nobody is touching still refuses
+   * once the investor switches the tolerance off — which is what switching it
+   * off asks for — and non-core exposure must not rise, so trimming a core
+   * holding while buying a non-core one on the same over-cap axis is not a
+   * reduction either. It is the shape `portfolioHeat` reads one line down.
+   */
+  const reducing = (row) => row.addedWeight < 0 && row.addedNonCoreWeight <= 0
+  const created = breaches.filter((row) => !row.grandfathered && !reducing(row))
   const expanded = breaches.filter((row) => row.grandfathered && row.addedNonCoreWeight > 0)
-  const carried = breaches.filter((row) => row.grandfathered && row.addedNonCoreWeight <= 0)
+  const carried = breaches.filter((row) => reducing(row) || (row.grandfathered && row.addedNonCoreWeight <= 0))
   if (created.length) diagnostics.push(diagnostic('concentration_breach', 'blocked', 'Proposed portfolio breaches concentration', 'proposed', { breaches: created }))
   if (expanded.length && grandfather.blocksNewNonCoreWhenBreached) {
     diagnostics.push(diagnostic('concentration_breach_expanded', 'blocked', 'An axis the book already carries above its cap is being added to; existing exposure is tolerated and new exposure is not', 'proposed', { breaches: expanded }))

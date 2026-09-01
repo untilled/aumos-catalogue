@@ -1297,6 +1297,49 @@ assert.equal(
 )
 
 /**
+ * ── `enabled: false` still may not refuse the reduction (review of #110) ───
+ *
+ * Turning the tolerance off is a request not to **tolerate** a breach. It was
+ * being read as a request to refuse the **trim that resolves** one: with the
+ * tolerance off nothing was grandfathered, so every breach fell through to
+ * `concentration_breach` — including a reduction of an axis the book was
+ * already over, in a response carrying `riskReducingAlwaysAllowed: true`. That
+ * is the inversion #109 is named after, reached through the config instead of
+ * through the input contract.
+ *
+ * The direction is now read before the tolerance, and the two cases below are
+ * the pair that pins it: a reduction passes, and standing still does not.
+ */
+const bluntTrim = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: { positions: overCap, proposed: [{ symbol: 'AAA', weight: 0.07, sector: 'semiconductors' }], caps, config: { grandfather: { enabled: false } } },
+})
+assert.equal(bluntTrim.data.breaches[0].grandfathered, false, 'with the tolerance off nothing is carried as grandfathered')
+assert.equal(bluntTrim.data.breaches[0].addedNonCoreWeight, -0.02, 'and the axis is still over the cap after the trim')
+assert.notEqual(bluntTrim.status, 'blocked', 'but a reduction is never what a safety gate refuses, whatever the tolerance says')
+assert.ok(bluntTrim.diagnostics.some((row) => row.code === 'concentration_grandfathered'))
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: overCap, proposed: [{ symbol: 'MORE', weight: 0.03, sector: 'semiconductors' }], caps, config: { grandfather: { enabled: false } } } }).status,
+  'blocked',
+  'and an addition to that same axis still refuses: inaction and expansion are not reductions',
+)
+
+const bluntHeatTrim = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: { positions: hotPositions, proposed: [{ symbol: 'AAA', weight: 0.175, stopLossPct: 0.2 }], caps: { ...heatCaps, position: 0.5 }, config: { grandfather: { enabled: false } } },
+})
+assert.equal(bluntHeatTrim.data.heat.withProposed, 0.065, 'the trim lowers measured heat and leaves it above the cap')
+assert.equal(bluntHeatTrim.data.heat.holdingsOnly, 0.07)
+assert.notEqual(bluntHeatTrim.status, 'blocked', 'heat reads the direction the same way the weight caps do')
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, caps: { ...heatCaps, position: 0.5 }, config: { grandfather: { enabled: false } } } }).status,
+  'blocked',
+  'and a book left standing above the heat cap with the tolerance off still refuses',
+)
+
+/**
  * Pacing warns and never blocks. (approved 2026-07-10, P5)
  */
 covers('audit/new-single-pacing')
