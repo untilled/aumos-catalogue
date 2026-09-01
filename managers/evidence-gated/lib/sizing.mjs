@@ -1,4 +1,4 @@
-import { diagnostic, finite, round, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW } from './diagnostics.mjs'
+import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW } from './diagnostics.mjs'
 
 /**
  * Lane ownership is keyed by flow, not by manager id.
@@ -148,10 +148,12 @@ export function legacySizeSuggestion(input) {
  * gate exists to refuse.
  *
  * Above the cap, a run that also proposes new non-core risk is blocked; a book
- * that is already over on its holdings alone warns instead, on the same
- * grandfathering logic the concentration gates use.
+ * that is already over on its holdings alone warns instead. ⚠️ That rule used
+ * to be written here in literals, which is why `config.grandfather` could be
+ * declared and read by nothing — the concept had a second, private copy. It now
+ * comes from the same `grandfatherPolicy` the weight caps read. (#109)
  */
-function portfolioHeat({ positions, proposed, cap, diagnostics }) {
+function portfolioHeat({ positions, proposed, cap, grandfather, diagnostics }) {
   const contribution = (rows, label) => {
     let total = 0
     for (const row of rows) {
@@ -172,7 +174,8 @@ function portfolioHeat({ positions, proposed, cap, diagnostics }) {
     return { holdingsOnly: round(held), withProposed: round(withProposed), cap: null, breached: null }
   }
   const addsNonCoreRisk = proposed.some((row) => !row?.core && finite(row?.weight) && row.weight > 0)
-  if (withProposed > cap && addsNonCoreRisk) {
+  const carried = grandfather.enabled && held > cap
+  if (withProposed > cap && (!carried || (addsNonCoreRisk && grandfather.blocksNewNonCoreWhenBreached))) {
     diagnostics.push(diagnostic('portfolio_heat_breach', 'blocked', 'Total loss if every stop fired is above the cap, and this run adds more of it', 'proposed', { withProposed: round(withProposed), cap }))
   } else if (held > cap) {
     diagnostics.push(diagnostic('portfolio_heat_above_cap', 'unevaluated', 'Held positions alone are above the heat cap; existing risk is grandfathered but new risk is not', 'positions', { holdingsOnly: round(held), cap }))
@@ -180,27 +183,59 @@ function portfolioHeat({ positions, proposed, cap, diagnostics }) {
   return { holdingsOnly: round(held), withProposed: round(withProposed), cap, breached: withProposed > cap }
 }
 
-export function concentration({ positions = [], proposed = [], caps = {} }) {
+/**
+ * The weight caps, and which side of them a proposal is moving.
+ *
+ * Exposure is accumulated twice — once from the holdings alone and once with
+ * what this run proposes — because a breach the book already carries and a
+ * breach this run creates are different findings and only one of them is a
+ * reason to refuse. A single total could not tell them apart, so every breach
+ * was blocked, including one that a **trim** would resolve: the run was told
+ * not to plan the reduction that fixes the thing being complained about.
+ *
+ * `config.grandfather` is the setting that says so, and this is where it is
+ * read. Existing exposure is carried; new non-core exposure on a breached axis
+ * is refused while `blocksNewNonCoreWhenBreached` holds. Turning `enabled` off
+ * restores the older, blunter reading in which any breach refuses — including
+ * one the book arrived with. (#109)
+ */
+export function concentration({ positions = [], proposed = [], caps = {}, config = {} }) {
   const diagnostics = []
-  const rows = [...positions, ...proposed]
-  const totals = { position: new Map(), sector: new Map(), theme: new Map(), factor: new Map() }
-  for (const row of rows) {
-    if (!finite(row?.weight) || row.weight < 0) {
-      diagnostics.push(diagnostic('weight_invalid', 'blocked', 'All weights must be non-negative', 'positions'))
-      continue
+  const grandfather = grandfatherPolicy(config)
+  const axes = () => ({ position: new Map(), sector: new Map(), theme: new Map(), factor: new Map() })
+  const held = axes()
+  const added = axes()
+  const addedNonCore = axes()
+  const accumulate = (rows, path, ...into) => {
+    for (const row of rows) {
+      if (!finite(row?.weight) || row.weight < 0) {
+        diagnostics.push(diagnostic('weight_invalid', 'blocked', 'All weights must be non-negative', path))
+        continue
+      }
+      const targets = row?.core ? into.slice(0, 1) : into
+      for (const totals of targets) {
+        totals.position.set(row.symbol, (totals.position.get(row.symbol) ?? 0) + row.weight)
+        if (row.sector) totals.sector.set(row.sector, (totals.sector.get(row.sector) ?? 0) + row.weight)
+        for (const theme of row.themes ?? []) totals.theme.set(theme, (totals.theme.get(theme) ?? 0) + row.weight)
+        /**
+         * A factor is a shared loss path that cuts across sectors — the AI-capex
+         * complex the harness capped separately because a sector cap never sees it.
+         * `allocate` and `thesis-challenge` both name this axis; without it the
+         * question "does an existing holding create the same loss path?" has no
+         * measured answer.
+         */
+        for (const factor of row.factors ?? []) totals.factor.set(factor, (totals.factor.get(factor) ?? 0) + row.weight)
+      }
     }
-    totals.position.set(row.symbol, (totals.position.get(row.symbol) ?? 0) + row.weight)
-    if (row.sector) totals.sector.set(row.sector, (totals.sector.get(row.sector) ?? 0) + row.weight)
-    for (const theme of row.themes ?? []) totals.theme.set(theme, (totals.theme.get(theme) ?? 0) + row.weight)
-    /**
-     * A factor is a shared loss path that cuts across sectors — the AI-capex
-     * complex the harness capped separately because a sector cap never sees it.
-     * `allocate` and `thesis-challenge` both name this axis; without it the
-     * question "does an existing holding create the same loss path?" has no
-     * measured answer.
-     */
-    for (const factor of row.factors ?? []) totals.factor.set(factor, (totals.factor.get(factor) ?? 0) + row.weight)
   }
+  accumulate(positions, 'positions', held)
+  accumulate(proposed, 'proposed', added, addedNonCore)
+  const totals = axes()
+  for (const kind of Object.keys(totals)) {
+    for (const [key, weight] of held[kind]) totals[kind].set(key, weight)
+    for (const [key, weight] of added[kind]) totals[kind].set(key, (totals[kind].get(key) ?? 0) + weight)
+  }
+
   const breaches = []
   for (const [kind, map] of Object.entries(totals)) {
     const cap = caps[kind]
@@ -209,12 +244,43 @@ export function concentration({ positions = [], proposed = [], caps = {} }) {
       continue
     }
     for (const [key, weight] of map.entries()) {
-      if (weight > cap) breaches.push({ kind, key, weight: round(weight), cap })
+      if (weight <= cap) continue
+      const heldWeight = held[kind].get(key) ?? 0
+      const grandfathered = grandfather.enabled && heldWeight > cap
+      breaches.push({
+        kind,
+        key,
+        weight: round(weight),
+        heldWeight: round(heldWeight),
+        addedWeight: round(weight - heldWeight),
+        addedNonCoreWeight: round(addedNonCore[kind].get(key) ?? 0),
+        cap,
+        grandfathered,
+      })
     }
   }
-  if (breaches.length) diagnostics.push(diagnostic('concentration_breach', 'blocked', 'Proposed portfolio breaches concentration', 'proposed', { breaches }))
-  const heat = portfolioHeat({ positions, proposed, cap: caps.portfolioHeat, diagnostics })
-  return { data: { breaches, heat, exposures: Object.fromEntries(Object.entries(totals).map(([kind, map]) => [kind, Object.fromEntries([...map].map(([key, weight]) => [key, round(weight)]))])) }, diagnostics }
+  const created = breaches.filter((row) => !row.grandfathered)
+  const expanded = breaches.filter((row) => row.grandfathered && row.addedNonCoreWeight > 0)
+  const carried = breaches.filter((row) => row.grandfathered && row.addedNonCoreWeight <= 0)
+  if (created.length) diagnostics.push(diagnostic('concentration_breach', 'blocked', 'Proposed portfolio breaches concentration', 'proposed', { breaches: created }))
+  if (expanded.length && grandfather.blocksNewNonCoreWhenBreached) {
+    diagnostics.push(diagnostic('concentration_breach_expanded', 'blocked', 'An axis the book already carries above its cap is being added to; existing exposure is tolerated and new exposure is not', 'proposed', { breaches: expanded }))
+  }
+  if (carried.length || (expanded.length && !grandfather.blocksNewNonCoreWhenBreached)) {
+    diagnostics.push(diagnostic('concentration_grandfathered', 'unevaluated', 'The book carries exposure above a cap; forcing an immediate sale is a trade the cap never asked for, and a trim or exit of it is never blocked', 'positions', { breaches: [...carried, ...(grandfather.blocksNewNonCoreWhenBreached ? [] : expanded)] }))
+  }
+  const heat = portfolioHeat({ positions, proposed, cap: caps.portfolioHeat, grandfather, diagnostics })
+  return {
+    data: {
+      breaches,
+      grandfatheredBreaches: breaches.filter((row) => row.grandfathered),
+      blocksNewNonCore: grandfather.blocksNewNonCoreWhenBreached && breaches.some((row) => row.grandfathered),
+      riskReducingAllowed: true,
+      heat,
+      exposures: Object.fromEntries(Object.entries(totals).map(([kind, map]) => [kind, Object.fromEntries([...map].map(([key, weight]) => [key, round(weight)]))])),
+    },
+    diagnostics,
+  }
 }
 
 export function specialistBudget({ managerId = MANAGER_ID, flow, market, currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight, emergencyExit = false }) {

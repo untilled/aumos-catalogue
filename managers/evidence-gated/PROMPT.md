@@ -63,6 +63,11 @@ planning and never stops reporting, and that is unchanged — but a flow dispatc
 run spends a whole subagent producing targets this run must discard. Report what is broken, name
 it in `uncertainty`, propose `WAIT`, and dispatch nothing.
 
+⚠️ **A `warn` is not a blocker, and a blocked run may still propose a reduction.** Positions no
+decision explains are warnings (§1b) and dispatch proceeds. And when something *is* blocked, the
+`exitCheck` candidates this run already computed may still be proposed as SELL or TRIM without
+dispatching anything: the flows exist to find new exposure, and reducing risk needs none of them.
+
 ⚠️ **A wake with no flow can land mid-session, and a scheduled one cannot.** That is the whole
 reason the reviews are armed at close plus buffer: by the time one fires, the bar it judges has
 closed. A manual run or an event review arrives whenever it arrives, so before dispatching a
@@ -146,7 +151,7 @@ something a run would otherwise discover *after* proposing.
 | # | check | what stops the run |
 |---|---|---|
 | 1 | `lessonAudit` | nothing — but proposing a change already waiting for the investor is repeating yourself |
-| 2 | `harnessAudit` | **a blocker stops planning.** Orphaned WATCHes, positions no decision accounts for, size disagreements, order-ready decisions with no registered exit |
+| 2 | `harnessAudit` | **a blocker stops planning.** Orphaned WATCHes, size disagreements, order-ready decisions with no registered exit. A held position no decision explains is a **`warn`**, not a blocker |
 | 3 | `calibration` | low maturity does not stop the run; it frames what it may claim, and caps size at `experimentalPositionCeiling` |
 | 4 | `exitCheck` over every non-core holding | nothing — but **its SELL and TRIM candidates are reported before any new buy is considered.** Selling what is broken comes before buying what is interesting, and a run that plans purchases first will find reasons not to revisit that order |
 | 5 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
@@ -156,6 +161,30 @@ something a run would otherwise discover *after* proposing.
 ⛔ **A `harnessAudit` blocker stops planning, never reporting.** Say what is broken, name it in
 `uncertainty`, and propose `WAIT`. The failure this prevents is a well-formed proposal built on a
 book that does not add up — which is worse than no proposal, because it looks like one.
+
+⚠️ **Pass `managedSince: mandate.effectiveFrom` and `config` to `harnessAudit`.** Without the first
+the run cannot tell a position it **inherited** from one bought since, and without the second
+`config.grandfather` governs nothing. Both values are already in this invocation — the mapping is
+the same shape as the close buffers `nextReviewSequence` takes:
+
+| operation input | what the invocation calls it |
+|---|---|
+| `managedSince` | `mandate.effectiveFrom` |
+| `config.grandfather` | the investor's `grandfather` configuration |
+
+⚠️ **A held position no decision explains is normal, and a run that treats it as a failure will
+never do anything.** This manager does not own the book: Aumos keeps the broker link, every order
+is approved by a person, and the investor trades outside this manager whenever they like. So on
+the first run after a broker is connected, *every* holding is unexplained by definition. It is a
+`warn`. What follows from it is narrow and it is the whole point:
+
+- **Carry it.** Holding what you inherited is not a decision this run has to justify.
+- **Reduce it.** SELL, TRIM and exit stay available — including of a position over a mandate or
+  concentration cap. ⛔ **A blocked pre-flight never blocks the direction that reduces risk.** A
+  gate that refuses the safe direction is not a safeguard; it is paralysis with a reason attached.
+- **Do not expand it.** While `harnessAudit` reports `blocksNewNonCore`, new non-core exposure
+  waits until the holding has a thesis, a stop and a decision that explains it. Registering those
+  one at a time, on the runs that had capacity anyway, is how the pile comes down.
 
 ### 2. Select the lane and collect evidence
 

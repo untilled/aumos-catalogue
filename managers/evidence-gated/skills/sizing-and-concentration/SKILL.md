@@ -18,13 +18,20 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    configured comes back unevaluated, never as a pass.
 3. Apply the stricter of Mandate and configured concentration thresholds. If classification is
    uncertain, use the more conservative applicable bucket and disclose it.
+3a. Separate the breach the book **arrived with** from the breach this run would create, and pass
+   `config` so `grandfather` is read. Existing exposure above a cap is carried: forcing an immediate
+   sale to satisfy a cap that was raised, or a position that grew into one, is a trade the cap never
+   asked for, and the breach resolves through trims and growth in the rest of the book. What is
+   refused is the **addition** — `blocksNewNonCoreWhenBreached`. ⛔ Never refuse the reduction. A
+   TRIM or exit of a position over its cap moves the book toward the cap, and blocking it was the
+   inversion #109 recorded: the audit's answer to an over-cap position was *do not plan*.
 3b. Apply portfolio heat — total loss if every stop fired at once, capped at
    `concentration.portfolioHeat`. Weight caps do not measure it: two books with identical weights
    have different heat when their stops sit in different places. Declare `stopLossPct` and `core` on
    each row; core DCA and parked liquidity carry no stop and are excluded, and a non-core row with no
    declared stop is unevaluated rather than zero risk. Over the cap, a run that adds new non-core risk
-   is blocked while a book already over on its holdings alone warns — the same grandfathering the
-   weight caps use.
+   is blocked while a book already over on its holdings alone warns — the same `config.grandfather`
+   reading the weight caps use, from the same place.
 4. Apply evidence maturity. `insufficient` and `observing` lenses are capped at
    `experimentalPositionCeiling`; `reviewable` is still not promoted and cannot expand solely because
    its sample threshold was reached.

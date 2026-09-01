@@ -89,3 +89,30 @@ export function requireNumber(value, path, diagnostics, { minimum, maximum } = {
   }
   return value
 }
+
+/**
+ * Grandfathering, read from configuration rather than hardcoded twice.
+ *
+ * `config.grandfather` was declared in `config.schema.json`, shown to the
+ * investor, recorded as ported in `MIGRATION.md` — and read by nothing. Two
+ * places carried their own copy of the idea instead: `portfolioHeat` warned on
+ * a book already over its cap, and `harnessAudit` did the opposite and turned
+ * an inherited position into a blocker.
+ *
+ * The concept is one sentence and it belongs in one place: **existing exposure
+ * is carried and new exposure is not.** `concentration` reads it for the weight
+ * caps and `harnessAudit` reads it for positions no decision explains, so an
+ * investor who turns it off turns off both.
+ */
+export const GRANDFATHER_DEFAULTS = { enabled: true, blocksNewNonCoreWhenBreached: true }
+
+export function grandfatherPolicy(config = {}) {
+  const declared = config?.grandfather ?? {}
+  return {
+    enabled: typeof declared.enabled === 'boolean' ? declared.enabled : GRANDFATHER_DEFAULTS.enabled,
+    blocksNewNonCoreWhenBreached:
+      typeof declared.blocksNewNonCoreWhenBreached === 'boolean'
+        ? declared.blocksNewNonCoreWhenBreached
+        : GRANDFATHER_DEFAULTS.blocksNewNonCoreWhenBreached,
+  }
+}
