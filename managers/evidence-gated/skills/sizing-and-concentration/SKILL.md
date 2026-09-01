@@ -18,8 +18,12 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    configured comes back unevaluated, never as a pass.
 3. Apply the stricter of Mandate and configured concentration thresholds. If classification is
    uncertain, use the more conservative applicable bucket and disclose it.
-3a. Separate the breach the book **arrived with** from the breach this run would create, and pass
-   `config` so `grandfather` is read. Existing exposure above a cap is carried: forcing an immediate
+3a. Pass current holdings as `positions` and this run's targets as `proposed`. ⚠️ **`proposed` is
+   the target state for the symbols it names, not an increment**: a row for a symbol already held
+   *replaces* that holding, and a symbol nobody names keeps the weight it has. That is how a TRIM
+   or RESIZE is expressed — `{ held 0.25 } → { proposed 0.15 }` is a reduction, and summing the two
+   into 0.40 would refuse it as though it were a purchase. Separate the breach the book **arrived
+   with** from the breach this run would create, and pass `config` so `grandfather` is read. Existing exposure above a cap is carried: forcing an immediate
    sale to satisfy a cap that was raised, or a position that grew into one, is a trade the cap never
    asked for, and the breach resolves through trims and growth in the rest of the book. What is
    refused is the **addition** — `blocksNewNonCoreWhenBreached`. ⛔ Never refuse the reduction. A

@@ -115,11 +115,20 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
     const symbol = position?.symbol ?? null
     const decision = accountedFor.get(position?.symbol)
     if (!decision) {
+      /**
+       * ⚠️ Two different questions, and they were one line until the review of
+       * #109 pulled them apart. `inherited` is a **fact** about when the
+       * position arrived; `carried` is a **policy** about what to do with it.
+       * Deciding the message from the policy made the record say "acquired
+       * under this manager" about a position whose acquisition date nobody
+       * knows, purely because the investor had switched the tolerance off.
+       * Turning grandfathering off is not learning when something was bought.
+       */
       const acquired = Date.parse(position?.acquiredAt)
-      const acquiredUnderManagement = managedFrom && Number.isFinite(acquired) ? acquired > Date.parse(managedFrom) : false
-      const inherited = grandfather.enabled && !acquiredUnderManagement
+      const inherited = managedFrom && Number.isFinite(acquired) ? acquired <= Date.parse(managedFrom) : true
+      const carried = grandfather.enabled && inherited
       unexplained.push(symbol)
-      if (inherited) grandfathered.push(symbol)
+      if (carried) grandfathered.push(symbol)
       add(
         'warn',
         'audit_position_untracked',
@@ -127,7 +136,7 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
         inherited
           ? 'The book holds something no decision explains and nothing says it was bought under this manager; carry it, reduce it or exit it, and do not expand it'
           : 'The book holds something no decision explains and it was acquired under this manager; the investor also trades this book directly, so this is a missing explanation rather than a size disagreement',
-        { grandfathered: inherited, managedSince: managedFrom, acquiredAt: position?.acquiredAt ?? null },
+        { inherited, grandfathered: carried, managedSince: managedFrom, acquiredAt: position?.acquiredAt ?? null },
       )
       continue
     }
@@ -141,11 +150,21 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
 
   const blockers = issues.filter((row) => row.severity === 'blocker')
   /**
-   * ⛔ New non-core exposure waits for the explanation; reducing risk never
-   * does. Blocking a trim of a position that is already over its cap is the
-   * inversion #109 recorded — a safety gate that refuses the safe direction.
+   * ⛔ New exposure **to these names** waits for the explanation; reducing risk
+   * never waits at all. Blocking a trim of a position already over its cap is
+   * the inversion #109 recorded — a safety gate that refuses the safe
+   * direction.
+   *
+   * ⚠️ The hold is per symbol, not per book, and the review of #109 is why.
+   * A book-wide freeze keyed off "any unexplained holding exists" would be a
+   * permanent freeze: this manager does not own the book, so the investor's
+   * own trades keep that set non-empty forever — the hard deadlock traded for
+   * a soft one. It also disagreed with its own message, which says *do not
+   * expand **it***. What keeps new risk off an unexamined book is the rest of
+   * the pre-flight: a new single still needs a thesis, evidence, a stop and
+   * headroom under a cap `concentration` grandfathers per axis.
    */
-  const blocksNewNonCore = grandfather.blocksNewNonCoreWhenBreached && unexplained.length > 0
+  const blocksExpansionOf = grandfather.blocksNewNonCoreWhenBreached ? unexplained : []
   return {
     data: {
       issues,
@@ -155,8 +174,8 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
       grandfathered,
       unexplained,
       managedSince: managedFrom,
-      blocksNewNonCore,
-      riskReducingAllowed: true,
+      blocksExpansionOf,
+      riskReducingAlwaysAllowed: true,
       meaning: 'a blocker stops planning, never reporting — say what is broken and WAIT; a warn is carried, and reducing risk is never blocked',
     },
     diagnostics,

@@ -1231,6 +1231,9 @@ assert.ok(
     .diagnostics.some((row) => row.code === 'portfolio_heat_stop_missing'),
   'a non-core row with no declared stop is unevaluated, never zero risk',
 )
+const heatTrim = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, proposed: [{ symbol: 'AAA', weight: 0.05, stopLossPct: 0.2 }], caps: heatCaps } })
+assert.equal(heatTrim.data.heat.withProposed, 0.04, 'heat reads a proposed row for a held symbol as that holding restated, so a trim lowers measured heat')
+assert.notEqual(heatTrim.status, 'blocked', 'and reducing heat on a book already over the cap is never the thing refused')
 
 /**
  * ── `config.grandfather`, read (issue #109) ────────────────────────────────
@@ -1251,10 +1254,37 @@ const carriedBreach = execute({ operation: 'concentration', asOf: methodology.as
 assert.deepEqual(carriedBreach.data.breaches.map((row) => [row.kind, row.grandfathered]), [['sector', true]], 'a sector the holdings alone are over is a breach the book carries')
 assert.notEqual(carriedBreach.status, 'blocked', 'and carrying it does not refuse the run — the reduction that fixes it is planned by a run that is allowed to plan')
 assert.ok(carriedBreach.diagnostics.some((row) => row.code === 'concentration_grandfathered' && row.severity === 'unevaluated'))
-assert.equal(carriedBreach.data.riskReducingAllowed, true)
+assert.equal(carriedBreach.data.riskReducingAlwaysAllowed, true)
+/**
+ * The shape a reduction actually has: a `proposed` row for a symbol the book
+ * already holds. Every case here used a symbol that was not held until the
+ * review of #109 pointed out that this is precisely the input the fix claims
+ * to have unblocked, and precisely the one nothing exercised.
+ */
+const trimmingTheBreach = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: { positions: overCap, proposed: [{ symbol: 'AAA', weight: 0.02, sector: 'semiconductors' }], caps },
+})
+assert.equal(trimmingTheBreach.data.exposures.sector.semiconductors, 0.16, 'a proposed row for a held symbol restates that holding; it does not stack on top of it')
+assert.notEqual(trimmingTheBreach.status, 'blocked', 'and the trim that resolves the breach is the one thing this gate must never refuse')
+assert.deepEqual(trimmingTheBreach.data.breaches, [], 'a trim that lands under the cap leaves no breach to carry')
+const stillOverAfterTrim = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: { positions: overCap, proposed: [{ symbol: 'AAA', weight: 0.02, sector: 'semiconductors' }], caps: { ...caps, sector: 0.15 } },
+})
+assert.equal(stillOverAfterTrim.data.breaches[0].addedNonCoreWeight, -0.07, 'the direction is measured, not assumed')
+assert.notEqual(stillOverAfterTrim.status, 'blocked', 'a trim that does not fully resolve the breach is still a trim')
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: overCap, proposed: [{ symbol: 'AAA', weight: 0.1, sector: 'semiconductors' }], caps } }).status,
+  'blocked',
+  'and a RESIZE **up** on the same axis is refused, so restating a holding is not a way around the cap',
+)
 const addingToBreach = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: overCap, proposed: [{ symbol: 'MORE', weight: 0.03, sector: 'semiconductors' }], caps } })
 assert.equal(addingToBreach.status, 'blocked', 'existing exposure above a cap is tolerated and new exposure is not')
 assert.ok(addingToBreach.diagnostics.some((row) => row.code === 'concentration_breach_expanded'))
+assert.deepEqual(carriedBreach.data.blocksExpansionOf, [{ kind: 'sector', key: 'semiconductors' }], 'and what is held back is named per axis, not as a freeze on the book')
 assert.equal(
   execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: overCap, proposed: [{ symbol: 'MORE', weight: 0.03, sector: 'semiconductors' }], caps, config: { grandfather: { blocksNewNonCoreWhenBreached: false } } } }).status,
   'unevaluated',
@@ -2127,8 +2157,12 @@ const inherited = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: c
 assert.equal(inherited.data.clearToPlan, true, 'a book bought before the manager existed is the initial condition of every install, not a consistency failure')
 assert.deepEqual(inherited.data.grandfathered, ['OLD'], 'what predates the mandate is carried')
 assert.deepEqual(inherited.data.unexplained, ['OLD', 'NEW'], 'and both kinds are still reported — the finding survives, the paralysis does not')
-assert.equal(inherited.data.blocksNewNonCore, true, 'carrying is not licence to expand: new non-core exposure waits for the explanation')
-assert.equal(inherited.data.riskReducingAllowed, true, 'and the direction that reduces risk is never the one a safety gate refuses')
+assert.deepEqual(inherited.data.blocksExpansionOf, ['OLD', 'NEW'], 'carrying is not licence to expand: adding to an unexplained holding waits for the explanation')
+assert.equal(inherited.data.riskReducingAlwaysAllowed, true, 'and the direction that reduces risk is never the one a safety gate refuses')
+assert.ok(
+  inherited.data.issues.every((row) => row.subject === null || inherited.data.blocksExpansionOf.includes(row.subject)),
+  'the hold names the symbols it holds back — a book-wide freeze keyed off a permanently non-empty set is the soft version of the deadlock this issue is about',
+)
 assert.ok(
   inherited.data.issues.every((row) => row.code !== 'audit_position_untracked' || row.severity === 'warn'),
   'the finding is a warn: what is missing is the explanation, not the denominator — `portfolio_read` supplies that from the broker',
@@ -2149,11 +2183,15 @@ assert.ok(
   'the check beside it is untouched: a recorded size that disagrees with the book is still a blocker',
 )
 const disabledGrandfather = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...coldStart, config: { grandfather: { enabled: false } } } })
-assert.deepEqual(disabledGrandfather.data.grandfathered, [], 'the investor can turn the tolerance off, and then nothing is labelled as inherited')
-assert.equal(disabledGrandfather.data.blocksNewNonCore, true, 'turning it off never loosens the run: an unexplained holding still holds back new non-core exposure')
-assert.equal(
-  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...coldStart, config: { grandfather: { blocksNewNonCoreWhenBreached: false } } } }).data.blocksNewNonCore,
-  false,
+assert.deepEqual(disabledGrandfather.data.grandfathered, [], 'the investor can turn the tolerance off, and then nothing is carried as inherited')
+assert.deepEqual(disabledGrandfather.data.blocksExpansionOf, ['OLD', 'NEW'], 'turning it off never loosens the run: an unexplained holding is still not expanded')
+assert.ok(
+  disabledGrandfather.data.issues.find((row) => row.subject === 'OLD').inherited,
+  'and the record still says when the position arrived: that is a fact about the book, not a consequence of a setting the investor changed',
+)
+assert.deepEqual(
+  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...coldStart, config: { grandfather: { blocksNewNonCoreWhenBreached: false } } } }).data.blocksExpansionOf,
+  [],
   'the key that governs new exposure is the one the schema says governs it',
 )
 

@@ -182,9 +182,13 @@ the first run after a broker is connected, *every* holding is unexplained by def
 - **Reduce it.** SELL, TRIM and exit stay available — including of a position over a mandate or
   concentration cap. ⛔ **A blocked pre-flight never blocks the direction that reduces risk.** A
   gate that refuses the safe direction is not a safeguard; it is paralysis with a reason attached.
-- **Do not expand it.** While `harnessAudit` reports `blocksNewNonCore`, new non-core exposure
-  waits until the holding has a thesis, a stop and a decision that explains it. Registering those
-  one at a time, on the runs that had capacity anyway, is how the pile comes down.
+- **Do not expand it.** `harnessAudit` names those holdings in `blocksExpansionOf`: adding to one
+  waits until it has a thesis, a stop and a decision that explains it. Registering those one at a
+  time, on the runs that had capacity anyway, is how the pile comes down. ⚠️ It is a hold on
+  **those names**, not a freeze on the book — the investor keeps trading outside this manager, so
+  that list is never permanently empty and a book-wide freeze keyed off it would never lift. New
+  risk elsewhere is held back by the gates that already do it: a thesis, evidence, a registered
+  exit, and headroom under a cap `concentration` grandfathers per axis.
 
 ### 2. Select the lane and collect evidence
 
