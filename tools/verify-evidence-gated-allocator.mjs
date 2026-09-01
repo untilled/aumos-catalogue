@@ -1231,6 +1231,113 @@ assert.ok(
     .diagnostics.some((row) => row.code === 'portfolio_heat_stop_missing'),
   'a non-core row with no declared stop is unevaluated, never zero risk',
 )
+const heatTrim = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, proposed: [{ symbol: 'AAA', weight: 0.05, stopLossPct: 0.2 }], caps: heatCaps } })
+assert.equal(heatTrim.data.heat.withProposed, 0.04, 'heat reads a proposed row for a held symbol as that holding restated, so a trim lowers measured heat')
+assert.notEqual(heatTrim.status, 'blocked', 'and reducing heat on a book already over the cap is never the thing refused')
+
+/**
+ * ── `config.grandfather`, read (issue #109) ────────────────────────────────
+ *
+ * The key was declared in the schema, shown on the install screen and recorded
+ * as ported in `MIGRATION.md`, and nothing read it. The reading it asks for is
+ * the one that was missing everywhere: a cap breach the book arrived with is
+ * carried, and only what this run adds is refused — including, until now, the
+ * **trim** that would have resolved the breach being complained about.
+ */
+covers('sizing/grandfathered-caps')
+const overCap = [
+  { symbol: 'AAA', weight: 0.09, sector: 'semiconductors' },
+  { symbol: 'BBB', weight: 0.09, sector: 'semiconductors' },
+  { symbol: 'CCC', weight: 0.05, sector: 'semiconductors' },
+]
+const carriedBreach = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: overCap, caps } })
+assert.deepEqual(carriedBreach.data.breaches.map((row) => [row.kind, row.grandfathered]), [['sector', true]], 'a sector the holdings alone are over is a breach the book carries')
+assert.notEqual(carriedBreach.status, 'blocked', 'and carrying it does not refuse the run — the reduction that fixes it is planned by a run that is allowed to plan')
+assert.ok(carriedBreach.diagnostics.some((row) => row.code === 'concentration_grandfathered' && row.severity === 'unevaluated'))
+assert.equal(carriedBreach.data.riskReducingAlwaysAllowed, true)
+/**
+ * The shape a reduction actually has: a `proposed` row for a symbol the book
+ * already holds. Every case here used a symbol that was not held until the
+ * review of #109 pointed out that this is precisely the input the fix claims
+ * to have unblocked, and precisely the one nothing exercised.
+ */
+const trimmingTheBreach = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: { positions: overCap, proposed: [{ symbol: 'AAA', weight: 0.02, sector: 'semiconductors' }], caps },
+})
+assert.equal(trimmingTheBreach.data.exposures.sector.semiconductors, 0.16, 'a proposed row for a held symbol restates that holding; it does not stack on top of it')
+assert.notEqual(trimmingTheBreach.status, 'blocked', 'and the trim that resolves the breach is the one thing this gate must never refuse')
+assert.deepEqual(trimmingTheBreach.data.breaches, [], 'a trim that lands under the cap leaves no breach to carry')
+const stillOverAfterTrim = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: { positions: overCap, proposed: [{ symbol: 'AAA', weight: 0.02, sector: 'semiconductors' }], caps: { ...caps, sector: 0.15 } },
+})
+assert.equal(stillOverAfterTrim.data.breaches[0].addedNonCoreWeight, -0.07, 'the direction is measured, not assumed')
+assert.notEqual(stillOverAfterTrim.status, 'blocked', 'a trim that does not fully resolve the breach is still a trim')
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: overCap, proposed: [{ symbol: 'AAA', weight: 0.1, sector: 'semiconductors' }], caps } }).status,
+  'blocked',
+  'and a RESIZE **up** on the same axis is refused, so restating a holding is not a way around the cap',
+)
+const addingToBreach = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: overCap, proposed: [{ symbol: 'MORE', weight: 0.03, sector: 'semiconductors' }], caps } })
+assert.equal(addingToBreach.status, 'blocked', 'existing exposure above a cap is tolerated and new exposure is not')
+assert.ok(addingToBreach.diagnostics.some((row) => row.code === 'concentration_breach_expanded'))
+assert.deepEqual(carriedBreach.data.blocksExpansionOf, [{ kind: 'sector', key: 'semiconductors' }], 'and what is held back is named per axis, not as a freeze on the book')
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: overCap, proposed: [{ symbol: 'MORE', weight: 0.03, sector: 'semiconductors' }], caps, config: { grandfather: { blocksNewNonCoreWhenBreached: false } } } }).status,
+  'unevaluated',
+  'and the investor can say otherwise through the key the schema publishes for it',
+)
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: overCap, caps, config: { grandfather: { enabled: false } } } }).status,
+  'blocked',
+  'turning the tolerance off restores the blunt reading in which any breach refuses',
+)
+
+/**
+ * ── `enabled: false` still may not refuse the reduction (review of #110) ───
+ *
+ * Turning the tolerance off is a request not to **tolerate** a breach. It was
+ * being read as a request to refuse the **trim that resolves** one: with the
+ * tolerance off nothing was grandfathered, so every breach fell through to
+ * `concentration_breach` — including a reduction of an axis the book was
+ * already over, in a response carrying `riskReducingAlwaysAllowed: true`. That
+ * is the inversion #109 is named after, reached through the config instead of
+ * through the input contract.
+ *
+ * The direction is now read before the tolerance, and the two cases below are
+ * the pair that pins it: a reduction passes, and standing still does not.
+ */
+const bluntTrim = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: { positions: overCap, proposed: [{ symbol: 'AAA', weight: 0.07, sector: 'semiconductors' }], caps, config: { grandfather: { enabled: false } } },
+})
+assert.equal(bluntTrim.data.breaches[0].grandfathered, false, 'with the tolerance off nothing is carried as grandfathered')
+assert.equal(bluntTrim.data.breaches[0].addedNonCoreWeight, -0.02, 'and the axis is still over the cap after the trim')
+assert.notEqual(bluntTrim.status, 'blocked', 'but a reduction is never what a safety gate refuses, whatever the tolerance says')
+assert.ok(bluntTrim.diagnostics.some((row) => row.code === 'concentration_grandfathered'))
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: overCap, proposed: [{ symbol: 'MORE', weight: 0.03, sector: 'semiconductors' }], caps, config: { grandfather: { enabled: false } } } }).status,
+  'blocked',
+  'and an addition to that same axis still refuses: inaction and expansion are not reductions',
+)
+
+const bluntHeatTrim = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: { positions: hotPositions, proposed: [{ symbol: 'AAA', weight: 0.175, stopLossPct: 0.2 }], caps: { ...heatCaps, position: 0.5 }, config: { grandfather: { enabled: false } } },
+})
+assert.equal(bluntHeatTrim.data.heat.withProposed, 0.065, 'the trim lowers measured heat and leaves it above the cap')
+assert.equal(bluntHeatTrim.data.heat.holdingsOnly, 0.07)
+assert.notEqual(bluntHeatTrim.status, 'blocked', 'heat reads the direction the same way the weight caps do')
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, caps: { ...heatCaps, position: 0.5 }, config: { grandfather: { enabled: false } } } }).status,
+  'blocked',
+  'and a book left standing above the heat cap with the tolerance off still refuses',
+)
 
 /**
  * Pacing warns and never blocks. (approved 2026-07-10, P5)
@@ -2056,11 +2163,9 @@ assert.ok(
     .data.issues.some((row) => row.code === 'audit_position_mismatch'),
   'a size disagreement makes the denominator every weight uses wrong',
 )
-assert.ok(
-  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, decisions: [] } })
-    .data.issues.some((row) => row.code === 'audit_position_untracked'),
-  'a held position no decision accounts for is a blocker, not a rounding difference',
-)
+const untracked = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, decisions: [] } })
+assert.ok(untracked.data.issues.some((row) => row.code === 'audit_position_untracked'), 'a held position no decision explains is still reported')
+assert.equal(untracked.data.clearToPlan, true, 'and it does not stop planning: a book connected to a broker satisfies this by definition on day one')
 assert.ok(
   execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, decisions: [{ asset: 'AAA', quantity: 10, orderReady: true }] } })
     .data.issues.some((row) => row.code === 'audit_unregistered_ready'),
@@ -2069,6 +2174,69 @@ assert.ok(
 const staleGate = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, watches: [{ subject: 'AAA', registeredAt: '2026-06-01T00:00:00Z' }] } })
 assert.ok(staleGate.data.issues.some((row) => row.code === 'audit_watch_stale' && row.severity === 'warn'), 'a month-old WATCH that never fired and cannot expire has stopped being a promise')
 assert.equal(staleGate.data.clearToPlan, true, 'a stale gate is a warning; it does not stop planning')
+
+/**
+ * ── The book the manager inherited (issue #109) ────────────────────────────
+ *
+ * `audit_position_untracked` was a blocker, and every book that connects a
+ * broker satisfies it by definition: nothing bought before this manager
+ * existed can have a decision explaining it. The observed book had nine of ten
+ * holdings blocked this way, on every run it ever made, and #96 had wired a
+ * blocker to dispatch — so the manager had never evaluated a candidate at all.
+ *
+ * The distinction the check could not draw is the one the invocation was
+ * already carrying: `mandate.effectiveFrom`, dropped on the floor by a
+ * signature that never took it.
+ */
+covers('audit/inherited-positions-carried')
+const coldStart = {
+  positions: [{ symbol: 'OLD', quantity: 10, acquiredAt: '2026-01-05T00:00:00Z' }, { symbol: 'NEW', quantity: 5, acquiredAt: '2026-08-18T00:00:00Z' }],
+  decisions: [],
+  theses: [],
+  watches: [],
+  managedSince: '2026-06-01T00:00:00Z',
+}
+const inherited = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: coldStart })
+assert.equal(inherited.data.clearToPlan, true, 'a book bought before the manager existed is the initial condition of every install, not a consistency failure')
+assert.deepEqual(inherited.data.grandfathered, ['OLD'], 'what predates the mandate is carried')
+assert.deepEqual(inherited.data.unexplained, ['OLD', 'NEW'], 'and both kinds are still reported — the finding survives, the paralysis does not')
+assert.deepEqual(inherited.data.blocksExpansionOf, ['OLD', 'NEW'], 'carrying is not licence to expand: adding to an unexplained holding waits for the explanation')
+assert.equal(inherited.data.riskReducingAlwaysAllowed, true, 'and the direction that reduces risk is never the one a safety gate refuses')
+assert.ok(
+  inherited.data.issues.every((row) => row.subject === null || inherited.data.blocksExpansionOf.includes(row.subject)),
+  'the hold names the symbols it holds back — a book-wide freeze keyed off a permanently non-empty set is the soft version of the deadlock this issue is about',
+)
+assert.ok(
+  inherited.data.issues.every((row) => row.code !== 'audit_position_untracked' || row.severity === 'warn'),
+  'the finding is a warn: what is missing is the explanation, not the denominator — `portfolio_read` supplies that from the broker',
+)
+assert.ok(
+  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...coldStart, managedSince: null } })
+    .diagnostics.some((row) => row.code === 'audit_managed_since_missing'),
+  'without the mandate date the two states cannot be told apart, and the run is told so rather than guessing',
+)
+assert.deepEqual(
+  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...coldStart, managedSince: null } }).data.grandfathered,
+  ['OLD', 'NEW'],
+  'and the safe direction is to carry both: Aumos exposes no acquisition date, so an unknown one is not expanded',
+)
+assert.ok(
+  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, decisions: [{ asset: 'AAA', quantity: 4, orderReady: true, exitRegistered: true }] } })
+    .data.clearToPlan === false,
+  'the check beside it is untouched: a recorded size that disagrees with the book is still a blocker',
+)
+const disabledGrandfather = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...coldStart, config: { grandfather: { enabled: false } } } })
+assert.deepEqual(disabledGrandfather.data.grandfathered, [], 'the investor can turn the tolerance off, and then nothing is carried as inherited')
+assert.deepEqual(disabledGrandfather.data.blocksExpansionOf, ['OLD', 'NEW'], 'turning it off never loosens the run: an unexplained holding is still not expanded')
+assert.ok(
+  disabledGrandfather.data.issues.find((row) => row.subject === 'OLD').inherited,
+  'and the record still says when the position arrived: that is a fact about the book, not a consequence of a setting the investor changed',
+)
+assert.deepEqual(
+  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...coldStart, config: { grandfather: { blocksNewNonCoreWhenBreached: false } } } }).data.blocksExpansionOf,
+  [],
+  'the key that governs new exposure is the one the schema says governs it',
+)
 
 covers('learning/lesson-audit')
 const lessons = execute({
@@ -2351,8 +2519,53 @@ for (const key of ['watchExpiryDays', 'priceConflictTolerance', 'experimentalPos
   )
 }
 
+/**
+ * ── A declared key nothing reads (issue #109) ──────────────────────────────
+ *
+ * Three times now the same hole: `flow` (#87), the close buffers (#91) and
+ * `grandfather` (#109) were each declared, documented, and read by no code —
+ * and the verifier was green through all three, because the check above asks
+ * whether a *documented* key is declared and never whether a *declared* key is
+ * read. A setting on the install screen that governs nothing is worse than a
+ * missing one: the investor set it and believes it took.
+ *
+ * The exemptions are the keys the **run** reads out of the invocation rather
+ * than any operation — each is named here with who reads it, and each is
+ * asserted absent from the library, so a key that is later wired up has to be
+ * taken off this list instead of quietly outliving its reason.
+ */
+covers('audit/declared-config-keys-are-read')
+const librarySource = (await Promise.all(
+  ['audit', 'backtest', 'calibration', 'coverage', 'diagnostics', 'envelopes', 'evidence', 'indicators', 'learning', 'methodology', 'outcomes', 'scanners', 'schedule', 'sizing', 'source-parsers']
+    .map((name) => readFile(new URL(`../lib/${name}.mjs`, fixtureRoot), 'utf8')),
+)).join('\n')
+const readByTheRunNotTheCode = {
+  reserveLiquiditySymbols: 'the US sleeve classifies the symbols; no operation takes a list of them',
+  'benchmarks.koreanEquity': 'the run reads the symbol and passes bars, not the ticker',
+  'benchmarks.usEquity': 'the run reads the symbol and passes bars, not the ticker',
+  'benchmarks.cashLike': 'the run reads the symbol and passes bars, not the ticker',
+  'freshnessHours.marketPrice': 'the run picks the lane limit and passes it to filterPointInTime as freshnessHours',
+  'freshnessHours.corporateAction': 'the run picks the lane limit and passes it to filterPointInTime as freshnessHours',
+}
+const declaredKeys = []
+const walkDeclared = (node, prefix = '') => {
+  for (const [name, property] of Object.entries(node.properties ?? {})) {
+    const path = prefix ? `${prefix}.${name}` : name
+    if (property.type === 'object') walkDeclared(property, path)
+    else declaredKeys.push({ name, path })
+  }
+}
+walkDeclared(configSchema)
+for (const { name, path } of declaredKeys) {
+  const read = new RegExp(`\\b${name}\\b`).test(librarySource)
+  const exempt = path in readByTheRunNotTheCode
+  assert.ok(read || exempt, `config.schema.json declares ${path} and no operation reads it — declaring a setting that governs nothing is how #87, #91 and #109 each arrived`)
+  assert.ok(!(read && exempt), `${path} is read by an operation now, so it does not belong on the run-reads-it list`)
+}
+assert.ok(/\bgrandfather\b/.test(librarySource), 'grandfather is the key this check was written for, and it is read')
+
 covers('policy/policy-lint-provenance')
-const policyBase = { concentration: { position: 0.1 }, minimumExpectedActiveReturn: 0.05 }
+const policyBase ={ concentration: { position: 0.1 }, minimumExpectedActiveReturn: 0.05 }
 const stricter = execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, concentration: { position: 0.08 } }, provenance: { 'concentration.position': { approvedBy: 'investor', approvedAt: '2026-08-01' } } } })
 assert.equal(stricter.data.changes[0].effect, 'stricter')
 assert.equal(stricter.status, 'ok', 'a tightening with attribution is accepted')

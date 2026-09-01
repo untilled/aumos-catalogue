@@ -1,4 +1,4 @@
-import { diagnostic, finite, round, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW } from './diagnostics.mjs'
+import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW } from './diagnostics.mjs'
 
 /**
  * Lane ownership is keyed by flow, not by manager id.
@@ -148,31 +148,59 @@ export function legacySizeSuggestion(input) {
  * gate exists to refuse.
  *
  * Above the cap, a run that also proposes new non-core risk is blocked; a book
- * that is already over on its holdings alone warns instead, on the same
- * grandfathering logic the concentration gates use.
+ * that is already over on its holdings alone warns instead. ⚠️ That rule used
+ * to be written here in literals, which is why `config.grandfather` could be
+ * declared and read by nothing — the concept had a second, private copy. It now
+ * comes from the same `grandfatherPolicy` the weight caps read, and `proposed`
+ * restates a holding here for the same reason it does there: a trim has to be
+ * able to lower measured heat, or the gate refuses the thing that fixes it.
+ * (#109)
+ *
+ * ⚠️ `enabled: false` is **stricter** than the literal it replaced, on purpose:
+ * a book over the cap on its holdings alone is then refused rather than warned.
+ * Turning the tolerance off is a request not to tolerate the breach, and a
+ * setting that changed only the wording would be another one that governs
+ * nothing.
  */
-function portfolioHeat({ positions, proposed, cap, diagnostics }) {
-  const contribution = (rows, label) => {
+function portfolioHeat({ positions, proposed, cap, grandfather, diagnostics }) {
+  const contribution = (rows, label, report = true) => {
     let total = 0
     for (const row of rows) {
       if (row?.core) continue
       if (!finite(row?.weight)) continue
       if (!finite(row?.stopLossPct)) {
-        diagnostics.push(diagnostic('portfolio_heat_stop_missing', 'unevaluated', 'A non-core row without a stop distance cannot contribute measured heat; it is not zero risk', `${label}.stopLossPct`, { symbol: row?.symbol ?? null }))
+        if (report) diagnostics.push(diagnostic('portfolio_heat_stop_missing', 'unevaluated', 'A non-core row without a stop distance cannot contribute measured heat; it is not zero risk', `${label}.stopLossPct`, { symbol: row?.symbol ?? null }))
         continue
       }
       total += row.weight * row.stopLossPct
     }
     return total
   }
+  const restated = new Set(proposed.map((row) => row?.symbol).filter((symbol) => symbol !== undefined && symbol !== null))
+  const heldWeight = new Map(positions.filter((row) => finite(row?.weight)).map((row) => [row.symbol, row.weight]))
   const held = contribution(positions, 'positions')
-  const withProposed = held + contribution(proposed, 'proposed')
+  const withProposed = contribution(positions.filter((row) => !restated.has(row?.symbol)), 'positions', false) + contribution(proposed, 'proposed')
   if (!finite(cap)) {
     diagnostics.push(diagnostic('portfolio_heat_cap_missing', 'unevaluated', 'Missing portfolio heat cap', 'caps.portfolioHeat'))
     return { holdingsOnly: round(held), withProposed: round(withProposed), cap: null, breached: null }
   }
-  const addsNonCoreRisk = proposed.some((row) => !row?.core && finite(row?.weight) && row.weight > 0)
-  if (withProposed > cap && addsNonCoreRisk) {
+  /**
+   * A row with no stop contributes no measured heat, so a purchase of one
+   * cannot be caught by comparing the two totals — it is caught by asking
+   * whether the run is raising that symbol's weight at all.
+   */
+  const addsNonCoreRisk =
+    withProposed > held ||
+    proposed.some((row) => !row?.core && finite(row?.weight) && !finite(row?.stopLossPct) && row.weight > (heldWeight.get(row?.symbol) ?? 0))
+  const carried = grandfather.enabled && held > cap
+  /**
+   * ⛔ The same ordering the weight caps use: a run that lowers measured heat
+   * and adds no risk is never the thing refused, whatever the tolerance says.
+   * `addsNonCoreRisk` still has to be false — trimming a stopped name while
+   * buying a stop-less one lowers *measured* heat and raises the real thing.
+   */
+  const reducesRisk = withProposed < held && !addsNonCoreRisk
+  if (withProposed > cap && !reducesRisk && (!carried || (addsNonCoreRisk && grandfather.blocksNewNonCoreWhenBreached))) {
     diagnostics.push(diagnostic('portfolio_heat_breach', 'blocked', 'Total loss if every stop fired is above the cap, and this run adds more of it', 'proposed', { withProposed: round(withProposed), cap }))
   } else if (held > cap) {
     diagnostics.push(diagnostic('portfolio_heat_above_cap', 'unevaluated', 'Held positions alone are above the heat cap; existing risk is grandfathered but new risk is not', 'positions', { holdingsOnly: round(held), cap }))
@@ -180,27 +208,67 @@ function portfolioHeat({ positions, proposed, cap, diagnostics }) {
   return { holdingsOnly: round(held), withProposed: round(withProposed), cap, breached: withProposed > cap }
 }
 
-export function concentration({ positions = [], proposed = [], caps = {} }) {
+/**
+ * The weight caps, and which side of them a proposal is moving.
+ *
+ * Exposure is accumulated twice — once from the holdings alone and once with
+ * what this run proposes — because a breach the book already carries and a
+ * breach this run creates are different findings and only one of them is a
+ * reason to refuse. A single total could not tell them apart, so every breach
+ * was blocked, including one that a **trim** would resolve: the run was told
+ * not to plan the reduction that fixes the thing being complained about.
+ *
+ * `config.grandfather` is the setting that says so, and this is where it is
+ * read. Existing exposure is carried; new non-core exposure on a breached axis
+ * is refused while `blocksNewNonCoreWhenBreached` holds. Turning `enabled` off
+ * restores the older, blunter reading in which any breach refuses — including
+ * one the book arrived with. (#109)
+ */
+export function concentration({ positions = [], proposed = [], caps = {}, config = {} }) {
   const diagnostics = []
-  const rows = [...positions, ...proposed]
-  const totals = { position: new Map(), sector: new Map(), theme: new Map(), factor: new Map() }
-  for (const row of rows) {
-    if (!finite(row?.weight) || row.weight < 0) {
-      diagnostics.push(diagnostic('weight_invalid', 'blocked', 'All weights must be non-negative', 'positions'))
-      continue
+  const grandfather = grandfatherPolicy(config)
+  const axes = () => ({ position: new Map(), sector: new Map(), theme: new Map(), factor: new Map() })
+  for (const [rows, path] of [[positions, 'positions'], [proposed, 'proposed']]) {
+    for (const row of rows) {
+      if (!finite(row?.weight) || row.weight < 0) diagnostics.push(diagnostic('weight_invalid', 'blocked', 'All weights must be non-negative', path))
     }
-    totals.position.set(row.symbol, (totals.position.get(row.symbol) ?? 0) + row.weight)
-    if (row.sector) totals.sector.set(row.sector, (totals.sector.get(row.sector) ?? 0) + row.weight)
-    for (const theme of row.themes ?? []) totals.theme.set(theme, (totals.theme.get(theme) ?? 0) + row.weight)
-    /**
-     * A factor is a shared loss path that cuts across sectors — the AI-capex
-     * complex the harness capped separately because a sector cap never sees it.
-     * `allocate` and `thesis-challenge` both name this axis; without it the
-     * question "does an existing holding create the same loss path?" has no
-     * measured answer.
-     */
-    for (const factor of row.factors ?? []) totals.factor.set(factor, (totals.factor.get(factor) ?? 0) + row.weight)
   }
+  const accumulate = (rows, { nonCoreOnly = false } = {}) => {
+    const totals = axes()
+    for (const row of rows) {
+      if (!finite(row?.weight) || row.weight < 0) continue
+      if (nonCoreOnly && row?.core) continue
+      totals.position.set(row.symbol, (totals.position.get(row.symbol) ?? 0) + row.weight)
+      if (row.sector) totals.sector.set(row.sector, (totals.sector.get(row.sector) ?? 0) + row.weight)
+      for (const theme of row.themes ?? []) totals.theme.set(theme, (totals.theme.get(theme) ?? 0) + row.weight)
+      /**
+       * A factor is a shared loss path that cuts across sectors — the AI-capex
+       * complex the harness capped separately because a sector cap never sees it.
+       * `allocate` and `thesis-challenge` both name this axis; without it the
+       * question "does an existing holding create the same loss path?" has no
+       * measured answer.
+       */
+      for (const factor of row.factors ?? []) totals.factor.set(factor, (totals.factor.get(factor) ?? 0) + row.weight)
+    }
+    return totals
+  }
+  /**
+   * ⚠️ **A `proposed` row for a symbol the book already holds replaces that
+   * holding; it does not stack on top of it.** `proposed` is the target state
+   * for the names it mentions, which is the vocabulary the rest of this
+   * package speaks — `targetWeight`, and a `DecisionProposal` carrying target
+   * weights. Summing the two would read the one shape a reduction has —
+   * `{ held: 0.25 } → { proposed: 0.15 }` — as 0.40, and refuse the trim as if
+   * it were a purchase. That is the inversion #109 is about, arriving through
+   * the input contract instead of through the gate.
+   */
+  const restated = new Set(proposed.map((row) => row?.symbol).filter((symbol) => symbol !== undefined && symbol !== null))
+  const standing = positions.filter((row) => !restated.has(row?.symbol))
+  const held = accumulate(positions)
+  const heldNonCore = accumulate(positions, { nonCoreOnly: true })
+  const totals = accumulate([...standing, ...proposed])
+  const finalNonCore = accumulate([...standing, ...proposed], { nonCoreOnly: true })
+
   const breaches = []
   for (const [kind, map] of Object.entries(totals)) {
     const cap = caps[kind]
@@ -209,12 +277,59 @@ export function concentration({ positions = [], proposed = [], caps = {} }) {
       continue
     }
     for (const [key, weight] of map.entries()) {
-      if (weight > cap) breaches.push({ kind, key, weight: round(weight), cap })
+      if (weight <= cap) continue
+      const heldWeight = held[kind].get(key) ?? 0
+      const grandfathered = grandfather.enabled && heldWeight > cap
+      breaches.push({
+        kind,
+        key,
+        weight: round(weight),
+        heldWeight: round(heldWeight),
+        addedWeight: round(weight - heldWeight),
+        addedNonCoreWeight: round((finalNonCore[kind].get(key) ?? 0) - (heldNonCore[kind].get(key) ?? 0)),
+        cap,
+        grandfathered,
+      })
     }
   }
-  if (breaches.length) diagnostics.push(diagnostic('concentration_breach', 'blocked', 'Proposed portfolio breaches concentration', 'proposed', { breaches }))
-  const heat = portfolioHeat({ positions, proposed, cap: caps.portfolioHeat, diagnostics })
-  return { data: { breaches, heat, exposures: Object.fromEntries(Object.entries(totals).map(([kind, map]) => [kind, Object.fromEntries([...map].map(([key, weight]) => [key, round(weight)]))])) }, diagnostics }
+  /**
+   * ⚠️ **The direction is read before the tolerance.** `enabled: false` is a
+   * request not to tolerate a breach; it is never a request to refuse the trim
+   * that resolves one. Reading the tolerance first put the inversion #109 is
+   * named after straight back into the gate — a reduction of an over-cap axis
+   * came out `concentration_breach: blocked`, in a response that carried
+   * `riskReducingAlwaysAllowed: true` beside it.
+   *
+   * ⛔ Inaction is not a reduction, and neither is a swap. The axis total has
+   * to fall **strictly**, so a standing breach nobody is touching still refuses
+   * once the investor switches the tolerance off — which is what switching it
+   * off asks for — and non-core exposure must not rise, so trimming a core
+   * holding while buying a non-core one on the same over-cap axis is not a
+   * reduction either. It is the shape `portfolioHeat` reads one line down.
+   */
+  const reducing = (row) => row.addedWeight < 0 && row.addedNonCoreWeight <= 0
+  const created = breaches.filter((row) => !row.grandfathered && !reducing(row))
+  const expanded = breaches.filter((row) => row.grandfathered && row.addedNonCoreWeight > 0)
+  const carried = breaches.filter((row) => reducing(row) || (row.grandfathered && row.addedNonCoreWeight <= 0))
+  if (created.length) diagnostics.push(diagnostic('concentration_breach', 'blocked', 'Proposed portfolio breaches concentration', 'proposed', { breaches: created }))
+  if (expanded.length && grandfather.blocksNewNonCoreWhenBreached) {
+    diagnostics.push(diagnostic('concentration_breach_expanded', 'blocked', 'An axis the book already carries above its cap is being added to; existing exposure is tolerated and new exposure is not', 'proposed', { breaches: expanded }))
+  }
+  if (carried.length || (expanded.length && !grandfather.blocksNewNonCoreWhenBreached)) {
+    diagnostics.push(diagnostic('concentration_grandfathered', 'unevaluated', 'The book carries exposure above a cap; forcing an immediate sale is a trade the cap never asked for, and a trim or exit of it is never blocked', 'positions', { breaches: [...carried, ...(grandfather.blocksNewNonCoreWhenBreached ? [] : expanded)] }))
+  }
+  const heat = portfolioHeat({ positions, proposed, cap: caps.portfolioHeat, grandfather, diagnostics })
+  return {
+    data: {
+      breaches,
+      grandfatheredBreaches: breaches.filter((row) => row.grandfathered),
+      blocksExpansionOf: grandfather.blocksNewNonCoreWhenBreached ? breaches.filter((row) => row.grandfathered).map((row) => ({ kind: row.kind, key: row.key })) : [],
+      riskReducingAlwaysAllowed: true,
+      heat,
+      exposures: Object.fromEntries(Object.entries(totals).map(([kind, map]) => [kind, Object.fromEntries([...map].map(([key, weight]) => [key, round(weight)]))])),
+    },
+    diagnostics,
+  }
 }
 
 export function specialistBudget({ managerId = MANAGER_ID, flow, market, currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight, emergencyExit = false }) {
