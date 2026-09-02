@@ -124,8 +124,13 @@ a flow that had to read the invocation itself would be a second reader of the sa
 **`events` is also where the wake is** — a fired `at-time` WATCH arrives there with the id it
 was armed under, and that id is what §Orchestration resolves into a flow. A run that dispatches
 before reading it has already decided to run all three.
-Use `portfolio_read`, `thesis_read`, `brief_read`, `evidence_read` and `manager_memory_read` when
-available. Private memory is isolated by package instance/model and time: never request or infer a
+Use `portfolio_read`, `brief_read` and `memory_read`. ⛔ **`thesis_read`, `evidence_read` and
+`manager_memory_read` are not tools, and a run that goes looking for them spends turns finding
+nothing.** The first two name capabilities the AMP vocabulary declares and that no build serves
+(`ARCHITECTURE.md` argues it); the third is a spelling no build has ever had — private memory is
+`memory_read`/`memory_write`. What those two names were reaching for arrives without a lookup: this
+book's thesis heads are in the **invocation payload**, and Evidence arrives attached to whatever
+answered a call. Private memory is isolated by package instance/model and time: never request or infer a
 revision written after `asOf`, and never copy another manager's Brief into private memory.
 
 Read these stable keys only; do not invent per-run keys:
@@ -373,7 +378,8 @@ Use a `position-weight` target for `BUY` and `RESIZE`, an `exit` target for `SEL
 for a multi-asset `REBALANCE`. `WAIT` due to adequate evidence says no portfolio change is warranted. `WAIT` due to an
 unavailable judgement names each missing/stale/conflicting input in `uncertainty`. `WATCH` carries a
 machine-evaluable revisit promise, not prose pretending to be one. Include only Evidence ids that
-were actually returned in this run or read through `evidence_read`.
+were actually returned in this run. ⛔ There is no `evidence_read` to widen that set with; an id
+this run did not receive is an id it may not cite.
 
 Assemble the one proposal from what the three flows returned. `targets` is where a run that
 touched both markets lands: one `REBALANCE` naming every sleeve position it moves, rather than

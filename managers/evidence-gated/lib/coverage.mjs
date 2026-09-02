@@ -1,5 +1,5 @@
 import { diagnostic } from './diagnostics.mjs'
-import { WATCH_TRIGGER_KINDS, normalizeTriggerKind } from './methodology.mjs'
+import { WATCH_TRIGGER_KINDS, normalizeWatch } from './methodology.mjs'
 
 export function coverageState({ scannerUniverses = [], extensions = [], holdings = [], dispositions = [], asOf }) {
   const diagnostics = []
@@ -37,13 +37,14 @@ export function coverageState({ scannerUniverses = [], extensions = [], holdings
  * deciding it should.
  */
 export function validateWatch(watch, current, asOf, config = {}) {
-  const diagnostics = []
-  const kind = normalizeTriggerKind(watch?.kind)
-  if (kind !== watch?.kind) {
-    diagnostics.push(diagnostic('trigger_kind_alias', 'info', 'The canonical spelling is kebab-case; the underscore form is accepted and normalized', 'watch.kind', { given: watch?.kind, canonical: kind }))
-  }
+  // AMP's spelling of the level and the band is read here too, so a watch
+  // written the only way a `DecisionProposal` accepts it is evaluable (see
+  // `normalizeWatch`). The `info` lines it raises say which name is canonical.
+  const normalized = normalizeWatch(watch)
+  const diagnostics = [...normalized.diagnostics]
+  watch = normalized.watch
+  const kind = watch?.kind
   if (!WATCH_TRIGGER_KINDS.has(kind)) diagnostics.push(diagnostic('watch_kind_unsupported', 'blocked', 'Use at-time, price or weight-drift; event producers are not assumed', 'watch.kind', { supported: [...WATCH_TRIGGER_KINDS] }))
-  watch = watch ? { ...watch, kind } : watch
   if (watch?.kind === 'at-time') {
     if (!watch.at || !Number.isFinite(Date.parse(watch.at)) || Date.parse(watch.at) <= Date.parse(asOf)) {
       diagnostics.push(diagnostic('watch_not_future', 'blocked', 'at-time WATCH must be a valid future instant', 'watch.at'))
@@ -63,10 +64,10 @@ export function validateWatch(watch, current, asOf, config = {}) {
   if (watch?.kind === 'weight-drift') {
     if (!Number.isFinite(watch?.threshold) || watch.threshold <= 0) {
       diagnostics.push(diagnostic('watch_threshold_invalid', 'blocked', 'weight-drift WATCH needs a positive drift threshold', 'watch.threshold'))
-    } else if (!Number.isFinite(watch?.baselineWeight)) {
-      diagnostics.push(diagnostic('watch_baseline_missing', 'unevaluated', 'weight-drift WATCH cannot be checked without the weight it was registered against', 'watch.baselineWeight'))
-    } else if (Number.isFinite(current?.weight) && Math.abs(current.weight - watch.baselineWeight) >= watch.threshold) {
-      diagnostics.push(diagnostic('watch_already_met', 'blocked', 'weight-drift WATCH is already true', 'watch.threshold', { drift: Math.abs(current.weight - watch.baselineWeight) }))
+    } else if (!Number.isFinite(watch?.baselineWeight) && !Number.isFinite(current?.baselineWeight)) {
+      diagnostics.push(diagnostic('watch_baseline_missing', 'unevaluated', 'weight-drift WATCH cannot be checked without the weight it was registered against; AMP states none, so it comes from the book', 'watch.baselineWeight'))
+    } else if (Number.isFinite(current?.weight) && Math.abs(current.weight - (Number.isFinite(watch?.baselineWeight) ? watch.baselineWeight : current.baselineWeight)) >= watch.threshold) {
+      diagnostics.push(diagnostic('watch_already_met', 'blocked', 'weight-drift WATCH is already true', 'watch.threshold', { drift: Math.abs(current.weight - (Number.isFinite(watch?.baselineWeight) ? watch.baselineWeight : current.baselineWeight)) }))
     }
   }
   if (watch?.observablePublished === false) diagnostics.push(diagnostic('watch_observable_unpublished', 'blocked', 'WATCH uses a KPI the company/source does not publish', 'watch.observable'))
@@ -171,8 +172,10 @@ const NEAR_DEFAULTS = { priceRatio: 0.03, driftFraction: 0.8, timeDays: 7 }
  * of the session.
  */
 export function evaluateWatch({ watch, observation = {}, blocks = [], alertedSessionKeys = [], asOf, config = {} } = {}) {
-  const diagnostics = []
-  const kind = normalizeTriggerKind(watch?.kind)
+  const normalized = normalizeWatch(watch)
+  const diagnostics = [...normalized.diagnostics]
+  watch = normalized.watch
+  const kind = watch?.kind
   const rule = WATCH_EVALUATION[kind]
   if (!rule) {
     diagnostics.push(diagnostic('watch_kind_unsupported', 'blocked', 'Use at-time, price or weight-drift; event producers are not assumed', 'watch.kind', { supported: Object.keys(WATCH_EVALUATION) }))
@@ -196,9 +199,14 @@ export function evaluateWatch({ watch, observation = {}, blocks = [], alertedSes
 
   if (kind === 'price-below' || kind === 'price-above') {
     const price = observation?.price
-    const level = watch?.threshold ?? watch?.level
+    const level = watch?.threshold
     if (!Number.isFinite(price) || !Number.isFinite(level)) {
-      diagnostics.push(diagnostic('watch_price_missing', 'unevaluated', 'A price WATCH needs an observed price and a numeric level', 'observation.price'))
+      // The path names whichever half is actually absent. It said
+      // `observation.price` unconditionally, so a run that observed a price and
+      // stated its level as AMP's `price` was told to go and fetch the one thing
+      // it had already supplied.
+      const path = Number.isFinite(price) ? 'watch.threshold' : 'observation.price'
+      diagnostics.push(diagnostic('watch_price_missing', 'unevaluated', 'A price WATCH needs an observed price and a numeric level', path, { observedPrice: Number.isFinite(price), level: Number.isFinite(level) }))
       return { data: { status: 'unevaluable', cadence: rule.cadence, needs: rule.observation, alertRequired: false }, diagnostics }
     }
     const met = kind === 'price-below' ? price <= level : price >= level
@@ -210,9 +218,22 @@ export function evaluateWatch({ watch, observation = {}, blocks = [], alertedSes
 
   if (kind === 'weight-drift') {
     const { weight } = observation
-    const { threshold, baselineWeight } = watch ?? {}
+    const { threshold } = watch ?? {}
+    // AMP states no baseline — the kernel measures drift against the weight in
+    // the stored snapshot — so the caller's own book is the other place it can
+    // come from. ⛔ Never defaulted to `weight`: a baseline equal to now is a
+    // drift of zero, which is a watch that never fires and never says why.
+    const baselineWeight = Number.isFinite(watch?.baselineWeight) ? watch.baselineWeight : observation?.baselineWeight
     if (!Number.isFinite(weight) || !Number.isFinite(threshold) || !Number.isFinite(baselineWeight)) {
-      diagnostics.push(diagnostic('watch_drift_inputs_missing', 'unevaluated', 'A drift WATCH needs an observed weight, a threshold and the baseline it was registered against', 'observation.weight'))
+      // Name the half that is missing. This said `observation.weight` however
+      // the call came in, so a run that supplied the weight correctly and stated
+      // its band as AMP's `beyond` was pointed at its own good input.
+      const path = !Number.isFinite(weight)
+        ? 'observation.weight'
+        : Number.isFinite(threshold)
+          ? 'watch.baselineWeight'
+          : 'watch.threshold'
+      diagnostics.push(diagnostic('watch_drift_inputs_missing', 'unevaluated', 'A drift WATCH needs an observed weight, a band (`threshold`, or AMP’s `beyond`) and the baseline it was registered against', path, { observedWeight: Number.isFinite(weight), threshold: Number.isFinite(threshold), baselineWeight: Number.isFinite(baselineWeight) }))
       return { data: { status: 'unevaluable', cadence: rule.cadence, needs: rule.observation, alertRequired: false }, diagnostics }
     }
     const drift = Math.abs(weight - baselineWeight)

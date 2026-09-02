@@ -45,6 +45,93 @@ export function normalizeTriggerKind(kind) {
   return TRIGGER_ALIASES[kind] ?? kind
 }
 
+/**
+ * ── The other half of the same inconsistency: the *fields* (2026-09-02) ────
+ *
+ * `normalizeTriggerKind` above accepts a second spelling of the **kind** and
+ * says which is canonical. Nothing did that for what the trigger carries, and
+ * the second vocabulary is not a legacy of this package — it is **AMP's, the
+ * published one**:
+ *
+ * | condition | `packages/amp` `planTriggerSchema` | this server |
+ * |---|---|---|
+ * | `price-below` / `price-above` | `price` (a `Money`) | `threshold` (a number) |
+ * | `weight-drift` | `beyond` (a fraction) | `threshold` + `baselineWeight` |
+ *
+ * A manager writes the AMP shape because that is the shape a `DecisionProposal`
+ * is accepted in — there is no other. It then hands the same object here and is
+ * told the watch is `unevaluable`, with the diagnostic naming
+ * `observation.weight`: **the one field the caller supplied correctly.** So the
+ * run reads it as a host defect and reports the price it did give.
+ *
+ * Measured 2026-09-01 in a real session, twice — once on a stop level
+ * (`price` vs `threshold`) and once on a drift band (`beyond`). Trusting the
+ * second reading, a run reports a stop that fired as *could not judge*.
+ *
+ * ⚠️ **`baselineWeight` has no AMP counterpart and must not be invented.** The
+ * kernel evaluates `weight-drift` against the weight in the **stored snapshot**
+ * (`wake/triggers.ts`: `Math.abs(now - position.weight)`), so the manager never
+ * states a baseline. Reading `observation.baselineWeight` is that same number
+ * arriving from the caller's own book. What this does not do is default it to
+ * the observed weight — a baseline equal to now is a drift of zero, which is a
+ * watch that never fires and never says why.
+ */
+const CURRENCY_MINOR_DIGITS = { KRW: 0, USD: 2 }
+
+/**
+ * A `Money` as this package counts money: a number of major units.
+ *
+ * Everything here is `{ amount, currency }` in major units, so a `Money` — an
+ * integer count of minor units — is foreign and has to be converted at the
+ * edge rather than compared as it is. `exponent` is optional in AMP and its
+ * absence means the currency's own minor unit (#581), which is why the table is
+ * consulted second and not first.
+ *
+ * Returns `null` for a currency this package does not count in, rather than
+ * guessing two decimals: a wrong exponent is a threshold off by a factor of a
+ * hundred, and that is a stop that fires early or never.
+ */
+export function moneyToMajor(value) {
+  if (finite(value)) return value
+  if (!value || typeof value !== 'object' || !Number.isFinite(value.minorUnits)) return null
+  const digits = Number.isFinite(value.exponent) ? value.exponent : CURRENCY_MINOR_DIGITS[value.currency]
+  return Number.isFinite(digits) ? value.minorUnits / 10 ** digits : null
+}
+
+/**
+ * A watch in this server's vocabulary, whichever vocabulary it arrived in.
+ *
+ * Returns the watch with `kind` and `threshold` filled in, plus the `info` and
+ * `unevaluated` lines the translation itself produced — never a refusal. A
+ * caller that already speaks this server's spelling gets its object back with
+ * an empty list.
+ */
+export function normalizeWatch(watch) {
+  const diagnostics = []
+  if (!watch || typeof watch !== 'object') return { watch, diagnostics }
+  const kind = normalizeTriggerKind(watch.kind)
+  const next = { ...watch, kind }
+  if (kind !== watch.kind) {
+    diagnostics.push(diagnostic('trigger_kind_alias', 'info', 'The canonical spelling is kebab-case; the underscore form is accepted and normalized', 'watch.kind', { given: watch.kind, canonical: kind }))
+  }
+  if ((kind === 'price-below' || kind === 'price-above') && !finite(next.threshold)) {
+    const level = finite(next.level) ? next.level : moneyToMajor(next.price)
+    if (finite(level)) {
+      next.threshold = level
+      if (next.price !== undefined) {
+        diagnostics.push(diagnostic('watch_field_alias', 'info', 'A price WATCH may state its level as AMP’s `price` (a Money) or as `threshold` (a number); both are read', 'watch.price', { threshold: level }))
+      }
+    } else if (next.price !== undefined) {
+      diagnostics.push(diagnostic('watch_price_uncountable', 'unevaluated', 'A price WATCH states a Money this package does not count in; give `threshold` in major units', 'watch.price', { currency: next.price?.currency ?? null, supported: Object.keys(CURRENCY_MINOR_DIGITS) }))
+    }
+  }
+  if (kind === 'weight-drift' && !finite(next.threshold) && finite(next.beyond)) {
+    next.threshold = next.beyond
+    diagnostics.push(diagnostic('watch_field_alias', 'info', 'A drift WATCH may state its band as AMP’s `beyond` or as `threshold`; both are read', 'watch.beyond', { threshold: next.beyond }))
+  }
+  return { watch: next, diagnostics }
+}
+
 const TRIGGER_KINDS = THESIS_TRIGGER_KINDS
 const MATURITY = new Set(['insufficient', 'observing', 'reviewable', 'promoted'])
 

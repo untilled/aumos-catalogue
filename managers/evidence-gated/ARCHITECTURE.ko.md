@@ -162,10 +162,14 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   없는 기계는 한국 펀더멘털을 판단할 수 없는 기계다.
 - **`thesis:read`와 `evidence:read`는 선언돼 있고 현재 Aumos 빌드에서 아무것도 서빙하지 않는다.**
   매니페스트 어휘에는 둘 다 있지만 `grant.ts`가 각각을 빈 도구 목록으로 매핑하므로 실행에
-  `thesis_read`/`evidence_read` 도구가 생기지 않는다. 프롬프트가 *가능할 때* 읽는다고 적고
-  매니페스트가 둘을 `optionalSkills`에 두는 이유가 정확히 그것이다. Aumos가 서빙하기 전까지 자산
-  주장은 invocation 페이로드와 Brief로 실행에 닿고, 패키지는 하지 못하는 조회를 하는 척하는 대신
-  그렇게 말한다. `RunProvenance.unservedTools`가 그 차이를 기록하는 자리다.
+  `thesis_read`/`evidence_read` 도구가 생기지 않는다. 매니페스트가 둘을 `optionalSkills`에 두는
+  이유가 정확히 그것이다 — 그 필드는 기계가 읽고, 실행은 읽지 않는다.
+  ⚠️ **실행이 읽는 쪽은 «가능할 때»라고 적고 있었고 그것으로는 부족했다**(2026-09-01): 진짜 세션
+  하나가 `thesis_read`·`evidence_read`·`manager_memory_read`를 찾아다녔고 — 마지막 것은 어느
+  빌드에도 없던 철자다 — 그 어긋남을 스스로 보고했다. «가능할 때»는 «불러 보고 알아내라»로 읽히고,
+  부르는 데는 턴이 든다. 이제 `PROMPT.md`와 `skills/orchestrate/SKILL.md`는 서빙되는 것만 이름
+  대고 그 셋이 도구가 아니라고 잘라 말한다. Aumos가 서빙하기 전까지 자산 주장은 invocation
+  페이로드와 Brief로 실행에 닿고, 패키지는 하지 못하는 조회를 하는 척하는 대신 그렇게 말한다. `RunProvenance.unservedTools`가 그 차이를 기록하는 자리다.
 - **매니저는 WATCH를 걸 수는 있고 읽을 수는 없다.** 권한→도구 맵은 `portfolio_read`,
   `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request`, `connection_request`를
   내놓고, watch나 plan
