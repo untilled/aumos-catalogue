@@ -1,6 +1,6 @@
 ---
 name: atlas-alpaca-window
-description: "The two connection_request calls Atlas Trend makes in Stage 1 through the investor's Alpaca connection, and the four Alpaca behaviours that each have a wrong answer looking like a right one — which feed to name, what the adjustment is measured from, what limit counts, and why snapshots cannot be asked at a past asOf. Read this before requesting the daily bar window."
+description: "The two connection_request calls Atlas Trend makes in Stage 1, and the four Alpaca behaviours that each have a wrong answer looking like a right one — which feed to name, what the adjustment is measured from, what limit counts, and why snapshots cannot be asked at a past asOf. Read this before requesting the daily bar window."
 ---
 
 # The window, and the four ways this vendor is not what it looks like
@@ -8,11 +8,20 @@ description: "The two connection_request calls Atlas Trend makes in Stage 1 thro
 This document carries **the shape of the calls and the behaviour of the vendor**. What to do
 with the answer is in `PROMPT.md`, and `PROMPT.md` governs wherever the two meet.
 
-`connection_request`'s description carries an **`Allowed:` list** of every
-`connector path ?parameters` available through this fund's broker connections. Read it and work
-from it — a guessed path is refused, and a refusal looks like the vendor being down. Use `alpaca`
-as the request's `source`; the field keeps the common relay shape even though the credential now
-comes from the connection rather than a data-source document.
+**The tool is `connection_request`, and the vendor is a login the investor already made.**
+Its description carries an **`Allowed:` list** of every `connector path ?parameters` this run may
+ask for. Read it and work from it — a guessed path is refused, and a refusal looks like the vendor
+being down.
+
+⚠️ **You are handed no credential and you choose no vendor.** The host signs the call with the
+Alpaca login this fund is already connected to; there is nothing to configure and no key to ask the
+investor for. If the fund holds no Alpaca login the tool is simply absent, which is a different
+thing from a call that failed — say which one happened.
+
+⚠️ **The upper bound is filled in for you.** Leave `end` out and the host writes this run's `asOf`
+into it; pass one that is later and it is trimmed. So a window you asked for may come back shorter
+than you asked, and it is never longer. ⛔ Do not try to reach past `asOf` by naming a different
+parameter — `asof` is the symbol table's date and is not a bound on the bars.
 
 ## 1. One window
 

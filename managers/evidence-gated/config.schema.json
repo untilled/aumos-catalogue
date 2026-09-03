@@ -90,7 +90,7 @@
       "type": "object",
       "additionalProperties": false,
       "default": {},
-      "description": "Existing exposure above a cap is tolerated while new exposure is not. Forcing an immediate sale to satisfy a cap that was raised or a position that grew is a trade the cap never asked for; the breach resolves through trims and growth in the rest of the book.",
+      "description": "Existing exposure above a cap is tolerated while new exposure is not. Forcing an immediate sale to satisfy a cap that was raised or a position that grew is a trade the cap never asked for; the breach resolves through trims and growth in the rest of the book. The same reading covers the book this manager inherited: a holding that predates the mandate, or one you bought yourself, is carried and may be reduced freely, and is not expanded until a decision explains it.",
       "properties": {
         "enabled": { "type": "boolean", "default": true },
         "blocksNewNonCoreWhenBreached": { "type": "boolean", "default": true }
