@@ -192,9 +192,15 @@ export function paperAdmission({ setup, challengeVerdict, thesis = {}, priceHist
  *
  * ⚠️ **The cost is stated rather than hidden.** Private memory is namespaced by
  * manager instance, so a paper track kept here is invisible to any other
- * manager on the same book, and an instance change starts it over. That is a
- * worse home than a shared record and it is the only one Aumos serves today.
+ * manager on the same book, and deleting the manager ends it. That is a worse
+ * home than a shared record and it is the only one Aumos serves today.
  * `README.md` says so under Known limits.
+ *
+ * ⚠️ **The lifetime is the instance's, not the model's.** The row is keyed by
+ * manager instance alone, so a model swap, a config edit and an in-place
+ * package update all read the same track back. That is why a d60 horizon is
+ * worth opening at all: nothing short of deleting the manager resets it.
+ * (untilled/aumos#638)
  */
 function foldWindow(closed, cohort, setup, horizon, forward) {
   for (const key of [`cohort:${cohort}`, `setup:${setup}`]) {

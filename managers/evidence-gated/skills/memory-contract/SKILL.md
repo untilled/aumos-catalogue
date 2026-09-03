@@ -5,7 +5,7 @@ description: Read and append instance-private learning revisions safely, includi
 
 # Manager memory contract
 
-Private manager memory is a compact, append-only learning index for this package instance/model. It
+Private manager memory is a compact, append-only learning index for this **manager instance**. It
 is not a hidden portfolio database and not a source cache.
 
 ## Stable keys
@@ -84,15 +84,18 @@ the `signalAt`-after-`asOf` refusal are inside the function. A hand-built value 
 one shape that can silently lose a window, and it did: registration lived only in a sentence and the
 track held zero rows across every run.
 
-⚠️ **What it costs.** Private memory is namespaced by manager instance, so this track is invisible to
-any other manager on the same book and a new instance starts it over. That is a worse home than a
-shared record, and it is the only one the runtime serves.
+⚠️ **What it costs, and what it does not.** Private memory is namespaced by manager instance, so
+this track is invisible to any other manager on the same book. That is a worse home than a shared
+record, and it is the only one the runtime serves. ⚠️ **The lifetime is the instance's, not the
+model's** — swapping the model, editing the instance config or updating the package in place all
+keep the same row, so a d60 window is worth opening. What ends the track is deleting the manager:
+a reinstall is a new instance and starts at zero.
 
 ## Read
 
 Read with invocation `asOf`. The runtime must return only revisions visible to this exact instance
-and model at that instant. Treat no result as valid merely because it parses. Each value must be a
-JSON object containing:
+at that instant. Treat no result as valid merely because it parses. Each value must be a JSON
+object containing:
 
 ```json
 {
@@ -136,6 +139,8 @@ briefs, evidence and watches are migrated to their canonical stores. Write
 
 ## Isolation expectations
 
-Another instance/model cannot read this memory. Another manager on the same book can read shared
-Brief revisions but not these keys. Reads and writes must appear in MCP audit and Evidence. Historical
+Another manager instance cannot read this memory, and another manager on the same book can read
+shared Brief revisions but not these keys. ⚠️ **A model swap is not another instance** — the row is
+keyed by instance alone, so memory written under one model is read back under the next. Deleting
+the manager is what ends it. Reads and writes must appear in MCP audit and Evidence. Historical
 replay must select the latest revision at or before replay `asOf`, never the current head.

@@ -74,11 +74,11 @@
     "asOf": "2026-08-23T00:00:00Z",
     "expectedRevision": null
   },
-  "modelIsolation": {
+  "modelContinuity": {
     "instance": "instance-a",
     "model": "model-b",
     "asOf": "2026-08-23T00:00:00Z",
-    "expectedRevision": null
+    "expectedRevision": 2
   },
   "sharedBrief": {
     "book": "book-a",
