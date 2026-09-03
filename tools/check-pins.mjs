@@ -79,20 +79,33 @@ function git(...args) {
  * The manifest filename is the only real difference between the two, so it is a
  * parameter and everything else is one loop.
  *
- * ⛔ **And since #112 ① the source entries no longer pin anything.** All five
- * are written `"source": "./sources/<id>"` — a relative path, because every one
- * of them named this repository and a pin across no boundary bought nothing but
- * a second pull request to move it. They reach the `git-subdir` guard below,
- * fail it, and print `--`: **this script now has nothing to say about
- * `.aumos/sources.json`**, and the paragraph above is kept because the failure
- * it describes is real and returns the moment a source entry pins again.
+ * ⛔ **And since #112 ① an entry that names this repository does not pin.** #116
+ * converted the five in `.aumos/sources.json` and #115 converts the nine in
+ * `.claude-plugin/marketplace.json`; both are written `"source": "./<dir>/<id>"`,
+ * because a pin's job is that somebody else's `HEAD` can move under you and
+ * these cross no boundary. They reach the `git-subdir` guard below, fail it, and
+ * print `--`. **When both have landed this script checks nothing at all** — every
+ * line is `--` and it exits 0 — and that is the asked-for end state, not a
+ * regression. The paragraphs above are kept because they describe real failures
+ * that return with the first entry naming another repository, which is the only
+ * kind that still pins.
  *
  * ⚠️ **What is no longer guarded, stated rather than left to be discovered.**
- * The claim this file makes is *the reviewed tree is the installed tree*, and
- * for a relative entry it is `.aumos/sources.json`'s reader — the Aumos
- * generator, reading `main` at whatever moment it runs — that has to keep it.
- * That is a claim this repository cannot check, and it is the reason #112 ① is
- * gated on the Aumos side rather than on this build going green.
+ * The claim this file makes is *the reviewed tree is the installed tree*, and a
+ * pin is what made it checkable here: the sha in the entry is a commit this
+ * clone can resolve. A relative entry moves that anchor to **the repository's
+ * `HEAD` at the moment the investor's machine fetched the document**
+ * (untilled/aumos#627) — not to a generator, and not to `main` at any nameable
+ * time. Two investors reading an hour apart can install different bytes under
+ * one version number with nobody having touched the catalogue in between.
+ *
+ * ⛔ **That is a weakening and it is deliberate, so it is named rather than
+ * absorbed.** `document.ts` over in Aumos already calls the sha anchor *"strictly
+ * weaker than what it replaces"*; this is one step further down the same
+ * staircase, taken because the round trip it removes was costing a pull request
+ * per submission. Nothing in this repository can check the new anchor — which is
+ * why the conversion followed #627's release rather than this build going
+ * green.
  */
 const SOURCES = '.aumos/sources.json'
 
@@ -204,11 +217,13 @@ for (const { entry: plugin, manifest: manifestFile, document } of plugins) {
  * documents disagree about *which* commit — every line prints ok and the
  * repository is still in the state #57 merged its entries to leave.
  *
- * ⛔ **With the source entries relative (#112 ①) this can no longer trip**, since
- * only `.claude-plugin/marketplace.json` contributes a sha and one document
- * cannot disagree with itself. It is left in place rather than deleted because
- * the entry it is written against is the *external* one — the first entry that
- * names another repository restores both the shape and this check's subject.
+ * ⛔ **With the source entries relative (#116) this can no longer trip**, since
+ * only `.claude-plugin/marketplace.json` still contributes a sha and one document
+ * cannot disagree with itself — and after #115 no entry contributes one, so the
+ * map is empty and the block is dead. It is left in place rather than deleted
+ * because its subject was always the *external* entry: the first one naming
+ * another repository restores the shape, and with it both this check and every
+ * failure the paragraphs above describe.
  */
 const pinned = new Map()
 for (const { entry: plugin, document } of plugins) {

@@ -32,21 +32,35 @@
  *
  * ── Two shapes of `source`, since #112 ① ──────────────────────────────────
  *
- * `.aumos/sources.json` now writes its five entries as a **relative path** —
- * `"source": "./sources/open-dart"` — because every one of them points at this
- * repository and a pin across no boundary only buys a second pull request to
- * move it. `.claude-plugin/marketplace.json` still pins, so both shapes are read
- * here and `checkRelative` states what changes between them.
+ * The rule is about the **boundary**, not about which document an entry is in:
  *
- * ⛔ **And the shape a reader accepts is not decided in this repository.** The
- * paragraph above is the reason: Aumos's schema is the one that admits or drops
- * a row, it is not vendored here, and `tools/lint-sources/source-spec.schema.json`
- * is the schema of a source **document** (`spec`/`id`/`hosts`/`endpoints`) — it
- * has no `source`, `name` or `metadata` and never sees an index entry. So this
- * file accepting a relative path establishes that the entry is *coherent with
- * this repository*, and establishes nothing about whether Aumos will read it.
- * That is the `alpaca` failure mode exactly, and it is why #112 ① is gated on an
- * answer from the Aumos side rather than on this check going green.
+ *   an entry that names *this* repository   →  `"source": "./sources/open-dart"`
+ *   an entry that names *another* one       →  `git-subdir` + a 40-hex `sha`
+ *
+ * A pin's whole job is that somebody else's `HEAD` can move under you. Across no
+ * boundary it buys nothing and costs a second pull request to move it, which is
+ * the round trip #112 measured. Both shapes are read here — `checkRelative`
+ * states what changes between them — and both must keep being read, because the
+ * first entry naming another repository restores the sha shape on its own.
+ *
+ * ⚠️ **Neither shape belongs to one of the two documents.** #116 converted the
+ * five in `.aumos/sources.json` and #115 converts the nine in
+ * `.claude-plugin/marketplace.json`, so this file spends one merge with a
+ * relative source list and a pinned plugin list and is written for either. When
+ * both have landed there is no sha in the repository at all and `check:pins` has
+ * nothing left to check — which is the state #112 ① is asking for, not an
+ * accident to guard against.
+ *
+ * ⛔ **What a green tick here does not establish, and it is the reason #116 was
+ * held.** Aumos's schema is what admits or drops a row and it is not vendored
+ * here — `tools/lint-sources/source-spec.schema.json` is the schema of a source
+ * **document** (`spec`/`id`/`hosts`/`endpoints`), has no `source`, `name` or
+ * `metadata`, and never sees an index entry. When this was written Aumos's
+ * reader took the object shape only (`managerSourceSchema`, a `strictObject`
+ * whose `sha` is `/^[0-9a-f]{40}$/`), so a relative entry would have been
+ * *skipped* — the `alpaca` failure exactly. untilled/aumos#627 is the reader
+ * that accepts both, and the conversion here follows its release rather than
+ * this check going green.
  *
  * ⚠️ **Needs full history.** `actions/checkout` clones shallow by default and
  * every `git cat-file` below would then fail on an older pin. The workflow sets
@@ -88,8 +102,12 @@ const problems = []
 const report = (where, message) => problems.push(`${where}: ${message}`)
 
 /**
- * An entry whose `source` is a relative path — `"./sources/open-dart"` — rather
- * than a `git-subdir` object. (#112 ①)
+ * An entry whose `source` is a relative path — `"./sources/open-dart"`,
+ * `"./managers/basic-investor"` — rather than a `git-subdir` object. (#112 ①)
+ *
+ * It is keyed off nothing but the type of `source`, so it serves both indexes:
+ * `index.manifest` is already the parameter that says whether the file inside is
+ * `source.json` or `aumos.json`.
  *
  * ⚠️ **This is the same questions asked of a different tree.** A pin names a
  * commit, so the sha branch above asks git what that commit holds. A relative
@@ -111,7 +129,16 @@ const report = (where, message) => problems.push(`${where}: ${message}`)
  * `check-pins.mjs`.** An uncommitted directory passes this and is not published.
  * That is the same bound `lint` already has (it reads the working tree too), and
  * the one guard that spoke about *committed* bytes — `check:pins` — no longer
- * has anything to say about these entries, and says so in its own ⛔ note.
+ * has anything to say about a relative entry, and says so in its own ⛔ note.
+ *
+ * ⚠️ **And the tree a reader installs is not this one either.** With
+ * untilled/aumos#627 a relative entry resolves to the repository's `HEAD` **at
+ * the moment that machine fetched the document**, which is what replaces the
+ * publisher-fixed commit. Two investors reading an hour apart can install
+ * different bytes under one version number with nobody having touched the
+ * catalogue in between. That is stated where it is decided — #627's own
+ * `document.ts` note — and repeated here only so that nobody reads this check's
+ * `statSync` as a claim about what installs.
  */
 function checkRelative(where, index, entry, source) {
   if (!source.startsWith('./')) {

@@ -50,7 +50,23 @@ GitHub이 옛 이름을 리다이렉트하므로 기존 클론이나 링크는 �
 
 ## 머지된 제출에 무슨 일이 일어나나
 
-Aumos는 하나의 생성기가 한 번의 패스로 각 카탈로그의 두 얼굴을 발행한다.
+**머지가 곧 발행이다.** untilled/aumos#323 이후 설치된 Aumos는 이 저장소의 인덱스 문서
+둘을 **HTTPS로, `HEAD`에서, 직접** 읽는다 — 빌드 단계도, 큐도, 눌러야 하는 것도 없다.
+
+| 읽히는 것 | 어디서 오나 |
+|---|---|
+| `raw.githubusercontent.com/untilled/aumos-catalogue/HEAD/.claude-plugin/marketplace.json` | 이 저장소. 그 기계가 가져오는 순간의 `HEAD` |
+| `raw.githubusercontent.com/untilled/aumos-catalogue/HEAD/.aumos/sources.json` | 데이터 소스도 같다 |
+| `codeload.github.com/<owner>/<repository>/tar.gz/<sha>` | 패키지의 **바이트**. 주소는 엔트리로부터 조립되고, 엔트리가 주소를 부르지는 않는다 |
+
+`main`이 아니라 `HEAD`인 것은 의도된 것이다. 기본 브랜치 이름이 다른 카탈로그가 아무도
+볼 수 없는 이유로 닿지 않게 되기 때문이다.
+
+⚠️ **그러므로 머지된 제출은 그 뒤에 가져가는 모든 기계에 즉시 살아 있고, 그 기계가 파싱하지
+못한 엔트리는 당신에게 보고되는 대신 건너뛰어진다.** `tools/check-index.mjs`가 막으려는
+것이 그것이다 — 서빙되기 전에 이 문서 둘을 판단하는 유일한 자리다.
+
+Aumos는 그와 별개로 하나의 생성기가 한 번의 패스로 각 카탈로그의 두 얼굴도 발행한다.
 
 | | |
 |---|---|
@@ -58,6 +74,13 @@ Aumos는 하나의 생성기가 한 번의 패스로 각 카탈로그의 두 얼
 | `aumos.app/managers` | 설치 전에 사람이 읽는 페이지 |
 | `releases.aumos.app/sources/sources.json` | 기계가 읽는 데이터 소스 인덱스. 같은 방식이다 |
 | `aumos.app/sources` | 그리고 그 페이지 |
+
+⚠️ **`releases.aumos.app` 두 줄은 발행 경로가 아니라 미러이고, 이 페이지는
+untilled/aumos-catalogue#116 전까지 그 반대로 적고 있었다.** 저것은 **frozen** 인덱스 —
+#323보다 오래된 Aumos 사본이 가져가는 것 — 이고, 둘 중 어느 쪽이 진짜인지는 Aumos의
+생성기 자신이 적는다: *"this is not where a package is published: publication is a commit
+to the catalogue repository's `marketplace.json`, and this only mirrors that document onto
+the frozen host."* `aumos.app` 두 줄은 같은 목록의 사람 쪽 얼굴이다.
 
 어느 쌍도 서로 다른 카탈로그를 서술할 수 없다. 각각 하나의 목록에서 쓰이기 때문이다 —
 그리고 이 저장소가 모든 목록을 만드는 두 곳 중 하나다. 다른 하나는 Aumos가 직접 싣는
