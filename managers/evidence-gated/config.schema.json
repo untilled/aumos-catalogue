@@ -72,11 +72,26 @@
       "type": "object",
       "additionalProperties": false,
       "default": {},
-      "description": "The named benchmark each kind of holding is measured against. This methodology is benchmark-relative end to end, so a denominator that changes between runs makes every active return incomparable — including the ones the promotion gate counts.",
+      "description": "The named benchmark each kind of holding is measured against. This methodology is benchmark-relative end to end, so a denominator that changes between runs makes every active return incomparable — including the ones the promotion gate counts. ⚠️ A benchmark has to be denominated in the same currency as the holdings it stands in for, or the difference measures the exchange rate rather than the selection: a KRW-listed S&P 500 ETF against a USD sleeve prices the index and USDKRW at once, and USDKRW moved 1392.20 → 1514.70 → 1359.14 over the twelve months to 2026-09-03 — a band wider than minimumExpectedActiveReturn itself.",
       "properties": {
-        "koreanEquity": { "type": "string", "pattern": "^[A-Z0-9.-]{1,20}$", "default": "069500" },
-        "usEquity": { "type": "string", "pattern": "^[A-Z0-9.-]{1,20}$", "default": "360750" },
-        "cashLike": { "type": "string", "pattern": "^[A-Z0-9.-]{1,20}$", "default": "153130" }
+        "koreanEquity": {
+          "type": "string",
+          "pattern": "^[A-Z0-9.-]{1,20}$",
+          "default": "069500",
+          "description": "KRW-denominated denominator for the KRW sleeve. KODEX 200, listed on XKRX."
+        },
+        "usEquity": {
+          "type": "string",
+          "pattern": "^[A-Z0-9.-]{1,20}$",
+          "default": "SPY",
+          "description": "USD-denominated denominator for the XNAS/XNYS sleeve. SPY over IVV and VOO because the denominator is quoted, never held: expense ratio never reaches an active return, and SPY is the one of the three that has a continuous daily close back to 1993-01-29 and the deepest quoted volume of any US-listed equity, so every lens window and every hurdle horizon this manager measures over has a close on both legs."
+        },
+        "cashLike": {
+          "type": "string",
+          "pattern": "^[A-Z0-9.-]{1,20}$",
+          "default": "153130",
+          "description": "KRW-denominated denominator for parked liquidity. KODEX 단기채권, listed on XKRX."
+        }
       }
     },
     "benchmarkHurdleAnnualPct": {
