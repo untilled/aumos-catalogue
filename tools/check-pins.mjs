@@ -69,15 +69,30 @@ function git(...args) {
 /**
  * ⚠️ **The source list was not read here until untilled/aumos#486.**
  *
- * This script named one document, and `.aumos/sources.json` pins its entries the
- * same way — `git-subdir` and a sha. So the two halves of this repository could
- * point at different commits and nothing said so, which is exactly what
+ * This script named one document, and `.aumos/sources.json` pinned its entries
+ * the same way — `git-subdir` and a sha. So the two halves of this repository
+ * could point at different commits and nothing said so, which is exactly what
  * happened: untilled/aumos#477's pull request repinned every manager entry and
  * left every source entry on the commit before it, undoing #57's *every entry
  * points at one commit* without a single red line.
  *
  * The manifest filename is the only real difference between the two, so it is a
  * parameter and everything else is one loop.
+ *
+ * ⛔ **And since #112 ① the source entries no longer pin anything.** All five
+ * are written `"source": "./sources/<id>"` — a relative path, because every one
+ * of them named this repository and a pin across no boundary bought nothing but
+ * a second pull request to move it. They reach the `git-subdir` guard below,
+ * fail it, and print `--`: **this script now has nothing to say about
+ * `.aumos/sources.json`**, and the paragraph above is kept because the failure
+ * it describes is real and returns the moment a source entry pins again.
+ *
+ * ⚠️ **What is no longer guarded, stated rather than left to be discovered.**
+ * The claim this file makes is *the reviewed tree is the installed tree*, and
+ * for a relative entry it is `.aumos/sources.json`'s reader — the Aumos
+ * generator, reading `main` at whatever moment it runs — that has to keep it.
+ * That is a claim this repository cannot check, and it is the reason #112 ① is
+ * gated on the Aumos side rather than on this build going green.
  */
 const SOURCES = '.aumos/sources.json'
 
@@ -188,6 +203,12 @@ for (const { entry: plugin, manifest: manifestFile, document } of plugins) {
  * broken.** Each entry can pin a commit that serves its own tree while the two
  * documents disagree about *which* commit — every line prints ok and the
  * repository is still in the state #57 merged its entries to leave.
+ *
+ * ⛔ **With the source entries relative (#112 ①) this can no longer trip**, since
+ * only `.claude-plugin/marketplace.json` contributes a sha and one document
+ * cannot disagree with itself. It is left in place rather than deleted because
+ * the entry it is written against is the *external* one — the first entry that
+ * names another repository restores both the shape and this check's subject.
  */
 const pinned = new Map()
 for (const { entry: plugin, document } of plugins) {

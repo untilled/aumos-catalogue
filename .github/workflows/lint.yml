@@ -146,4 +146,11 @@ jobs:
       # Moving it last changes nothing about what is checked or about the job's
       # result: an unrepinned pull request still fails. What it buys is that the
       # failure no longer hides the checks a reviewer needs.
+      #
+      # ⚠️ **Half of that is no longer true, since #112 ①.** The five entries in
+      # `.aumos/sources.json` are relative paths now — `"./sources/<id>"`, no
+      # sha — so this step has no pin to check for them and a pull request that
+      # changes a data source is **not** red here and needs no repin. The
+      # paragraph above still describes `.claude-plugin/marketplace.json`, whose
+      # nine entries still pin, and that is where the expected red comes from.
       - run: npm run check:pins
