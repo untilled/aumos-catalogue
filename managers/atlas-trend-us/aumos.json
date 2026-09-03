@@ -57,6 +57,7 @@
     },
     {
       "kind": "connection:passthrough",
+      "reason": "Daily total-return bars for a fixed basket of ETFs, and the corporate actions over the same window — the second is what lets this manager check the dividend adjustment the first one claims rather than trust it. Both are Alpaca's answer, relayed through the investor's existing connection and unread by Aumos.",
       "connectors": [
         "alpaca"
       ]
@@ -64,7 +65,7 @@
   ],
   "requires": {
     "skills": [
-      "source_request"
+      "connection_request"
     ],
     "optionalSkills": [
       "portfolio_read",

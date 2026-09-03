@@ -181,7 +181,7 @@ want this run monthly, check that interval when you install it.**
 | | |
 |---|---|
 | **Market** | Korea-listed ETFs, in won |
-| **Data sources** | `toss` and `fsc-securities-product`, both at 0.1.0 or later |
+| **Connection and data source** | a Toss login linked to this fund for adjusted candles, plus `fsc-securities-product` 0.1.0 or later for NAV, underlying index, size and turnover. A market-data-only Toss login is sufficient; no brokerage account has to be attached |
 | **What a key costs** | `fsc-securities-product` is free with an automatically approved key from Korea's public data portal, and its licence puts no restriction on use |
 | **Settings** | the risk target, the per-role cap, the no-trade band, which cash fund to use and whether TR share classes are preferred are all yours to set; the horizons, the voting rule and the universe are not configurable, because they are the methodology |
 | **The book** | it reads your portfolio, and the book's own note on whether it is currently all in cash |

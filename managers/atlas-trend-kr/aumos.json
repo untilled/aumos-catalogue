@@ -43,6 +43,7 @@
   "capabilities": [
     {
       "kind": "source:passthrough",
+      "reason": "금융위원회's 증권상품시세정보 supplies the NAV, the underlying index and the fund size that say whether the fund is worth holding at all. The answer is the vendor's, unread by Aumos.",
       "sources": [
         "fsc-securities-product"
       ]
@@ -61,6 +62,7 @@
     },
     {
       "kind": "connection:passthrough",
+      "reason": "토스증권 supplies the adjusted won price history the trend is measured on. Its answer is relayed through the investor's existing Toss connection and remains unread by Aumos.",
       "connectors": [
         "toss"
       ]
@@ -68,7 +70,8 @@
   ],
   "requires": {
     "skills": [
-      "source_request"
+      "source_request",
+      "connection_request"
     ],
     "optionalSkills": [
       "portfolio_read",

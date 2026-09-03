@@ -12,7 +12,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/coinbase-exchange",
         "ref": "main",
-        "sha": "953034ba28202e0e018bfdbe6262bc250977f060"
+        "sha": "f7b00c2f281070f23852464da71c649ed5b00b5c"
       },
       "version": "0.1.0",
       "metadata": {
@@ -90,7 +90,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/fsc-securities-product",
         "ref": "main",
-        "sha": "953034ba28202e0e018bfdbe6262bc250977f060"
+        "sha": "f7b00c2f281070f23852464da71c649ed5b00b5c"
       },
       "version": "0.1.0",
       "metadata": {
@@ -212,7 +212,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/open-dart",
         "ref": "main",
-        "sha": "953034ba28202e0e018bfdbe6262bc250977f060"
+        "sha": "f7b00c2f281070f23852464da71c649ed5b00b5c"
       },
       "version": "0.1.0",
       "metadata": {
@@ -290,7 +290,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/openbb-fmp",
         "ref": "main",
-        "sha": "953034ba28202e0e018bfdbe6262bc250977f060"
+        "sha": "f7b00c2f281070f23852464da71c649ed5b00b5c"
       },
       "version": "0.3.2",
       "metadata": {
@@ -327,7 +327,7 @@
         "url": "https://github.com/untilled/aumos-catalogue",
         "path": "sources/sec-edgar",
         "ref": "main",
-        "sha": "953034ba28202e0e018bfdbe6262bc250977f060"
+        "sha": "f7b00c2f281070f23852464da71c649ed5b00b5c"
       },
       "version": "0.3.2",
       "metadata": {

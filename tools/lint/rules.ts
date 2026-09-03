@@ -126,6 +126,13 @@ interface ManifestView {
    * flat list of kinds has thrown that away.
    */
   readonly capabilitiesWithSources: readonly string[]
+  /**
+   * Capability entries that carry a `connectors` array, by kind. (#575)
+   *
+   * Its twin one field up, for the same reason: the rule below asks about the
+   * *pairing*, and a flat list of kinds has thrown that away.
+   */
+  readonly capabilitiesWithConnectors: readonly string[]
   readonly configSchema: string | undefined
   readonly readme: string | undefined
   /** `manifest.prompt`, unresolved. Absent means the conventional `PROMPT.md`. (#286) */
@@ -166,6 +173,12 @@ function readManifest(raw: unknown): ManifestView {
     capabilitiesWithSources: Array.isArray(field(raw, 'capabilities'))
       ? (field(raw, 'capabilities') as unknown[])
           .filter((capability) => Array.isArray(field(capability, 'sources')))
+          .map((capability) => text(field(capability, 'kind')))
+          .filter((kind): kind is string => kind !== undefined)
+      : [],
+    capabilitiesWithConnectors: Array.isArray(field(raw, 'capabilities'))
+      ? (field(raw, 'capabilities') as unknown[])
+          .filter((capability) => Array.isArray(field(capability, 'connectors')))
           .map((capability) => text(field(capability, 'kind')))
           .filter((kind): kind is string => kind !== undefined)
       : [],
@@ -410,6 +423,30 @@ export function lintManagerPackage(files: PackageFiles): readonly Problem[] {
       problem(
         'sources-only-on-passthrough',
         `capability ${kind} carries a sources list. Only source:passthrough reaches a data source, so the field says nothing here and nothing reads it`,
+      )
+    }
+  }
+
+  /**
+   * `connectors` belongs to `connection:passthrough` and to nothing else. (#575)
+   *
+   * `sources`' rule one capability over, and it is here for the same three
+   * reasons: the manifest schema is a published document and a cross-field
+   * condition does not survive JSON Schema generation, `previewInstall` reads
+   * `connectors` only off `connection:passthrough` entries so a misplaced key
+   * cannot widen anything, and a key that is inert is exactly the kind of
+   * authoring mistake a linter is for.
+   *
+   * ⛔ **There is no rule requiring `connectors` on a broker-relay capability.**
+   * *Declared and named nothing* is a package that will relay through whatever
+   * login the fund has, which `InstallPreview.callsConnections` carries to the
+   * screen as *did not say* rather than *needs none*.
+   */
+  for (const kind of manifest.capabilitiesWithConnectors) {
+    if (kind !== 'connection:passthrough') {
+      problem(
+        'connectors-only-on-connection-passthrough',
+        `capability ${kind} carries a connectors list. Only connection:passthrough relays through a broker login, so the field says nothing here and nothing reads it`,
       )
     }
   }

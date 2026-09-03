@@ -14,14 +14,14 @@ deterministic contract is complete.
 ## Phase 0 — platform and contracts
 
 - [x] Three-manager manifest and market/task ownership
-- [x] Toss connector/source boundary, source freshness/conflict/degradation matrix
-- [x] Manifest names its required sources on `source:passthrough`; vendored catalogue lint refreshed to the build that reads the field
+- [x] Toss connection/data-source boundary, source freshness/conflict/degradation matrix
+- [x] Manifest names broker inputs on `connection:passthrough` and document inputs on `source:passthrough`; vendored catalogue lint refreshed to the build that reads both fields
 - [x] Sleeve-budget Brief ownership and Global-only cross-market allocation
 - [x] Producer-less `event` WATCH refusal; earnings use official web research plus `at-time`
 - [x] Timezone/DST/session input, bounded retry and schedule-drift contracts
 - [x] Secure OpenDART `crtfc_key` query-secret injection (aumos #419/#422) and a published
       `sources/open-dart` document named by this manifest
-- [x] KR/US market-calendar endpoints declared by the installed `toss` source and consumed by
+- [x] KR/US market-calendar endpoints declared by the Toss broker relay and consumed by
       `nextMarketReview` instead of a 24-hour addition
 - [ ] Those two endpoints called against real sessions — needs Toss credentials
 

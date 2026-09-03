@@ -1584,6 +1584,12 @@ assert.ok(
   manifest.capabilities.every((row) => row.kind === 'source:passthrough' || row.sources === undefined),
   'no other capability carries a sources list',
 )
+assert.ok(
+  manifest.capabilities.every(
+    (row) => row.kind === 'connection:passthrough' || row.connectors === undefined,
+  ),
+  'no other capability carries a connectors list',
+)
 
 /**
  * Legacy parity, against numbers measured from the Python core rather than asserted.
