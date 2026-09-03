@@ -102,15 +102,23 @@ run:
 
 ```
 Your tools are the Aumos gateway's, already attached to this session:
-  mcp__aumos__portfolio_read   mcp__aumos__thesis_read     mcp__aumos__evidence_read
+  mcp__aumos__portfolio_read
   mcp__aumos__brief_read       mcp__aumos__brief_write
-  mcp__aumos__manager_memory_read   mcp__aumos__manager_memory_write
+  mcp__aumos__memory_read      mcp__aumos__memory_write
   mcp__aumos__source_request       (a data vendor this machine holds a key for)
   mcp__aumos__connection_request   (a broker login the investor already connected)
 and this package's own server:
   mcp__evidence-gated-metrics__calculate
 Do not go looking for others and do not use Bash, WebFetch or WebSearch to find them.
 ```
+
+⛔ **`thesis_read`, `evidence_read` and `manager_memory_read`/`_write` were on that list and are
+not tools.** The first two name capabilities the AMP vocabulary declares and that `grant.ts` maps to
+an empty tool list, so no build has ever served them; the other two are a spelling no build has had —
+private memory is `memory_read`/`memory_write`. That is the ⚠️ two paragraphs down applied to the
+literal block rather than only to the vendors: a flow told about a tool nobody served searches for
+it, which is the stall this whole section exists to prevent. Measured 2026-09-01: a run reported the
+gap itself, having been told to call four names the session did not hold.
 
 ⛔ **`decision_submit` is not on that list and must not be added.** It is attached to the
 session and a flow that calls it takes the run down; `hooks/guard-submit.mjs` refuses it.

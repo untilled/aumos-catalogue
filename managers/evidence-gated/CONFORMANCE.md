@@ -201,10 +201,10 @@ reports no session at all (aumos #453).
   behaviour of `corpCode.xml` and the `status`-on-200 error path against the vendor itself.
 - The three packages of this collection have not yet been installed together against the same Toss-connected shadow
   portfolio for consecutive KR close → US close → Global review cycles.
-- ✅ *Partly resolved by the cycle above.* Real `manager_memory_write` reached the store from all
+- ✅ *Partly resolved by the cycle above.* Real `memory_write` reached the store from all
   three instances, each into its own namespace, and the seeds handed to each run were projected from
   what the earlier runs had written. What is **still** unmeasured is the pair that needs a second run
-  of the *same* instance: a later `manager_memory_read` of a key that instance itself wrote, and a
+  of the *same* instance: a later `memory_read` of a key that instance itself wrote, and a
   historical replay proving a past `asOf` does not see a later revision.
 - Official IR web research → `at-time` WATCH → scheduled wake → actual release/missing retry →
   Evidence/Thesis/Decision → next WATCH needs a real CLI/web-enabled manager run in both KR and US.

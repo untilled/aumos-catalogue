@@ -188,9 +188,14 @@ fixture asserts the difference so it cannot be undone silently.
   fundamentals.
 - **`thesis:read` and `evidence:read` are declared and serve nothing in the current Aumos
   build.** The manifest vocabulary carries both, and `grant.ts` maps each to an empty tool
-  list, so a run gets no `thesis_read`/`evidence_read` tool. The prompt reads them *when
-  available* and the manifest lists them under `optionalSkills` for exactly that reason.
-  Until Aumos serves them, asset claims reach a run through the invocation payload and
+  list, so a run gets no `thesis_read`/`evidence_read` tool. The manifest lists them under
+  `optionalSkills` for exactly that reason — that field is machine-readable and no run reads it.
+  ⚠️ **What a run reads used to say *when available*, and that was not enough** (2026-09-01): a
+  real session went looking for `thesis_read`, `evidence_read` and `manager_memory_read` — the
+  last of which is a spelling no build has ever had — and reported the gap itself. *When
+  available* reads as *ask and find out*, and asking costs turns. `PROMPT.md` and
+  `skills/orchestrate/SKILL.md` now name only what is served and say plainly that those are not
+  tools. Until Aumos serves them, asset claims reach a run through the invocation payload and
   through Brief, and the package says so rather than implying a lookup it cannot make.
   `RunProvenance.unservedTools` is where a run records the difference.
 - **A manager can arm a WATCH and cannot read one back.** The grant map publishes

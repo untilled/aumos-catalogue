@@ -272,7 +272,7 @@
         "sha": "047832161f33744a8718589234b80ba067f62509"
       },
       "description": "One evidence-gated methodology run as three market flows: a Korean sleeve, a US sleeve, and the allocator that sets their budgets and proposes the cross-market rebalance. The flows are subagents of one manager; only the orchestrator submits.",
-      "version": "0.4.6",
+      "version": "0.4.7",
       "metadata": {
         "name": "Evidence-Gated Allocator",
         "publisher": "aumos",
