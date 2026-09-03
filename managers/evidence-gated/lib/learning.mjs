@@ -211,7 +211,71 @@ function foldWindow(closed, cohort, setup, horizon, forward) {
   }
 }
 
-export function signalPaper({ rows = [], state = {}, horizons = [5, 20, 60], asOf } = {}) {
+/**
+ * Registration, and why it had to be an input here rather than a sentence.
+ *
+ * `paperAdmission` returned an `openWindow` and `theme-radar/SKILL.md` said
+ * "append it to `learning/paper-cohorts`". Nothing appended it. `nextState`
+ * was computed as *prior windows minus matured ones*, so a window admitted in
+ * this run was dropped on the floor unless a run hand-spliced JSON between two
+ * tool calls — and the one thing this package never asks a run to do is
+ * arithmetic a function should have done.
+ *
+ * ⚠️ Measured on run `run_f1560197652549e18bf7c1420f83983b`: the track held
+ * zero rows, and every published path into it ended in prose.
+ *
+ * So admissions arrive here and `nextState` is the whole answer: what the run
+ * read, minus what matured, plus what it registered. A run writes it back
+ * verbatim and nothing is left to a paragraph.
+ *
+ * ⛔ An admission never touches `closed`. It has no bars yet; folding one in
+ * would count a window at the instant it opened, which is the shape of
+ * manufacturing a sample rather than gathering one.
+ */
+function mergeAdmissions(openWindows, admissions, diagnostics, asOf) {
+  const registered = []
+  for (const [index, admission] of admissions.entries()) {
+    const path = `admissions[${index}]`
+    if (!SETUP_COHORTS[admission?.setup]) {
+      diagnostics.push(diagnostic('paper_setup_unknown', 'blocked', 'An admitted window names a published setup', `${path}.setup`, { setup: admission?.setup ?? null }))
+      continue
+    }
+    if (!admission?.symbol) {
+      diagnostics.push(diagnostic('paper_admission_incomplete', 'blocked', 'A registered window names the asset it is measuring', `${path}.symbol`))
+      continue
+    }
+    if (admission?.ruleVersion === undefined || admission?.ruleVersion === null) {
+      diagnostics.push(diagnostic('paper_rule_version_missing', 'blocked', 'A registered window carries the rule version it will be scored under; without it the row cannot be pooled or excluded later', `${path}.ruleVersion`))
+      continue
+    }
+    if (typeof admission?.signalAt !== 'string' || !Number.isFinite(Date.parse(admission.signalAt))) {
+      diagnostics.push(diagnostic('paper_admission_incomplete', 'blocked', 'A forward record is measured from an instant; a window without one cannot be scored', `${path}.signalAt`))
+      continue
+    }
+    if (typeof asOf === 'string' && Date.parse(admission.signalAt) > Date.parse(asOf)) {
+      diagnostics.push(diagnostic('paper_admission_after_as_of', 'blocked', 'A window registered after asOf would be measured from a moment this run cannot see', `${path}.signalAt`, { signalAt: admission.signalAt, asOf }))
+      continue
+    }
+    const duplicate = openWindows.some((window) => window?.symbol === admission.symbol && window?.setup === admission.setup)
+    if (duplicate) {
+      diagnostics.push(diagnostic('paper_window_already_open', 'unevaluated', 'This symbol and setup already has a live window; re-registering it would count one idea twice', `${path}.symbol`, { symbol: admission.symbol, setup: admission.setup }))
+      continue
+    }
+    const window = {
+      symbol: admission.symbol,
+      setup: admission.setup,
+      cohort: SETUP_COHORTS[admission.setup],
+      ruleVersion: admission.ruleVersion,
+      signalAt: admission.signalAt,
+      benchmark: admission.benchmark ?? null,
+    }
+    openWindows.push(window)
+    registered.push(window)
+  }
+  return registered
+}
+
+export function signalPaper({ rows = [], state = {}, admissions = [], horizons = [5, 20, 60], asOf } = {}) {
   const diagnostics = []
   const scored = []
   const closed = JSON.parse(JSON.stringify(state?.closed ?? {}))
@@ -255,6 +319,39 @@ export function signalPaper({ rows = [], state = {}, horizons = [5, 20, 60], asO
     matured.push(entry.symbol)
   }
   const openWindows = priorWindows.filter((window) => !matured.includes(window?.symbol))
+  const registered = mergeAdmissions(openWindows, admissions, diagnostics, asOf)
+
+  /**
+   * ── The silence that made the empty track indistinguishable from a skipped
+   * one (issue #118) ────────────────────────────────────────────────────────
+   *
+   * `signalPaper({ rows: [], state: {} })` returned `status: 'ok'` with no
+   * diagnostic. So did a run that read the key, carried five live windows and
+   * never fetched a bar for any of them. Two entirely different failures, one
+   * clean output — and the second is the one that had been happening.
+   *
+   * ⚠️ These are `unevaluated`, not `blocked`. A cold start is not an error and
+   * a run that could not reach bar data still has to submit a proposal. What
+   * they do is make the skip **say so**: `PROMPT.md` §5 names them in
+   * `uncertainty`, so a run that did not walk the loop cannot be told apart
+   * from one that did only by reading the code afterwards.
+   */
+  const scoredSymbols = new Set(scored.map((entry) => entry.symbol).filter(Boolean))
+  /**
+   * ⚠️ A window registered in *this* run is not unscored — it has no forward
+   * bar yet, by construction. Only a window carried in from an earlier run
+   * that nobody fetched bars for is the skip this names.
+   */
+  const registeredSymbols = new Set(registered.map((window) => window.symbol))
+  const unscoredWindows = [...new Set(openWindows.map((window) => window?.symbol))]
+    .filter((symbol) => symbol && !scoredSymbols.has(symbol) && !registeredSymbols.has(symbol))
+  if (unscoredWindows.length) {
+    diagnostics.push(diagnostic('paper_windows_unscored', 'unevaluated', 'These windows are registered and this run passed no bars for them; a window nobody looked at accrues nothing, and reporting the track as unchanged would hide the run that skipped it', 'rows', { symbols: unscoredWindows }))
+  }
+  const trackStatus = openWindows.length === 0 && Object.keys(closed).length === 0 ? 'empty' : 'accruing'
+  if (trackStatus === 'empty') {
+    diagnostics.push(diagnostic('paper_track_empty', 'unevaluated', 'The paper track holds no window and no closed sum. It is the only path to the 30-sample promotion gate, so an empty track is a run that registered nothing rather than a run with nothing to say', 'state', { registeredThisRun: registered.length }))
+  }
 
   const bucket = () => ({ samples: 0, sumExcess: 0, sumReturn: 0, wins: 0, absoluteWins: 0, absoluteSamples: 0 })
   const summarize = (map) => Object.fromEntries([...map].map(([key, horizonMap]) => [key, Object.fromEntries([...horizonMap].map(([horizon, stats]) => {
@@ -316,6 +413,9 @@ export function signalPaper({ rows = [], state = {}, horizons = [5, 20, 60], asO
       nextState: { schemaVersion: 1, updatedAsOf: asOf ?? null, closed, openWindows, maturedThisRun: matured },
       openWindowCount: openWindows.length,
       maturedThisRun: matured,
+      registeredThisRun: registered,
+      unscoredWindows,
+      trackStatus,
       cohortsAreSeparate: true,
       sampleKind: 'paper-only-never-mixed-with-closed-decisions',
       asOf: asOf ?? null,

@@ -30,7 +30,7 @@ const operations = {
   opportunityUniverse,
   trendState,
   blendedSectorStrength: (input) => blendedSectorStrength(input?.assetBars ?? [], input?.benchmarkBars ?? [], input?.weights),
-  sectorStrength,
+  sectorStrength: (input, asOf) => sectorStrength({ ...input, asOf }),
   regimeTag: (input, asOf) => regimeTag({ ...input, asOf }),
   sleeveNav,
   targetWeight,

@@ -1402,6 +1402,28 @@ assert.equal(sectorLane.data.meaning, 'research-priority-only')
 covers('scanner/bot-baseline-never-traded')
 assert.ok(sectorLane.data.baselineSignals.every((row) => row.tradeable === false), 'the bot baseline is a measuring stick and says so in the data')
 assert.equal(sectorLane.data.baselineSignals[0].setup, 'rs_breakout')
+
+covers('scanner/baseline-signals-are-admissible')
+/**
+ * "Logged for measurement" was an adjective. Every baseline row was missing the
+ * two fields `paperAdmission` requires, so the control arm the research cohort
+ * is measured against could not be loaded by any published path — and a run
+ * that supplied a version would have been inventing one for code it did not
+ * write. The rule lives in `baselineSetup`, so the version travels with the row.
+ */
+for (const row of sectorLane.data.baselineSignals) {
+  assert.equal(row.ruleVersion, 'rs-v1', 'the version of the bot travels with the signal; it is not a run\'s to choose')
+  assert.equal(row.signalAt, methodology.asOf, 'a forward record is measured from an instant, and this run is it')
+}
+const baselineAdmitted = execute({
+  operation: 'paperAdmission',
+  asOf: methodology.asOf,
+  input: { setup: sectorLane.data.baselineSignals[0].setup, thesis: sectorLane.data.baselineSignals[0] },
+})
+assert.equal(baselineAdmitted.status, 'ok', 'a baseline signal is admissible verbatim, with no field a run had to supply itself')
+assert.equal(baselineAdmitted.data.cohort, 'mechanical-baseline')
+assert.equal(baselineAdmitted.data.openWindow.symbol, 'LEAD')
+assert.equal(baselineAdmitted.data.tradeable, false)
 assert.ok(sectorLane.diagnostics.some((row) => row.code === 'sector_series_unverified'), 'a sector that could not be read is named unread, never dropped')
 
 /**
@@ -1890,6 +1912,73 @@ assert.ok(
   'a registered window carries the version it will be scored under, or it cannot be pooled or excluded later',
 )
 assert.ok(/instance/i.test(memorySkill.slice(memorySkill.indexOf('What it costs'))), 'the cost of this home — instance-scoped, invisible to another manager — is stated where the key is')
+
+covers('learning/paper-registration-is-mechanical')
+/**
+ * ── Registration was a sentence, and sentences do not append (issue #118) ───
+ *
+ * `paperAdmission` returned an `openWindow`; `theme-radar/SKILL.md` said to
+ * append it. `nextState.openWindows` was computed as *prior minus matured*, so
+ * nothing carried an admitted window across the two calls and the track held
+ * zero rows on every run measured. The merge is inside `signalPaper` now, and
+ * these assertions are what stops it going back to prose.
+ */
+const registerAsOf = '2026-08-20T00:00:00Z'
+const admittedWindow = execute({
+  operation: 'paperAdmission',
+  asOf: registerAsOf,
+  input: { setup: 'thesis_call', challengeVerdict: 'cleared', thesis: { evidenceStatus: 'complete', asset: 'NEW', ruleVersion: 'tc-v1', benchmark: 'KOSPI200' }, priceHistoryLatestDate: '2026-08-19' },
+}).data.openWindow
+const registered = execute({ operation: 'signalPaper', asOf: registerAsOf, input: { rows: [], state: {}, admissions: [admittedWindow] } })
+assert.deepEqual(registered.data.nextState.openWindows.map((row) => row.symbol), ['NEW'], 'what admission produced is in the state this run writes back, without a run assembling it')
+assert.deepEqual(registered.data.registeredThisRun.map((row) => row.symbol), ['NEW'])
+assert.equal(registered.data.nextState.closed['cohort:llm-research'], undefined, 'a window has no bars at the instant it opens; folding one into the sums would manufacture a sample')
+assert.deepEqual(registered.data.unscoredWindows, [], 'a window registered in this run is not one nobody looked at')
+const reRegistered = execute({ operation: 'signalPaper', asOf: registerAsOf, input: { rows: [], state: registered.data.nextState, admissions: [admittedWindow] } })
+assert.equal(reRegistered.data.nextState.openWindows.length, 1, 'the same symbol and setup does not open twice; one idea counted twice is a manufactured sample')
+assert.ok(reRegistered.diagnostics.some((row) => row.code === 'paper_window_already_open'))
+assert.equal(
+  execute({ operation: 'signalPaper', asOf: registerAsOf, input: { rows: [], state: {}, admissions: [{ symbol: 'X', setup: 'thesis_call', signalAt: '2026-12-01T00:00:00Z', ruleVersion: 'tc-v1' }] } }).status,
+  'blocked',
+  'a window registered after asOf would be measured from a moment this run cannot see',
+)
+assert.ok(
+  execute({ operation: 'signalPaper', asOf: registerAsOf, input: { rows: [], state: {}, admissions: [{ symbol: 'X', setup: 'thesis_call', signalAt: registerAsOf }] } })
+    .diagnostics.some((row) => row.code === 'paper_rule_version_missing'),
+  'the merge applies the same version rule the scorer does; a run cannot slip a row in around it',
+)
+const baselineRegistered = execute({
+  operation: 'signalPaper',
+  asOf: registerAsOf,
+  input: { rows: [], state: {}, admissions: [admittedWindow, { symbol: 'BOT', setup: 'rs_breakout', ruleVersion: 'rs-v1', signalAt: registerAsOf }] },
+})
+assert.deepEqual(
+  baselineRegistered.data.nextState.openWindows.map((row) => row.cohort),
+  ['llm-research', 'mechanical-baseline'],
+  'both arms register through one call and each row keeps the cohort its setup assigns; the merge never pools them',
+)
+assert.ok(prompt.includes('admissions'), 'and the run skeleton hands the admissions in rather than describing an append')
+
+covers('learning/empty-paper-track-is-observable')
+/**
+ * Two entirely different failures had one clean output. `signalPaper` with no
+ * rows and no state returned `ok` and no diagnostic — and so did a run holding
+ * five live windows that fetched a bar for none of them. The second is the one
+ * that was happening, and nothing in the run could have said so.
+ */
+const emptyTrack = execute({ operation: 'signalPaper', asOf: registerAsOf, input: { rows: [], state: {} } })
+assert.equal(emptyTrack.data.trackStatus, 'empty')
+assert.ok(emptyTrack.diagnostics.some((row) => row.code === 'paper_track_empty'), 'an empty track is the only path to the promotion gate holding nothing, and it says so')
+assert.equal(emptyTrack.status, 'unevaluated', 'a cold start is reported, never blocked — the run still has a proposal to make')
+const skipped = execute({ operation: 'signalPaper', asOf: registerAsOf, input: { rows: [], state: registered.data.nextState } })
+assert.equal(skipped.data.trackStatus, 'accruing')
+assert.deepEqual(skipped.data.unscoredWindows, ['NEW'])
+assert.ok(skipped.diagnostics.some((row) => row.code === 'paper_windows_unscored'), 'a carried window nobody fetched bars for is a skipped loop, not an unchanged track')
+assert.ok(prompt.includes('paper_windows_unscored') && prompt.includes('paper_track_empty'), 'and the run skeleton says to report them in uncertainty')
+assert.ok(
+  /trackStatus/.test(await readFile(new URL('../skills/evidence-gates/SKILL.md', fixtureRoot), 'utf8')),
+  'the gate that the track exists to make reachable says how to read an empty column',
+)
 
 covers('learning/signal-paper-cohorts')
 const paperBars = (rate, count = 70) => Array.from({ length: count }, (_, index) => {

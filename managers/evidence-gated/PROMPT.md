@@ -161,7 +161,7 @@ something a run would otherwise discover *after* proposing.
 | 4 | `exitCheck` over every non-core holding | nothing — but **its SELL and TRIM candidates are reported before any new buy is considered.** Selling what is broken comes before buying what is interesting, and a run that plans purchases first will find reasons not to revisit that order |
 | 5 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
 | 6 | broker limits | Aumos owns them; read what the invocation carries and do not assume |
-| 7 | `signalPaper` → `verdictReport` | nothing — but a met threshold is stated in this run, and a `NO_GO` freezes new non-core experiments |
+| 7 | `signalPaper` → `verdictReport` | nothing — but a met threshold is stated in this run, a `NO_GO` freezes new non-core experiments, and an empty or unadvanced track is named in `uncertainty` rather than passed over |
 
 ⛔ **A `harnessAudit` blocker stops planning, never reporting.** Say what is broken, name it in
 `uncertainty`, and propose `WAIT`. The failure this prevents is a well-formed proposal built on a
@@ -235,9 +235,16 @@ proposes adding to a position.
 is due, load `skills/theme-radar/SKILL.md` and run it before naming lenses, because it is where a
 candidate that no scanner would surface comes from. Call `sectorStrength` first — its
 `researchQueue` is the input, and its ranking, rank moves and regime reading are attention, not
-signals. Its `baselineSignals` are logged for measurement and are never traded. A run with no web
+signals. A run with no web
 lane produces no forward thesis and says the lane was missing; a silent fallback is forbidden.
 Record the run under `run/theme-radar-last` whether or not it produced anything.
+
+⚠️ **"Logged for measurement" is a call, not an adjective.** Each `sectorStrength.baselineSignals`
+row carries the `ruleVersion` and `signalAt` that admit it: pass it to `paperAdmission` as the
+`thesis` and carry the returned `openWindow` into §5's `admissions`. Every cleared, conditional or
+rejected thesis this run produced goes the same way. **They are never traded** — `tradeable: false`
+travels with every row — and they are the control arm the research cohort is measured against, so a
+run that produces calls and no baselines is building a comparison with one side missing.
 
 ### 3. Name the lens
 
@@ -360,13 +367,36 @@ never create an infinite near-term loop. Distinguish source failure from not-yet
 
 ### 5. Update durable state sparingly
 
-Score the paper track before the real one, because it is where most of the evidence is. Read
-`learning/paper-cohorts`, fetch bars for each of its `openWindows`, and call `signalPaper` with both;
-write `nextState` back to that key. The closed sums carry the history and the matured windows drop
-out, so the key stays small. Then call `verdictReport` on the `llm-research` cohort's d60 window; add `shadowTrack` and `baselineTrack` when both curves are available. ⛔ Paper counts are
+Score the paper track before the real one, because it is where most of the evidence is. **This runs
+on every wake, and it is not conditional on having found anything** — it is the only path to the
+30-sample promotion gate, so a run that skips it postpones every size decision this book will ever
+make by one run.
+
+Four steps, in order, and `signalPaper` is called once with all of them:
+
+1. Read `learning/paper-cohorts`. Empty is valid on a first run and is not a reason to stop.
+2. Fetch bars for **every** symbol in its `openWindows`, and pass them as `rows` — a carried window
+   nobody fetched bars for accrues nothing.
+3. Pass every `openWindow` that `paperAdmission` admitted in this run as `admissions` — the thesis
+   calls from `theme-radar` and the `sectorStrength` baseline signals both.
+4. Write the returned `nextState` back to that key **verbatim**. It is the whole answer: what was
+   carried, minus what matured, plus what this run registered. ⛔ Do not assemble that object by
+   hand — a window appended in prose is a window that was never appended.
+
+The closed sums carry the history and the matured windows drop out, so the key stays small.
+
+⚠️ **An empty or unadvanced track says so, and this run repeats it.** `trackStatus: 'empty'` with
+`paper_track_empty` means nothing has ever been registered; `paper_windows_unscored` names windows
+that were carried and not looked at. Put either in `uncertainty` naming the reason. Neither blocks —
+a cold start is not an error — but a run that reported the track as unchanged when what happened is
+that nobody walked it has made the skip invisible, which is the failure this step exists to prevent.
+
+Then call `verdictReport` on the `llm-research` cohort's d60 window; add `shadowTrack` and
+`baselineTrack` when both curves are available. ⛔ Paper counts are
 never reported as maturity counts — `signalPaper` returns `cohortsAreSeparate` and `sampleKind` so
-the distinction is in the data, not only in this sentence. Thresholds may be passed stricter, never
-looser: a criterion adjusted after seeing the result is refused.
+the distinction is in the data, not only in this sentence. ⛔ And `verdictReport` refuses any cohort
+but `llm-research` outright: the mechanical baseline is measured, never promoted. Thresholds may be
+passed stricter, never looser: a criterion adjusted after seeing the result is refused.
 
 When `verdictReport` returns proposals, **state them in this run**. They are what a met threshold
 looks like, they still require the investor's approval, and a manager that only ever argues itself

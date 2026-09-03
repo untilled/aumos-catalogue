@@ -36,7 +36,15 @@ So both are kept, in separate columns:
 
 `signalPaper` returns `cohortsAreSeparate: true` and `sampleKind` says which kind of sample it is
 holding. A run that reports a paper count as a maturity count has broken the rule the label exists to
-state. Rows carry the `ruleVersion` they were judged under and are never pooled across versions:
+state.
+
+⚠️ **And an empty paper column is a finding, not a blank.** The track is the only thing that makes
+this gate reachable, so `signalPaper` reports `trackStatus` and raises `paper_track_empty` when
+nothing has ever been registered and `paper_windows_unscored` when a carried window was not looked
+at. Before that it returned a clean, empty, silent result for both a cold start and a run that
+skipped the loop entirely — which is what had been happening, and the reason every lens below reads
+`insufficient` with nothing on the way to change it. Report the status; do not read a zero as
+"nothing qualified". Rows carry the `ruleVersion` they were judged under and are never pooled across versions:
 re-tagging old rows under a new definition would manufacture a sample rather than gather one.
 
 The research cohort is measured against two things and not one — the index *and* the mechanical
