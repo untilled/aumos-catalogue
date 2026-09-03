@@ -53,7 +53,25 @@ It is short, and it is where the rules are argued rather than merely listed.
 
 ## What happens to a merged submission
 
-Aumos publishes two faces of each catalogue from one generator, in one pass:
+**The merge is the publication.** Since untilled/aumos#323 an installed Aumos reads the
+two index documents in this repository **directly, over HTTPS, at `HEAD`** — no build
+step, no queue, nothing to press:
+
+| what is read | where it comes from |
+|---|---|
+| `raw.githubusercontent.com/untilled/aumos-catalogue/HEAD/.claude-plugin/marketplace.json` | this repository, at whatever `HEAD` is when the machine fetches it |
+| `raw.githubusercontent.com/untilled/aumos-catalogue/HEAD/.aumos/sources.json` | the same, for data sources |
+| `codeload.github.com/<owner>/<repository>/tar.gz/<sha>` | a package's **bytes** — the address is composed from the entry, never named by it |
+
+`HEAD` rather than `main` deliberately: a catalogue whose default branch is called
+something else would otherwise be unreachable for a reason nobody could see.
+
+⚠️ **So a merged submission is live to every machine that fetches after it, and an entry
+that machine cannot parse is skipped rather than reported to you.** That is what
+`tools/check-index.mjs` exists to prevent — it is the only place that judges these two
+documents before they are served.
+
+Aumos also publishes two faces of each catalogue from one generator, in one pass:
 
 | | |
 |---|---|
@@ -61,6 +79,14 @@ Aumos publishes two faces of each catalogue from one generator, in one pass:
 | `aumos.app/managers` | the page a person reads before installing one |
 | `releases.aumos.app/sources/sources.json` | the machine index of data sources, the same way |
 | `aumos.app/sources` | and its page |
+
+⚠️ **The two `releases.aumos.app` rows are a mirror, not the publication path, and this
+page said otherwise until untilled/aumos-catalogue#116.** They are the **frozen** index —
+what copies of Aumos older than #323 fetch — and Aumos's own generator is explicit about
+which of the two is the real one: *"this is not where a package is published: publication
+is a commit to the catalogue repository's `marketplace.json`, and this only mirrors that
+document onto the frozen host."* The two `aumos.app` rows are the human face of the same
+list.
 
 Neither pair can describe different catalogues, because each is written from one list —
 and this repository is one of the two places every list is built from. The other is

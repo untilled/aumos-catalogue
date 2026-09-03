@@ -146,4 +146,18 @@ jobs:
       # Moving it last changes nothing about what is checked or about the job's
       # result: an unrepinned pull request still fails. What it buys is that the
       # failure no longer hides the checks a reviewer needs.
+      #
+      # ⚠️ **That expected red is being removed, not worked around (#112 ①).** An
+      # entry naming this repository does not pin any more — it is written
+      # `"source": "./<dir>/<id>"` — so this step has no pin to check for it and
+      # a pull request touching it is not red here and needs no repin. #116 did
+      # the five in `.aumos/sources.json`; #115 does the nine in
+      # `.claude-plugin/marketplace.json`, and after it this step prints `--` for
+      # every entry and passes. **Then the paragraph above describes nothing that
+      # happens** until an entry names another repository, which is the only kind
+      # that still pins — and on that day it is true again, unchanged.
+      #
+      # ⚠️ **Its position stays last regardless.** The reason it moved here was
+      # that a red step hides the four that judge a submission, and that is a
+      # property of `steps` being sequential, not of pins.
       - run: npm run check:pins
