@@ -1,7 +1,7 @@
 import { result, diagnostic } from './diagnostics.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
-import { sleeveNav, targetWeight, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing } from './sizing.mjs'
+import { sleeveNav, targetWeight, experimentalCeiling, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing } from './sizing.mjs'
 import { coverageState, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
 import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
@@ -34,6 +34,7 @@ const operations = {
   regimeTag: (input, asOf) => regimeTag({ ...input, asOf }),
   sleeveNav,
   targetWeight,
+  experimentalCeiling,
   legacySizeSuggestion,
   concentration,
   entryQualityGate,

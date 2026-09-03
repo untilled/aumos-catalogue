@@ -1776,7 +1776,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 82)
+assert.equal(supportedOperations.length, 83)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -2074,6 +2074,62 @@ assert.equal(starved.data.lanes['post-event-continuation'].starved, true)
 assert.equal(starved.data.lanes['post-event-continuation'].reasons['no-event-in-the-last-30-days'], 5)
 assert.ok(starved.diagnostics.some((row) => row.code === 'radar_lane_starved'), 'an unfed lane says so rather than reading as no opportunity')
 assert.equal(starved.data.lanes.inflection.starved, false, 'a lane that is being fed is not flagged')
+
+/**
+ * ── A ceiling that can be executed (issue #121) ────────────────────────────
+ *
+ * The ratio was the whole ceiling, and a ratio cannot say whether the order it
+ * permits is placeable. The numbers below are the ones from the issue — a
+ * 10,095,751 KRW book and a 33,050 KRW name — so the case fails if the rule
+ * ever stops reproducing the size the source methodology actually took.
+ *
+ * ⚠️ The third assertion is the one that matters most: **the floor may not
+ * inflate the weight without limit.** "Larger of a ratio and an amount" is
+ * unbounded as the book shrinks, and on a 3,000,000 KRW book the floor alone
+ * would ask for 10%.
+ */
+covers('sizing/executable-experimental-ceiling')
+const ceilingConfig = { experimentalPositionCeiling: 0.01, experimentalPositionFloor: { KRW: 300000, USD: 200 }, experimentalPositionCeilingMax: 0.03 }
+const issueBook = { portfolioNav: 10095751, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1359.14 } }
+const ceilingOf = (input) => execute({ operation: 'experimentalCeiling', asOf: radarAsOf, input })
+const krCeiling = ceilingOf({ ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' })
+assert.equal(krCeiling.status, 'ok')
+assert.equal(krCeiling.data.binding, 'floor', 'on this book the executable minimum binds, not the ratio')
+assert.ok(krCeiling.data.experimentalCeiling > 0.025 && krCeiling.data.experimentalCeiling <= 0.03, 'and it lands on the Experiment-stage size the port came from, not a third of it')
+assert.ok(
+  Math.floor((krCeiling.data.experimentalCeiling * 10095751) / 33050) >= 9,
+  'nine whole shares of the name the issue measured, against three under the ratio alone',
+)
+const usCeiling = ceilingOf({ ...ceilingConfig, ...issueBook, positionCurrency: 'USD' })
+assert.equal(usCeiling.data.binding, 'floor')
+assert.ok(usCeiling.data.floorWeight > 0.026 && usCeiling.data.floorWeight < 0.028, 'the USD floor crosses into the KRW denominator at the NAV rate and not by a second FX rule')
+const smallBook = ceilingOf({ ...ceilingConfig, portfolioNav: 3000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1359.14 }, positionCurrency: 'KRW' })
+assert.equal(smallBook.data.floorWeight, 0.1)
+assert.equal(smallBook.data.experimentalCeiling, 0.03, 'the floor never carries the ceiling past experimentalPositionCeilingMax')
+assert.equal(smallBook.data.binding, 'ceilingMax')
+assert.ok(
+  smallBook.diagnostics.some((row) => row.code === 'experimental_floor_unreachable'),
+  'a book that cannot hold an executable experiment inside the band is told so; a position rounded up to the cap is not the one the floor asked for',
+)
+const bigBook = ceilingOf({ ...ceilingConfig, portfolioNav: 100000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1359.14 }, positionCurrency: 'KRW' })
+assert.equal(bigBook.data.experimentalCeiling, 0.01, 'where the ratio is already executable it is still the ceiling — this floor lifts nothing on a large book')
+assert.equal(ceilingOf({ experimentalPositionCeiling: 0.01 }).data.experimentalCeiling, 0.01, 'a caller that declares no floor gets the ratio it always got')
+assert.ok(
+  ceilingOf({ ...ceilingConfig, ...issueBook }).diagnostics.some((row) => row.code === 'experimental_floor_unevaluated'),
+  'a floor quoted per venue needs the venue named; guessing the currency would be inventing the number',
+)
+const sizedUnderFloor = execute({
+  operation: 'targetWeight',
+  asOf: radarAsOf,
+  input: { expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, configPositionCap: 0.1, maturityStatus: 'observing', researchGate: 'passed', challengeVerdict: 'cleared', ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' },
+})
+assert.equal(sizedUnderFloor.data.experimentalCeiling, krCeiling.data.experimentalCeiling, 'targetWeight applies the same rule rather than a second copy of the arithmetic')
+assert.equal(sizedUnderFloor.data.bindingCap, krCeiling.data.experimentalCeiling)
+assert.equal(
+  execute({ operation: 'targetWeight', asOf: radarAsOf, input: { expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, configPositionCap: 0.1, maturityStatus: 'promoted', researchGate: 'passed', challengeVerdict: 'cleared', ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' } }).data.bindingCap,
+  0.1,
+  'a promoted lens is not held to the experimental ceiling at all, floor or no floor',
+)
 
 /**
  * ── The control arm, and the prohibition on expanding it (issue #70 §9) ────
@@ -2517,7 +2573,7 @@ for (const [where, text] of Object.entries(documents)) {
     assert.ok(configurablePaths.has(key) || configurablePaths.has(key.split('.').at(-1)), `${where} calls ${key} configured, so config.schema.json has it`)
   }
 }
-for (const key of ['watchExpiryDays', 'priceConflictTolerance', 'experimentalPositionCeiling', 'minimumExpectedActiveReturn', 'reviewReadyClosedOutcomes', 'benchmarkHurdleAnnualPct']) {
+for (const key of ['watchExpiryDays', 'priceConflictTolerance', 'experimentalPositionCeiling', 'experimentalPositionFloor', 'experimentalPositionCeilingMax', 'minimumExpectedActiveReturn', 'reviewReadyClosedOutcomes', 'benchmarkHurdleAnnualPct']) {
   assert.ok(configurablePaths.has(key), `${key} is a real configuration key`)
   assert.ok(
     Object.values(documents).some((text) => text.includes(key)),

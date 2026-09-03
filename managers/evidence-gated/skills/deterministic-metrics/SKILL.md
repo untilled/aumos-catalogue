@@ -48,6 +48,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 |---|---|
 | `sleeveNav` | KRW/USD/SGOV net asset value and the FX that joins them |
 | `targetWeight` | desired portfolio weight under maturity and caps |
+| `experimentalCeiling` | the ceiling an unpromoted lens is held to — the ratio or the venue's minimum executable amount, whichever is larger, bounded |
 | `legacySizeSuggestion` | the ported Kelly-gated heuristic and its mode label |
 | `concentration` | position/sector/theme/factor caps and portfolio heat |
 | `newSinglePacing` | three approved pacing warnings; never blocks |

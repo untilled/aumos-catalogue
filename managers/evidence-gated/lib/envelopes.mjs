@@ -288,6 +288,16 @@ const POLICY_DIRECTIONS = {
   benchmarkHurdleAnnualPct: 'higher-is-stricter',
   watchExpiryDays: 'lower-is-stricter',
   experimentalPositionCeiling: 'lower-is-stricter',
+  /**
+   * The floor raises the ceiling, so a larger floor is a looser manager and a
+   * smaller one is a stricter manager — the opposite of what the word "floor"
+   * suggests, which is exactly why it is declared rather than inferred. An
+   * undeclared key is `policy_direction_undeclared`, and a value whose
+   * direction nobody can name is one `policyLint` cannot refuse.
+   */
+  'experimentalPositionFloor.KRW': 'lower-is-stricter',
+  'experimentalPositionFloor.USD': 'lower-is-stricter',
+  experimentalPositionCeilingMax: 'lower-is-stricter',
   priceConflictTolerance: 'lower-is-stricter',
   'concentration.position': 'lower-is-stricter',
   'concentration.sector': 'lower-is-stricter',

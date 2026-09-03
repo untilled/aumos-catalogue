@@ -36,9 +36,18 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    declared stop is unevaluated rather than zero risk. Over the cap, a run that adds new non-core risk
    is blocked while a book already over on its holdings alone warns — the same `config.grandfather`
    reading the weight caps use, from the same place.
-4. Apply evidence maturity. `insufficient` and `observing` lenses are capped at
-   `experimentalPositionCeiling`; `reviewable` is still not promoted and cannot expand solely because
-   its sample threshold was reached.
+4. Apply evidence maturity. `insufficient` and `observing` lenses are capped at the experimental
+   ceiling; `reviewable` is still not promoted and cannot expand solely because its sample threshold
+   was reached. ⚠️ **That ceiling is not `experimentalPositionCeiling` alone.** A ratio says nothing
+   about whether the order it permits can be placed: 1% of a 10,095,751 KRW book is 100,958 KRW,
+   which is three shares of a 33,050 KRW name, and a three-share position cannot be scaled into,
+   trimmed, or made to express conviction. So the effective ceiling is the larger of that ratio and
+   `experimentalPositionFloor` — the smallest position worth opening in **that venue's** currency —
+   bounded by `experimentalPositionCeilingMax`. Call `experimentalCeiling` for it rather than
+   deriving it; `targetWeight` applies the same rule and reports which of the three bound.
+   ⛔ When the floor does not fit inside the band the operation says `experimental_floor_unreachable`
+   and the honest answer is that this book cannot run a real-money controlled experiment in that
+   market — not a position rounded up to the cap.
 5. Compare with cash and benchmark alternatives. A target is the desired portfolio weight, not an
    order quantity, and it is never negative.
 
@@ -144,4 +153,6 @@ bound for a fact that stops mattering at the closing bell.
 
 When OpenDART is unavailable, a new Korean single-name fundamental BUY remains unable-to-judge
 `WAIT` even if the price example looks attractive. When only evidence maturity is low but every
-research input is complete, a controlled experiment may use at most the configured ceiling.
+research input is complete, a controlled experiment may use at most the configured ceiling — the
+ratio or the venue's minimum executable amount, whichever is larger, and never above
+`experimentalPositionCeilingMax`.

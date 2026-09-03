@@ -51,6 +51,93 @@ export function sleeveNav({ cash = [], positions = [], fx = {} }) {
   }
 }
 
+/**
+ * ── A ceiling that can be executed (issue #121) ────────────────────────────
+ *
+ * `experimentalPositionCeiling` was a ratio and nothing else, and a ratio
+ * alone says nothing about whether the order it permits can be placed. On the
+ * book that found this, 1% of 10,095,751 KRW is 100,958 KRW, and the name the
+ * methodology was ported with — KOGAS at 33,050 — is **three shares**. The
+ * smallest expressible change in a three-share position is a third of it: it
+ * cannot be scaled into, trimmed, or made to express conviction, and after the
+ * tick and the round-trip fee there is no result left to measure. The ceiling
+ * was reading as *do not start* rather than *start small*. The source
+ * methodology's own Experiment-stage size for that same name was ten shares —
+ * 2.6% of its book — so the port was 60% below the discipline it claims.
+ *
+ * ⛔ This is not a licence to size up, and it is deliberately not a runtime
+ * config change: `policyLint` refuses a loosened threshold, and it is right to.
+ * The floor raises the ceiling only until the position is executable, and
+ * `experimentalPositionCeilingMax` is what stops it there.
+ *
+ * ⚠️ **The floor is denominated per venue, not in the book's base currency.**
+ * What makes an order unexecutable — tick size, lot size, the price a share
+ * trades at, the fee and tax schedule — is a fact about the exchange; the base
+ * currency is only where the investor keeps score. One USD number would buy a
+ * granular position in a market quoting $0.01 ticks and a three-share position
+ * in one quoting 50원 ticks on a 33,050원 share. The conversion into the
+ * book's denominator uses the same USDKRW `sleeveNav` already requires.
+ *
+ * ⚠️ It is an approximation and stays one: exact granularity is a fact about
+ * the *name*, and this operation is given no price. The currency is the
+ * coarsest partition that is still correct.
+ *
+ * ⚠️ **Below roughly 10,000,000 KRW of NAV the floor stops fitting inside the
+ * band, and the run is told so rather than quietly sized at the cap.** A book
+ * that small cannot run this lane on real money at all, and the honest sample
+ * there is the paper cohort — not a position that has been rounded up until it
+ * looks like one.
+ */
+export function experimentalCeiling(input = {}) {
+  const diagnostics = []
+  const ratio = finite(input.experimentalPositionCeiling) ? Math.max(0, input.experimentalPositionCeiling) : 0
+  const ceilingMax = finite(input.experimentalPositionCeilingMax) ? Math.max(0, input.experimentalPositionCeilingMax) : null
+  const floors = input.experimentalPositionFloor
+  const currency = input.positionCurrency
+  const data = {
+    ratioCeiling: round(ratio),
+    floorAmount: null,
+    floorCurrency: currency ?? null,
+    floorWeight: null,
+    ceilingMax: ceilingMax === null ? null : round(ceilingMax),
+    experimentalCeiling: round(ratio),
+    binding: 'ratio',
+    units: { floorAmount: 'currency-major-units', ratioCeiling: 'portfolio-weight', floorWeight: 'portfolio-weight', experimentalCeiling: 'portfolio-weight' },
+  }
+  if (!floors || typeof floors !== 'object') return { data, diagnostics }
+  const amount = finite(floors[currency]) ? floors[currency] : null
+  if (amount === null) {
+    diagnostics.push(diagnostic('experimental_floor_unevaluated', 'unevaluated', 'A minimum executable amount is declared per venue currency, so the currency of the position being sized is required and has to be one the floor names', 'positionCurrency', { currency: currency ?? null, declared: Object.keys(floors) }))
+    return { data, diagnostics }
+  }
+  data.floorAmount = round(amount, 2)
+  const nav = input.portfolioNav
+  const navCurrency = input.portfolioNavCurrency
+  const usdKrw = input.fx?.USDKRW
+  if (!finite(nav) || nav <= 0 || !['KRW', 'USD'].includes(navCurrency)) {
+    diagnostics.push(diagnostic('experimental_floor_unevaluated', 'unevaluated', 'An amount becomes a weight only against the book it is a weight of; portfolioNav and portfolioNavCurrency are required', 'portfolioNav'))
+    return { data, diagnostics }
+  }
+  let amountInNav = amount
+  if (currency !== navCurrency) {
+    if (!finite(usdKrw) || usdKrw <= 0) {
+      diagnostics.push(diagnostic('experimental_floor_unevaluated', 'unevaluated', 'The floor is quoted in the venue currency and the book is denominated in another, so USDKRW is required to compare them', 'fx.USDKRW'))
+      return { data, diagnostics }
+    }
+    amountInNav = currency === 'USD' ? amount * usdKrw : amount / usdKrw
+  }
+  const floorWeight = amountInNav / nav
+  data.floorWeight = round(floorWeight)
+  const lifted = Math.max(ratio, floorWeight)
+  const capped = ceilingMax === null ? lifted : Math.min(lifted, ceilingMax)
+  data.experimentalCeiling = round(capped)
+  data.binding = capped === ratio && floorWeight <= ratio ? 'ratio' : ceilingMax !== null && lifted > ceilingMax ? 'ceilingMax' : 'floor'
+  if (ceilingMax !== null && floorWeight > ceilingMax) {
+    diagnostics.push(diagnostic('experimental_floor_unreachable', 'unevaluated', 'The smallest executable position in this venue is larger than the experimental band allows, so this book cannot run a real-money controlled experiment here; the paper cohort is the sample that is available, and a position rounded up to the cap would not be the one this floor was asked for', 'experimentalPositionFloor', { floorWeight: round(floorWeight), ceilingMax: round(ceilingMax) }))
+  }
+  return { data, diagnostics }
+}
+
 export function targetWeight(input) {
   const diagnostics = []
   const expected = input?.expectedActiveReturn
@@ -75,8 +162,18 @@ export function targetWeight(input) {
   if (input.researchGate !== 'passed' || input.challengeVerdict !== 'cleared') {
     diagnostics.push(diagnostic('research_or_challenge_blocked', 'blocked', 'Sizing cannot repair a failed research or challenge gate', 'researchGate'))
   }
-  const experimentalCap = finite(input.experimentalPositionCeiling) ? input.experimentalPositionCeiling : 0
-  if (['insufficient', 'observing', 'reviewable'].includes(maturity)) caps.push(experimentalCap)
+  /**
+   * One rule, called here. The ceiling an unpromoted lens is held to is
+   * `experimentalCeiling()`'s answer and never a second copy of the arithmetic
+   * — a floor computed in one place and a ratio read in another is how the two
+   * come to disagree about what the ceiling is.
+   */
+  const unpromoted = ['insufficient', 'observing', 'reviewable'].includes(maturity)
+  const ceiling = experimentalCeiling(input)
+  if (unpromoted) {
+    diagnostics.push(...ceiling.diagnostics)
+    caps.push(finite(ceiling.data.experimentalCeiling) ? ceiling.data.experimentalCeiling : 0)
+  }
   const cap = caps.length ? Math.max(0, Math.min(...caps)) : 0
   return {
     data: {
@@ -84,7 +181,9 @@ export function targetWeight(input) {
       bindingCap: round(cap),
       targetWeight: diagnostics.some((item) => item.severity === 'blocked') ? null : round(Math.min(raw, cap)),
       maturityStatus: maturity,
-      units: { rawWeight: 'portfolio-weight', bindingCap: 'portfolio-weight', targetWeight: 'portfolio-weight' },
+      experimentalCeiling: ceiling.data.experimentalCeiling,
+      experimentalCeilingBinding: ceiling.data.binding,
+      units: { rawWeight: 'portfolio-weight', bindingCap: 'portfolio-weight', targetWeight: 'portfolio-weight', experimentalCeiling: 'portfolio-weight' },
     },
     diagnostics,
   }

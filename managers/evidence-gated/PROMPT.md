@@ -157,7 +157,7 @@ something a run would otherwise discover *after* proposing.
 |---|---|---|
 | 1 | `lessonAudit` | nothing — but proposing a change already waiting for the investor is repeating yourself |
 | 2 | `harnessAudit` | **a blocker stops planning.** Orphaned WATCHes, size disagreements, order-ready decisions with no registered exit. A held position no decision explains is a **`warn`**, not a blocker |
-| 3 | `calibration` | low maturity does not stop the run; it frames what it may claim, and caps size at `experimentalPositionCeiling` |
+| 3 | `calibration` | low maturity does not stop the run; it frames what it may claim, and caps size at the experimental ceiling — `experimentalCeiling`, not the ratio alone |
 | 4 | `exitCheck` over every non-core holding | nothing — but **its SELL and TRIM candidates are reported before any new buy is considered.** Selling what is broken comes before buying what is interesting, and a run that plans purchases first will find reasons not to revisit that order |
 | 5 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
 | 6 | broker limits | Aumos owns them; read what the invocation carries and do not assume |
@@ -303,8 +303,14 @@ calibration, attribution, parser or scheduling calculation. The stdio executable
 an Aumos run. Do not replace either interface's structured output with free-form arithmetic. Then load
 `skills/sizing-and-concentration/SKILL.md`. Apply the Mandate first, then the stricter configured
 position/sector/theme/factor thresholds and the portfolio heat cap. `targetWeight` is never negative. An `insufficient` or `observing`
-lens can only support a controlled experiment at or below `experimentalPositionCeiling`; it never
-supports larger size by rhetoric. A machine-evaluable future condition belongs in `watches` or
+lens can only support a controlled experiment at or below the experimental ceiling; it never
+supports larger size by rhetoric. **Call `experimentalCeiling` for that number and do not derive
+it**: it is the larger of `experimentalPositionCeiling` and `experimentalPositionFloor` — the
+smallest position worth opening in the venue's currency, converted at the same USDKRW the NAV uses
+— bounded by `experimentalPositionCeilingMax`. A ratio on its own permits three shares on a small
+book, which is an order that cannot be trimmed or added to and leaves nothing to measure; when even
+the floor does not fit the band the operation says `experimental_floor_unreachable` and the lane is
+paper here, not a position rounded up to the cap. A machine-evaluable future condition belongs in `watches` or
 `plans`, with an achievable trigger and expiry. Never register a trigger already true at creation.
 
 **Evaluate a standing WATCH with `evaluateWatch`, and pass the observation you actually have.**

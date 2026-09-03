@@ -22,7 +22,7 @@ not become one. It has no fill, no cost and no slippage, so admitting it here wo
 hypothetical unlock real size, and that is the failure this whole gate exists to prevent.
 
 It is also the only thing that makes the gate reachable. The floors are 30 samples, 10 independent
-clusters and 3 regimes; real fills are capped at `experimentalPositionCeiling` while a lens is
+clusters and 3 regimes; real fills are capped at the experimental ceiling while a lens is
 unpromoted, so a book that counted only real fills would take years to reach a verdict and the gate
 would be decoration. The methodology this is ported from answered that by running a paper track
 beside the real one — more throughput, no additional risk.
@@ -113,6 +113,14 @@ For a new single-name BUY require all of the following:
 If an input is unknowable, do not insert a neutral number. Mark the gate unresolved. `insufficient`
 or `observing` permits at most the configured experimental ceiling when every research and safety
 gate is otherwise complete; missing fundamental provenance or unresolved high risk permits no BUY.
+
+⚠️ **A small experiment has to be one that can be executed.** The ceiling is
+`experimentalPositionCeiling` or `experimentalPositionFloor` — the smallest position worth opening
+in the venue's own currency — whichever is larger, bounded by `experimentalPositionCeilingMax`;
+`experimentalCeiling` is the one operation that answers it. The ratio alone was capping this book's
+first real experiment at three shares, and the source methodology's Experiment-stage entry in that
+same name was ten. Below the band the answer is `experimental_floor_unreachable`: this book runs
+that lane on paper, and paper never unlocks real size — the columns stay separate.
 
 ## WAIT versus unable to judge
 
