@@ -73,6 +73,28 @@ function ageDays(from, to) {
  * `positions[].acquiredAt`, so a position with no acquisition date is carried
  * as inherited, which is the safe direction (carried, never expanded).
  */
+/**
+ * The asset a row is about, whichever of the three names it arrived under.
+ *
+ * ⚠️ **One call, three spellings** — and that was the defect rather than the
+ * style: `positions` were read as `.symbol`, `decisions` and `theses` as
+ * `.asset`, and `watches` as `.subject ?? .symbol`. A caller consistent with
+ * *any one* of them was silently wrong about the other two, because a row whose
+ * key did not match simply fell out of the set. Measured 2026-09-01: a run
+ * keyed its decisions one way and was told the book holds ten things no
+ * decision explains, with nothing in the answer saying the input was unread.
+ *
+ * `subject` first because that is the AMP name a `DecisionProposal` carries, and
+ * an `AssetRef` passed whole resolves through its own `symbol` — a manager holds
+ * `{ assetClass, market, symbol }` and has no reason to know which half this
+ * wants.
+ */
+function subjectOf(row) {
+  const value = row?.subject ?? row?.asset ?? row?.symbol ?? null
+  if (typeof value === 'string') return value || null
+  return typeof value?.symbol === 'string' ? value.symbol || null : null
+}
+
 export function harnessAudit({ positions = [], watches = [], theses = [], decisions = [], gateStaleDays = GATE_STALE_DAYS, managedSince = null, config = {}, asOf } = {}) {
   const diagnostics = []
   const issues = []
@@ -81,11 +103,11 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
     diagnostics.push(diagnostic(code, severity === 'blocker' ? 'blocked' : 'unevaluated', message, 'input', { subject, ...detail }))
   }
 
-  const held = new Set(positions.map((row) => row?.symbol).filter(Boolean))
-  const claimed = new Set(theses.filter((row) => row?.status !== 'closed').map((row) => row?.asset).filter(Boolean))
+  const held = new Set(positions.map(subjectOf).filter(Boolean))
+  const claimed = new Set(theses.filter((row) => row?.status !== 'closed').map(subjectOf).filter(Boolean))
 
   for (const watch of watches) {
-    const subject = watch?.subject ?? watch?.symbol ?? null
+    const subject = subjectOf(watch)
     if (!subject) {
       add('blocker', 'audit_watch_subjectless', null, 'A revisit promise with no subject can never be evaluated or retired')
       continue
@@ -100,11 +122,18 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
   }
 
   const accountedFor = new Map()
-  for (const decision of decisions) {
-    if (!decision?.asset) continue
-    accountedFor.set(decision.asset, decision)
+  for (const [index, decision] of decisions.entries()) {
+    const subject = subjectOf(decision)
+    if (!subject) {
+      // ⛔ This used to `continue` with nothing said. A `decisions` list keyed
+      // the wrong way then accounted for nothing, every position came back
+      // unexplained, and the answer named the book rather than the input.
+      diagnostics.push(diagnostic('audit_decision_subjectless', 'unevaluated', 'A decision names no asset, so nothing can be accounted to it', `decisions[${index}]`, { keys: Object.keys(decision ?? {}) }))
+      continue
+    }
+    accountedFor.set(subject, decision)
     if (decision?.orderReady === true && decision?.exitRegistered !== true) {
-      add('blocker', 'audit_unregistered_ready', decision.asset, 'A decision reached order-ready without its exit registered; the original measured this leaking two of seven orders')
+      add('blocker', 'audit_unregistered_ready', subject, 'A decision reached order-ready without its exit registered; the original measured this leaking two of seven orders')
     }
   }
   const grandfather = grandfatherPolicy(config)
@@ -112,8 +141,8 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
   const grandfathered = []
   const unexplained = []
   for (const position of positions) {
-    const symbol = position?.symbol ?? null
-    const decision = accountedFor.get(position?.symbol)
+    const symbol = subjectOf(position)
+    const decision = symbol === null ? undefined : accountedFor.get(symbol)
     if (!decision) {
       /**
        * ⚠️ Two different questions, and they were one line until the review of
@@ -141,7 +170,7 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
       continue
     }
     if (finite(decision.quantity) && finite(position.quantity) && decision.quantity !== position.quantity) {
-      add('blocker', 'audit_position_mismatch', position.symbol, 'The recorded decision and the portfolio disagree about the size held', { decided: decision.quantity, held: position.quantity })
+      add('blocker', 'audit_position_mismatch', symbol, 'The recorded decision and the portfolio disagree about the size held', { decided: decision.quantity, held: position.quantity })
     }
   }
   if (unexplained.length && !managedFrom) {
