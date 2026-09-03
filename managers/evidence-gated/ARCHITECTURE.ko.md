@@ -182,6 +182,10 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   그리고 다리일 뿐이다: 사설 메모리는 인스턴스 범위라 새 인스턴스는 눈이 먼 채 시작하고 기록은
   Aumos가 든 것과 갈라질 수 있다.
   ([#97](https://github.com/untilled/aumos-catalogue/issues/97))
+  단일종목 분할 진입도 같은 이유로 같은 다리를 탄다: `entryTranchePlan`이 채워지지 않은 각 트랜치를
+  무장할 `intent`를 돌려주고, `resolveTrancheWake`가 발화한 plan의 이벤트 summary에서 그 마커를
+  다시 읽는다 — 읽을 것이 그것밖에 없기 때문이다.
+  ([#120](https://github.com/untilled/aumos-catalogue/issues/120))
 - **페이퍼 트랙은 인스턴스 사설 메모리에 산다 — 담을 수 있는 곳이 그것뿐이기 때문이다.** 페이퍼
   콜은 주문도 체결도 없으므로 Decision이 아니고, 런타임은 `thesis:write`를 내지 않으며
   `thesis:read`는 도구를 하나도 주지 않는다. 그래서 `learning/paper-cohorts`가 누적 합과 열린 관측

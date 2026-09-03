@@ -301,6 +301,22 @@ history warns and never blocks — over-constraint is not caution.
 Load `skills/evidence-gates/SKILL.md` and `skills/candidate-research/SKILL.md` for any new or resized
 risk. Load `skills/thesis-challenge/SKILL.md` before any new single-name BUY or thesis promotion.
 
+**A single name under an unpromoted lens enters in stages, and the stages are a plan before they are
+an entry.** Call `entryTranchePlan` with the ladder, the lens, its maturity and the price: it says
+which rung is due, which is within 5% of firing, and — the part nothing adjudicated before — which
+rung's condition **expired with the plan unfinished**. That last one blocks: half an entry plan is a
+position nobody decided the size of, so this run re-arms, resizes or abandons the remainder in words.
+The reason to stage is the uncertainty and not the size, which is why the requirement follows the
+lens maturity rather than the weight. ⛔ A `core-dca` lens is refused there — that ladder is a cash
+deployment, and pooling it with single names is what the classification row has always forbidden.
+⛔ Three tranches are **one** sample; `sampleCount` says so.
+
+Arm each unfilled rung with the `intent` the call returns, **verbatim** — the same round-trip
+problem the market reviews have, and the same answer. `resolveTrancheWake` reads that marker out of a
+fired plan's event summary, so the run it wakes knows it is standing in the middle of an entry plan
+rather than answering an ordinary revisit promise. The ladder itself is recorded in the Thesis, which
+is where a plan the investor approves one rung at a time can still be read as one document.
+
 ### 4. Size and schedule
 
 Load `skills/deterministic-metrics/SKILL.md` and call the package MCP tool

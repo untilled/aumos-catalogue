@@ -22,7 +22,7 @@ the JSON remains the canonical explanation.
 
 ## The operations
 
-All 78, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
+All 84, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
 calling it wrong is not a discovery path — every flow skill tells you not to go looking, so the
 names have to be here. A name absent from this table is a name you cannot call.
 
@@ -52,6 +52,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `legacySizeSuggestion` | the ported Kelly-gated heuristic and its mode label |
 | `concentration` | position/sector/theme/factor caps and portfolio heat |
 | `newSinglePacing` | three approved pacing warnings; never blocks |
+| `entryTranchePlan` | a single name's T1/T2/T3 ladder: which rung is due, which is within 5%, which lapsed with the plan unfinished — and that the whole plan is one sample |
 | `specialistBudget` | a sleeve flow inside its Brief budget and market lane |
 | `globalAllocation` | the one cross-market denominator; refuses double-spend |
 
@@ -136,6 +137,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `nextMarketReview` | the next real open session close plus buffer |
 | `nextReviewSequence` | the three flows' reviews in order, owned by one manager, each with the `intent` it must be armed with and the `{ cron, timeZone }` `rule` that goes beside `at` on the trigger. The rule draws the calendar forward and wakes nothing; `at` is still the whole schedule, and a review whose buffer crosses local midnight returns `rule: null` |
 | `resolveWakeFlow` | which flow a fired plan's event summary was armed for — `null` for a wake this manager did not arm |
+| `resolveTrancheWake` | whether a fired plan's event summary is a rung of an unfinished staged entry, and which one |
 | `reconcileArmedReviews` | which of this run's reviews are not already armed, given what the last run wrote down |
 | `earningsCheckpoint` | BMO/AMC/date-only → an at-time checkpoint |
 | `boundedRetry` | the bounded retry after a wake found nothing published |
@@ -188,6 +190,7 @@ named field is the difference between a gate that runs and a gate that blocks or
 | `concentration` | `caps.portfolioHeat`, and `stopLossPct` + `core` on each row | Heat is loss-if-every-stop-fires, which weights do not measure. A non-core row with no stop is unevaluated, not zero. |
 | `concentration` | `positions` separate from `proposed`, and `config` | The split is what tells a breach the book **arrived with** from one this run creates: only the second refuses. ⚠️ `proposed` is the **target state** for the symbols it names — a row for a held symbol replaces that holding rather than adding to it, which is the only shape a TRIM has. Without `config.grandfather` the tolerance the investor set is not applied, and a breach that a trim would resolve used to block the trim. |
 | `newSinglePacing` | `proposedNewSingles`, `priorNewSingles` with `verified`, `sizingPolicyUpdatedAt`, `closedOutcomeCount` | Every field is a separate approved warning; omitting one silently drops that warning rather than failing. |
+| `entryTranchePlan` | `lens`, `maturity`, `price`, and `expiresAt` on every unfilled tranche | The lens keeps the lanes apart — `core-dca` is refused rather than counted as a single name. The maturity decides whether staging is *required*; unstated leaves it unjudged rather than passed. Without `price` the price rungs are unread and dated rungs still run. Without `expiresAt` a tranche can never lapse, which is the state `tranche_plan_incomplete` exists to catch. |
 | `signalPaper` | `ruleVersion` on every row, and `benchmarkBars` | A row with no rule version is refused: rows judged under different versions are reported together and never pooled. Without a benchmark a row scores no excess and drops out of the aggregate rather than counting as zero. |
 | `paperAdmission` | `challengeVerdict`, and for a call `thesis.evidenceStatus` plus `priceHistoryLatestDate` | The verdict decides the setup, so a conditional verdict cannot be logged as a call. A promote on price history stale by more than two weekdays is refused. |
 | `verdictReport` | `paper.d60` from `signalPaper.byCohort['llm-research']`, the `cohort` it came from, and optionally `shadow`, `baseline`, `closedOutcomeCount` | Thresholds may be passed **stricter only** — a looser one is refused, not honoured. Any cohort other than `llm-research` is refused outright: a control arm is measured, never promoted. |

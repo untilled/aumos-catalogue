@@ -405,6 +405,108 @@ assert.equal(globalBudget.data.residualCashWeight, 0)
 const doubleSpend = execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'kr-sleeve', weight: 0.6 }, { key: 'us-sleeve', weight: 0.6 }] } })
 assert.equal(doubleSpend.status, 'blocked', 'one global denominator prevents cash double spend')
 
+/**
+ * ── The staged single-name entry (issue #120) ──────────────────────────────
+ *
+ * `candidate-research` required a tranche plan of `core-dca` only, and the row
+ * that separated the two lanes — a cash deployment "does not count as a ready
+ * single-name BUY" — is right and has to survive whatever closes the gap. So
+ * these three cases are written as a pair of opposing pressures: the single
+ * name gets the ladder the ported theses actually used, and the sample
+ * arithmetic does not move in either direction.
+ *
+ * ⚠️ The one that would be easy to lose is the last assertion of the second
+ * case. Three tranches counted as three samples is the same inflation the
+ * classification row prevents, arriving from the other side.
+ */
+covers('research/single-name-tranche-plan')
+const trancheAsOf = methodology.asOf
+const naverPlan = {
+  symbol: '035420',
+  lens: 'mean-reversion',
+  maturity: 'observing',
+  price: 180_000,
+  plannedTotalWeight: 0.03,
+  tranches: [
+    { label: 'T1', weight: 0.01, condition: { kind: 'immediate' }, filled: true },
+    { label: 'T2', weight: 0.01, condition: { kind: 'price-below', threshold: 175_000 }, expiresAt: '2099-01-01T00:00:00Z' },
+    { label: 'T3', weight: 0.01, condition: { kind: 'at-time', at: '2099-02-01T00:00:00Z' }, expiresAt: '2099-03-01T00:00:00Z' },
+  ],
+}
+const staged = execute({ operation: 'entryTranchePlan', asOf: trancheAsOf, input: naverPlan })
+assert.equal(staged.status, 'ok', 'a three-rung plan with sizes and conditions is a plan')
+assert.equal(staged.data.staged, true)
+assert.equal(staged.data.remainingWeight, 0.02, 'what is left of the plan is arithmetic, not prose')
+assert.deepEqual(
+  staged.data.findings.map((row) => `${row.label}:${row.kind}`),
+  ['T2:tranche_approach', 'T3:tranche_pending'],
+  'a rung within 5% is re-read before it fires — the entry-side counterpart of trim_approach',
+)
+const intention = execute({
+  operation: 'entryTranchePlan',
+  asOf: trancheAsOf,
+  input: { ...naverPlan, tranches: [naverPlan.tranches[0], { label: 'T2', weight: 0.02, condition: null }] },
+})
+assert.ok(
+  intention.diagnostics.some((row) => row.code === 'tranche_condition_missing' && row.severity === 'blocked'),
+  '"we will add on weakness" is not a tranche on this side of the line either',
+)
+const unstaged = execute({ operation: 'entryTranchePlan', asOf: trancheAsOf, input: { ...naverPlan, tranches: [naverPlan.tranches[0]] } })
+assert.ok(
+  unstaged.diagnostics.some((row) => row.code === 'tranche_plan_required' && row.severity === 'blocked'),
+  'an unpromoted lens enters in stages; the reason is the uncertainty, not the weight',
+)
+const promotedLens = execute({ operation: 'entryTranchePlan', asOf: trancheAsOf, input: { ...naverPlan, maturity: 'promoted', plannedTotalWeight: 0.01, tranches: [naverPlan.tranches[0]] } })
+assert.ok(
+  !promotedLens.diagnostics.some((row) => row.code === 'tranche_plan_required'),
+  'a promoted lens may enter at once; the requirement follows the evidence',
+)
+
+covers('research/tranche-plan-not-cash-deployment')
+const dcaLadder = execute({ operation: 'entryTranchePlan', asOf: trancheAsOf, input: { ...naverPlan, lens: 'core-dca' } })
+assert.equal(dcaLadder.status, 'blocked', 'a Core DCA ladder is refused here rather than relabelled')
+assert.ok(dcaLadder.diagnostics.some((row) => row.code === 'tranche_lane_mismatch'))
+assert.equal(dcaLadder.data.countsAsSingleNameSample, false)
+assert.equal(dcaLadder.data.sampleCount, 0, 'a cash deployment is not a single-name sample; the separation is code, not a label')
+assert.equal(staged.data.countsAsCashDeployment, false, 'and the traffic does not flow the other way either')
+assert.equal(staged.data.trancheCount, 3)
+assert.equal(staged.data.sampleCount, 1, 'three tranches are one idea decided once; counting the rungs would manufacture evidence')
+assert.equal(staged.data.sampleKind, 'one-single-name-sample-per-plan-never-one-per-tranche')
+assert.ok(
+  /staged entry is one sample/i.test(await readFile(new URL('../skills/evidence-gates/SKILL.md', fixtureRoot), 'utf8')),
+  'the gate that owns sample independence says it, not only the function that returns it',
+)
+
+/**
+ * ── The other half of an armed tranche: what happens when it does not fire ─
+ *
+ * A tranche armed as a bare `price-below` is indistinguishable from any other
+ * revisit promise, so an expired T2 left half an entry plan standing with
+ * nothing adjudicating it. The marker is the same bridge `run/armed-reviews`
+ * uses for reviews — `intent` is the only field that survives the round trip —
+ * and the expiry is a blocking diagnostic rather than a silence.
+ */
+covers('watch/tranche-intent-round-trip')
+const armedRung = staged.data.intents.find((row) => row.label === 'T2')
+const wake = execute({ operation: 'resolveTrancheWake', asOf: trancheAsOf, input: { summary: `Price fell below 175000 — watching for: ${armedRung.intent}` } })
+assert.deepEqual(wake.data, { symbol: '035420', label: 'T2', entryPlanUnfinished: true }, 'the run that wakes is told it is standing in the middle of an entry plan')
+assert.equal(
+  execute({ operation: 'resolveWakeFlow', asOf: trancheAsOf, input: { summary: armedRung.intent } }).data,
+  null,
+  'the tranche marker is a different prefix, not a widening of the market-review one',
+)
+const lapsedPlan = execute({
+  operation: 'entryTranchePlan',
+  asOf: trancheAsOf,
+  input: { ...naverPlan, tranches: [naverPlan.tranches[0], { ...naverPlan.tranches[1], expiresAt: '2000-01-01T00:00:00Z' }, naverPlan.tranches[2]] },
+})
+assert.ok(
+  lapsedPlan.diagnostics.some((row) => row.code === 'tranche_plan_incomplete' && row.severity === 'blocked'),
+  'a condition that expired with the plan unfinished is adjudicated, not left standing',
+)
+assert.deepEqual(lapsedPlan.data.lapsed, ['T2'])
+assert.equal(lapsedPlan.data.action, 'REVIEW')
+
 covers('research/thesis-metadata')
 const thesis = execute({ operation: 'validateThesis', asOf: methodology.asOf, input: methodology.thesis })
 assert.equal(thesis.status, 'ok', 'complete thesis metadata is machine-valid')
@@ -1798,7 +1900,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 83)
+assert.equal(supportedOperations.length, 85)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),

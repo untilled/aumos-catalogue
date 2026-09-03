@@ -1,4 +1,6 @@
 import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW } from './diagnostics.mjs'
+import { normalizeTriggerKind } from './methodology.mjs'
+import { trancheIntent } from './schedule.mjs'
 
 /**
  * Lane ownership is keyed by flow, not by manager id.
@@ -487,4 +489,214 @@ export function newSinglePacing({ proposedNewSingles = [], priorNewSingles = [],
     diagnostics.push(diagnostic('new_single_pacing_warn', relaxed ? 'info' : 'unevaluated', 'New single-name exposure is being added faster than it is being learned from; say so before approval', 'proposedNewSingles', warning))
   }
   return { data: { warnings, newSingleCount: newCount, relaxed, closedOutcomeCount }, diagnostics }
+}
+
+/**
+ * ── The staged entry, on the single-name side (#120) ───────────────────────
+ *
+ * `candidate-research` already required a tranche plan — "T1/T2/T3 each with
+ * its size and its date-or-price condition. *We will add on weakness* is not a
+ * tranche" — and required it **only of `core-dca`**. That row's last line is
+ * right and stays: a cash deployment is not a ready single-name BUY, and
+ * pooling the two makes the single-name sample look larger than it is.
+ *
+ * What the split lost is that the original harness staged single names too, and
+ * ⚠️ **not because they were large — because the conviction was low.** The NAVER
+ * thesis wrote its own reason down: technically oversold was confirmed, the
+ * earnings/multiple case was not, so it was "제한 분할매수 후보" — a limited,
+ * staged candidate — on a three-tranche plan. Not going in at once is what that
+ * methodology *did* about an unverified claim, and after the port that device
+ * survived on the ETF side only.
+ *
+ * So this is the same five-condition shape, addressed to a single name, and the
+ * two lanes are kept apart **in code**: a `core-dca` lens is refused here, and
+ * what this returns says in its own data that a plan is one sample no matter how
+ * many tranches it has. Three tranches counted as three samples would be the
+ * "repeated runs on one still-open idea" `evidence-gates` forbids — the same
+ * inflation, arriving from the other direction.
+ *
+ * ⚠️ **The plan is one document, and the document is the Thesis.** A tranche
+ * ladder in private memory would be a second copy of a fact the Thesis already
+ * owns, and invariant 7 says which copy is authoritative. Nothing here writes a
+ * new memory key.
+ *
+ * ⛔ Nothing here sizes or orders. Like every `exitCheck` verdict, a `tranche_due`
+ * is a *candidate* for the one proposal the investor still approves.
+ */
+export const SINGLE_NAME_TRANCHES = {
+  /** T1/T2/T3, the number the ported theses actually wrote. */
+  planned: 3,
+  /**
+   * The same 5% band `exitCheck` raises `trim_approach` in, for the same
+   * reason: a rung set weeks ago can be stale by the time price reaches it, and
+   * the premise is re-read *before* it fires rather than after.
+   */
+  approachPct: 0.05,
+  /** Unpromoted evidence is precisely the state the staging exists for. */
+  stagingRequiredMaturities: ['insufficient', 'observing'],
+}
+
+/** A tranche waits on a date or on a price. `immediate` is the one that does not wait. */
+const TRANCHE_CONDITION_KINDS = new Set(['immediate', 'at-time', 'price-below', 'price-above'])
+
+export function entryTranchePlan({ symbol = null, lens = null, maturity = null, price, plannedTotalWeight = null, tranches = [], asOf } = {}) {
+  const diagnostics = []
+  const findings = []
+  const add = (kind, label, message, detail = {}) => findings.push({ kind, symbol, label, message, ...detail })
+  const asOfInstant = Date.parse(asOf)
+
+  /**
+   * The lane separation, as a refusal rather than a sentence. A cash
+   * deployment's tranches are the `core-dca` conditions and they are counted in
+   * the other column; asking this function to hold them is the pooling the
+   * classification row exists to prevent.
+   */
+  if (lens === 'core-dca') {
+    diagnostics.push(diagnostic('tranche_lane_mismatch', 'blocked', 'Core DCA tranches are a cash deployment and are recorded under the core-dca conditions; they never become a single-name sample', 'lens', { lens }))
+    return {
+      data: {
+        symbol, lens, classification: 'cash-deployment', countsAsSingleNameSample: false, sampleCount: 0,
+        sampleKind: 'cash-deployment-never-a-single-name-sample', staged: null, action: 'NONE',
+        findings, intents: [], candidateOnly: true,
+      },
+      diagnostics,
+    }
+  }
+
+  const rows = tranches.map((row, index) => ({
+    label: typeof row?.label === 'string' && row.label ? row.label : `T${index + 1}`,
+    weight: row?.weight,
+    condition: row?.condition ?? null,
+    filled: row?.filled === true,
+    expiresAt: row?.expiresAt ?? null,
+    index,
+  }))
+
+  if (!rows.length) {
+    diagnostics.push(diagnostic('tranche_plan_missing', 'blocked', 'A staged entry is a plan or it is not staged; T1/T2/T3 each carry a size and a date-or-price condition', 'tranches'))
+  }
+
+  let plannedSum = 0
+  let filledWeight = 0
+  for (const row of rows) {
+    const where = `tranches[${row.index}]`
+    if (!finite(row.weight) || row.weight <= 0) {
+      diagnostics.push(diagnostic('tranche_weight_missing', 'blocked', 'A tranche states the weight it puts to work; a share of the plan nobody wrote down is not a tranche', `${where}.weight`, { label: row.label }))
+    } else {
+      plannedSum += row.weight
+      if (row.filled) filledWeight += row.weight
+    }
+    const kind = normalizeTriggerKind(row.condition?.kind)
+    if (!TRANCHE_CONDITION_KINDS.has(kind)) {
+      diagnostics.push(diagnostic('tranche_condition_missing', 'blocked', '"We will add on weakness" is not a tranche; each one carries a date-or-price condition', `${where}.condition`, { label: row.label, supported: [...TRANCHE_CONDITION_KINDS] }))
+      continue
+    }
+    if (kind === 'immediate' && row.index !== 0) {
+      diagnostics.push(diagnostic('tranche_condition_missing', 'blocked', 'Only the first tranche executes on the run that plans it; a later one waits on a stated condition', `${where}.condition`, { label: row.label }))
+      continue
+    }
+    if ((kind === 'price-below' || kind === 'price-above') && !finite(row.condition?.threshold)) {
+      diagnostics.push(diagnostic('tranche_condition_missing', 'blocked', 'A price tranche states the level it waits for', `${where}.condition.threshold`, { label: row.label }))
+    }
+    if (kind === 'at-time' && !Number.isFinite(Date.parse(row.condition?.at))) {
+      diagnostics.push(diagnostic('tranche_condition_missing', 'blocked', 'A dated tranche states the instant it waits for', `${where}.condition.at`, { label: row.label }))
+    }
+  }
+
+  if (finite(plannedTotalWeight) && rows.length && Math.abs(plannedSum - plannedTotalWeight) > 1e-9) {
+    diagnostics.push(diagnostic('tranche_sizes_do_not_sum', 'blocked', 'The tranches add up to the position the plan says it is building, or the plan is describing two different positions', 'tranches', { plannedTotalWeight, trancheSum: round(plannedSum) }))
+  }
+
+  /**
+   * Whether staging is *required* is a maturity question, because the reason
+   * for staging was never size. An unstated maturity is unevaluated rather than
+   * waved through: the requirement is not judged, and the run is told so.
+   */
+  const staged = rows.length >= SINGLE_NAME_TRANCHES.planned
+  if (maturity === null || maturity === undefined) {
+    diagnostics.push(diagnostic('tranche_maturity_unstated', 'unevaluated', 'Whether this entry has to be staged is decided by the lens maturity; without it the requirement is not judged', 'maturity', { planned: SINGLE_NAME_TRANCHES.planned }))
+  } else if (SINGLE_NAME_TRANCHES.stagingRequiredMaturities.includes(maturity) && !staged) {
+    diagnostics.push(diagnostic('tranche_plan_required', 'blocked', 'An unpromoted lens enters in stages; the split is what an unverified claim does about its own uncertainty, not a way of being small', 'tranches', { maturity, planned: SINGLE_NAME_TRANCHES.planned, given: rows.length }))
+  }
+
+  const priceRead = finite(price)
+  if (!priceRead) {
+    diagnostics.push(diagnostic('tranche_price_unread', 'unevaluated', 'Without a current price the price tranches are unread; dated and lapsed tranches are still judged', 'price'))
+  }
+
+  const lapsed = []
+  const intents = []
+  for (const row of rows) {
+    if (row.filled) continue
+    const kind = normalizeTriggerKind(row.condition?.kind)
+    const expiry = Date.parse(row.expiresAt)
+    if (Number.isFinite(expiry) && Number.isFinite(asOfInstant) && expiry <= asOfInstant) {
+      lapsed.push(row.label)
+      add('tranche_lapsed', row.label, 'A tranche condition expired with the plan unfinished; the remainder is re-armed, resized or abandoned in this run', { expiresAt: row.expiresAt, weight: row.weight ?? null })
+      continue
+    }
+    if (kind === 'immediate') {
+      add('tranche_due', row.label, 'The first tranche executes on the run that plans it', { weight: row.weight ?? null })
+      continue
+    }
+    if (kind === 'at-time') {
+      const at = Date.parse(row.condition?.at)
+      if (Number.isFinite(at) && Number.isFinite(asOfInstant) && at <= asOfInstant) add('tranche_due', row.label, 'A dated tranche reached its instant', { at: row.condition.at, weight: row.weight ?? null })
+      else add('tranche_pending', row.label, 'A dated tranche is still waiting', { at: row.condition?.at ?? null, weight: row.weight ?? null })
+      intents.push({ label: row.label, at: row.condition?.at ?? null, intent: trancheIntent(symbol, row.label) })
+      continue
+    }
+    if (kind === 'price-below' || kind === 'price-above') {
+      intents.push({ label: row.label, threshold: row.condition?.threshold ?? null, intent: trancheIntent(symbol, row.label) })
+      if (!priceRead || !finite(row.condition?.threshold)) continue
+      const level = row.condition.threshold
+      const met = kind === 'price-below' ? price <= level : price >= level
+      const near = kind === 'price-below'
+        ? price <= level * (1 + SINGLE_NAME_TRANCHES.approachPct)
+        : price >= level * (1 - SINGLE_NAME_TRANCHES.approachPct)
+      if (met) add('tranche_due', row.label, 'A price tranche reached its level', { level, price, weight: row.weight ?? null })
+      else if (near) add('tranche_approach', row.label, 'Price is within 5% of a tranche rung; re-read the premise before it fires', { level, price, weight: row.weight ?? null })
+      else add('tranche_pending', row.label, 'A price tranche is still waiting', { level, price, weight: row.weight ?? null })
+    }
+  }
+
+  const complete = rows.length > 0 && rows.every((row) => row.filled)
+  if (lapsed.length && !complete) {
+    diagnostics.push(diagnostic('tranche_plan_incomplete', 'blocked', 'Half an entry plan is a position nobody decided the size of; state the remainder as re-armed, resized or abandoned', 'tranches', { lapsed, filledWeight: round(filledWeight), plannedTotalWeight: finite(plannedTotalWeight) ? plannedTotalWeight : round(plannedSum) }))
+  }
+  const kinds = new Set(findings.map((row) => row.kind))
+  const action = kinds.has('tranche_lapsed') || kinds.has('tranche_approach')
+    ? 'REVIEW'
+    : kinds.has('tranche_due')
+      ? 'ENTER'
+      : 'NONE'
+
+  return {
+    data: {
+      symbol, lens, maturity,
+      classification: 'single-name',
+      /**
+       * ⛔ The number that must not move. A staged entry is one idea decided
+       * once; counting a tranche as a sample would manufacture evidence out of
+       * the risk control that exists because the evidence is thin.
+       */
+      countsAsSingleNameSample: true,
+      sampleCount: 1,
+      sampleKind: 'one-single-name-sample-per-plan-never-one-per-tranche',
+      countsAsCashDeployment: false,
+      staged,
+      trancheCount: rows.length,
+      plannedTotalWeight: finite(plannedTotalWeight) ? plannedTotalWeight : round(plannedSum),
+      filledWeight: round(filledWeight),
+      remainingWeight: round(plannedSum - filledWeight),
+      complete,
+      lapsed,
+      action,
+      findings,
+      intents,
+      priceLaneRead: priceRead,
+      candidateOnly: true,
+    },
+    diagnostics,
+  }
 }
