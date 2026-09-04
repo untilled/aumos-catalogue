@@ -495,6 +495,21 @@ const RANK_JUMP_FOR_RESEARCH = 3
 const AT_HIGH_TOLERANCE = 0.995
 
 /**
+ * The version of the bot the research cohort is measured against.
+ *
+ * ⚠️ It belongs here and not to the caller. `baselineSetup` below **is** the
+ * rule, and `paperAdmission` refuses a window without the version it will be
+ * scored under — so before this the baseline cohort was unloadable by any
+ * published path: every `baselineSignals` row was missing exactly the field
+ * that admits it, and a run that supplied one would have been inventing a
+ * version for code it did not write.
+ *
+ * A change to `baselineSetup` increments this. It never re-tags rows already
+ * recorded (`envelopes.mjs` §ruleVersions holds that rule for every axis).
+ */
+export const BASELINE_RULE_VERSION = 'rs-v1'
+
+/**
  * L1 — where the team should look, which is not what the team should buy.
  *
  * `blendedSectorStrength` above scores one sector against one benchmark. That
@@ -515,7 +530,7 @@ const AT_HIGH_TOLERANCE = 0.995
  * beat a dumb momentum bot, and not merely the index?" has an answer. They are
  * never traded, and `tradeable: false` travels with every row.
  */
-export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks = {}, lane = null, weights } = {}) {
+export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks = {}, lane = null, weights, asOf = null } = {}) {
   const diagnostics = []
   if (benchmarkBars.length === 0) {
     diagnostics.push(diagnostic('sector_benchmark_missing', 'unevaluated', 'Without the lane benchmark no relative strength is measurable; the lane is unread rather than neutral', 'benchmarkBars'))
@@ -610,7 +625,13 @@ export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks
       const excess60 = returnOver(leader.bars, 60) - returnOver(benchmarkBars, 60)
       if (!finite(excess60) || excess60 <= 0) continue
       const setup = baselineSetup(closes)
-      if (setup) baselineSignals.push({ lane, sector: row.name, symbol: leader.symbol, setup, close: closes.at(-1), excess60Pct: round(excess60 * 100, 2), tradeable: false })
+      /**
+       * `ruleVersion` and `signalAt` are what make this row an admission
+       * rather than a sentence. `paperAdmission` takes it as-is; without both
+       * it is refused, and the control arm the research cohort is measured
+       * against has no rows in it.
+       */
+      if (setup) baselineSignals.push({ lane, sector: row.name, symbol: leader.symbol, setup, ruleVersion: BASELINE_RULE_VERSION, signalAt: asOf, close: closes.at(-1), excess60Pct: round(excess60 * 100, 2), tradeable: false })
     }
   }
 

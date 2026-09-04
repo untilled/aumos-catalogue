@@ -78,6 +78,12 @@ Its shape is what keeps it inside the rule above:
 That distinction is the whole of why this is not the hidden portfolio database the section above
 forbids. If a field would let you reconstruct the book from this key, it does not belong here.
 
+⚠️ **Write `signalPaper`'s `nextState` verbatim and assemble nothing.** It already is *what was
+carried, minus what matured, plus what this run registered* — the merge, the duplicate refusal and
+the `signalAt`-after-`asOf` refusal are inside the function. A hand-built value for this key is the
+one shape that can silently lose a window, and it did: registration lived only in a sentence and the
+track held zero rows across every run.
+
 ⚠️ **What it costs.** Private memory is namespaced by manager instance, so this track is invisible to
 any other manager on the same book and a new instance starts it over. That is a worse home than a
 shared record, and it is the only one the runtime serves.

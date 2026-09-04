@@ -55,10 +55,30 @@ unresolved high risk `thesis_rejected`. The verdict decides the setup and you do
 logging a conditional idea as a call would put an unchallenged claim into the cohort that unlocks
 size. Only the call pays the full evidence cost, and a promote is refused outright when the price
 history is stale, because a forward record started from a stale price measures the pipeline rather
-than the idea. Admission returns the `openWindow` row; append it to `learning/paper-cohorts` and it accrues a forward record through `signalPaper` from that instant. This is what makes the layer
-measurable: the team's calls are scored against the index *and* against the mechanical baseline
-signals `sectorStrength` logs, so "our research beats a dumb momentum bot" is a number rather than a
-belief. Until that number exists, the team's edge is a hypothesis exactly as the bot's is.
+than the idea.
+
+Admission returns an `openWindow` row. **Carry every one of them into `signalPaper`'s `admissions`
+in §5 of the run skeleton**, and write the `nextState` it returns back to `learning/paper-cohorts`.
+That is the whole of registration and there is no other step.
+
+⛔ **It is not "append it to the key" — that sentence stood here and nothing appended anything.**
+`signalPaper` computed `nextState.openWindows` as *what was carried, minus what matured*, so a
+window admitted this run was dropped between two tool calls and the track stayed at zero rows
+(measured, run `run_f1560197652549e18bf7c1420f83983b`). The merge is now inside `signalPaper` —
+it refuses a duplicate symbol/setup, a missing rule version and a `signalAt` after `asOf`, and none
+of those judgements is a run's to make by hand.
+
+This is what makes the layer measurable: the team's calls are scored against the index *and* against
+the mechanical baseline signals `sectorStrength` logs, so "our research beats a dumb momentum bot" is
+a number rather than a belief. Until that number exists, the team's edge is a hypothesis exactly as
+the bot's is.
+
+**So register the bot too, in the same run.** Each `baselineSignals` row carries its own
+`ruleVersion` — the version of `baselineSetup`, which is the rule, and not one a run may choose —
+and its `signalAt`. Pass the row to `paperAdmission` as the `thesis`, with its own `setup`, and its
+`openWindow` joins the same `admissions` list. ⛔ The cohorts do not merge and the control arm is
+never promoted: `verdictReport` refuses to render a verdict on anything but `llm-research`, so a
+strong baseline reads "our bar is high" and can never read "do more of this".
 
 **Nothing reaches the watchlist before `thesis-challenge` clears it.** A forward claim is the most
 attractive kind of wrong: it is unfalsified precisely because it has not happened yet. Paper
