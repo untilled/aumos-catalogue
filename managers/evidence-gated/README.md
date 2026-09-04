@@ -14,7 +14,10 @@ it proposes a new position it wants a claim that could be proved wrong, an expla
 *why* the thing is cheap, an argument that it beats simply buying the index instead, and
 an adversarial review that tried to knock the case down. And it sizes by track record
 rather than by confidence: until this *kind* of judgement has accumulated enough
-independent forward evidence, the most it will propose is a small controlled experiment.
+independent forward evidence, the most it will propose is a small controlled experiment — small,
+but never so small that it cannot be executed: the experimental ceiling is a percentage of the book
+*or* the smallest position worth opening on that exchange, whichever is larger, and on a book too
+small for either it says so rather than proposing an order that a tick and a fee would swallow.
 It covers Korea and the US in one manager, and returns exactly one proposal per run.
 
 It is a **port** of the methodology and validation loop of `morethanmin/trading-harness` —

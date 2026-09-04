@@ -236,7 +236,36 @@
       "minimum": 0.001,
       "maximum": 0.05,
       "default": 0.01,
-      "description": "Maximum target weight while a lens is insufficient or observing. The Mandate and concentration limits may impose a lower ceiling."
+      "description": "Ratio side of the maximum target weight while a lens is insufficient, observing or reviewable. The Mandate and concentration limits may impose a lower ceiling. ⚠️ A ratio alone does not say whether the order it permits can be placed: on a 10,095,751 KRW book 1% is 100,958 KRW, which is three shares of a 33,050 KRW name, and the smallest change expressible in a three-share position is a third of it. So the effective ceiling is this ratio or experimentalPositionFloor converted to a weight, whichever is larger, bounded by experimentalPositionCeilingMax."
+    },
+    "experimentalPositionFloor": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "Smallest position, per venue currency, that is worth opening on real money — the amount below which tick size, lot size and the round-trip fee leave no result to measure. ⚠️ It is denominated per venue rather than in the book's base currency because what makes an order unexecutable is a fact about the exchange: the tick, the lot, the price a share trades at and the fee and tax schedule. The base currency is only where the investor keeps score, and one number in it would buy a granular position in a market quoting $0.01 ticks and a three-share position in one quoting 50 KRW ticks on a 33,050 KRW share. Converting into the book's denominator uses the same USDKRW the global NAV already requires. ⚠️ It is an approximation and stays one — exact granularity is a fact about the name, and the sizing operation is given no price.",
+      "properties": {
+        "KRW": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100000000,
+          "default": 300000,
+          "description": "XKRX. 300,000 KRW is nine to fifteen whole shares across the 20,000–50,000 KRW tick band, so one share is at most about a tenth of the position and one 50 KRW tick is 0.1–0.25% of it. The methodology this is ported from entered KOGAS at 33,050 with ten shares — 330,500 KRW — and called that its Experiment-stage small position."
+        },
+        "USD": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100000,
+          "default": 200,
+          "description": "XNAS/XNYS. About one share of a median S&P 500 constituent, and ten or more of a $20 name. Smaller than the Korean floor because US venues quote to $0.01 — 0.005% of a $200 share against 0.15% for a 50 KRW tick on a 33,050 KRW one — so granularity binds far less tightly here. It is not smaller because the sleeve matters less."
+        }
+      }
+    },
+    "experimentalPositionCeilingMax": {
+      "type": "number",
+      "minimum": 0.001,
+      "maximum": 0.05,
+      "default": 0.03,
+      "description": "The most experimentalPositionFloor may lift the ceiling to. The floor exists to make the ratio executable, not to turn an experiment into a conviction position, and without a second bound 'the larger of a ratio and an amount' inflates the weight without limit as the book shrinks. 3% sits just above the source methodology's own Experiment-stage size for the same name (2.6%), so the floor can reproduce what that methodology actually did and can never exceed it. ⚠️ Below roughly 10,000,000 KRW of NAV the Korean floor no longer fits inside this band; the run then reports experimental_floor_unreachable rather than sizing at the cap, because a book that small cannot run this lane on real money and the paper cohort is the sample that is honestly available."
     },
     "schedule": {
       "type": "object",
