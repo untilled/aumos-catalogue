@@ -631,6 +631,35 @@ covers('coverage/universe-union', 'coverage/uncovered-zero')
 const completeCoverage = execute({ operation: 'coverage', asOf: methodology.asOf, input: { scannerUniverses: [['A', 'B'], ['A', 'B']], extensions: ['C'], holdings: ['A'], dispositions: [{ symbol: 'B' }, { symbol: 'C' }], asOf: methodology.asOf } })
 assert.equal(completeCoverage.data.complete, true)
 assert.deepEqual(completeCoverage.data.uncovered, [])
+assert.equal(completeCoverage.data.screenedUniverseCount, 3, 'the declaration is the screen plus the extensions; A is held and also screened')
+
+/**
+ * ── A pass over the empty set is not a pass (issue #129) ───────────────────
+ *
+ * The discovery machinery was ported and the universe it sweeps was not, so a
+ * real run called `coverage` with two empty lists and was told
+ * `complete: true`, `uncovered: []`, no diagnostics — on a denominator made
+ * entirely of its own holdings (`run_ba37a8f6907a49c3a805a4ce3ee10ec6`). The
+ * three things asserted here are the three ways that result lied: it counted
+ * the book as a declaration, it said complete, and it said nothing.
+ */
+covers('coverage/undeclared-universe')
+const undeclared = execute({ operation: 'coverage', asOf: methodology.asOf, input: { scannerUniverses: [], extensions: [], holdings: ['069500', '153130', 'SGOV'], dispositions: [], asOf: methodology.asOf } })
+assert.equal(undeclared.data.screenedUniverseCount, 0, 'holdings are the book, never a declaration')
+assert.equal(undeclared.data.complete, null, 'complete is unanswerable, and `false` would claim the run looked')
+assert.equal(undeclared.status, 'unevaluated', 'the run did not ask — the same answer `evaluateWatch` gives when it could not observe')
+assert.ok(
+  undeclared.diagnostics.some((row) => row.code === 'universe_undeclared' && row.severity === 'unevaluated'),
+  'and it says so by name rather than by an empty uncovered list',
+)
+assert.deepEqual(undeclared.data.uncovered, [], 'uncovered stays empty, which is why it cannot be the thing that reports this')
+const declaredOnce = execute({ operation: 'coverage', asOf: methodology.asOf, input: { scannerUniverses: [['069500']], extensions: [], holdings: ['069500'], dispositions: [], asOf: methodology.asOf } })
+assert.ok(
+  !declaredOnce.diagnostics.some((row) => row.code === 'universe_undeclared'),
+  'a universe every one of whose names happens to be held is still a declared universe',
+)
+assert.equal(declaredOnce.data.complete, true)
+
 covers('portfolio/krw-usd-sgov-nav')
 const sleeve = execute({ operation: 'sleeveNav', asOf: methodology.asOf, input: { cash: [{ currency: 'KRW', amount: 1000000 }, { currency: 'USD', amount: 100 }], positions: [{ symbol: 'SGOV', currency: 'USD', marketValue: 200 }], fx: { USDKRW: 1300 } } })
 assert.equal(sleeve.data.usdLiquidity, 300)
@@ -1329,6 +1358,86 @@ assert.equal(
   'reviewable',
   'and a session that holds the web tools reaches a reviewable lane — the outcome the missing block line was denying',
 )
+
+/**
+ * ── The universe is declared each run, and by a named owner (issue #129) ───
+ *
+ * `lib/coverage.mjs` now refuses to call an empty sweep complete, which is the
+ * half a fixture can measure. The other half is that somebody is told to go and
+ * declare one — and the reason it was missing for so long is that the word
+ * `universe` appeared four times in this package and every occurrence assumed
+ * the thing already existed. So the check is that each document says the half
+ * it owns and no document restates another's: the procedure is
+ * `candidate-research`'s, the route is `data-source-contract`'s, and `PROMPT.md`
+ * says only that the denominator is this run's to declare.
+ */
+covers('audit/universe-is-declared-each-run')
+const universeSkill = await readFile(new URL('../skills/candidate-research/SKILL.md', fixtureRoot), 'utf8')
+const universeProcedure = universeSkill.slice(universeSkill.indexOf('## Declaring the universe'), universeSkill.indexOf('## Coverage'))
+assert.ok(universeProcedure.length > 0, 'candidate-research owns a procedure for declaring the universe')
+assert.ok(/every run/i.test(universeProcedure), 'and it is per run rather than once')
+assert.ok(
+  universeProcedure.includes('`scannerUniverses`') && universeProcedure.includes('`extensions`') && universeProcedure.includes('`coverage/universe-state`'),
+  'it names the two arguments the operation takes and the key the state is kept under, in this package’s existing vocabulary',
+)
+assert.ok(
+  universeProcedure.includes('skills/data-source-contract/SKILL.md') && !universeProcedure.includes('/api/v1/stocks/all'),
+  'and it points at the route rather than copying it — a rule written twice is how #127 happened',
+)
+assert.ok(
+  contractSkill.includes('/api/v1/stocks/all'),
+  'the contract skill carries the listing route, because endpoints are its half',
+)
+for (const filter of ['`market`', '`status`', '`securityType`', '`commonShare`']) {
+  assert.ok(contractSkill.includes(filter), `the listing route names its ${filter} filter`)
+}
+assert.ok(
+  /not point-in-time|no time parameter/i.test(contractSkill),
+  'and states that the roster is read at call time, so a universe declared from it is survivorship-shaped',
+)
+assert.ok(
+  /universe_undeclared/.test(invariantsText) && /complete: null/.test(invariantsText),
+  'PROMPT.md names the answer a run gets when it declared nothing, so a run reads it before a tool returns it',
+)
+assert.equal(
+  execute({ operation: 'coverage', asOf: methodology.asOf, input: { scannerUniverses: [], extensions: [], holdings: ['A'], dispositions: [], asOf: methodology.asOf } }).data.complete,
+  null,
+  'and the documents and the code agree on that value',
+)
+
+/**
+ * ── The one crossing of the universe boundary (issue #129 §3) ──────────────
+ *
+ * The ported decision (2026-07-24, option B) was that the mechanical scanners
+ * see inside the declared universe and the theme radar is the only way anything
+ * else gets in — therefore every radar run examines at least one axis outside
+ * it. The port kept the machinery and dropped the obligation: `outside`,
+ * `beyond` and `at least one` appeared nowhere in the skill, and
+ * `candidate-research` had turned the requirement into *"a theme radar **may**
+ * add candidates"*, which a run satisfies by doing nothing.
+ */
+covers('audit/theme-radar-leaves-the-universe')
+const radarSkill = await readFile(new URL('../skills/theme-radar/SKILL.md', fixtureRoot), 'utf8')
+/** Whitespace-collapsed, for the reason the prompt prose above is: a check that depends on where a paragraph was reflowed measures the formatter. */
+const radarProse = radarSkill.replace(/\s+/g, ' ')
+assert.ok(/at least one axis outside the universe/i.test(radarProse), 'the radar states the obligation in the words the decision was made in')
+assert.ok(/every run/i.test(radarProse), 'and that it is owed every run rather than when something looks promising')
+assert.ok(
+  /only way anything else gets in|only crossing/i.test(radarProse),
+  'with the reason: the scanners cannot see past the boundary, so nothing else can bring a name across',
+)
+assert.ok(
+  /obligation is to look, never to find/i.test(radarProse),
+  'and the counterweight, because a mandatory search that also demanded a result would be the quota-filling this package forbids',
+)
+const universeProse = universeSkill.replace(/\s+/g, ' ')
+assert.ok(
+  !/A theme radar \*?\*?may\*?\*? add candidates/.test(universeProse),
+  'candidate-research no longer states the obligation as a permission',
+)
+assert.ok(
+  /must add candidates from outside the universe/.test(universeProse) && universeSkill.includes('skills/theme-radar/SKILL.md'),
+  'it states the requirement and defers the count of axes to the skill that owns it',)
 
 /**
  * The approved entry-quality gate, in code rather than in prose. (issue #70 §2)

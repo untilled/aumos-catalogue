@@ -1,5 +1,5 @@
 {
   "name": "evidence-gated",
-  "version": "0.4.15",
+  "version": "0.4.16",
   "description": "One evidence-gated methodology run as three market flows: a Korean sleeve, a US sleeve, and the allocator that sets their budgets and proposes the cross-market rebalance. The flows are subagents of one manager; only the orchestrator submits."
 }

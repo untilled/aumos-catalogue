@@ -1,6 +1,6 @@
 ---
 name: theme-radar
-description: Forward research — find the sector or theme that will lead in three to six months, register it as a paper thesis call, and refuse the ones that are already consensus.
+description: Forward research — examine at least one axis outside the declared universe every run, find the sector or theme that will lead in three to six months, register it as a paper thesis call, and refuse the ones that are already consensus.
 ---
 
 # Theme radar
@@ -33,6 +33,32 @@ For each queued area: what leads in three to six months, and what is the evidenc
 already consensus? Supply and demand imbalance, capacity cycles, a policy inflection, the
 second-order beneficiary nobody has connected yet — and how much of it the current price already
 carries.
+
+## At least one axis outside the universe, every run
+
+**The mechanical scanners look inside the declared universe and nowhere else. This skill is the only
+way anything else gets in — so every run of it deliberately examines at least one axis beyond that
+boundary, and says which one it took.** This is a requirement, not an encouragement: it was decided
+as one in the methodology this is ported from (2026-07-24, option B, over the alternative of
+widening the screen), and it arrived here as permission — *"a theme radar **may** add candidates"* —
+which is a sentence a run satisfies by doing nothing.
+
+An axis is a direction to look in, named before you look: a supply chain the universe screens out by
+size or by listing venue, a market the sleeve does not usually price, a policy or capacity cycle
+whose beneficiary is a second-order name nobody has connected, a sector at the edge of the screen's
+filters. `sectorStrength.researchQueue` cannot supply one — it ranks what is already in the
+universe, which is the boundary this requirement exists to cross.
+
+⚠️ **The obligation is to look, never to find.** Zero forward theses is still a normal outcome and a
+better one than a narrative written to fill the slot; what a run may not report is that it looked
+everywhere it was asked to when it only looked inside. Name the axis and the outcome in the run
+record whether or not anything survived it — an examined axis that produced nothing is a fact about
+this market, and it is the only fact that distinguishes a radar that ran from one that idled.
+
+⚠️ **A cleared `thesis_call` from outside becomes part of the universe from then on**, through
+`extensions` in `coverage` and `coverage/universe-state`. Otherwise the name is researched once,
+never swept again, and the boundary closes behind it. The original methodology's own record of this
+is the name it found that way and would have lost.
 
 ## What a forward thesis must contain
 

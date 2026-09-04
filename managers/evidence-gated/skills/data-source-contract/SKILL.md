@@ -20,7 +20,7 @@ a different thing from a call that failed.
 | provider | tool | catalogue endpoints used here | time meaning |
 |---|---|---|---|
 | Toss broker connector | — | portfolio, cash, fills, order/approval path | Kernel-owned; never call through either tool |
-| 토스 login | `connection_request` | `/api/v1/candles`, `/prices`, `/orderbook`, `/trades`, `/stocks`, warnings, flows, FX, calendars, rankings, indicators | the host bounds `before`/`until`/`dateTime` at `asOf` for you; a window may come back shorter than asked and never longer |
+| 토스 login | `connection_request` | `/api/v1/candles`, `/prices`, `/orderbook`, `/trades`, `/stocks`, `/stocks/all`, warnings, flows, FX, calendars, rankings, indicators | the host bounds `before`/`until`/`dateTime` at `asOf` for you; a window may come back shorter than asked and never longer |
 | `sec-edgar` | `source_request` | ticker mapping and `/api/xbrl/companyfacts/{symbol}` | each fact unit is available at its `filed` date, not fiscal period end |
 | Alpaca login | `connection_request` | bars, news, corporate actions | `end` is filled at `asOf` if you leave it out; snapshots are always current and never canonical replay evidence |
 | `openbb-fmp` | `/api/v1/equity/price/historical` only | optional long history; set `end_date`, record provider and adjustment |
@@ -45,6 +45,26 @@ answered wrongly:
 asked for the 200, so it is not evidence here. A weekly or monthly spelling may well exist and this
 package does not know it, so a run that needs one is varying a parameter — the section below, not a
 value copied out of this table.
+
+### The listing route, which is where the universe comes from
+
+`/api/v1/stocks/all` is the one route here that answers with a **roster** rather than with a
+reading, and it is how a run declares the universe it is about to sweep
+(`skills/candidate-research/SKILL.md` owns that procedure; this row is the call it makes). It takes
+four filters — `market`, `status`, `securityType`, `commonShare` — and a run states which it passed,
+because a screen nobody wrote down is not a declared universe.
+
+⚠️ **Those four are parameter *names*, and their values are a vocabulary this package has not
+measured.** Do not copy a value out of anywhere, including this page — there is none here for that
+reason. Send the filter you mean, and when the vendor refuses it you are in the section above: a
+sibling route decides whether the route is unwell or the value is, and a filter vocabulary the
+vendor never published is a row in `missingFields`, not a guess.
+
+⛔ **It carries no time parameter, so it is not point-in-time and never becomes replay evidence.**
+The roster it returns is what is listed at the moment of the call: a name delisted last year is
+absent, so a universe declared from it is survivorship-shaped, and every backward-looking number
+computed over it inherits that. That is a caveat to state, not a reason to skip the call — an
+undeclared universe is worse than a survivor-biased one, because it reports as complete.
 
 ## Time filter
 
