@@ -1,4 +1,5 @@
 import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW } from './diagnostics.mjs'
+import { METHODOLOGY } from './constants.mjs'
 import { normalizeTriggerKind } from './methodology.mjs'
 import { trancheIntent } from './schedule.mjs'
 
@@ -72,6 +73,13 @@ export function sleeveNav({ cash = [], positions = [], fx = {} }) {
  * The floor raises the ceiling only until the position is executable, and
  * `experimentalPositionCeilingMax` is what stops it there.
  *
+ * ⚠️ **The ratio and its bound are `METHODOLOGY` constants since #133.** They
+ * are the size an *unpromoted* lens is trusted with, which is this package's
+ * claim about evidence rather than the investor's about their money — and an
+ * absent one used to read as `0`, so a caller who omitted them got a ceiling
+ * that refused every experiment. The floor stays configured: what makes an
+ * order unexecutable is a fact about a venue, and venues differ.
+ *
  * ⚠️ **The floor is denominated per venue, not in the book's base currency.**
  * What makes an order unexecutable — tick size, lot size, the price a share
  * trades at, the fee and tax schedule — is a fact about the exchange; the base
@@ -92,8 +100,8 @@ export function sleeveNav({ cash = [], positions = [], fx = {} }) {
  */
 export function experimentalCeiling(input = {}) {
   const diagnostics = []
-  const ratio = finite(input.experimentalPositionCeiling) ? Math.max(0, input.experimentalPositionCeiling) : 0
-  const ceilingMax = finite(input.experimentalPositionCeilingMax) ? Math.max(0, input.experimentalPositionCeilingMax) : null
+  const ratio = finite(input.experimentalPositionCeiling) ? Math.max(0, input.experimentalPositionCeiling) : METHODOLOGY.experimentalPositionCeiling
+  const ceilingMax = finite(input.experimentalPositionCeilingMax) ? Math.max(0, input.experimentalPositionCeilingMax) : METHODOLOGY.experimentalPositionCeilingMax
   const floors = input.experimentalPositionFloor
   const currency = input.positionCurrency
   const data = {
@@ -153,9 +161,22 @@ export function targetWeight(input) {
     diagnostics.push(diagnostic('sizing_inputs_invalid', 'blocked', 'Downside must be negative and conviction must be in [0,1]', 'input'))
     return { data: { targetWeight: null }, diagnostics }
   }
-  const caps = [input.mandatePositionCap, input.configPositionCap, input.sectorHeadroom, input.themeHeadroom]
-    .filter(finite)
-  if (caps.length < 2) diagnostics.push(diagnostic('concentration_inputs_missing', 'unevaluated', 'Mandate and config caps are required', 'input'))
+  /**
+   * ⚠️ **The position cap is the Mandate's, and there is no second one.**
+   * `configPositionCap` was `concentration.position`, default 0.10, standing
+   * beside a Mandate `maxPositionWeight` of 0.20 — one axis said twice, in two
+   * numbers, with nothing to say which was the real one. The Kernel enforces
+   * the Mandate's: a proposal over it is refused before it is ever sealed
+   * (`judge()`), so the configured copy could only ever be the quieter of the
+   * two and was silently the one that bound. It is gone, and this reads the
+   * value the invocation already carries. (#133)
+   *
+   * ⛔ A missing `mandatePositionCap` is `unevaluated`, never a pass — an
+   * absent cap is *"nobody said"*, and sizing to `sectorHeadroom` alone is a
+   * position limit derived from a sector limit.
+   */
+  const caps = [input.mandatePositionCap, input.sectorHeadroom, input.themeHeadroom].filter(finite)
+  if (!finite(input.mandatePositionCap)) diagnostics.push(diagnostic('concentration_inputs_missing', 'unevaluated', "The Mandate's maxPositionWeight is the position cap and this run was given none", 'mandatePositionCap'))
   const raw = Math.max(0, expected / Math.abs(downside)) * conviction
   const maturity = input.maturityStatus
   if (!['insufficient', 'observing', 'reviewable', 'promoted'].includes(maturity)) {
@@ -243,6 +264,20 @@ export function legacySizeSuggestion(input) {
  * books with identical weights have different heat when their stops sit in
  * different places.
  *
+ * ⚠️ **That cap is the Mandate's `maxDrawdown` since #133, not a config key.**
+ * *"How much of the account may I lose if every stop fires at once"* is the
+ * planned maximum drawdown, and the investor already declares that number in
+ * the one document the whole system reads — where the Approval screen shows it
+ * and every manager on the book is measured against the same figure, instead of
+ * each package holding a private copy under its own name.
+ * ⛔ **The Kernel does not enforce it**, and this gate is not a formality
+ * standing in front of one: `CONSTRAINT_FACTS` classifies `maxDrawdown` as
+ * `recorded` — a drawdown is a fact about the book's history rather than about
+ * a proposal, so `judge()` will not rule on it. What moved is where the number
+ * is declared. What enforces it is still this.
+ * ⚠️ A Mandate that declares none leaves this `unevaluated`, which is not a
+ * pass and is reported as one more thing nobody has said yet.
+ *
  * Core DCA and parked liquidity are excluded: they carry no stop and so are not
  * a source of heat. A row that declares no `stopLossPct` is unevaluated rather
  * than zero — reading a missing stop as "no risk" is exactly the direction this
@@ -282,7 +317,7 @@ function portfolioHeat({ positions, proposed, cap, grandfather, diagnostics }) {
   const held = contribution(positions, 'positions')
   const withProposed = contribution(positions.filter((row) => !restated.has(row?.symbol)), 'positions', false) + contribution(proposed, 'proposed')
   if (!finite(cap)) {
-    diagnostics.push(diagnostic('portfolio_heat_cap_missing', 'unevaluated', 'Missing portfolio heat cap', 'caps.portfolioHeat'))
+    diagnostics.push(diagnostic('portfolio_heat_cap_missing', 'unevaluated', "Missing portfolio heat cap; it is the Mandate's maxDrawdown and this run was given none", 'caps.portfolioHeat'))
     return { holdingsOnly: round(held), withProposed: round(withProposed), cap: null, breached: null }
   }
   /**
@@ -474,7 +509,7 @@ export function globalAllocation({ targets = [], availableWeight = 1, currentWei
  * loud before the investor approves it. The harness relaxes them once the book
  * has ten closed outcomes to learn from.
  */
-export function newSinglePacing({ proposedNewSingles = [], priorNewSingles = [], sizingPolicyUpdatedAt = null, closedOutcomeCount = 0, asOf, reviewReadyClosedOutcomes = 10 }) {
+export function newSinglePacing({ proposedNewSingles = [], priorNewSingles = [], sizingPolicyUpdatedAt = null, closedOutcomeCount = 0, asOf, reviewReadyClosedOutcomes = METHODOLOGY.reviewReadyClosedOutcomes }) {
   const diagnostics = []
   const warnings = []
   const relaxed = closedOutcomeCount >= reviewReadyClosedOutcomes

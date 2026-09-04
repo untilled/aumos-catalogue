@@ -10,41 +10,50 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
 ## Order of constraints
 
 1. Apply `mandate.constraints`: allowed asset classes/markets, excluded symbols, leverage/shorting,
-   cash floor and position limits. Cash is part of total portfolio value.
+   cash floor and position limits. Cash is part of total portfolio value. ⚠️ **Two of the caps this
+   skill applies come from here and from nowhere else** — `maxPositionWeight` is the position cap
+   (`caps.position`, and `mandatePositionCap` on `targetWeight`) and `maxDrawdown` is the portfolio
+   heat cap (`caps.portfolioHeat`). Configuration used to carry a second copy of each under its own
+   name, at its own number, and the run had no way to tell which of the two was the real limit.
+   ⛔ A constraint the Mandate leaves unset is `unevaluated`, not unlimited: report it.
 2. Compute current and proposed position, sector, theme and factor weights using total portfolio
    value as the denominator. Only actual holdings consume exposure; a Thesis, WATCH or paper
    candidate does not. A factor is a shared loss path that crosses sectors — declare it on the row as
-   `factors` so a cross-sector complex cannot pass under a sector cap. An axis whose cap is not
-   configured comes back unevaluated, never as a pass.
-3. Apply the stricter of Mandate and configured concentration thresholds. If classification is
-   uncertain, use the more conservative applicable bucket and disclose it.
+   `factors` so a cross-sector complex cannot pass under a sector cap. An axis whose cap nobody
+   declared — in the Mandate or in configuration — comes back unevaluated, never as a pass.
+3. Apply the configured sector, theme and factor caps on top of the Mandate's. Configuration may
+   be stricter than the Mandate and never looser. If classification is uncertain, use the more
+   conservative applicable bucket and disclose it.
 3a. Pass current holdings as `positions` and this run's targets as `proposed`. ⚠️ **`proposed` is
    the target state for the symbols it names, not an increment**: a row for a symbol already held
    *replaces* that holding, and a symbol nobody names keeps the weight it has. That is how a TRIM
    or RESIZE is expressed — `{ held 0.25 } → { proposed 0.15 }` is a reduction, and summing the two
    into 0.40 would refuse it as though it were a purchase. Separate the breach the book **arrived
-   with** from the breach this run would create, and pass `config` so `grandfather` is read. Existing exposure above a cap is carried: forcing an immediate
+   with** from the breach this run would create. Existing exposure above a cap is carried: forcing an immediate
    sale to satisfy a cap that was raised, or a position that grew into one, is a trade the cap never
    asked for, and the breach resolves through trims and growth in the rest of the book. What is
-   refused is the **addition** — `blocksNewNonCoreWhenBreached`. ⛔ Never refuse the reduction. A
+   refused is the **addition**. ⛔ That tolerance is a package rule, not a setting — there is
+   nothing to pass and nothing to switch off. ⛔ Never refuse the reduction. A
    TRIM or exit of a position over its cap moves the book toward the cap, and blocking it was the
    inversion #109 recorded: the audit's answer to an over-cap position was *do not plan*.
-3b. Apply portfolio heat — total loss if every stop fired at once, capped at
-   `concentration.portfolioHeat`. Weight caps do not measure it: two books with identical weights
+3b. Apply portfolio heat — total loss if every stop fired at once, capped at the Mandate's
+   `maxDrawdown`. Weight caps do not measure it: two books with identical weights
    have different heat when their stops sit in different places. Declare `stopLossPct` and `core` on
    each row; core DCA and parked liquidity carry no stop and are excluded, and a non-core row with no
    declared stop is unevaluated rather than zero risk. Over the cap, a run that adds new non-core risk
-   is blocked while a book already over on its holdings alone warns — the same `config.grandfather`
+   is blocked while a book already over on its holdings alone warns — the same grandfathering
    reading the weight caps use, from the same place.
 4. Apply evidence maturity. `insufficient` and `observing` lenses are capped at the experimental
    ceiling; `reviewable` is still not promoted and cannot expand solely because its sample threshold
-   was reached. ⚠️ **That ceiling is not `experimentalPositionCeiling` alone.** A ratio says nothing
+   was reached. ⚠️ **That ceiling is not the package's experimental ratio alone.** A ratio says nothing
    about whether the order it permits can be placed: 1% of a 10,095,751 KRW book is 100,958 KRW,
    which is three shares of a 33,050 KRW name, and a three-share position cannot be scaled into,
    trimmed, or made to express conviction. So the effective ceiling is the larger of that ratio and
    `experimentalPositionFloor` — the smallest position worth opening in **that venue's** currency —
-   bounded by `experimentalPositionCeilingMax`. Call `experimentalCeiling` for it rather than
-   deriving it; `targetWeight` applies the same rule and reports which of the three bound.
+   bounded by the package's ceiling maximum. Call `experimentalCeiling` for it rather than
+   deriving it; `targetWeight` applies the same rule and reports which of the three bound. ⚠️ The
+   ratio and its bound are package constants — only the floor is configured, because what makes an
+   order unexecutable is a fact about a venue.
    ⛔ When the floor does not fit inside the band the operation says `experimental_floor_unreachable`
    and the honest answer is that this book cannot run a real-money controlled experiment in that
    market — not a position rounded up to the cap.
@@ -61,7 +70,7 @@ book is adding single names faster than it is learning from them: two or more in
 one while the previous new single is still unverified, and one on the day the sizing policy changed.
 None of them is evidence that this candidate is wrong, so none of them blocks — they are what the run
 says out loud before the investor approves it. They relax to advisory once the book has
-`reviewReadyClosedOutcomes` closed outcomes to learn from.
+the package's review-ready count of closed outcomes to learn from — ten.
 
 ## Action mapping
 
@@ -80,7 +89,7 @@ condition already true is invalid: evaluate it now or choose the actual unresolv
 date anchor for a scheduled filing/event. Only use a metric the named source/company really reports.
 The trigger must be reachable within the lens that created it.
 
-Expiry defaults to `watchExpiryDays`, and `validateWatch` applies it: an absent `expiresAt` is
+Expiry defaults to thirty days, and `validateWatch` applies it: an absent `expiresAt` is
 derived from `asOf` and returned as `expiresAt` with `expirySource: 'default'`, an expiry already
 past blocks as `watch_expired`, and an `at-time` trigger later than its own expiry blocks as
 `watch_expiry_before_trigger` because it can never fire. On expiry, force review; do not silently
@@ -105,7 +114,7 @@ first one to go wrong.
 Five statuses, and the last two are the ones that were missing:
 
 - **`met`** — the condition is true.
-- **`near`** — within the configured band (`watchNear`: 3% of a price level, 80% of a drift
+- **`near`** — within the declared band (3% of a price level, 80% of a drift
   threshold, 7 days of an instant). A level approached is a person's cue to prepare; a two-state
   check only ever says "too late" or "nothing".
 - **`not-met`** — evaluated, and the condition is not true.
@@ -153,6 +162,6 @@ bound for a fact that stops mattering at the closing bell.
 
 When OpenDART is unavailable, a new Korean single-name fundamental BUY remains unable-to-judge
 `WAIT` even if the price example looks attractive. When only evidence maturity is low but every
-research input is complete, a controlled experiment may use at most the configured ceiling — the
+research input is complete, a controlled experiment may use at most the experimental ceiling — the
 ratio or the venue's minimum executable amount, whichever is larger, and never above
-`experimentalPositionCeilingMax`.
+the package's ceiling maximum.

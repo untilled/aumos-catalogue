@@ -1,5 +1,6 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
 import { forwardOutcome } from './outcomes.mjs'
+import { METHODOLOGY } from './constants.mjs'
 
 /**
  * ── The learning-acceleration layer (issue #70 §6, §10) ────────────────────
@@ -75,7 +76,7 @@ const PREREGISTERED = {
   go: { minSamples: 20, minWinRatePct: 55, minAvgExcessPct: 2 },
   noGo: { minSamples: 20, maxWinRatePct: 50, maxAvgExcessPct: 0 },
   shadow: { minExcessVsRealPp: 3, minWindowDays: 60 },
-  reviewReadyClosedOutcomes: 10,
+  reviewReadyClosedOutcomes: METHODOLOGY.reviewReadyClosedOutcomes,
 }
 
 function weekdaysBetween(fromDate, toDate) {

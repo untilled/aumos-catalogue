@@ -281,13 +281,17 @@ export function ruleVersions({ registry = {}, rows = [], axis = null } = {}) {
  * because something went wrong once, and the moment to argue about one is
  * before it binds, not while it is refusing a trade.
  */
+/**
+ * ⚠️ **A direction is declared for every key `config.schema.json` still has,
+ * and for no key it lost.** #133 moved nine of them into `METHODOLOGY` and two
+ * into the Mandate; a direction left behind for one of those would be
+ * `policy_provenance_orphan`'s sibling — a rule about a value no configuration
+ * can carry. What a package constant needs is a version bump and a reviewer,
+ * which is a stronger gate than this one, not a weaker one.
+ */
 const POLICY_DIRECTIONS = {
   minimumExpectedActiveReturn: 'higher-is-stricter',
-  minimumLensSamples: 'higher-is-stricter',
-  minimumIndependentDateClusters: 'higher-is-stricter',
   benchmarkHurdleAnnualPct: 'higher-is-stricter',
-  watchExpiryDays: 'lower-is-stricter',
-  experimentalPositionCeiling: 'lower-is-stricter',
   /**
    * The floor raises the ceiling, so a larger floor is a looser manager and a
    * smaller one is a stricter manager — the opposite of what the word "floor"
@@ -297,13 +301,10 @@ const POLICY_DIRECTIONS = {
    */
   'experimentalPositionFloor.KRW': 'lower-is-stricter',
   'experimentalPositionFloor.USD': 'lower-is-stricter',
-  experimentalPositionCeilingMax: 'lower-is-stricter',
   priceConflictTolerance: 'lower-is-stricter',
-  'concentration.position': 'lower-is-stricter',
   'concentration.sector': 'lower-is-stricter',
   'concentration.theme': 'lower-is-stricter',
   'concentration.factor': 'lower-is-stricter',
-  'concentration.portfolioHeat': 'lower-is-stricter',
   'coreDca.reserveFloorWeight': 'higher-is-stricter',
   'coreDca.minimumCashWeightForFirstTranche': 'higher-is-stricter',
   'coreDca.monthlyTrancheMaxWeight': 'lower-is-stricter',

@@ -3,6 +3,8 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated/lib/index.mjs'
 import { handleMcpRequest } from '../managers/evidence-gated/lib/mcp-server.mjs'
+import { METHODOLOGY } from '../managers/evidence-gated/lib/constants.mjs'
+import { GRANDFATHER_DEFAULTS } from '../managers/evidence-gated/lib/diagnostics.mjs'
 import { loadParity, comparePort } from './legacy-parity.mjs'
 
 /**
@@ -598,7 +600,6 @@ assert.ok(
   existsSync(new URL('../managers/evidence-gated/hooks/guard-submit.mjs', import.meta.url)),
   'the submit guard ships with the package that states the rule',
 )
-assert.deepEqual(configSchema.properties.reserveLiquiditySymbols.default, [], 'reserve liquidity is opt-in')
 assert.equal(
   mcpConfig.mcpServers['evidence-gated-metrics'].args[0],
   '${AUMOS_MANAGER_PACKAGE}/bin/evidence-gated-metrics-mcp',
@@ -1171,8 +1172,13 @@ assert.ok(
 )
 
 covers('watch/expiry-forced-review')
-const derivedExpiry = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-08-21T00:00:00Z' }, current: {}, config: { watchExpiryDays: 30 } } })
-assert.equal(derivedExpiry.data.expirySource, 'default', 'an undeclared expiry is derived from watchExpiryDays rather than left absent')
+const derivedExpiry = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'at-time', at: '2026-08-21T00:00:00Z' }, current: {} } })
+assert.equal(derivedExpiry.data.expirySource, 'default', 'an undeclared expiry is derived from the package expiry rather than left absent')
+assert.equal(
+  derivedExpiry.data.expiresAt,
+  new Date(Date.parse(methodology.asOf) + METHODOLOGY.watchExpiryDays * 86_400_000).toISOString(),
+  'and the number it derives from is METHODOLOGY.watchExpiryDays — since #133 there is no config key for it, so a run that passes none still gets thirty days rather than a literal somebody edited into coverage.mjs',
+)
 assert.equal(derivedExpiry.data.expiresAt, '2026-09-19T00:00:00.000Z')
 const expiredWatch = execute({ operation: 'validateWatch', asOf: methodology.asOf, input: { watch: { kind: 'price-below', threshold: 50, expiresAt: '2026-08-01T00:00:00Z' }, current: { price: 90 } } })
 assert.ok(expiredWatch.diagnostics.some((row) => row.code === 'watch_expired'), 'an expired WATCH forces review instead of renewing itself')
@@ -2105,9 +2111,49 @@ const boundedNumbers = (node, path = 'config') => {
   }
 }
 boundedNumbers(configSchema)
-for (const gate of ['minimumExpectedActiveReturn', 'minimumLensSamples', 'minimumIndependentDateClusters']) {
+for (const gate of ['minimumExpectedActiveReturn']) {
   assert.ok(configSchema.properties[gate].minimum > 0, `${gate} cannot be configured down to nothing`)
 }
+/**
+ * ── A parent default is not an empty object (issue #133) ───────────────────
+ *
+ * Every object here declared `"default": {}` beside children that declared
+ * real numbers, and that is a schema contradicting itself: Aumos's resolver
+ * takes a declared `default` **verbatim and does not descend**, so the group's
+ * own `{}` won and every number underneath it was dropped. The run then got no
+ * concentration caps at all — `unevaluated`, which is not a pass — and a
+ * schedule computed from the package's fallbacks rather than the numbers the
+ * settings dialog showed (untilled/aumos#652, measured on
+ * `run_f1560197652549e18bf7c1420f83983b`).
+ *
+ * ⛔ The fix is not to write the parent out in full. Two copies of one number
+ * is the drift this package refuses everywhere else; the group declares no
+ * default and the resolver composes one from the leaves.
+ */
+const parentDefaults = (node, path = 'config') => {
+  for (const [name, property] of Object.entries(node.properties ?? {})) {
+    if (property.type !== 'object') continue
+    assert.ok(!('default' in property), `${path}.${name} declares no default of its own — a parent default is taken verbatim and its children's are never read`)
+    parentDefaults(property, `${path}.${name}`)
+  }
+}
+parentDefaults(configSchema)
+/**
+ * ── One axis, one place (issue #133) ───────────────────────────────────────
+ *
+ * `concentration.position` (0.10) stood beside `mandate.constraints`'
+ * `maxPositionWeight` (0.20) and said the same thing in a different number,
+ * and the Mandate's is the one the Kernel refuses a proposal over. Portfolio
+ * heat is the same shape: it is the planned maximum drawdown, and the investor
+ * already declares that in the Mandate.
+ */
+for (const gone of ['position', 'portfolioHeat']) {
+  assert.equal(configSchema.properties.concentration.properties[gone], undefined, `${gone} is the Mandate's axis; a second copy under another name only tells a run two numbers for one limit`)
+}
+for (const gone of ['reserveLiquiditySymbols', 'reviewReadyClosedOutcomes', 'grandfather', 'minimumLensSamples', 'minimumIndependentDateClusters', 'watchNear', 'watchExpiryDays', 'experimentalPositionCeiling', 'experimentalPositionCeilingMax']) {
+  assert.equal(configSchema.properties[gone], undefined, `${gone} is a claim this methodology makes, not a preference an investor can answer — it is a constant in lib/constants.mjs`)
+}
+assert.ok(configSchema.properties.experimentalPositionFloor, 'the floor stays configured: what makes an order unexecutable is a fact about a venue, and venues differ')
 assert.ok(
   /stricter/i.test(configSchema.description) && /cannot waive/i.test(configSchema.description),
   'the schema states the rule its bounds enforce',
@@ -2538,6 +2584,8 @@ assert.ok(
 const bigBook = ceilingOf({ ...ceilingConfig, portfolioNav: 100000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1359.14 }, positionCurrency: 'KRW' })
 assert.equal(bigBook.data.experimentalCeiling, 0.01, 'where the ratio is already executable it is still the ceiling — this floor lifts nothing on a large book')
 assert.equal(ceilingOf({ experimentalPositionCeiling: 0.01 }).data.experimentalCeiling, 0.01, 'a caller that declares no floor gets the ratio it always got')
+assert.equal(ceilingOf({}).data.experimentalCeiling, METHODOLOGY.experimentalPositionCeiling, 'and a caller that declares no ratio either gets the package constant — an absent one used to read as 0, which refuses every experiment rather than sizing one small')
+assert.equal(ceilingOf({ portfolioNav: 1000000, portfolioNavCurrency: 'KRW', positionCurrency: 'KRW', experimentalPositionFloor: { KRW: 300000 } }).data.ceilingMax, METHODOLOGY.experimentalPositionCeilingMax, 'and the bound the floor may lift it to is the same constant')
 assert.ok(
   ceilingOf({ ...ceilingConfig, ...issueBook }).diagnostics.some((row) => row.code === 'experimental_floor_unevaluated'),
   'a floor quoted per venue needs the venue named; guessing the currency would be inventing the number',
@@ -2545,14 +2593,19 @@ assert.ok(
 const sizedUnderFloor = execute({
   operation: 'targetWeight',
   asOf: radarAsOf,
-  input: { expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, configPositionCap: 0.1, maturityStatus: 'observing', researchGate: 'passed', challengeVerdict: 'cleared', ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' },
+  input: { expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'observing', researchGate: 'passed', challengeVerdict: 'cleared', ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' },
 })
 assert.equal(sizedUnderFloor.data.experimentalCeiling, krCeiling.data.experimentalCeiling, 'targetWeight applies the same rule rather than a second copy of the arithmetic')
 assert.equal(sizedUnderFloor.data.bindingCap, krCeiling.data.experimentalCeiling)
 assert.equal(
-  execute({ operation: 'targetWeight', asOf: radarAsOf, input: { expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, configPositionCap: 0.1, maturityStatus: 'promoted', researchGate: 'passed', challengeVerdict: 'cleared', ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' } }).data.bindingCap,
-  0.1,
-  'a promoted lens is not held to the experimental ceiling at all, floor or no floor',
+  execute({ operation: 'targetWeight', asOf: radarAsOf, input: { expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'promoted', researchGate: 'passed', challengeVerdict: 'cleared', ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' } }).data.bindingCap,
+  0.2,
+  "a promoted lens is not held to the experimental ceiling at all, floor or no floor — what binds is the Mandate's maxPositionWeight, which since #133 is the only position cap there is",
+)
+assert.ok(
+  execute({ operation: 'targetWeight', asOf: radarAsOf, input: { expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, sectorHeadroom: 0.2, themeHeadroom: 0.15, maturityStatus: 'promoted', researchGate: 'passed', challengeVerdict: 'cleared', ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' } })
+    .diagnostics.some((row) => row.code === 'concentration_inputs_missing' && row.path === 'mandatePositionCap'),
+  'and a run with sector and theme headroom but no Mandate position cap is unevaluated rather than sized to a sector limit',
 )
 
 /**
@@ -2872,7 +2925,7 @@ assert.deepEqual(
   ['koreanEquity', 'usEquity', 'cashLike'],
   'the benchmark is fixed per kind of holding; a denominator that changes between runs makes every active return incomparable',
 )
-assert.equal(configSchema.properties.grandfather.properties.blocksNewNonCoreWhenBreached.default, true, 'existing exposure is tolerated and new exposure is not')
+assert.equal(GRANDFATHER_DEFAULTS.blocksNewNonCoreWhenBreached, true, 'existing exposure is tolerated and new exposure is not — a package rule since #133, not a setting')
 const dcaSkill = await readFile(new URL('../skills/candidate-research/SKILL.md', fixtureRoot), 'utf8')
 for (const condition of ['minimumCashWeightForFirstTranche', 'reserveFloorWeight', 'catchUpMonthlyMaxWeight']) {
   assert.ok(dcaSkill.includes(condition), `the Core DCA gate names ${condition} rather than describing it`)
@@ -2997,7 +3050,13 @@ for (const [where, text] of Object.entries(documents)) {
     assert.ok(configurablePaths.has(key) || configurablePaths.has(key.split('.').at(-1)), `${where} calls ${key} configured, so config.schema.json has it`)
   }
 }
-for (const key of ['watchExpiryDays', 'priceConflictTolerance', 'experimentalPositionCeiling', 'experimentalPositionFloor', 'experimentalPositionCeilingMax', 'minimumExpectedActiveReturn', 'reviewReadyClosedOutcomes', 'benchmarkHurdleAnnualPct']) {
+/**
+ * ⚠️ **The list shrank in #133 and that is the point.** Six of the eight named
+ * here were the methodology's own numbers; they are constants now, and a
+ * document that still called one "configured" would be describing a control
+ * that no longer exists. The loop above catches that in the other direction.
+ */
+for (const key of ['priceConflictTolerance', 'experimentalPositionFloor', 'minimumExpectedActiveReturn', 'benchmarkHurdleAnnualPct']) {
   assert.ok(configurablePaths.has(key), `${key} is a real configuration key`)
   assert.ok(
     Object.values(documents).some((text) => text.includes(key)),
@@ -3026,7 +3085,6 @@ const librarySource = (await Promise.all(
     .map((name) => readFile(new URL(`../lib/${name}.mjs`, fixtureRoot), 'utf8')),
 )).join('\n')
 const readByTheRunNotTheCode = {
-  reserveLiquiditySymbols: 'the US sleeve classifies the symbols; no operation takes a list of them',
   'benchmarks.koreanEquity': 'the run reads the symbol and passes bars, not the ticker',
   'benchmarks.usEquity': 'the run reads the symbol and passes bars, not the ticker',
   'benchmarks.cashLike': 'the run reads the symbol and passes bars, not the ticker',
@@ -3048,23 +3106,24 @@ for (const { name, path } of declaredKeys) {
   assert.ok(read || exempt, `config.schema.json declares ${path} and no operation reads it — declaring a setting that governs nothing is how #87, #91 and #109 each arrived`)
   assert.ok(!(read && exempt), `${path} is read by an operation now, so it does not belong on the run-reads-it list`)
 }
-assert.ok(/\bgrandfather\b/.test(librarySource), 'grandfather is the key this check was written for, and it is read')
+assert.ok(/\bgrandfather\b/.test(librarySource), 'grandfather is the concept this check was written for, and it is read')
+assert.equal(configSchema.properties.grandfather, undefined, 'and since #133 it is read from lib/constants.mjs rather than asked for on an install screen')
 
 covers('policy/policy-lint-provenance')
-const policyBase ={ concentration: { position: 0.1 }, minimumExpectedActiveReturn: 0.05 }
-const stricter = execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, concentration: { position: 0.08 } }, provenance: { 'concentration.position': { approvedBy: 'investor', approvedAt: '2026-08-01' } } } })
+const policyBase ={ concentration: { sector: 0.2 }, minimumExpectedActiveReturn: 0.05 }
+const stricter = execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, concentration: { sector: 0.18 } }, provenance: { 'concentration.sector': { approvedBy: 'investor', approvedAt: '2026-08-01' } } } })
 assert.equal(stricter.data.changes[0].effect, 'stricter')
 assert.equal(stricter.status, 'ok', 'a tightening with attribution is accepted')
 const looser = execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, minimumExpectedActiveReturn: 0.03 } } })
 assert.equal(looser.status, 'blocked')
 assert.ok(looser.diagnostics.some((row) => row.code === 'policy_auto_relax'), 'the moment to argue about a threshold is before it binds, not while it is refusing a trade')
 assert.ok(
-  execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, concentration: { position: 0.08 } }, provenance: { 'concentration.position': { immutable: true } } } })
+  execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, concentration: { sector: 0.18 } }, provenance: { 'concentration.sector': { immutable: true } } } })
     .diagnostics.some((row) => row.code === 'policy_immutable_changed'),
   'an immutable value moves by package revision, never by configuration',
 )
 assert.ok(
-  execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, concentration: { position: 0.08 } } } })
+  execute({ operation: 'policyLint', asOf: envelopeAsOf, input: { current: policyBase, proposed: { ...policyBase, concentration: { sector: 0.18 } } } })
     .diagnostics.some((row) => row.code === 'policy_requires_approval'),
   'an unattributed change is unresolved rather than applied',
 )
