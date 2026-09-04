@@ -120,7 +120,7 @@ gate remains open.
 - `theme-radar`: forward research — where an idea comes from, and what a forward thesis must carry;
 - `position-research`: the sell-side watch on what is already held, price and fundamentals in parallel;
 - `evidence-gates`: sample independence, maturity and entry gates;
-- `data-source-contract`: endpoints, time boundaries and degradation;
+- `data-source-contract`: endpoints, time boundaries, degradation, and what a vendor error may be recorded as;
 - `candidate-research`: lens-specific why-cheap/trap/variant/benchmark work;
 - `thesis-challenge`: adversarial review and unresolved-risk blocking;
 - `sizing-and-concentration`: target weights, caps and WATCH hygiene;

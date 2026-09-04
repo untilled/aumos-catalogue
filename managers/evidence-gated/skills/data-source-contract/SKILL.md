@@ -27,6 +27,25 @@ a different thing from a call that failed.
 | `open-dart` | `/api/corpCode.xml`, `/api/company.json`, `/api/list.json`, `/api/fnlttSinglAcntAll.json`, `/api/fnlttSinglAcnt.json` | the **receipt** is the moment: `rcept_no` begins with the receipt date and `rcept_dt` repeats it; a business year is not a disclosure date |
 | CLI web | IR, consensus, policy, macro, industry/theme context | supplementary and non-canonical; retain URL/access time and disclose replay gap |
 
+### Toss's two time formats, and the one enum this package guessed
+
+The 토스 login is two families of route, and they do not spell time the same way. Neither shape is
+derivable from the other, so a run that carries one across is refused by the vendor rather than
+answered wrongly:
+
+| route family | parameter | shape | what comes back |
+|---|---|---|---|
+| `/api/v1/candles`, `/api/v1/market-indicators/{symbol}/candles` | `before` | RFC 3339 with an offset — `2026-08-20T00:00:00.000+09:00` | `nextBefore`, in that same shape |
+| `/api/v1/stocks/{symbol}/…` | `until` | a date — `2026-08-27` | `nextUntil`, in that same shape |
+
+`interval` on the two candle routes is a closed vocabulary, and the daily member is **`1d`**.
+`day` is refused with a 400 — one string, and it stopped this book for two days
+(untilled/aumos-catalogue#127). ⛔ **`1d` is written here because `1d` is what was measured**, on
+2026-09-04, against 069500: 200 with sixty daily bars. `KOSPI` reproduced the 400 and was never
+asked for the 200, so it is not evidence here. A weekly or monthly spelling may well exist and this
+package does not know it, so a run that needs one is varying a parameter — the section below, not a
+value copied out of this table.
+
 ## Time filter
 
 For every response:
@@ -51,6 +70,40 @@ filled in with the preliminary figures.
 
 Never mix adjusted and unadjusted bars. Request the basis explicitly, verify discontinuities against
 corporate actions, and block price-derived returns or targets when the basis cannot be reconciled.
+
+## A vendor error is not an outage until it is proved one
+
+The section below is about a source this fund does not have. This is the other case — the source is
+there, the call was made, and the vendor answered with an error — and it is the one a run improvises.
+Invariant 5 forbids turning missing, stale or conflicting evidence into confidence; **infrastructure
+evidence is evidence**, and the same discipline governs it. What a failed call establishes is *this
+request returned this status*. *The route is down* is a different claim about a different subject,
+and this run has to earn it.
+
+Earn it by calling a **sibling route on the same source** — one whose shape this run already knows,
+`/prices` or a market calendar for 토스, a mapping call for `sec-edgar`, `list.json` for `open-dart`
+— and read the pair:
+
+| the siblings | what that is | what this run does |
+|---|---|---|
+| answer normally | **a request error.** A vendor serving three routes out of five is not down | vary the request one axis at a time, and take the fields that may carry a closed vocabulary first — `interval` is the shape of that failure, because a wrong enum member and a dead route return the same status. Where the vendor names no vocabulary for the field, that absence is the finding: record it in `missingFields` |
+| fail the same way | a source failure, which may be recorded as one | record it, and apply the degradation row below for that source |
+| are not conclusive either way | undetermined | say so in `uncertainty` and **write no blocking list.** "I could not tell" is a sentence this package already has a home for |
+
+⛔ **A 4xx is the vendor saying the request was wrong, and reading it as an outage inverts it.** A
+4xx may be recorded as a vendor failure only after a sibling call failed too; without that, it is a
+request error whose axis has not been found yet.
+
+⛔ **An unconfirmed diagnosis does not enter a Brief conclusion or `failures/repeated-patterns`.**
+Those two hold observations, and a causal claim written into either outlives every run that could
+have falsified it — the next run reads it as something already established and stops looking.
+`uncertainty` is where an unverified inference belongs, and it ends with the run that wrote it.
+`skills/memory-contract/SKILL.md` carries the same refusal from the writing side.
+
+⚠️ **Read back the record you are about to write.** The failure this section exists for wrote its
+own refutation into the same object — three sibling routes listed as healthy, beside a conclusion
+that the vendor was down — and never re-read it. A diagnosis whose own fields contradict it is not
+a diagnosis, and the fields are right there.
 
 ## Required and optional installation policy
 
