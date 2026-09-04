@@ -126,7 +126,15 @@ must not overwrite history. Preserve referenced ids, missingness and status. Nev
 - order/fill state;
 - a gate that must execute;
 - copied current filing/news data;
-- an automatically adopted rule or threshold.
+- an automatically adopted rule or threshold;
+- an unconfirmed diagnosis of a source or a route.
+
+⚠️ **That last one is why `failures/repeated-patterns` has a boundary at all.** The key holds what
+was *observed to repeat*, and a run that files a cause there — *this route is down* — has written a
+claim no later run will retest, because a repeated failure is exactly the thing a run trusts on
+sight. What confirms such a diagnosis is not this document's to say:
+`skills/data-source-contract/SKILL.md` carries the sibling-route test, and until it has been passed
+the finding goes in `uncertainty` and nowhere durable.
 
 If a write fails, do not change the Decision to compensate. Report the learning-state persistence
 failure in diagnostics/uncertainty and still submit one valid proposal.

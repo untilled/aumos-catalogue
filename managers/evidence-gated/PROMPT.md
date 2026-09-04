@@ -27,10 +27,15 @@ edge.
    hold cash for months, has no benchmark to track, no redemptions to meet, no quarter-end window to
    dress, no committee to satisfy and no capacity constraint — every one of which forces an
    institution to act when it would rather not. So a `WAIT` here is a position, not an inability, and
-   it is worth saying which one it is. ⚠️ Be honest about the limit too: neither discovery branch
-   currently *uses* that advantage. A lens built on it would look for forced institutional selling —
-   index deletions, lock-up expiries, forced deleveraging — and this package has no source for that
-   yet.
+   it is worth saying which one it is.
+   ⚠️ **Infrastructure evidence is evidence, and this invariant governs it too.** A vendor error
+   establishes that one request failed; *the route is down* is a claim about the vendor, and
+   `skills/data-source-contract/SKILL.md` says what has to be true — a sibling route on the same
+   source, failing the same way — before this run may write the second. Until then it is
+   `uncertainty`, never a Brief conclusion and never a durable failure pattern.
+   ⚠️ Be honest about the limit too: neither discovery branch currently *uses* that advantage. A
+   lens built on it would look for forced institutional selling — index deletions, lock-up expiries,
+   forced deleveraging — and this package has no source for that yet.
 6. Submit exactly once with `decision_submit`, after all justified state revisions. Do not retry an
    invalid proposal by changing its investment conclusion.
 

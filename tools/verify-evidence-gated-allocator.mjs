@@ -1210,6 +1210,45 @@ for (const unit of ['percent', 'ratio', 'count', 'multiple', 'index-points', 'da
 }
 
 /**
+ * ── A vendor error is one call's status, not the vendor's state (issue #127) ─
+ *
+ * A run took two 400s and wrote *the route is down* into `failures/repeated-patterns`
+ * and into a Brief conclusion, and the book stopped for two days for a wrong
+ * `interval` string. Its own record listed three sibling routes as healthy.
+ *
+ * Nothing here is arithmetic, so what is checked is that the three documents
+ * that had to say it do say it, and that each one says the half it owns: the
+ * contract skill owns the triage, the memory contract owns the refusal to write
+ * an unconfirmed one down, and `PROMPT.md` extends invariant 5 to reach them.
+ * A rule stated in one place and enforced in another is how this went wrong the
+ * first time.
+ */
+covers('audit/vendor-error-triage')
+assert.ok(/sibling route/i.test(contractSkill), 'the contract skill names the sibling-route test')
+assert.ok(/4xx/.test(contractSkill), 'and says what a 4xx is evidence of')
+for (const outcome of ['`missingFields`', '`uncertainty`', '`failures/repeated-patterns`']) {
+  assert.ok(contractSkill.includes(outcome), `the triage lands in ${outcome}, in this package's existing vocabulary`)
+}
+assert.ok(
+  contractSkill.includes('`1d`') && contractSkill.includes('`interval`'),
+  'the daily candle interval is written down — the string this whole issue was',
+)
+assert.ok(
+  contractSkill.includes('`before`') && contractSkill.includes('`until`') && contractSkill.includes('`nextBefore`') && contractSkill.includes('`nextUntil`'),
+  'both Toss time parameters are named, because neither shape is derivable from the other',
+)
+const memoryWriteSkill = await readFile(new URL('../skills/memory-contract/SKILL.md', fixtureRoot), 'utf8')
+assert.ok(
+  /unconfirmed diagnosis/i.test(memoryWriteSkill) && memoryWriteSkill.includes('skills/data-source-contract/SKILL.md'),
+  'the memory contract refuses an unconfirmed diagnosis and points at the document that confirms one, rather than restating it',
+)
+const invariantsText = await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')
+assert.ok(
+  /Infrastructure evidence is evidence/.test(invariantsText),
+  'invariant 5 reaches infrastructure evidence — that it did not is the whole of this failure',
+)
+
+/**
  * The approved entry-quality gate, in code rather than in prose. (issue #70 §2)
  *
  * Series are built so each case isolates one branch: a knife still cutting

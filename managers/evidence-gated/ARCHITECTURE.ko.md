@@ -105,7 +105,7 @@ node tools/verify-evidence-gated-allocator.mjs
 - `theme-radar`: 선행 리서치 — 아이디어가 어디서 오는지, forward thesis가 무엇을 지녀야 하는지;
 - `position-research`: 이미 보유한 것에 대한 매도 방향 감시, 가격과 펀더멘털을 병행해서;
 - `evidence-gates`: 표본 독립성, maturity, 진입 게이트;
-- `data-source-contract`: 엔드포인트, 시간 경계, 열화;
+- `data-source-contract`: 엔드포인트, 시간 경계, 열화, 그리고 벤더 에러를 무엇으로 기록해도 되는가;
 - `candidate-research`: lens별 why-cheap/trap/variant/benchmark 작업;
 - `thesis-challenge`: 적대적 검토와 미해소 리스크 차단;
 - `sizing-and-concentration`: 목표 비중, 상한, WATCH 위생;
