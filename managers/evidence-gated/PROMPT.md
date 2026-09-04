@@ -176,15 +176,18 @@ something a run would otherwise discover *after* proposing.
 `uncertainty`, and propose `WAIT`. The failure this prevents is a well-formed proposal built on a
 book that does not add up — which is worse than no proposal, because it looks like one.
 
-⚠️ **Pass `managedSince: mandate.effectiveFrom` and `config` to `harnessAudit`.** Without the first
-the run cannot tell a position it **inherited** from one bought since, and without the second
-`config.grandfather` governs nothing. Both values are already in this invocation — the mapping is
-the same shape as the close buffers `nextReviewSequence` takes:
+⚠️ **Pass `managedSince: mandate.effectiveFrom` to `harnessAudit`.** Without it the run cannot tell
+a position it **inherited** from one bought since. The value is already in this invocation — the
+mapping is the same shape as the close buffers `nextReviewSequence` takes:
 
 | operation input | what the invocation calls it |
 |---|---|
 | `managedSince` | `mandate.effectiveFrom` |
-| `config.grandfather` | the investor's `grandfather` configuration |
+
+⛔ **Grandfathering is not a setting and there is nothing to pass for it.** *Existing exposure is
+carried and new exposure is not* is this methodology's rule, held once in `lib/constants.mjs`, and
+`harnessAudit` and `concentration` read the same copy — so they cannot come to disagree, and no run
+has to remember to hand it over.
 
 ⚠️ **A held position no decision explains is normal, and a run that treats it as a failure will
 never do anything.** This manager does not own the book: Aumos keeps the broker link, every order
@@ -350,13 +353,20 @@ Load `skills/deterministic-metrics/SKILL.md` and call the package MCP tool
 calibration, attribution, parser or scheduling calculation. The stdio executable
 `bin/evidence-gated-metrics` is the equivalent operator/CI interface; do not invoke it with Bash in
 an Aumos run. Do not replace either interface's structured output with free-form arithmetic. Then load
-`skills/sizing-and-concentration/SKILL.md`. Apply the Mandate first, then the stricter configured
-position/sector/theme/factor thresholds and the portfolio heat cap. `targetWeight` is never negative. An `insufficient` or `observing`
+`skills/sizing-and-concentration/SKILL.md`. **The position cap and the portfolio heat cap are the
+Mandate's** — `mandate.constraints.maxPositionWeight` is `caps.position` and `mandatePositionCap`,
+and `mandate.constraints.maxDrawdown` is `caps.portfolioHeat`. Neither is a config key: one axis
+declared twice in two numbers only ever tells a run which number to believe by accident. On top of
+them apply the configured sector/theme/factor thresholds, which may be stricter and never looser.
+⛔ **A cap the Mandate does not declare is `unevaluated`, and that is not a pass** — say so in
+`uncertainty` rather than sizing as though the limit were absent.
+`targetWeight` is never negative. An `insufficient` or `observing`
 lens can only support a controlled experiment at or below the experimental ceiling; it never
 supports larger size by rhetoric. **Call `experimentalCeiling` for that number and do not derive
-it**: it is the larger of `experimentalPositionCeiling` and `experimentalPositionFloor` — the
+it**: it is the larger of the package's own experimental ratio and the configured
+`experimentalPositionFloor` — the
 smallest position worth opening in the venue's currency, converted at the same USDKRW the NAV uses
-— bounded by `experimentalPositionCeilingMax`. A ratio on its own permits three shares on a small
+— bounded by the package's ceiling maximum. A ratio on its own permits three shares on a small
 book, which is an order that cannot be trimmed or added to and leaves nothing to measure; when even
 the floor does not fit the band the operation says `experimental_floor_unreachable` and the lane is
 paper here, not a position rounded up to the cap. A machine-evaluable future condition belongs in `watches` or

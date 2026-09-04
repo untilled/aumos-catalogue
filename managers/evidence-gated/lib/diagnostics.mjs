@@ -1,3 +1,5 @@
+import { METHODOLOGY } from './constants.mjs'
+
 export const RULE_VERSION = 'ega-1.0.0'
 
 /**
@@ -91,7 +93,7 @@ export function requireNumber(value, path, diagnostics, { minimum, maximum } = {
 }
 
 /**
- * Grandfathering, read from configuration rather than hardcoded twice.
+ * Grandfathering, read from one place rather than hardcoded twice.
  *
  * `config.grandfather` was declared in `config.schema.json`, shown to the
  * investor, recorded as ported in `MIGRATION.md` — and read by nothing. Two
@@ -101,10 +103,18 @@ export function requireNumber(value, path, diagnostics, { minimum, maximum } = {
  *
  * The concept is one sentence and it belongs in one place: **existing exposure
  * is carried and new exposure is not.** `concentration` reads it for the weight
- * caps and `harnessAudit` reads it for positions no decision explains, so an
- * investor who turns it off turns off both.
+ * caps and `harnessAudit` reads it for positions no decision explains, so the
+ * two can never disagree about the tolerance.
+ *
+ * ⚠️ **It stopped being a setting in #133.** *"Should an inherited breach be
+ * carried or forced out today?"* is a claim this methodology makes — the whole
+ * argument for it is written in `concentration`, and an investor was being
+ * asked to overrule that argument from an install screen with nothing beside it
+ * to reason from. `METHODOLOGY.grandfather` is the answer now. The argument
+ * still takes an override so the blunt reading stays reachable from the
+ * verifier; ⛔ no flow skill names it, and a run passes none.
  */
-export const GRANDFATHER_DEFAULTS = { enabled: true, blocksNewNonCoreWhenBreached: true }
+export const GRANDFATHER_DEFAULTS = METHODOLOGY.grandfather
 
 export function grandfatherPolicy(config = {}) {
   const declared = config?.grandfather ?? {}

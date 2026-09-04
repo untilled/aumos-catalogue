@@ -1,5 +1,6 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
 import { REGIMES, normalizeRegime } from './scanners.mjs'
+import { METHODOLOGY } from './constants.mjs'
 
 export function independentDateClusters(dates, gapDays = 5) {
   const unique = [...new Set((dates ?? []).filter((value) => typeof value === 'string' && Number.isFinite(Date.parse(value))))].sort()
@@ -19,7 +20,7 @@ export function brierScore(probabilities, outcomeIndex) {
   return round(probabilities.reduce((sum, value, index) => sum + (value - (index === outcomeIndex ? 1 : 0)) ** 2, 0), 4)
 }
 
-export function calibrationSummary({ samples = [], minimumSamples = 10, minimumClusters = 4 }) {
+export function calibrationSummary({ samples = [], minimumSamples = METHODOLOGY.minimumLensSamples, minimumClusters = METHODOLOGY.minimumIndependentDateClusters }) {
   const diagnostics = []
   const complete = samples.filter((row) => finite(row?.activeReturn) && typeof row?.date === 'string')
   const clusters = independentDateClusters(complete.map((row) => row.date))

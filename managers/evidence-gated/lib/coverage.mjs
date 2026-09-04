@@ -1,4 +1,5 @@
 import { diagnostic } from './diagnostics.mjs'
+import { METHODOLOGY } from './constants.mjs'
 import { WATCH_TRIGGER_KINDS, normalizeWatch } from './methodology.mjs'
 
 /**
@@ -132,7 +133,7 @@ export function validateWatch(watch, current, asOf, config = {}) {
   if (watch?.observablePublished === false) diagnostics.push(diagnostic('watch_observable_unpublished', 'blocked', 'WATCH uses a KPI the company/source does not publish', 'watch.observable'))
 
   const asOfInstant = Date.parse(asOf)
-  const defaultDays = Number.isFinite(config?.watchExpiryDays) ? config.watchExpiryDays : 30
+  const defaultDays = Number.isFinite(config?.watchExpiryDays) ? config.watchExpiryDays : METHODOLOGY.watchExpiryDays
   let expiresAt = watch?.expiresAt ?? null
   let expirySource = 'declared'
   if (expiresAt === null || expiresAt === undefined || expiresAt === '') {
@@ -202,7 +203,7 @@ const OBSERVATION_SUPPORTS = {
   clock: new Set(['clock']),
 }
 
-const NEAR_DEFAULTS = { priceRatio: 0.03, driftFraction: 0.8, timeDays: 7 }
+const NEAR_DEFAULTS = METHODOLOGY.watchNear
 
 /**
  * Is this WATCH met, near, or neither — and was this run even able to ask?

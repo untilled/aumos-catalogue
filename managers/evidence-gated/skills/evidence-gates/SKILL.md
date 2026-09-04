@@ -126,12 +126,12 @@ For a new single-name BUY require all of the following:
 - Mandate and concentration headroom.
 
 If an input is unknowable, do not insert a neutral number. Mark the gate unresolved. `insufficient`
-or `observing` permits at most the configured experimental ceiling when every research and safety
+or `observing` permits at most the experimental ceiling when every research and safety
 gate is otherwise complete; missing fundamental provenance or unresolved high risk permits no BUY.
 
-⚠️ **A small experiment has to be one that can be executed.** The ceiling is
-`experimentalPositionCeiling` or `experimentalPositionFloor` — the smallest position worth opening
-in the venue's own currency — whichever is larger, bounded by `experimentalPositionCeilingMax`;
+⚠️ **A small experiment has to be one that can be executed.** The ceiling is the package's
+experimental ratio or the configured `experimentalPositionFloor` — the smallest position worth
+opening in the venue's own currency — whichever is larger, bounded by the package's ceiling maximum;
 `experimentalCeiling` is the one operation that answers it. The ratio alone was capping this book's
 first real experiment at three shares, and the source methodology's Experiment-stage entry in that
 same name was ten. Below the band the answer is `experimental_floor_unreachable`: this book runs

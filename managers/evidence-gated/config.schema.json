@@ -5,16 +5,6 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "reserveLiquiditySymbols": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "pattern": "^[A-Z0-9.-]{1,20}$"
-      },
-      "uniqueItems": true,
-      "default": [],
-      "description": "Assets explicitly classified by the investor as reserve liquidity for the selected sleeve. SGOV is not reserve liquidity unless listed here or in the current shared Brief."
-    },
     "minimumExpectedActiveReturn": {
       "type": "number",
       "minimum": 0.02,
@@ -25,25 +15,21 @@
     "concentration": {
       "type": "object",
       "additionalProperties": false,
-      "default": {},
+      "description": "Caps on the shared loss paths a position weight cannot see. ⚠️ The position axis is not here: the Mandate's maxPositionWeight is that cap, the Kernel refuses a proposal over it, and a second copy under another name only ever told the run two different numbers for one limit. Portfolio heat — total loss if every stop fired at once — is the Mandate's maxDrawdown for the same reason. ⚠️ Every cap here is declared rather than left empty: an absent cap is not \"no limit\", it is concentration_cap_missing / unevaluated, which is recorded every run and is not a pass. Loosen one by declaring the looser number.",
       "properties": {
-        "position": {
-          "type": "number",
-          "minimum": 0.02,
-          "maximum": 0.25,
-          "default": 0.1
-        },
         "sector": {
           "type": "number",
           "minimum": 0.05,
           "maximum": 0.4,
-          "default": 0.2
+          "default": 0.2,
+          "description": "Cap on one sector. Declared loose rather than absent — raise it to 0.4 to say \"this book is allowed to be a sector bet\" and have that be a recorded choice."
         },
         "theme": {
           "type": "number",
           "minimum": 0.05,
           "maximum": 0.3,
-          "default": 0.15
+          "default": 0.15,
+          "description": "Cap on one narrative the book is expressing in several names. A theme is declared on the row; an undeclared theme is unevaluated, never zero."
         },
         "factor": {
           "type": "number",
@@ -51,27 +37,12 @@
           "maximum": 0.3,
           "default": 0.15,
           "description": "Cap on one shared loss path across sectors — the cross-sector complex a sector cap cannot see. Positions declare their factors; an undeclared factor is unevaluated, never zero."
-        },
-        "portfolioHeat": {
-          "type": "number",
-          "minimum": 0.01,
-          "maximum": 0.15,
-          "default": 0.06,
-          "description": "Cap on total loss if every stop fired at once, as a fraction of the account. Weight caps do not measure it. Core DCA and parked liquidity carry no stop and are excluded; a non-core row with no declared stop is unevaluated, never zero."
         }
       }
-    },
-    "reviewReadyClosedOutcomes": {
-      "type": "integer",
-      "minimum": 5,
-      "maximum": 50,
-      "default": 10,
-      "description": "Closed outcomes after which the new-single pacing warnings relax from unevaluated to advisory. Pacing never blocks at any count."
     },
     "benchmarks": {
       "type": "object",
       "additionalProperties": false,
-      "default": {},
       "description": "The named benchmark each kind of holding is measured against. This methodology is benchmark-relative end to end, so a denominator that changes between runs makes every active return incomparable — including the ones the promotion gate counts. ⚠️ A benchmark has to be denominated in the same currency as the holdings it stands in for, or the difference measures the exchange rate rather than the selection: a KRW-listed S&P 500 ETF against a USD sleeve prices the index and USDKRW at once, and USDKRW moved 1392.20 → 1514.70 → 1359.14 over the twelve months to 2026-09-03 — a band wider than minimumExpectedActiveReturn itself.",
       "properties": {
         "koreanEquity": {
@@ -101,20 +72,9 @@
       "default": 7.67,
       "description": "The annualized return the book has to clear to have been worth running rather than held passively. Distinct from minimumExpectedActiveReturn, which is a per-candidate gate: one asks whether this trade is worth doing, the other whether any of it was."
     },
-    "grandfather": {
-      "type": "object",
-      "additionalProperties": false,
-      "default": {},
-      "description": "Existing exposure above a cap is tolerated while new exposure is not. Forcing an immediate sale to satisfy a cap that was raised or a position that grew is a trade the cap never asked for; the breach resolves through trims and growth in the rest of the book. The same reading covers the book this manager inherited: a holding that predates the mandate, or one you bought yourself, is carried and may be reduced freely, and is not expanded until a decision explains it.",
-      "properties": {
-        "enabled": { "type": "boolean", "default": true },
-        "blocksNewNonCoreWhenBreached": { "type": "boolean", "default": true }
-      }
-    },
     "coreDca": {
       "type": "object",
       "additionalProperties": false,
-      "default": {},
       "description": "Broad-ETF deployment is a cash-allocation decision, not a single-name BUY, and is recorded as one.",
       "properties": {
         "minimumCashWeightForFirstTranche": {
@@ -153,57 +113,9 @@
       "default": 0.05,
       "description": "Relative difference between the vendor price and a web figure that still counts as agreement. Beyond it the vendor reading is selected and the conflict is retained rather than averaged."
     },
-    "minimumLensSamples": {
-      "type": "integer",
-      "minimum": 5,
-      "maximum": 100,
-      "default": 10
-    },
-    "minimumIndependentDateClusters": {
-      "type": "integer",
-      "minimum": 2,
-      "maximum": 20,
-      "default": 4
-    },
-    "watchNear": {
-      "type": "object",
-      "additionalProperties": false,
-      "default": {},
-      "description": "How close a WATCH has to be before it is reported as `near` rather than not-met. A level approached is a person's cue to prepare; a two-state check only ever says \"too late\" or \"nothing\". The defaults are the original harness's own near bands.",
-      "properties": {
-        "priceRatio": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 0.2,
-          "default": 0.03,
-          "description": "Fraction away from the level a price is still `near` at. 0.03 means a price-below level of 196 reports near from 201.88 down."
-        },
-        "driftFraction": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1,
-          "default": 0.8,
-          "description": "Fraction of a weight-drift threshold at which the drift is `near`. 0.8 means a 5-point threshold reports near from 4 points."
-        },
-        "timeDays": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 60,
-          "default": 7,
-          "description": "Calendar days before an at-time WATCH's instant that it reports `near`."
-        }
-      }
-    },
-    "watchExpiryDays": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 180,
-      "default": 30
-    },
     "freshnessHours": {
       "type": "object",
       "additionalProperties": false,
-      "default": {},
       "properties": {
         "marketPrice": {
           "type": "number",
@@ -231,17 +143,9 @@
         }
       }
     },
-    "experimentalPositionCeiling": {
-      "type": "number",
-      "minimum": 0.001,
-      "maximum": 0.05,
-      "default": 0.01,
-      "description": "Ratio side of the maximum target weight while a lens is insufficient, observing or reviewable. The Mandate and concentration limits may impose a lower ceiling. ⚠️ A ratio alone does not say whether the order it permits can be placed: on a 10,095,751 KRW book 1% is 100,958 KRW, which is three shares of a 33,050 KRW name, and the smallest change expressible in a three-share position is a third of it. So the effective ceiling is this ratio or experimentalPositionFloor converted to a weight, whichever is larger, bounded by experimentalPositionCeilingMax."
-    },
     "experimentalPositionFloor": {
       "type": "object",
       "additionalProperties": false,
-      "default": {},
       "description": "Smallest position, per venue currency, that is worth opening on real money — the amount below which tick size, lot size and the round-trip fee leave no result to measure. ⚠️ It is denominated per venue rather than in the book's base currency because what makes an order unexecutable is a fact about the exchange: the tick, the lot, the price a share trades at and the fee and tax schedule. The base currency is only where the investor keeps score, and one number in it would buy a granular position in a market quoting $0.01 ticks and a three-share position in one quoting 50 KRW ticks on a 33,050 KRW share. Converting into the book's denominator uses the same USDKRW the global NAV already requires. ⚠️ It is an approximation and stays one — exact granularity is a fact about the name, and the sizing operation is given no price.",
       "properties": {
         "KRW": {
@@ -260,17 +164,9 @@
         }
       }
     },
-    "experimentalPositionCeilingMax": {
-      "type": "number",
-      "minimum": 0.001,
-      "maximum": 0.05,
-      "default": 0.03,
-      "description": "The most experimentalPositionFloor may lift the ceiling to. The floor exists to make the ratio executable, not to turn an experiment into a conviction position, and without a second bound 'the larger of a ratio and an amount' inflates the weight without limit as the book shrinks. 3% sits just above the source methodology's own Experiment-stage size for the same name (2.6%), so the floor can reproduce what that methodology actually did and can never exceed it. ⚠️ Below roughly 10,000,000 KRW of NAV the Korean floor no longer fits inside this band; the run then reports experimental_floor_unreachable rather than sizing at the cap, because a book that small cannot run this lane on real money and the paper cohort is the sample that is honestly available."
-    },
     "schedule": {
       "type": "object",
       "additionalProperties": false,
-      "default": {},
       "properties": {
         "releaseBufferMinutes": {
           "type": "integer",
@@ -302,14 +198,14 @@
           "minimum": 10,
           "maximum": 180,
           "default": 30,
-          "description": "Minutes after the XKRX close before the Korean sleeve's review fires. Reaches nextReviewSequence as buffers.kr. \u26a0\ufe0f The default was 60 here and 30 in the code until #91, and the code was what ran \u2014 nothing passed this key to anything. The behaviour is kept and the declaration corrected to match it, rather than the other way round, because 30/45 is what every document describing this schedule was written against."
+          "description": "Minutes after the XKRX close before the Korean sleeve's review fires. Reaches nextReviewSequence as buffers.kr. ⚠️ The default was 60 here and 30 in the code until #91, and the code was what ran — nothing passed this key to anything. The behaviour is kept and the declaration corrected to match it, rather than the other way round, because 30/45 is what every document describing this schedule was written against."
         },
         "usCloseBufferMinutes": {
           "type": "integer",
           "minimum": 10,
           "maximum": 240,
           "default": 45,
-          "description": "Minutes after the actual XNYS/XNAS close before the US sleeve's review fires. Reaches nextReviewSequence as buffers.us. Longer than the Korean one, and no note records why \u2014 the asymmetry is inherited rather than argued, and is left as it was instead of being flattened on a guess."
+          "description": "Minutes after the actual XNYS/XNAS close before the US sleeve's review fires. Reaches nextReviewSequence as buffers.us. Longer than the Korean one, and no note records why — the asymmetry is inherited rather than argued, and is left as it was instead of being flattened on a guess."
         }
       }
     }
