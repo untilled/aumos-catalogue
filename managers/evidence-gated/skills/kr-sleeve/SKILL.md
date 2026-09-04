@@ -17,9 +17,14 @@ of `skills/orchestrate/SKILL.md` asks for.
 
 ⚠️ **The orchestrator names them in your prompt, and that list is the whole of it.** You are a
 fresh context: nothing you can see says which server is attached, so **do not go looking.**
-`ToolSearch`, `Bash`, `WebFetch` and `WebSearch` are not in this run's grant — reaching for one
-stops the session on a permission question the investor may not be sitting in front of, and a
-run that stalls there produces no judgement at all.
+`ToolSearch` and `Bash` are not in this run's grant — reaching for one stops the session on a
+permission question the investor may not be sitting in front of, and a run that stalls there
+produces no judgement at all.
+
+⚠️ **`WebSearch` and `WebFetch` are the exception, and only when your prompt names them.** They
+are the CLI's, not the gateway's, so the orchestrator states whether this session holds them.
+Named, they are yours and the web lane is open; unnamed, that lane is an absence like any other.
+⛔ They are for research and never for discovering tools — that is what the sentence above bans.
 
 If a tool you need was not named, that is an **absence to report**, not a thing to search for:
 say so in your `uncertainty` and degrade the way this file's rules say to. Reporting *I could

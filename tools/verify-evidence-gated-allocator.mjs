@@ -1249,6 +1249,88 @@ assert.ok(
 )
 
 /**
+ * ── The web lane has to reach the flow that needs it (issue #130) ──────────
+ *
+ * Three documents were each right on their own and closed theme radar between
+ * them. The canonical dispatch block named no web tool; `agents/*.md` told a
+ * flow that a name it was not given is an absence to **report, never find**;
+ * and `skills/theme-radar/SKILL.md` forbids a silent fallback. A flow following
+ * all three returns "no web lane" forever — measured 2026-09-04, in a session
+ * that held both `WebSearch` and `WebFetch`.
+ *
+ * There is no arithmetic here and there deliberately is none in `lib/` either:
+ * the web tools are the CLI's, so nothing this package can execute observes
+ * whether a session holds them. What is checked is that the documents stopped
+ * contradicting each other — the block may name them, the discovery ban no
+ * longer does, and the orchestrator is told to settle the lane before dispatch.
+ * `laneCoverage` is the one part that is arithmetic, and it already was: it is
+ * asserted here only to hold the verdict the prose now promises.
+ */
+covers('audit/web-lane-reaches-the-flow')
+const dispatchBlock = /```\n(Your tools are the Aumos gateway's[\s\S]*?)```/.exec(orchestrateSkill)?.[1]
+assert.ok(dispatchBlock, 'the canonical dispatch block is still a fenced literal a run copies')
+for (const tool of ['WebSearch', 'WebFetch']) {
+  assert.ok(dispatchBlock.includes(tool), `the block names ${tool} — a tool left off it is one the flow reports as absent`)
+}
+assert.ok(
+  /only when this session actually holds it/.test(dispatchBlock),
+  'and says it is conditional in the block itself, the same shape `source_request` and `connection_request` already use — the block is copied, so a condition stated only in prose beside it does not travel',
+)
+const discoveryBan = dispatchBlock.split('\n').find((line) => /Do not go looking for others/.test(line))
+assert.ok(discoveryBan, 'the block still bans discovery — #87 is why it is there')
+for (const tool of ['Bash', 'ToolSearch']) {
+  assert.ok(discoveryBan.includes(tool), `${tool} stays named in the discovery ban; narrowing it is not removing it`)
+}
+for (const tool of ['WebFetch', 'WebSearch']) {
+  assert.ok(!discoveryBan.includes(tool), `${tool} is out of the discovery ban — naming a research instrument there reaches the flow as a blanket prohibition`)
+}
+for (const flow of ['kr-sleeve', 'us-sleeve', 'allocate']) {
+  const agentFile = await readFile(new URL(`../agents/${flow}.md`, fixtureRoot), 'utf8')
+  const ban = agentFile.split('\n\n').find((paragraph) => /do not use `Bash`/.test(paragraph))
+  assert.ok(ban, `${flow} still forbids going to look for tools`)
+  assert.ok(ban.includes('`ToolSearch`'), `${flow} keeps ToolSearch out of a flow's hands`)
+  assert.ok(
+    !ban.includes('`WebFetch`') && !ban.includes('`WebSearch`'),
+    `${flow} no longer names the web tools in that sentence — it is the sentence a flow reads as "you may not", and it is why one reported a lane it was holding`,
+  )
+  assert.ok(
+    /research instrument/.test(agentFile) && agentFile.includes('`WebSearch`'),
+    `${flow} says instead what a web tool is for, and that it is the orchestrator's prompt that grants it`,
+  )
+  const sleeveSkill = await readFile(new URL(`../skills/${flow}/SKILL.md`, fixtureRoot), 'utf8')
+  const grantSentence = sleeveSkill.split('\n\n').find((paragraph) => /not in this run's grant/.test(paragraph))
+  assert.ok(grantSentence, `skills/${flow} still states what is outside the grant`)
+  assert.ok(
+    !grantSentence.includes('`WebFetch`') && !grantSentence.includes('`WebSearch`'),
+    `skills/${flow} no longer asserts the web tools are ungranted — a skill is loaded after the prompt, so it would overrule the list that just named them`,
+  )
+}
+assert.ok(
+  orchestrateSkill.includes('laneCoverage') && orchestrateSkill.includes("intent: 'theme-radar'"),
+  'the orchestration skill names the call that settles the lane, so the absence is a fact before the dispatch prompt is written rather than a flow\'s answer an hour later',
+)
+assert.ok(
+  invariantsText.includes('laneCoverage') && /settled before dispatch/.test(invariantsText),
+  'and the run skeleton says the same at the point theme radar is reached',
+)
+assert.ok(
+  /A silent fallback is forbidden/.test(await readFile(new URL('../skills/theme-radar/SKILL.md', fixtureRoot), 'utf8')),
+  'theme radar still refuses the quiet substitute — this issue was never a case for softening it, only for handing the flow the lane it asks for',
+)
+const webBlocked = execute({
+  operation: 'laneCoverage',
+  asOf: globalIntegration.asOf,
+  input: { lane: 'kr', intent: 'theme-radar', sources: { toss: { status: 'fresh' } } },
+})
+assert.equal(webBlocked.data.judgement, 'unable', 'with no web lane the forward research intent is still unable to be judged')
+assert.ok(webBlocked.diagnostics.some((row) => row.code === 'lane_source_blocked' && row.details.unavailable.includes('web')), 'and it names the web lane as the one that closed it')
+assert.equal(
+  execute({ operation: 'laneCoverage', asOf: globalIntegration.asOf, input: { lane: 'kr', intent: 'theme-radar', sources: { toss: { status: 'fresh' }, web: { status: 'available' } } } }).data.judgement,
+  'reviewable',
+  'and a session that holds the web tools reaches a reviewable lane — the outcome the missing block line was denying',
+)
+
+/**
  * The approved entry-quality gate, in code rather than in prose. (issue #70 §2)
  *
  * Series are built so each case isolates one branch: a knife still cutting

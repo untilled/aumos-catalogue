@@ -2,7 +2,7 @@
   "spec": "EvidenceGatedMigrationCoverage/1",
   "groups": {
     "attribution": ["attribution-additive-identity", "twr-with-start-of-day-flow", "annualized-money-weighted-return", "shadow-sizing-bottleneck", "passive-baseline"],
-    "audit": ["memory-contract", "migration-matrix-structure", "package-boundary-scan", "skill-code-unit-vocabulary", "portfolio-heat", "new-single-pacing", "paper-sample-status-stated", "two-discovery-branches-stated", "structural-advantage-stated", "harness-audit-blockers", "inherited-positions-carried", "declared-config-keys-are-read", "preflight-order-stated", "rule-version-registry", "data-file-inventory", "skill-code-enum-agreement", "configured-x-exists", "vendor-error-triage"],
+    "audit": ["memory-contract", "migration-matrix-structure", "package-boundary-scan", "skill-code-unit-vocabulary", "portfolio-heat", "new-single-pacing", "paper-sample-status-stated", "two-discovery-branches-stated", "structural-advantage-stated", "harness-audit-blockers", "inherited-positions-carried", "declared-config-keys-are-read", "preflight-order-stated", "rule-version-registry", "data-file-inventory", "skill-code-enum-agreement", "configured-x-exists", "vendor-error-triage", "web-lane-reaches-the-flow"],
     "backtest": ["trend-gate-forward", "dca-multiplier", "oversold-strata"],
     "calibration": ["categorical-brier", "independent-date-clusters", "calibration-maturity"],
     "coverage": ["universe-union", "uncovered-zero"],
