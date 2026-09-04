@@ -130,8 +130,9 @@ nothing.** The first two name capabilities the AMP vocabulary declares and that 
 (`ARCHITECTURE.md` argues it); the third is a spelling no build has ever had — private memory is
 `memory_read`/`memory_write`. What those two names were reaching for arrives without a lookup: this
 book's thesis heads are in the **invocation payload**, and Evidence arrives attached to whatever
-answered a call. Private memory is isolated by package instance/model and time: never request or infer a
-revision written after `asOf`, and never copy another manager's Brief into private memory.
+answered a call. Private memory is isolated by manager instance and time — not by model, so a
+model swap reads the same rows back: never request or infer a revision written after `asOf`, and
+never copy another manager's Brief into private memory.
 
 Read these stable keys only; do not invent per-run keys:
 

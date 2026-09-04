@@ -22,7 +22,9 @@ how memory works, which skills exist, and how the port is held to the original.
 Private memory never contains active theses, raw evidence bodies, shared Brief content,
 executable gates, orders/fills, copied stale source data or self-approved rule changes.
 Briefs are readable by other managers on the same book; private memory is scoped to this
-package instance/model. Different instances and models do not share it.
+manager instance. Different instances do not share it. A model swap is not a different
+instance — the row is keyed by instance alone, so memory outlives the model that wrote it,
+and deleting the manager is what ends it.
 
 ## Data architecture and installation policy
 
@@ -98,7 +100,7 @@ node tools/verify-evidence-gated-allocator.mjs
 ```
 
 The fixture proves run A → run B persistence, append-only same-key revisions, historical
-replay, instance/model isolation, shared-Brief/private-memory separation, audit/Evidence
+replay, instance isolation, model-swap continuity, shared-Brief/private-memory separation, audit/Evidence
 observability, empty-memory operation and malformed-memory degradation. It also checks
 future-row removal, staleness, source conflict and adjusted/unadjusted mixing. The fixture
 is a deterministic contract model; a release candidate must additionally repeat the same
@@ -219,7 +221,9 @@ fixture asserts the difference so it cannot be undone silently.
   carries running sums and an index of open measurement windows. Two consequences follow
   and neither is hidden: another manager on the same book cannot see this evidence, and a
   new manager instance starts the track over. A shared record would be the right home;
-  this is the one the runtime serves.
+  this is the one the runtime serves. What does *not* end the track is a model swap, a
+  config edit or an in-place package update: the row is keyed by instance alone, so a d60
+  window is worth opening. ([untilled/aumos#638](https://github.com/untilled/aumos/pull/638))
 - The forward-research and sell-side layers are ported, but their track record is not.
   `theme-radar` produces `thesis_call` paper positions and `sectorStrength` logs the two
   mechanical baselines they are measured against; the comparison that answers "do the

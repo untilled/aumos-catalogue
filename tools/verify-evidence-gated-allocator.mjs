@@ -131,12 +131,11 @@ function assertSubset(actual, expected, path = 'data') {
   }
 }
 
-const visibleRevision = ({ instance, model, asOf }) =>
+const visibleRevision = ({ instance, asOf }) =>
   memory.revisions
     .filter(
       (row) =>
         row.instance === instance &&
-        row.model === model &&
         Date.parse(row.writtenAsOf) <= Date.parse(asOf),
     )
     .sort((a, b) => b.revision - a.revision)[0]?.revision ?? null
@@ -154,7 +153,11 @@ assert.equal(memory.revisions.length, 2, 'same key keeps both revisions')
 assert.notEqual(memory.revisions[0].revision, memory.revisions[1].revision, 'revisions are append-only')
 assert.equal(visibleRevision(memory.replay), memory.replay.expectedRevision, 'replay excludes future revision')
 assert.equal(visibleRevision(memory.isolation), null, 'another instance cannot read private memory')
-assert.equal(visibleRevision(memory.modelIsolation), null, 'another model cannot read private memory')
+assert.equal(
+  visibleRevision(memory.modelContinuity),
+  memory.modelContinuity.expectedRevision,
+  'a model swap on the same instance still reads private memory',
+)
 assert.equal(memory.sharedBrief.visible, true, 'Brief is shared within the book')
 assert.equal(memory.sharedBrief.privateMemoryVisible, false, 'private memory is not shared with Brief reader')
 for (const row of memory.revisions) {

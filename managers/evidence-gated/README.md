@@ -264,7 +264,9 @@ package says so rather than implying a lookup it cannot make.
 paper call has no order and no fill, so it is not a Decision. Two consequences follow and
 neither is hidden: another manager on the same book cannot see this evidence, and a new
 manager instance starts the track over. A shared record would be the right home; this is
-the one the runtime serves.
+the one the runtime serves. What does *not* start it over is a model swap, a config edit
+or an in-place package update — the row is keyed by manager instance alone, so the d60
+window survives all three, and only deleting the manager resets it.
 
 **Provenance.** Ported from `morethanmin/trading-harness` at the commit recorded in the
 manifest. No credentials, account or position data, caches, backups, personal thesis text,
