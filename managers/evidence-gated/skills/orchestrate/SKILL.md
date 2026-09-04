@@ -109,7 +109,10 @@ Your tools are the Aumos gateway's, already attached to this session:
   mcp__aumos__connection_request   (a broker login the investor already connected)
 and this package's own server:
   mcp__evidence-gated-metrics__calculate
-Do not go looking for others and do not use Bash, WebFetch or WebSearch to find them.
+and, when this session was served them, the CLI's own web research:
+  WebSearch                        (only when this session actually holds it)
+  WebFetch                         (only when this session actually holds it)
+Do not go looking for others, and do not use Bash or ToolSearch to find them.
 ```
 
 ⛔ **`thesis_read`, `evidence_read` and `manager_memory_read`/`_write` were on that list and are
@@ -128,6 +131,18 @@ when this fund has data sources selected, and `connection_request` only when it 
 login — so a flow told about a tool that is not there searches for it, the same stall by another
 road. Name what you were actually served.
 
+⚠️ **The web tools are the same rule read the other way, and leaving them off closed the only
+lane that finds anything.** `WebSearch` and `WebFetch` are not the gateway's — the vendor CLI
+attaches them to the session, so `tools/list` does not answer for them and **you** do: name them
+when you hold them and leave the two lines out when you do not. They were missing from this
+block while `agents/*.md` told a flow that a name it was not given is an absence to report, and
+`skills/theme-radar/SKILL.md` forbids a silent fallback — so the flow did the only thing the
+three documents left it: it reported *no web lane* and produced no forward thesis. Measured
+2026-09-04, run `run_ba37a8f6907a49c3a805a4ce3ee10ec6`: the session held **both** tools.
+⛔ That is not a licence to search. Web research is a research instrument, never a way to
+discover tools — `Bash` and `ToolSearch` stay out of a flow's hands for the reason measured
+above, and a flow whose prompt does not name a web tool still reports its absence.
+
 ⚠️ **The two are not interchangeable and the difference is the credential.** `source_request`
 reaches a vendor this machine has a key filed for; `connection_request` reaches one the investor
 **connected**, and the manager is handed nothing. Telling a flow to fetch prices through the first
@@ -136,6 +151,28 @@ one is telling it to use a source this fund no longer has.
 ⛔ **Do not hand a flow your private memory.** The namespace is this instance and the flows
 share it; a flow that was told what a calibration key says will write about it in prose, and
 prose is not what `skills/memory-contract/SKILL.md` accepts.
+
+### ⚠️ Settle the web lane before you dispatch, not after
+
+`themeRadarDue` is answered in pre-flight, and the lane theme radar needs is answered by you,
+here, in the same breath — **before** a flow is dispatched. `laneCoverage` already computes what
+a missing source closes; pass it the lane, `intent: 'theme-radar'`, and a `sources` map whose
+`web` entry says `available` when this session holds `WebSearch`/`WebFetch` and is left out when
+it does not. A `blocked` verdict is a fact you have before the dispatch prompt is written, and
+it belongs in that prompt and in `uncertainty` — not in a flow's answer an hour later.
+
+⛔ **`sources.web` is your observation and nothing else can make it.** The gateway builds
+`source_request` and `connection_request`, and a run can see what it built; it does not build the
+web tools, so no operation in `lib/` can be asked whether this session has them. Do not infer the
+lane from a config key, from `themeRadarDue`, or from the fact that a previous run had it — say
+what you were served, the same sentence the tool block already asks of you.
+
+⚠️ **What this changes is when the run finds out, not what it may claim.** A blocked web lane is
+still a blocked theme radar: no forward thesis, the lane named as missing, and `run/theme-radar-last`
+recorded either way. `skills/theme-radar/SKILL.md` owns that refusal and this section does not
+restate it. What it removes is the turn spent discovering it — measured 2026-09-04, a flow spent
+its whole dispatch establishing an absence the orchestrator could have stated before writing the
+prompt, and the run's only discovery lane closed for it.
 
 ## What a flow must return, and what you do with it
 

@@ -103,7 +103,10 @@ the whole book is `allocate`'s, and a sleeve that never saw the other one cannot
 Load `skills/orchestrate/SKILL.md` before dispatching anything. ⚠️ **Every dispatch prompt
 names the tools that flow has**, from what this session was actually served — a flow that
 was not told goes looking, and looking means `Bash`, which stops the run on a permission
-question. That skill carries the list and the measurement behind it.
+question. That skill carries the list and the measurement behind it. ⚠️ **`WebSearch` and
+`WebFetch` belong on that list when this session holds them**: they are the CLI's rather than
+the gateway's, so a flow not told about them reports the web lane missing while it is attached —
+which closes theme radar, the one discovery branch §3 does not call a control arm.
 
 ⛔ **Only you call `decision_submit`, and exactly once.** A flow that submitted would seal a
 judgement the other two never saw, and the second submission of a run is refused — so a flow
@@ -244,6 +247,14 @@ candidate that no scanner would surface comes from. Call `sectorStrength` first 
 signals. A run with no web
 lane produces no forward thesis and says the lane was missing; a silent fallback is forbidden.
 Record the run under `run/theme-radar-last` whether or not it produced anything.
+
+⚠️ **Whether there is a web lane is settled before dispatch, and it is settled by you.** The web
+tools are the CLI's rather than the gateway's, so no operation here can be asked whether this
+session holds them — call `laneCoverage` with `intent: 'theme-radar'` and a `sources.web` entry
+that says what you were actually served, and carry the verdict into the dispatch prompt. A flow
+that has to discover the absence itself spends its whole turn on it and this book's only
+discovery lane closes for the run. `skills/orchestrate/SKILL.md` carries the check and the
+measurement behind it.
 
 ⚠️ **"Logged for measurement" is a call, not an adjective.** Each `sectorStrength.baselineSignals`
 row carries the `ruleVersion` and `signalAt` that admit it: pass it to `paperAdmission` as the
