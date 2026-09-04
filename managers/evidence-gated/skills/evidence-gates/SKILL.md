@@ -15,6 +15,13 @@ enough provenance to reproduce the lens classification. Do not backfill legacy T
 history into Aumos Forward Track Record. Open decisions, repeated runs on one still-open idea,
 synthetic backtests and five names found during one shock are not five independent samples.
 
+⚠️ **A staged entry is one sample.** A name entered in three tranches was one idea decided once, so
+`entryTranchePlan` returns `sampleCount: 1` and `sampleKind` says per plan and never per tranche.
+Counting the rungs would manufacture evidence out of the risk control that exists *because* the
+evidence is thin — the same inflation as repeated runs on one still-open idea, arriving from the
+other direction. And it is still not a `core-dca` tranche: that one is a cash deployment, counted in
+neither of the columns below, and the function refuses the lens rather than trusting the label.
+
 ### Paper samples are counted, and never in the same column
 
 A paper position — a `thesis_call`, a mechanical baseline signal — is not a closed Decision and does

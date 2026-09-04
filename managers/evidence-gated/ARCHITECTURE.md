@@ -209,6 +209,10 @@ fixture asserts the difference so it cannot be undone silently.
   — the manager writes down what it armed — and a bridge is what they are: private memory is scoped
   to this instance, so a new instance starts blind and the record can drift from what Aumos holds.
   ([#97](https://github.com/untilled/aumos-catalogue/issues/97))
+  A staged single-name entry rides the same bridge for the same reason: `entryTranchePlan` returns
+  the `intent` each unfilled rung is armed with, and `resolveTrancheWake` reads that marker back out
+  of the fired plan's event summary, because there is nothing else to read.
+  ([#120](https://github.com/untilled/aumos-catalogue/issues/120))
 - **The paper track lives in instance-private memory, because nothing else can hold it.**
   A paper call has no order and no fill, so it is not a Decision; the runtime publishes no
   `thesis:write` and `thesis:read` grants no tool. `learning/paper-cohorts` therefore

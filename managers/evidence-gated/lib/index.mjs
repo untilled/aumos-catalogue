@@ -1,7 +1,7 @@
 import { result, diagnostic } from './diagnostics.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
-import { sleeveNav, targetWeight, experimentalCeiling, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing } from './sizing.mjs'
+import { sleeveNav, targetWeight, experimentalCeiling, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { coverageState, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
 import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
@@ -13,7 +13,7 @@ import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCo
 import { harnessAudit, lessonAudit } from './audit.mjs'
 import { lensEnvelope, clusterBlock, timeStopPolicy, ruleVersions, policyLint } from './envelopes.mjs'
 import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport, controlArmLane } from './learning.mjs'
-import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence, resolveWakeFlow, reconcileArmedReviews } from './schedule.mjs'
+import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence, resolveWakeFlow, resolveTrancheWake, reconcileArmedReviews } from './schedule.mjs'
 
 const operations = {
   indicators(input, asOf) {
@@ -39,6 +39,7 @@ const operations = {
   concentration,
   entryQualityGate,
   newSinglePacing: (input, asOf) => newSinglePacing({ ...input, asOf }),
+  entryTranchePlan: (input, asOf) => entryTranchePlan({ ...input, asOf }),
   specialistBudget,
   globalAllocation,
   coverage: coverageState,
@@ -105,6 +106,7 @@ const operations = {
   themeRadarDue: (input, asOf) => themeRadarDue({ ...input, asOf }),
   nextReviewSequence: (input, asOf) => nextReviewSequence({ ...input, asOf }),
   resolveWakeFlow,
+  resolveTrancheWake,
   reconcileArmedReviews: (input, asOf) => reconcileArmedReviews({ ...input, asOf }),
 }
 

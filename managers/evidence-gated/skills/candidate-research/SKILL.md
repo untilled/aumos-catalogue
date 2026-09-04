@@ -105,6 +105,44 @@ Five conditions, all of them numbers rather than intentions:
 catching up on a schedule that fell behind. Catching up accelerates placement; it never raises the
 target.
 
+## Staged entry on a single name
+
+⚠️ **The classification row above is right and this section does not weaken it.** A `core-dca`
+tranche is a cash deployment and never a single-name sample. What the split lost is that the ported
+methodology staged *single names* too, and that lane came across without the device.
+
+**And the reason was never size.** The NAVER thesis wrote its own down: technically oversold was
+confirmed, the earnings and multiple case was not, so the name was carried as a limited staged
+candidate on a three-tranche plan rather than as high conviction. Not going in at once is what that
+methodology *did* about a claim it had not finished verifying — so the requirement follows the
+evidence, not the weight. A 1% position split three ways is still a staged entry.
+
+Call `entryTranchePlan`. It holds the same shape the Core DCA row states, addressed to one name:
+
+| | |
+|---|---|
+| plan | T1/T2/T3, each with its size and its `immediate`, `at-time`, `price-below` or `price-above` condition. **"We will add on weakness" is not a tranche** — the same discriminant, on this side of the line |
+| when it is required | an `insufficient` or `observing` lens enters in stages. `reviewable` and `promoted` may enter at once; an unstated maturity leaves the requirement unjudged and says so |
+| the sizes | they add up to the position the plan says it is building, or the plan is describing two different positions |
+| the rungs | a tranche within 5% of its level raises `tranche_approach` — the entry-side counterpart of `exitCheck`'s `trim_approach`, and re-read before it fires for the same reason |
+| when half of it lapses | an expired condition on an unfilled tranche is `tranche_plan_incomplete` and **blocks**. Half an entry plan is a position nobody decided the size of; this run re-arms, resizes or abandons the remainder in words |
+| classification | one single-name sample **per plan, never one per tranche**. `sampleCount` is 1 whether the name was entered in one step or three, and `countsAsCashDeployment` is false |
+
+⛔ `entryTranchePlan` refuses a `core-dca` lens outright. The two lanes are kept apart in code, not
+only in this table: pooled the other way — three tranches counted as three samples — a staged entry
+would manufacture the "repeated runs on one still-open idea" `evidence-gates` forbids, out of the
+very risk control that exists because the evidence is thin.
+
+**Arm each unfilled tranche with the `intent` the call returns**, verbatim. It carries the same kind
+of marker `nextReviewSequence` puts on a review, for the same reason: a manager cannot choose a plan
+id and cannot read a WATCH back, so `intent` is the only field that survives the round trip. Armed as
+a bare `price-below`, T2 is indistinguishable from any other revisit promise and the run it wakes is
+never told it is standing in the middle of an entry plan. `resolveTrancheWake` reads the marker out
+of the fired plan's event summary.
+
+⛔ The plan lives in the Thesis, not in private memory. It is one document because the decision was
+one decision; a ladder in a memory key would be a second copy of what the Thesis already owns.
+
 ## Candidate record
 
 Write the following in reasoning and, when a durable asset claim is created, its Thesis:
@@ -122,6 +160,9 @@ Write the following in reasoning and, when a durable asset claim is created, its
    name earns its extra idiosyncratic risk. Active expected return is candidate minus benchmark.
 7. **Catalyst and event risk** — dates known at `asOf`, next review and data that must arrive first.
 8. **Exit logic** — thesis invalidation, price risk boundary, review horizon and trim conditions.
+9. **Entry plan** — the tranche ladder from `entryTranchePlan`, each rung with its size, its
+   condition and its expiry, written before the first tranche rather than after it. One plan is one
+   sample.
 
 Reject ready BUY when expected return is non-positive, active expected return is below config,
 trap evidence dominates, evidence quality is inadequate, or challenge is unresolved. Do not fill a

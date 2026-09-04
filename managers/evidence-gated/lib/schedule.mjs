@@ -416,3 +416,56 @@ export function reconcileArmedReviews({ previous = null, sequence = [], asOf } =
     diagnostics,
   }
 }
+
+/**
+ * ── The second marker: an entry plan that is not finished (#120) ───────────
+ *
+ * `marketReviewIntent` / `resolveWakeFlow` above are the bridge for a review:
+ * the manager cannot choose a plan id and cannot read its own WATCHes back, so
+ * the one field that survives the round trip is `intent`, and the wake arrives
+ * as an event `summary` with the marker inside it.
+ *
+ * A tranche condition needs exactly that bridge and did not have it. Armed as a
+ * bare `price-below`, T2 is indistinguishable from any other revisit promise —
+ * so when it fires, the run that wakes is not told it is standing in the middle
+ * of an entry plan, and when it *expires*, nothing says half the plan was never
+ * executed. `entryTranchePlan` adjudicates the second half; this marker is what
+ * lets the run recognise the first.
+ *
+ * ⚠️ **Two segments, not three.** The review marker carries its scheduled
+ * instant so a late fire is legible. A tranche usually waits on a price, which
+ * has no instant to carry — the plan's own dates live in the Thesis, which is
+ * where the plan is. Carrying a fabricated instant here would be a second copy
+ * of a fact, and the wrong one.
+ *
+ * ⛔ It is a different prefix from the review marker rather than a widening of
+ * it: `resolveWakeFlow` answers "which of my three flows woke", and a tranche
+ * wake is not one of them. A tranche wake dispatches by the symbol's market
+ * like any asset review does.
+ */
+const TRANCHE_PREFIX = 'tranche'
+const TRANCHE_MARKER = /tranche:([^\s:]+):([^\s:]+)/
+
+export function trancheIntent(symbol, label) {
+  return `${TRANCHE_PREFIX}:${symbol}:${label} — ${label} of an unfinished staged entry in ${symbol}; the plan is in the thesis`
+}
+
+/**
+ * Which tranche a wake belongs to, read out of the event a fired plan raised.
+ *
+ * `null` data for any wake that carries no tranche marker — that is the normal
+ * case and carries no diagnostic. A marker present but unreadable is a wake
+ * nobody will answer as a tranche, so it says so.
+ */
+export function resolveTrancheWake({ summary, intent, watchId } = {}) {
+  const diagnostics = []
+  const text = [summary, intent, watchId].find((value) => typeof value === 'string' && value.includes(`${TRANCHE_PREFIX}:`))
+  if (text === undefined) return { data: null, diagnostics }
+  const match = TRANCHE_MARKER.exec(text)
+  if (match === null) {
+    diagnostics.push(diagnostic('tranche_marker_unreadable', 'unevaluated', 'A tranche marker is present but not in the shape this package arms', 'summary', { text }))
+    return { data: null, diagnostics }
+  }
+  const [, symbol, label] = match
+  return { data: { symbol, label, entryPlanUnfinished: true }, diagnostics }
+}

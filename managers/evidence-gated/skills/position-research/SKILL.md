@@ -25,6 +25,11 @@ position. A layer that looks closely at what you own and is allowed to recommend
 find reasons, and the reasons will be the ones you already believed. Buy-side work has its own
 entrance: `theme-radar` for where an idea comes from, `candidate-research` for whether it survives.
 
+⚠️ **That includes the next rung of an entry already planned.** `exitCheck` reads a trim ladder here
+and there is now a counterpart on the way in — `entryTranchePlan`, in `candidate-research` — but it
+is *there* and not here on purpose. A layer looking at what you own must not be the layer that
+decides to own more of it, even when the plan to own more was written down first.
+
 ## When to run it
 
 - Every `PORTFOLIO_REVIEW`, over every non-core holding.
