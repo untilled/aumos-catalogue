@@ -1,10 +1,60 @@
 import { diagnostic } from './diagnostics.mjs'
 import { WATCH_TRIGGER_KINDS, normalizeWatch } from './methodology.mjs'
 
+/**
+ * Coverage over a universe, and the answer when there was no universe.
+ *
+ * The discovery machinery was ported and the universe it sweeps was not: the
+ * two files that held it (`screen_universe.json`, `universe_extensions.json`)
+ * are `AR` in the migration matrix, and nothing took the job over. So a real
+ * run called this with `scannerUniverses: []` and `extensions: []` and was
+ * answered `complete: true`, `uncovered: []`, no diagnostics — on a denominator
+ * made **entirely of the book's own holdings**
+ * (`run_ba37a8f6907a49c3a805a4ce3ee10ec6`, measured 2026-09-04). "Coverage
+ * complete" was reporting a pass over the empty set.
+ *
+ * The two counts are therefore separate, because they answer different
+ * questions and only one of them can be zero without the result being a lie:
+ *
+ * - `screenedUniverseCount` — what the run **declared**: the scanner universes
+ *   plus the theme-radar extensions. Holdings are not a declaration; they are
+ *   the book, and they arrive whether or not anybody screened anything.
+ * - `declaredUniverseCount` — the denominator every disposition is counted
+ *   against, which is that set plus the holdings.
+ *
+ * ⚠️ **`complete` is `null` rather than `false` when nothing was screened.**
+ * `false` would say the run looked and found gaps; the truth is that it never
+ * asked, which is the same distinction `evaluateWatch` keeps as `unevaluable`
+ * two functions down. `uncovered: []` beside a `false` reads as "no misses" and
+ * would carry the original error into its own fix.
+ *
+ * ⚠️ **`unevaluated`, not `blocked`.** What is missing is an input, and the
+ * package's own idiom for a missing input is `unevaluated` (`missing()` in
+ * `diagnostics.mjs`); the named precedent — `watch_cadence_unavailable` — is
+ * that severity too. Blocking would also stop the run that has no universe yet
+ * *and nothing to buy with it*: the sell-side watch, the exit lanes and the
+ * existing-position review all run on the book alone, and `PROMPT.md` is
+ * explicit that a blocked pre-flight never blocks the direction that reduces
+ * risk. What had to stop was the **claim**, and the claim is `complete`.
+ *
+ * Declaring the universe is `skills/candidate-research/SKILL.md`'s procedure;
+ * the route it is procured over is `skills/data-source-contract/SKILL.md`'s.
+ * This function only refuses to pretend it happened.
+ */
 export function coverageState({ scannerUniverses = [], extensions = [], holdings = [], dispositions = [], asOf }) {
   const diagnostics = []
   const universeSets = scannerUniverses.map((rows) => new Set(rows))
-  const union = new Set([...extensions, ...holdings, ...universeSets.flatMap((set) => [...set])])
+  const screened = new Set([...extensions, ...universeSets.flatMap((set) => [...set])])
+  const union = new Set([...screened, ...holdings])
+  if (!screened.size) {
+    diagnostics.push(diagnostic(
+      'universe_undeclared',
+      'unevaluated',
+      'No universe was declared, so coverage has nothing to be complete over; procure the listing for this run before reading a coverage verdict',
+      'scannerUniverses',
+      { holdingsCount: new Set(holdings).size, extensionsCount: new Set(extensions).size },
+    ))
+  }
   if (universeSets.length > 1) {
     const [first, ...rest] = universeSets
     const drift = rest.some((set) => [...new Set([...first, ...set])].some((symbol) => first.has(symbol) !== set.has(symbol)))
@@ -23,7 +73,16 @@ export function coverageState({ scannerUniverses = [], extensions = [], holdings
     if (disposition.revisitAt && Date.parse(disposition.revisitAt) <= Date.parse(asOf)) uncovered.push(symbol)
   }
   if (uncovered.length) diagnostics.push(diagnostic('coverage_incomplete', 'blocked', 'Every declared-universe candidate needs a current disposition', 'dispositions', { uncovered }))
-  return { data: { declaredUniverseCount: union.size, dispositionCount: bySymbol.size, uncovered, complete: uncovered.length === 0 }, diagnostics }
+  return {
+    data: {
+      declaredUniverseCount: union.size,
+      screenedUniverseCount: screened.size,
+      dispositionCount: bySymbol.size,
+      uncovered,
+      complete: screened.size ? uncovered.length === 0 : null,
+    },
+    diagnostics,
+  }
 }
 
 /**

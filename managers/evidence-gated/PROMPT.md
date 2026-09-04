@@ -270,6 +270,15 @@ and one does not replace the other** — the price-pattern branch is the only me
 whole universe, so switching it off collapses the coverage denominator. The second branch is
 reinforcement, not replacement.
 
+⚠️ **That denominator is declared by this run, and a run that has not declared it has not swept
+anything.** The universe is procured before the sweep rather than shipped with this package;
+`skills/candidate-research/SKILL.md` owns the procedure and `skills/data-source-contract/SKILL.md`
+owns the route. `coverage` answers `universe_undeclared` with `complete: null` when nothing was
+declared — which is *the sweep did not happen*, never *the sweep found nothing*. ⛔ **And the sweep
+sees inside that boundary only.** Forward research is the one crossing: the theme radar examines an
+axis outside it every run and a cleared call joins the universe as an extension, so a run that skips
+the radar has not merely produced fewer ideas — it has left the boundary permanently where it was.
+
 #### Price patterns — `scan`, `opportunityMetrics`
 
 

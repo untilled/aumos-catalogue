@@ -1,6 +1,6 @@
 ---
 name: candidate-research
-description: Research a candidate under its discovery lens, including why-cheap, trap, variant, scenario and benchmark-alternative tests.
+description: Declare the universe this run sweeps, then research a candidate under its discovery lens — why-cheap, trap, variant, scenario and benchmark-alternative tests.
 ---
 
 # Candidate research
@@ -168,10 +168,55 @@ Reject ready BUY when expected return is non-positive, active expected return is
 trap evidence dominates, evidence quality is inadequate, or challenge is unresolved. Do not fill a
 missing field with model knowledge. Preserve source Evidence ids and web URLs separately.
 
+## Declaring the universe
+
+**The universe is declared by this run, every run, before the price-pattern sweep — and it is a
+call, not a file.** This is the half of the discovery machinery that did not come across: the
+scanners, the drift guard and the coverage denominator were all ported, and the thing they sweep was
+not, so a run answered `complete: true` over a denominator that was nothing but its own holdings
+(untilled/aumos-catalogue#129).
+
+⛔ **It is not shipped in this package and must not be.** The methodology this is ported from kept
+the universe in two committed files and paid for it in the way committed lists are always paid for —
+they had to be edited together, they drifted, and the 93 names one held and the other did not were a
+blind spot nobody could see. A universe procured each run cannot drift from itself. It also cannot
+be a claim this package makes about the investor's market, which is the same reason no sector map
+ships here.
+
+Procure it per sleeve, from the vendor listing this fund already has a login for. The route, its
+filters and what its answer is *not* are `skills/data-source-contract/SKILL.md`'s — read it there
+rather than composing a call from this page.
+
+1. **Enumerate.** Call the listing route for the sleeve's markets and take the symbols it returns.
+2. **Screen it down to what this run will actually sweep**, and say what you dropped by: the filter
+   values you passed, and any exclusion you applied afterwards. An exclusion nobody wrote down is
+   indistinguishable from a name the vendor never listed.
+3. **Add the extensions.** Every theme-radar `thesis_call` that cleared belongs in the universe from
+   then on — that is the one path by which a name the scanners cannot see enters the denominator.
+4. **Pass both to `coverage`**, the screen as `scannerUniverses` and the extensions as `extensions`.
+   Two scanners with different screens are two entries, not one merged list: the drift guard exists
+   to catch exactly that and cannot if the merge already happened.
+5. **Record it in `coverage/universe-state`** — the declared count, the filters, the scanned count,
+   the exclusions and the unresolved count. It is an aggregate and stays one; a per-symbol roster in
+   private memory would be the ledger `skills/memory-contract/SKILL.md` forbids, and it would be a
+   second copy of a list the vendor answers in one call.
+
+⚠️ **A run that could not enumerate has no universe, and says so.** The listing lane being down is a
+missing input, not an empty market: `coverage` answers `universe_undeclared` with `complete: null`,
+and this run reports the sweep as not performed rather than as clean. ⛔ Do not fall back to the
+holdings, to a previous run's `coverage/universe-state`, or to a list from model knowledge — each of
+those is a denominator this run did not read, presented as one it did.
+
 ## Coverage
 
-Track the declared universe, scanned count, exclusions and unresolved count in
-`coverage/universe-state`. “Coverage complete” means the declared universe was accounted for, not
-that the whole market was searched. A theme radar may add candidates, but quota-filling is forbidden:
-zero qualified candidates is valid. Schedule skipped or conditionally rejected candidates with
-WATCH/plan so they do not disappear into prose.
+“Coverage complete” means the declared universe was accounted for, not that the whole market was
+searched — and with nothing declared it means neither. `complete` is `null` in that case, and
+reporting it as a pass is the specific error this section exists to prevent.
+
+**The theme radar must add candidates from outside the universe, and this is not optional.** The
+mechanical scanners see inside the declared universe and nowhere else, so forward research is the
+only path across that boundary; `skills/theme-radar/SKILL.md` owns the requirement and states how
+many axes a run owes. Quota-filling stays forbidden in the other direction: the obligation is to
+*look* outside on a named axis, never to produce a candidate, and zero qualified candidates is
+valid. Schedule skipped or conditionally rejected candidates with WATCH/plan so they do not
+disappear into prose.
