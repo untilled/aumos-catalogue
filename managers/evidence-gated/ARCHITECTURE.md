@@ -219,14 +219,19 @@ fixture asserts the difference so it cannot be undone silently.
   result carrying any string that is ISO-8601 shaped and later than `asOf`, and the shape it
   matches includes the date-only form — a bare `2026-09-05` is compared against the end of that
   day, because that is what SEC's `filed` means. `run/armed-reviews` is future by construction and
-  `run/watch-alerts` named the current session, so both were refused in normal operation, and the
-  refusal is per read rather than per key: one poisoned key takes a whole keyless namespace read
-  with it. The package's answer is to stop writing timestamp-shaped strings — epoch milliseconds
-  for the instant that is one, a `session-` prefixed label for the field that never was. The other
-  half is the host's: a schedule key needs either an exemption or a per-entry read that drops the
-  key it cannot serve and returns the rest.
+  `run/watch-alerts` named the current session, so both were refused in normal operation. Before
+  `untilled/aumos#659` the refusal was per read rather than per key, so one poisoned key took a
+  whole keyless namespace read with it; that read now folds per entry and names what it dropped in
+  `omitted.keys`. ⚠️ **The key itself is still not read.** What changed is that the rest of the
+  namespace survives and the absence is no longer silent — which is why the encoding here changed
+  too, and not instead. The package's answer is to stop writing timestamp-shaped strings: epoch
+  milliseconds for the instant that is one, a `session-` prefixed label for the field that never
+  was. ⛔ The other half was not an exemption, and that was decided rather than left open — which
+  field is scheduled is the manager's private schema, and a gateway that knows it is a second table
+  of every manager's fields.
   ([#136](https://github.com/untilled/aumos-catalogue/issues/136),
-  [untilled/aumos#658](https://github.com/untilled/aumos/issues/658))
+  [untilled/aumos#658](https://github.com/untilled/aumos/issues/658),
+  [untilled/aumos#659](https://github.com/untilled/aumos/issues/659))
 - **The paper track lives in instance-private memory, because nothing else can hold it.**
   A paper call has no order and no fill, so it is not a Decision; the runtime publishes no
   `thesis:write` and `thesis:read` grants no tool. `learning/paper-cohorts` therefore

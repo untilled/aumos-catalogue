@@ -3346,6 +3346,14 @@ assert.ok(
  * had the right shape all along.
  */
 covers('watch/session-label-is-not-a-timestamp')
+/**
+ * ⚠️ **A copy of the host's matcher, and the host is the original.** This is
+ * `assertNoFutureTimestamps`'s pattern from `packages/skill-gateway/src/timegate.ts`
+ * in `untilled/aumos`. If the two ever disagree, that one is canon and this one
+ * is the stale copy — fix it here, not there. It is copied rather than described
+ * because a description of it would not have caught the date-only form, which is
+ * the whole of why this key was unreadable.
+ */
 const hostTimestampShaped = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d{1,9})?(?:Z|[+-]\d{2}:?\d{2})?)?$/
 const labelled = execute({ operation: 'watchAlertState', asOf: '2026-09-05T06:45:00.000Z', input: { previous: null, sessionDate: '2026-09-05', alerting: ['nvda-entry|2026-09-05'] } })
 assert.ok(
