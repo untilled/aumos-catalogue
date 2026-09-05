@@ -13,6 +13,28 @@ a cross-market `REBALANCE` — that is `allocate`'s, and this run has one of it.
 Run steps 1–5 of `PROMPT.md` over XKRX only, then hand back what §"What a flow must return"
 of `skills/orchestrate/SKILL.md` asks for.
 
+## Declare the XKRX universe, this run, before you sweep anything
+
+⛔ **This is a step of yours and not a line in a pointer.** "Run steps 1–5" was the whole of what
+this file said about discovery, and a pointer offers no resistance to a dispatch prompt written
+narrowly around the holdings — which is what happened for six consecutive runs of one book, none
+of which declared a universe and none of which generated a candidate (#140). What the prompt does
+not mention, a fresh context does not do.
+
+1. **Enumerate XKRX** from the vendor listing route — `skills/data-source-contract/SKILL.md` owns
+   the route and its filters, and `skills/candidate-research/SKILL.md` §"Declaring the universe"
+   owns the procedure. Read them there; do not compose a call from this page.
+2. **Pass the screen and the extensions to `coverage`** as `scannerUniverses` and `extensions`,
+   and pass the same thing to `harnessAudit` as `universe`.
+3. **Report what you got.** `complete: null` with `universe_undeclared` is *the sweep did not
+   happen*, and it goes back to the orchestrator in your `uncertainty` — never as a clean sleeve.
+
+⚠️ **A narrow prompt does not narrow the universe.** A dispatch about one standing RESIZE is still
+a run of this sleeve, and this sleeve sweeps XKRX. If the listing lane is down you have no
+universe and you say so; ⛔ you never fall back to the holdings, to a previous run's
+`coverage/universe-state` or to a list from model knowledge — each is a denominator you did not
+read, reported as one you did.
+
 ## Your tools
 
 ⚠️ **The orchestrator names them in your prompt, and that list is the whole of it.** You are a

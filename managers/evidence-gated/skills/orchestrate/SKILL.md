@@ -86,6 +86,8 @@ Use the Agent tool with `subagent_type` set to the flow's name. Hand it, in the 
 - `asOf` verbatim, and the invocation's `language`
 - the `task` and what you already read from `portfolio`, `mandate` and `events`
 - the current sleeve budget from Brief, when one is recorded
+- ⚠️ **the instruction to declare the sleeve's universe and run the discovery sweep** — in those
+  words, every dispatch, whatever this wake was about. See below
 - for `allocate`: what the two sleeve flows returned
 
 ### ⚠️ Name the tools, every time
@@ -156,6 +158,39 @@ run that concluded the Toss lane was gone had not reached dispatch yet.
 share it; a flow that was told what a calibration key says will write about it in prose, and
 prose is not what `skills/memory-contract/SKILL.md` accepts.
 
+### ⚠️ Say the discovery sweep out loud, on every dispatch
+
+**This list was written on the criterion *omit it and the run stops*, and discovery is the one
+item that fails that test in the other direction.** Leave out the tool list and the flow stalls on
+a permission prompt — loud, and fixed the day it was measured. Leave out discovery and nothing
+happens at all: the flow watches the holdings, prices the sleeve, hands back a tidy answer, and
+the run ends in a `WAIT` with no candidate in it and nothing anywhere saying a candidate was never
+looked for. Measured over six runs of one book (#140): **no universe declared, no candidate
+generated, three holdings all inherited, and no output that would let an investor see it.** A
+silent omission needs stating *more* than a loud one, not less.
+
+So every dispatch prompt carries this, adjusted to the flow's markets:
+
+```
+Declare this sleeve's universe for this run before any sweep — enumerate the market from
+the vendor listing route, screen it, add the theme-radar extensions, and pass both to
+`coverage` (`scannerUniverses`, `extensions`) and to `harnessAudit` (`universe`).
+Then run the price-pattern sweep over it. If you could not enumerate, you have no
+universe: say so in `uncertainty` and never substitute the holdings for one.
+```
+
+⚠️ **A narrow `task` is not a narrow mandate, and this is where the failure was yours.** The run
+that measured this was dispatched with a prompt built around the holdings and a standing RESIZE,
+and both flows did exactly what they were told. The flow skills now carry the step themselves —
+`kr-sleeve` and `us-sleeve` each own a section for it, so the pointer is no longer the only thing
+standing between a narrow prompt and a run that finds nothing. Say it here as well: two documents
+saying it is what makes it survive one of them being read quickly.
+
+⛔ **Do not decide on the flow's behalf that today is not a discovery day.** `themeRadarDue`
+answers for the forward branch and only for it; the mechanical sweep has no interval and is due
+every run. A dispatch that drops discovery because the radar is not due has shut both branches by
+hand — which is precisely the `discovery_lane_dark` state `PROMPT.md` §1b makes you report.
+
 ### ⚠️ Settle the web lane before you dispatch, not after
 
 `themeRadarDue` is answered in pre-flight, and the lane theme radar needs is answered by you,
@@ -199,6 +234,13 @@ A flow returns Evidence ids, proposed targets and its own `uncertainty`. Treat i
 when this was a single-sleeve wake. `WAIT` when the assembled set is empty and the evidence was
 adequate; `WAIT` also when it was not, and the two are told apart in `keyReasons` and
 `uncertainty`.
+
+⛔ **An empty set with no discovery behind it is the second kind, and it says so by name.** Call
+`discoveryCapacity` over this run's `themeRadarDue` and `coverage` answers before you assemble:
+when both branches were shut, the proposal carries the code `discovery_lane_dark` verbatim in one
+`uncertainty` entry, and `keyReasons` says the set is empty because nothing was searched rather
+than because nothing qualified. Passing the assembled `uncertainty` back to `discoveryCapacity`
+is what makes that a refusal instead of a habit.
 
 ⛔ **A flow never calls `decision_submit`.** `hooks/hooks.json` refuses it, and the refusal is
 the second line of defence: the first is that the flows are told not to, here and in each of

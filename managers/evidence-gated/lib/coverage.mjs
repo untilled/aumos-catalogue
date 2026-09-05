@@ -87,6 +87,124 @@ export function coverageState({ scannerUniverses = [], extensions = [], holdings
 }
 
 /**
+ * How much discovery capacity this run actually had — and the answer when it
+ * had none.
+ *
+ * ── The run that measured zero (issue #140) ───────────────────────────────
+ *
+ * This book woke six times and never once proposed a name it found itself. The
+ * three holdings are all inherited; the manager had been a sell-side watcher
+ * and an allocation calculator, and no output said so. The mechanism is that
+ * discovery runs on **two** branches and both of them can be dark on the same
+ * day:
+ *
+ * - **forward research** — `themeRadarDue` answers `due: false` for two days
+ *   out of every three, which is the interval working as designed;
+ * - **the mechanical sweep** — it needs a declared universe, and on a run that
+ *   declared none `coverage` answers `universe_undeclared` with
+ *   `complete: null`.
+ *
+ * Each half is individually correct and nothing anywhere added them up. The run
+ * ended as a `WAIT` indistinguishable from the `WAIT` that means *evidence was
+ * adequate and no change is needed* — which is the distinction `PROMPT.md`
+ * invariant 5 spends a paragraph on, collapsing here on the one axis nobody
+ * applied it to. So this counts the lanes, because *both lanes were shut* is a
+ * fact about the run and not a mood.
+ *
+ * ⚠️ **A lane nobody asked about is not a lane that was open.** An absent input
+ * is `unstated` rather than `open`: the failing run's whole shape was a
+ * question never put, and defaulting the unasked half to open would reproduce
+ * it. It is not `dark` either — that would claim a radar this call never saw
+ * was not due.
+ *
+ * ⛔ **Never `blocked`, on any path.** The book whose universe is undeclared is
+ * exactly the book that still has to be watched on the sell side: `exitCheck`,
+ * `thesisSentinel` and the existing-position review all run on holdings alone,
+ * and `PROMPT.md` is explicit that a blocked pre-flight never blocks the
+ * direction that reduces risk. Zero discovery is a **report**, not a stop.
+ *
+ * ⚠️ **The one exception is the undisclosed claim, and it is not the run being
+ * blocked — it is the proposal.** Pass this run's `DecisionProposal.uncertainty`
+ * and a dark run that does not carry the fact is `blocked`: what is refused is
+ * a proposal that had zero discovery capacity and does not say so, which is the
+ * output the investor cannot tell from a considered no-change. The marker is
+ * the code `discovery_lane_dark` **verbatim** in one `uncertainty` entry —
+ * a token rather than a phrase, because the prose around it is written in the
+ * invocation's `language` and a matcher looking for English words would pass
+ * every Korean run for the wrong reason. It is the same round trip
+ * `entryTranchePlan`'s `intent` makes for the same purpose.
+ *
+ * Omitting `uncertainty` leaves the disclosure unjudged rather than passed:
+ * a call made before the proposal exists has nothing to read.
+ */
+export function discoveryCapacity({ radar = null, coverage = null, uncertainty = null } = {}) {
+  const diagnostics = []
+  const laneOf = (value) => (value === null ? 'unstated' : value ? 'open' : 'dark')
+  const radarDue = typeof radar?.due === 'boolean' ? radar.due : null
+  const screened = Number.isFinite(coverage?.screenedUniverseCount) ? coverage.screenedUniverseCount : null
+  const lanes = {
+    forwardResearch: laneOf(radarDue),
+    mechanicalSweep: laneOf(screened === null ? null : screened > 0),
+  }
+  const values = Object.values(lanes)
+  const openLaneCount = values.filter((lane) => lane === 'open').length
+  const unstated = Object.entries(lanes).filter(([, lane]) => lane === 'unstated').map(([name]) => name)
+  const dark = values.every((lane) => lane === 'dark')
+  const capacity = openLaneCount === 2 ? 'full' : openLaneCount === 1 ? 'partial' : dark ? 'none' : 'unknown'
+  if (unstated.length) {
+    diagnostics.push(diagnostic(
+      'discovery_lane_unstated',
+      'unevaluated',
+      'A discovery lane nobody asked about is not a lane that was open; pass themeRadarDue as `radar` and the coverage answer as `coverage`',
+      unstated.includes('forwardResearch') ? 'radar' : 'coverage',
+      { unstated },
+    ))
+  }
+  if (dark) {
+    diagnostics.push(diagnostic(
+      'discovery_lane_dark',
+      'unevaluated',
+      'Both discovery branches were shut on this run — the radar was not due and no universe was declared — so this run’s discovery capacity was zero; report it as cannot-adjudicate rather than as a no-change with adequate evidence',
+      'radar',
+      { radarReason: radar?.reason ?? null, screenedUniverseCount: screened },
+    ))
+  } else if (openLaneCount === 1) {
+    diagnostics.push(diagnostic(
+      'discovery_lane_single',
+      'info',
+      'One discovery branch carried this run alone; the branches reinforce each other and neither replaces the other',
+      'radar',
+      { open: Object.entries(lanes).filter(([, lane]) => lane === 'open').map(([name]) => name) },
+    ))
+  }
+  const disclosed = Array.isArray(uncertainty)
+    ? uncertainty.some((entry) => typeof entry === 'string' && entry.includes('discovery_lane_dark'))
+    : null
+  if (dark && disclosed === false) {
+    diagnostics.push(diagnostic(
+      'discovery_lane_dark_undisclosed',
+      'blocked',
+      'This run found nothing because it looked nowhere, and its proposal does not say so; carry the code `discovery_lane_dark` verbatim in one `uncertainty` entry',
+      'uncertainty',
+      { entries: uncertainty.length },
+    ))
+  }
+  return {
+    data: {
+      lanes,
+      openLaneCount,
+      capacity,
+      dark,
+      mustReport: dark,
+      disclosed,
+      waitCharacter: dark ? 'cannot-adjudicate' : null,
+      meaning: 'zero discovery capacity is reported and never blocks; what is blocked is a proposal that had none and does not say so',
+    },
+    diagnostics,
+  }
+}
+
+/**
  * A revisit promise is only a precommitment if it can expire.
  *
  * `sizing-and-concentration` states the contract in prose — every WATCH carries
