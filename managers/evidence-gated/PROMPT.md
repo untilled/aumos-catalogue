@@ -449,6 +449,25 @@ holdings die together; **a denomination is not a loss path**, and a label standi
 is returned as `concentration_factor_label_unexamined` for this run to answer, not to size around.
 ⛔ **A cap the Mandate does not declare is `unevaluated`, and that is not a pass** — say so in
 `uncertainty` rather than sizing as though the limit were absent.
+
+⛔ **And a cap the Mandate *does* declare, which this methodology then reduces, is disclosed with
+the same weight.** Call `effectivePositionCap` with `mandatePositionCap`, `maturityStatus`, the
+`lane` the candidate would enter, the NAV/floor inputs `experimentalCeiling` takes, and — once the
+proposal exists — this run's `uncertainty`. It returns the declared cap beside the one that
+actually binds, which of the three limits produced it, and what lifts it. A reduction comes back as
+`position_cap_reduced_by_maturity`, and a proposal sized under it that does not carry that code
+**verbatim** in one `uncertainty` entry is `position_cap_reduction_undisclosed` / `blocked` — the
+same round trip `discovery_lane_dark` makes, for the same reason: an investor who declared 0.20 and
+is being sized at 0.01 cannot tell that run from one where 0.20 was simply not needed. ⛔ The
+disclosure is never an argument for raising anything; the gates are right and `policyLint` refuses
+a loosened threshold.
+
+⚠️ **`experimental_floor_exceeds_cap` means the venue's minimum executable amount is larger than
+the control arm allows one name to be** — no name enters that lane at any share price, and the
+diagnostic carries the NAV that resolves it. It is the middle of three nested readings of the same
+floor: `experimental_floor_unreachable` (above the whole band) is wider, `experimental_ladder_unreachable`
+(a position fits, three rungs do not) is narrower. ⛔ Report and act on the outermost that fires;
+answering the ladder first is how a run enlarges a plan to solve a book-size problem.
 `targetWeight` is never negative. An `insufficient` or `observing`
 lens can only support a controlled experiment at or below the experimental ceiling; it never
 supports larger size by rhetoric. **Call `experimentalCeiling` for that number and do not derive

@@ -29,7 +29,7 @@ the JSON remains the canonical explanation.
 
 ## The operations
 
-All 84, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
+All 90, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
 calling it wrong is not a discovery path — every flow skill tells you not to go looking, so the
 names have to be here. A name absent from this table is a name you cannot call.
 
@@ -56,6 +56,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `sleeveNav` | KRW/USD/SGOV net asset value and the FX that joins them |
 | `targetWeight` | desired portfolio weight under maturity and caps |
 | `experimentalCeiling` | the ceiling an unpromoted lens is held to — the ratio or the venue's minimum executable amount, whichever is larger, bounded |
+| `effectivePositionCap` | the cap the investor declared against the cap that actually binds, what reduced it, and what lifts it — plus the venue floor that sits above the control arm's single-name cell |
 | `inputContracts` | guarded operation keys and evaluator vocabulary |
 | `researchUniverse` | pinned KR/US curated roster plus dated, evidenced extensions; current eligibility must be checked |
 | `researchState` | bounded research roster and Evidence references; no source payload cache |
@@ -194,6 +195,7 @@ named field is the difference between a gate that runs and a gate that blocks or
 |---|---|---|
 | `specialistBudget` | `flow` — `kr-sleeve` or `us-sleeve` | Market lanes belong to flows, not to the manager id. `managerId` defaults to this package's own id and is rejected if it names a retired pre-2026-08-27 package. |
 | `concentration` | `caps.factor`, and `factors` on each row | The factor axis is a shared loss path across sectors. An unconfigured cap comes back `concentration_cap_missing` / `unevaluated`, which is not a pass. ⚠️ The labels are the run's own and the package declares none, so a denomination — a currency of quotation, a venue, a listing country — can be written onto this axis and become a country allocation cap the Mandate never made. A single label at twice its cap comes back `concentration_factor_label_unexamined` / `unevaluated`, which asks about the label and blocks nothing. |
+| `effectivePositionCap` | `mandatePositionCap`, `maturityStatus`, `lane`, the NAV/floor inputs `experimentalCeiling` takes, and `uncertainty` once the proposal exists | Without the declared cap there is nothing to measure the reduction against and the answer is `concentration_inputs_missing`. Without `lane` the control arm's single-name cell is not applied, so a control-arm candidate reads as capped at the maturity ceiling when 1% is what will bind it. `maturityStatus` is the same vocabulary `targetWeight` uses, not `entryTranchePlan`'s `maturity`. `uncertainty` is what turns the disclosure into a check: omitted it is unjudged, present and silent it is `position_cap_reduction_undisclosed` / `blocked`. Optional `promotion: {samples, regimes, clusters}` puts this run's progress toward the gate in the diagnostic. |
 | `validateWatch` | `expiresAt` on the watch; `threshold` and `baselineWeight` on a `weight-drift` watch | Expiry is enforced, not described. Omitting `expiresAt` derives one thirty days out from `asOf` — the package's own expiry, not a setting — and reports `expirySource: 'default'`; omitting the drift baseline leaves the already-met check unevaluated. |
 | `sectorStrength` | `benchmarkBars`, each sector's own `bars`, `previousRanks` from the last run | Without the benchmark the lane is unread, not neutral. Without `previousRanks` the rank-move trigger cannot fire — a rank with no history is a number, not a change. |
 | `exitCheck` | `price`, `rules`, `thesis`, and the `sentinel` verdict | The two lanes are independent inputs: a missing price unreads the price lane and the fundamental lane still runs. Omitting `sentinel` silently drops the fundamental verdict and its escalation. |

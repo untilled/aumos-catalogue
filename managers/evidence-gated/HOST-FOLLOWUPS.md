@@ -1,7 +1,7 @@
-# Host dependencies after issues #145–149
+# Host dependencies after issues #145–151
 
-Version 0.4.21 restores the curated research assets and makes collection, input and scheduling
-failures observable. Two runtime facilities remain outside this catalogue package.
+Version 0.4.22 discloses the operative position cap and the venue floor that closes the control
+arm. Three runtime facilities remain outside this catalogue package.
 
 ## Fundamental storage (#146)
 
@@ -46,3 +46,35 @@ the observed price. USD 200 at DKS USD 139.15 cannot fund three whole-share rung
 The ceiling and staging policy are unchanged. Broker lot size must be supplied; fractional lots
 are used only when the broker actually supports them. Missing execution inputs produce
 `experimental_ladder_unevaluated`, never an assertion that every entry gate passed.
+
+⚠️ The issue's own "only names under USD 66 can enter" reading is **withdrawn** by #151 and was
+too generous. The binding fact is that `experimentalPositionFloor.USD` (200) is above the control
+arm's single-name cell (1% of USD 14,866.44 = USD 148.66), so no US name enters that lane at any
+share price. `experimental_floor_exceeds_cap` reports it, with the resolving NAV (USD 20,000).
+
+## The effective cap on the input screen (#151, proposal 4)
+
+`effectivePositionCap` now computes the reduction and every run that applies one discloses it, so
+the fact reaches the investor **after** a run. It does not reach them where the number is entered.
+An investor typing `maxPositionWeight = 0.20` into fund settings is declaring a limit that this
+manager will operate twentyfold below for as long as its lenses are unpromoted, and the screen
+says nothing.
+
+The host would need, beside the position-limit field, the effective limit each installed manager
+would apply at the current evidence state and book size — which is a value only the manager can
+compute, so it needs a read path Aumos does not have: a way to ask an installed manager for its
+operative constraints outside a decision run. That is Aumos's design call, not this package's;
+what this package can do is make the answer computable, which `effectivePositionCap` is. This
+follow-up is owned by `untilled/aumos`, and #151 is therefore not fully closed by this package.
+
+⛔ It is a **disclosure** dependency and not a gating one. Nothing here waits on the host: the
+diagnostic fires today, and the proposal that does not carry it is refused today.
+
+## The promotion ladder's middle rungs (#151, proposal 3)
+
+Left open deliberately. Whether an intermediate grade should exist between the experimental
+ceiling and a full promotion — reaching, say, 3% on 10 samples and 5 clusters without the third
+regime — is a methodology judgement about how much size unproven evidence may carry, and it is
+exactly the kind of number the source harness marked *"값 수정·완화는 사용자만 한다"*. This
+revision changes no threshold and adds no rung. It states the wait in `README.md` so the investor
+can decide before installing, and leaves the ladder question on the issue.

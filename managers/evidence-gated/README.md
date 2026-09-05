@@ -230,6 +230,26 @@ WAIT that says which one.
 
 - **Being quick.** Every gate exists to slow a new position down, and most runs end in
   WATCH rather than a trade. If that reads as indecision, this is the wrong package.
+- **Buying a single name at the size you declared, for the first few years.** ⚠️ **Read this
+  before you install, because it is the thing most likely to surprise you.** The position
+  limit you set in your Mandate is the ceiling, not the operating number. Until a lens is
+  *promoted*, this manager holds every individual stock to its experimental ceiling —
+  around **1% of the book**, and never more than 3% — whatever `maxPositionWeight` says.
+  A `maxPositionWeight` of 20% and an unpromoted lens means an effective 1%: a twentieth of
+  what you declared. The manager now says so out loud on every run it applies
+  (`position_cap_reduced_by_maturity`, with your declared number, the operative number and
+  what lifts it), and it did not before.
+  **Promotion is measured in years, not weeks.** A lens is promoted on 30 closed outcomes,
+  10 independent date clusters and **3 distinct market regimes**. The first two respond to
+  finding more candidates; the third does not — a regime turns on the calendar, so three of
+  them is a multi-year wait no rate of activity shortens. In the meantime the individual
+  names are 1% experiments and the weight of the book sits in ETFs and cash: **for that
+  period this is, in practice, an ETF allocator that runs a small controlled experiment on
+  the side.** That is the methodology working as designed rather than a defect — a
+  methodology that sizes on evidence has to be small before it has any — but it is a
+  multi-year property of the thing you are installing, and you are owed it in advance.
+  If you want a manager that will put 20% of your book into one conviction name this
+  quarter, it is not this one.
 - **Short positions and leverage.** It is long-only.
 - **Its own newest layers.** The forward-research and sell-side layers are ported, but
   their track record is not: the comparison that answers *"do the team's calls beat the

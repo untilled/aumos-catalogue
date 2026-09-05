@@ -148,6 +148,204 @@ export function experimentalCeiling(input = {}) {
   return { data, diagnostics }
 }
 
+/** The maturities that are held to the experimental ceiling rather than to the Mandate alone. */
+const UNPROMOTED_MATURITIES = ['insufficient', 'observing', 'reviewable']
+
+/**
+ * ── The cap the investor declared, and the cap that binds (issue #151) ─────
+ *
+ * An investor set `mandate.constraints.maxPositionWeight` to 0.20 and asked
+ * why the book would not buy more than 1.3% of a name. The answer was yes,
+ * and **nothing in any output said so.** The chain that produced it is three
+ * rules, each defensible on its own: §4 holds an unpromoted lens to
+ * `experimentalCeiling` (0.01345312 on a USD 14,866.44 book, the floor
+ * binding), `controlArmLane` then holds a control-arm name to 1%, and
+ * `promotionGate` is what lifts either — samples 30, regimes 3, clusters 10,
+ * standing at 0/0/0. A twentieth of the declared number was the operative
+ * limit, and the run submitted a `WAIT` carrying nine `uncertainty` entries,
+ * none of which could be that one, because **no operation computed it.**
+ *
+ * ⚠️ **The asymmetry is the defect.** `concentration` reports a cap the
+ * Mandate never declared as `concentration_cap_missing` / `unevaluated`, every
+ * run, on the argument that *nobody said* is not a pass. A cap the investor
+ * **did** declare, reduced twentyfold by this package's own evidence rules,
+ * was reported nowhere at all. Whatever is owed for the first is owed more
+ * plainly for the second: the first is a limit nobody chose, the second is a
+ * limit somebody chose and did not get.
+ *
+ * ⛔ **This does not raise anything and must never be read as an argument to.**
+ * The gates are right. `policyLint` refuses a loosened threshold and is right
+ * to. What this operation adds is the sentence *"you declared 0.20 and this
+ * book is operating at 0.01, because the lens is insufficient, and it lifts at
+ * `promotionGate`"* — a disclosure, computed, in the same diagnostic vocabulary
+ * as everything else, rather than a paragraph of prose a run may or may not
+ * reconstruct.
+ *
+ * ⚠️ **The disclosure round-trips, the same way `discovery_lane_dark` does.**
+ * Pass this run's `DecisionProposal.uncertainty` and a reduced cap that the
+ * proposal does not carry is `blocked` — what is refused is the *proposal*,
+ * never the run. The marker is the code `position_cap_reduced_by_maturity`
+ * **verbatim** in one entry, a token rather than a sentence, because the prose
+ * beside it is written in the invocation's `language`. Omitting `uncertainty`
+ * leaves the disclosure unjudged rather than passed.
+ *
+ * ── The floor above the cap ───────────────────────────────────────────────
+ *
+ * The same book produced a second thing nothing said: `experimentalPositionFloor.USD`
+ * is 200, and the control arm's 1% cell of that NAV is USD 148.66. **The floor
+ * is above the cap**, so no US name enters that lane at any share price — this
+ * is not the "under USD 66" reading #149 published, which was wrong and is
+ * corrected here. `experimental_floor_exceeds_cap` names it and carries the
+ * NAV that resolves it (USD 20,000 here), because the run should not have to
+ * rediscover the arithmetic every time.
+ *
+ * ⚠️ **Three diagnostics look at this floor and they nest; the boundary is
+ * deliberate.**
+ *
+ * | code | question | severity |
+ * |---|---|---|
+ * | `experimental_floor_unreachable` | the floor is above the whole experimental band (`> experimentalPositionCeilingMax`) | `unevaluated` |
+ * | `experimental_floor_exceeds_cap` | the floor is above the control arm's single-name cell — not one position fits | `unevaluated` |
+ * | `experimental_ladder_unreachable` | a position fits, but the capped budget cannot fund one lot per rung (#149) | `blocked` |
+ *
+ * They are ordered outermost first, and the outer ones are strictly wider: a
+ * floor over the band is also over the lane cell. ⛔ **Report and act on the
+ * outermost that fires** — an unreachable ladder under an unreachable floor is
+ * a plan detail on a lane that could not hold one position, and answering it
+ * first is how a run ends up enlarging a ladder to solve a NAV problem. The
+ * two floor codes are `unevaluated` because they report *this book cannot run
+ * a real-money experiment here*; the ladder code is `blocked` because it
+ * refuses a specific plan.
+ */
+export function effectivePositionCap(input = {}) {
+  const diagnostics = []
+  const declared = finite(input?.mandatePositionCap) ? Math.max(0, input.mandatePositionCap) : null
+  const maturity = input?.maturityStatus ?? null
+  const unpromoted = UNPROMOTED_MATURITIES.includes(maturity)
+  const lane = input?.lane === 'control-arm' ? 'control-arm' : input?.lane === 'main' ? 'main' : null
+  const ceiling = experimentalCeiling(input)
+  /**
+   * The ceiling's own diagnostics belong to the run only where the ceiling
+   * binds. On a promoted lens it is not the limit and reporting its floor
+   * would be reporting a rule that did not apply.
+   */
+  if (unpromoted) diagnostics.push(...ceiling.diagnostics)
+  if (declared === null) {
+    diagnostics.push(diagnostic('concentration_inputs_missing', 'unevaluated', "The Mandate's maxPositionWeight is the position cap and this run was given none", 'mandatePositionCap'))
+  }
+
+  const limits = []
+  if (declared !== null) limits.push({ source: 'mandate', weight: declared })
+  if (unpromoted && finite(ceiling.data.experimentalCeiling)) limits.push({ source: 'lens-maturity', weight: ceiling.data.experimentalCeiling })
+  if (lane === 'control-arm') limits.push({ source: 'control-arm-lane', weight: METHODOLOGY.controlArm.singleMaxWeight })
+  const bound = limits.length ? limits.reduce((low, row) => (row.weight < low.weight ? row : low)) : null
+  const effective = bound ? round(bound.weight) : null
+
+  /**
+   * The *reason* is the maturity whenever the lens is unpromoted, even when
+   * the arithmetic is bound by the lane cap: the control arm is the only lane
+   * an unpromoted price-pattern candidate has, so "the lens is insufficient"
+   * is what a person can act on and "the lane caps at 1%" is a consequence of
+   * it. `limits` carries both so neither reading is lost.
+   */
+  const reason = unpromoted ? `lens_${maturity}` : lane === 'control-arm' ? 'control_arm_lane' : null
+  const unlocksAt = unpromoted ? 'promotionGate' : null
+  const progress = input?.promotion ?? null
+  const promotion = {
+    required: METHODOLOGY.promotionGate,
+    observed: {
+      samples: finite(progress?.samples) ? progress.samples : null,
+      regimes: finite(progress?.regimes) ? progress.regimes : null,
+      clusters: finite(progress?.clusters) ? progress.clusters : null,
+    },
+  }
+  const reduced = declared !== null && effective !== null && effective + 1e-12 < declared
+  if (reduced) {
+    diagnostics.push(diagnostic(
+      'position_cap_reduced_by_maturity',
+      'unevaluated',
+      'The position cap this book is operating under is smaller than the one the Mandate declares, because evidence maturity holds it there; say so with the declared number, the effective number and what lifts it, rather than sizing to the smaller one in silence',
+      'mandatePositionCap',
+      {
+        declared: round(declared),
+        effective,
+        reducedToFraction: declared > 0 ? round(effective / declared) : null,
+        reductionMultiple: effective > 0 ? round(declared / effective, 4) : null,
+        binding: bound.source,
+        reason,
+        unlocksAt,
+        promotion,
+        limits: limits.map((row) => ({ source: row.source, weight: round(row.weight) })),
+      },
+    ))
+  }
+  const disclosed = Array.isArray(input?.uncertainty)
+    ? input.uncertainty.some((entry) => typeof entry === 'string' && entry.includes('position_cap_reduced_by_maturity'))
+    : null
+  if (reduced && disclosed === false) {
+    diagnostics.push(diagnostic(
+      'position_cap_reduction_undisclosed',
+      'blocked',
+      'This proposal is sized under a cap smaller than the one the investor declared and does not say so; carry the code `position_cap_reduced_by_maturity` verbatim in one `uncertainty` entry',
+      'uncertainty',
+      { declared: round(declared), effective, entries: input.uncertainty.length },
+    ))
+  }
+
+  /**
+   * The floor and the lane cell, compared in the venue's own currency. NAV is
+   * recovered from the ceiling's own conversion (`floorAmount / floorWeight`)
+   * rather than converted a second time here — one FX reading, one answer.
+   */
+  const laneCap = METHODOLOGY.controlArm.singleMaxWeight
+  const floorAmount = ceiling.data.floorAmount
+  const floorWeight = ceiling.data.floorWeight
+  let floorVersusCap = null
+  if (finite(floorAmount) && finite(floorWeight) && floorWeight > 0) {
+    const navInFloorCurrency = floorAmount / floorWeight
+    floorVersusCap = {
+      floorAmount: round(floorAmount, 2),
+      floorCurrency: ceiling.data.floorCurrency,
+      laneSingleMaxWeight: laneCap,
+      laneCellAmount: round(laneCap * navInFloorCurrency, 2),
+      portfolioNavInFloorCurrency: round(navInFloorCurrency, 2),
+      resolvesAtNav: round(floorAmount / laneCap, 2),
+      exceeds: floorWeight > laneCap + 1e-12,
+    }
+    if (unpromoted && floorVersusCap.exceeds) {
+      diagnostics.push(diagnostic(
+        'experimental_floor_exceeds_cap',
+        'unevaluated',
+        'The smallest position this venue is willing to open is larger than the control arm allows a single name to be, so no name enters that lane here at any share price; this is a fact about the size of the book, and the NAV that resolves it is stated rather than rediscovered each run',
+        'experimentalPositionFloor',
+        floorVersusCap,
+      ))
+    }
+  }
+
+  return {
+    data: {
+      declaredCap: declared,
+      effectiveCap: effective,
+      binding: bound?.source ?? null,
+      reduced,
+      reducedToFraction: reduced && declared > 0 ? round(effective / declared) : null,
+      reason,
+      unlocksAt,
+      promotion,
+      limits: limits.map((row) => ({ source: row.source, weight: round(row.weight) })),
+      lane,
+      maturityStatus: maturity,
+      mustReport: reduced,
+      disclosed,
+      ceiling: ceiling.data,
+      floorVersusCap,
+      units: { declaredCap: 'portfolio-weight', effectiveCap: 'portfolio-weight', reducedToFraction: 'ratio' },
+    },
+    diagnostics,
+  }
+}
+
 export function targetWeight(input) {
   const diagnostics = []
   const expected = input?.expectedActiveReturn
@@ -176,7 +374,6 @@ export function targetWeight(input) {
    * position limit derived from a sector limit.
    */
   const caps = [input.mandatePositionCap, input.sectorHeadroom, input.themeHeadroom].filter(finite)
-  if (!finite(input.mandatePositionCap)) diagnostics.push(diagnostic('concentration_inputs_missing', 'unevaluated', "The Mandate's maxPositionWeight is the position cap and this run was given none", 'mandatePositionCap'))
   const raw = Math.max(0, expected / Math.abs(downside)) * conviction
   const maturity = input.maturityStatus
   if (!['insufficient', 'observing', 'reviewable', 'promoted'].includes(maturity)) {
@@ -189,14 +386,18 @@ export function targetWeight(input) {
    * One rule, called here. The ceiling an unpromoted lens is held to is
    * `experimentalCeiling()`'s answer and never a second copy of the arithmetic
    * — a floor computed in one place and a ratio read in another is how the two
-   * come to disagree about what the ceiling is.
+   * come to disagree about what the ceiling is. ⚠️ Since #151 the call goes
+   * through `effectivePositionCap`, which is that same rule plus the sentence
+   * saying how far it moved the investor's declared cap: sizing is the place
+   * that already holds both numbers, so it is the place that owes the
+   * comparison. A missing `mandatePositionCap` is reported there, under the
+   * code it has always had.
    */
-  const unpromoted = ['insufficient', 'observing', 'reviewable'].includes(maturity)
-  const ceiling = experimentalCeiling(input)
-  if (unpromoted) {
-    diagnostics.push(...ceiling.diagnostics)
-    caps.push(finite(ceiling.data.experimentalCeiling) ? ceiling.data.experimentalCeiling : 0)
-  }
+  const unpromoted = UNPROMOTED_MATURITIES.includes(maturity)
+  const capReport = effectivePositionCap(input)
+  const ceiling = { data: capReport.data.ceiling }
+  diagnostics.push(...capReport.diagnostics)
+  if (unpromoted) caps.push(finite(ceiling.data.experimentalCeiling) ? ceiling.data.experimentalCeiling : 0)
   const cap = caps.length ? Math.max(0, Math.min(...caps)) : 0
   return {
     data: {
@@ -206,7 +407,11 @@ export function targetWeight(input) {
       maturityStatus: maturity,
       experimentalCeiling: ceiling.data.experimentalCeiling,
       experimentalCeilingBinding: ceiling.data.binding,
-      units: { rawWeight: 'portfolio-weight', bindingCap: 'portfolio-weight', targetWeight: 'portfolio-weight', experimentalCeiling: 'portfolio-weight' },
+      declaredPositionCap: capReport.data.declaredCap,
+      effectivePositionCap: capReport.data.effectiveCap,
+      positionCapReduced: capReport.data.reduced,
+      positionCapUnlocksAt: capReport.data.unlocksAt,
+      units: { rawWeight: 'portfolio-weight', bindingCap: 'portfolio-weight', targetWeight: 'portfolio-weight', experimentalCeiling: 'portfolio-weight', declaredPositionCap: 'portfolio-weight', effectivePositionCap: 'portfolio-weight' },
     },
     diagnostics,
   }

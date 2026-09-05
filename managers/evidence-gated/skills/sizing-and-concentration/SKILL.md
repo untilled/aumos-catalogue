@@ -72,6 +72,23 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    ⛔ When the floor does not fit inside the band the operation says `experimental_floor_unreachable`
    and the honest answer is that this book cannot run a real-money controlled experiment in that
    market — not a position rounded up to the cap.
+4a. **Say what the investor's declared cap became.** Call `effectivePositionCap` with
+   `mandatePositionCap`, `maturityStatus`, the `lane` (`control-arm` or `main`), the same NAV and
+   floor inputs `experimentalCeiling` takes, and this run's `uncertainty` once the proposal exists.
+   It returns `declaredCap`, `effectiveCap`, which of the three limits bound — the Mandate, the
+   lens-maturity ceiling, the control arm's single-name cell — and `unlocksAt`. ⚠️ **This is the
+   asymmetry #151 closed.** A cap nobody declared has been reported every run since the beginning as
+   `concentration_cap_missing`; a cap somebody *did* declare and did not get was reported nowhere.
+   A book on an insufficient lens ran at a twentieth of a declared 0.20 and no output said so.
+   ⛔ A proposal sized under a reduced cap carries the code `position_cap_reduced_by_maturity`
+   **verbatim** in one `uncertainty` entry, or it comes back `position_cap_reduction_undisclosed` /
+   `blocked` — the proposal, never the run. ⛔ Nothing here raises a cap, and a run that reads it
+   as licence to has read it backwards: the disclosure exists precisely so the small number can
+   stand without being a secret.
+   ⚠️ `experimental_floor_exceeds_cap` is the second thing it answers: the venue floor above the
+   control arm's 1% cell, which closes the lane to every name at every price. The diagnostic carries
+   the NAV that resolves it. Read the three floor codes outermost-first — `experimental_floor_unreachable`,
+   then `experimental_floor_exceeds_cap`, then #149's `experimental_ladder_unreachable`.
 5. Compare with cash and benchmark alternatives. A target is the desired portfolio weight, not an
    order quantity, and it is never negative.
 

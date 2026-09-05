@@ -137,6 +137,20 @@ first real experiment at three shares, and the source methodology's Experiment-s
 same name was ten. Below the band the answer is `experimental_floor_unreachable`: this book runs
 that lane on paper, and paper never unlocks real size — the columns stay separate.
 
+⚠️ **And the floor can sit above the control arm's cell without being above the band.** On a USD
+14,866.44 book the lane's 1% is USD 148.66 and the configured floor is USD 200 — so the arm is shut
+to every US name at every share price, while `experimentalCeiling` reports a perfectly ordinary
+0.01345312. `effectivePositionCap` is what says it: `experimental_floor_exceeds_cap`, carrying the
+NAV that resolves it (USD 20,000 there). ⛔ It is a report about the size of the book, not a reason
+to lift the lane cap — the control arm's 1% is what makes its variant-view waiver legitimate, and a
+lane enlarged to fit a floor is no longer a control.
+
+The same call is what tells the investor that a declared `maxPositionWeight` of 0.20 is operating
+at 0.01 while the lens is unpromoted: `position_cap_reduced_by_maturity`, with the declared number,
+the effective number, and `promotionGate` as what lifts it. ⛔ **Disclosing the gate is not
+loosening it.** Nothing in this package's promotion thresholds moves because a cap was found to be
+binding; the whole point of a control arm is that it binds.
+
 ## WAIT versus unable to judge
 
 - **Judged WAIT**: the required lane is fresh enough, claims were challenged, and no change has

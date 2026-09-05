@@ -669,13 +669,7 @@ export function verdictReport({ paper = {}, cohort = 'llm-research', shadow = {}
  * more of this". Expansion is a separate proposal that must first say what
  * replaces the control.
  */
-const CONTROL_ARM = {
-  singleMaxWeight: 0.01,
-  laneTotalMaxWeight: 0.06,
-  maxConcurrentPositions: 6,
-  timeStopTradingDays: 40,
-  hardStopPct: -0.08,
-}
+const CONTROL_ARM = METHODOLOGY.controlArm
 
 export function controlArmLane({ positions = [], proposed = [], experimentTotalRemainingWeight = null } = {}) {
   const diagnostics = []

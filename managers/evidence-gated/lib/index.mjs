@@ -3,7 +3,7 @@ import { validateInput, INPUT_KEYS, INPUT_VOCABULARY } from './input-contracts.m
 import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
-import { sleeveNav, targetWeight, experimentalCeiling, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
+import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
 import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
@@ -40,6 +40,7 @@ const operations = {
   sleeveNav,
   targetWeight,
   experimentalCeiling,
+  effectivePositionCap,
   legacySizeSuggestion,
   concentration,
   entryQualityGate,
