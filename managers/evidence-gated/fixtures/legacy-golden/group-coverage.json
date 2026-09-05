@@ -2,10 +2,10 @@
   "spec": "EvidenceGatedMigrationCoverage/1",
   "groups": {
     "attribution": ["attribution-additive-identity", "twr-with-start-of-day-flow", "annualized-money-weighted-return", "shadow-sizing-bottleneck", "passive-baseline"],
-    "audit": ["memory-contract", "migration-matrix-structure", "package-boundary-scan", "skill-code-unit-vocabulary", "portfolio-heat", "new-single-pacing", "paper-sample-status-stated", "two-discovery-branches-stated", "structural-advantage-stated", "harness-audit-blockers", "inherited-positions-carried", "declared-config-keys-are-read", "preflight-order-stated", "rule-version-registry", "data-file-inventory", "skill-code-enum-agreement", "configured-x-exists", "vendor-error-triage", "web-lane-reaches-the-flow", "universe-is-declared-each-run", "theme-radar-leaves-the-universe", "both-tool-allowlists-are-read", "time-watch-is-evaluable-without-subject"],
+    "audit": ["memory-contract", "migration-matrix-structure", "package-boundary-scan", "skill-code-unit-vocabulary", "portfolio-heat", "new-single-pacing", "paper-sample-status-stated", "two-discovery-branches-stated", "structural-advantage-stated", "harness-audit-blockers", "inherited-positions-carried", "declared-config-keys-are-read", "preflight-order-stated", "rule-version-registry", "data-file-inventory", "skill-code-enum-agreement", "configured-x-exists", "vendor-error-triage", "web-lane-reaches-the-flow", "universe-is-declared-each-run", "theme-radar-leaves-the-universe", "both-tool-allowlists-are-read", "time-watch-is-evaluable-without-subject", "universe-undeclared-is-a-warn", "discovery-is-instructed-not-inferred"],
     "backtest": ["trend-gate-forward", "dca-multiplier", "oversold-strata"],
     "calibration": ["categorical-brier", "independent-date-clusters", "calibration-maturity"],
-    "coverage": ["universe-union", "uncovered-zero", "undeclared-universe"],
+    "coverage": ["universe-union", "uncovered-zero", "undeclared-universe", "discovery-lane-dark"],
     "earnings": ["exact-bmo-amc-date-only", "actual-anchor"],
     "exit": ["exit-check-sell-trim-review", "exit-price-and-fundamental-lanes", "exit-candidate-never-order", "forward-outcome", "mfe-mae", "time-stop-policy"],
     "learning": ["upside-radar", "memory-revision", "no-auto-method-change", "paper-admission", "signal-paper-cohorts", "lesson-audit", "paper-track-persists", "paper-registration-is-mechanical", "empty-paper-track-is-observable", "paper-state-arrives-as-state"],

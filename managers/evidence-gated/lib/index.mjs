@@ -2,7 +2,7 @@ import { result, diagnostic } from './diagnostics.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
 import { sleeveNav, targetWeight, experimentalCeiling, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
-import { coverageState, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
+import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
 import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
 import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
@@ -43,6 +43,7 @@ const operations = {
   specialistBudget,
   globalAllocation,
   coverage: coverageState,
+  discoveryCapacity,
   validateWatch: (input, asOf) => validateWatch(input?.watch, input?.current, asOf, input?.config),
   evaluateWatch: (input, asOf) => evaluateWatch({ ...input, asOf }),
   watchAlertState: (input, asOf) => watchAlertState({ ...input, asOf }),

@@ -5,7 +5,13 @@
   "cases": [
     {
       "name": "adequate-evidence-wait",
-      "proposal": { "action": "WAIT", "thesisRefs": ["thesis-1@1"], "rationale": { "conclusion": "No portfolio change is warranted.", "keyReasons": ["The current weight equals the evidence-qualified target."], "risks": ["Waiting may miss a rapid move."] }, "evidenceIds": ["evidence-1"] }
+      "discovery": { "radar": { "due": false, "reason": "not-due", "ageDays": 0.6 }, "coverage": { "screenedUniverseCount": 812, "complete": true } },
+      "proposal": { "action": "WAIT", "thesisRefs": ["thesis-1@1"], "rationale": { "conclusion": "No portfolio change is warranted.", "keyReasons": ["The declared universe was swept and nothing cleared the entry gates.", "The current weight equals the evidence-qualified target."], "risks": ["Waiting may miss a rapid move."] }, "evidenceIds": ["evidence-1"] }
+    },
+    {
+      "name": "discovery-dark-wait",
+      "discovery": { "radar": { "due": false, "reason": "not-due", "ageDays": 0.6 }, "coverage": { "screenedUniverseCount": 0, "complete": null } },
+      "proposal": { "action": "WAIT", "thesisRefs": [], "rationale": { "conclusion": "No portfolio change is proposed, and this run had no discovery capacity.", "keyReasons": ["The candidate set is empty because nothing was searched, not because nothing qualified."], "risks": ["A candidate this book would have taken may have existed and been unseen."], "uncertainty": ["discovery_lane_dark: the theme radar was not due and no universe was declared, so the mechanical sweep did not run; coverage returned complete: null."] }, "evidenceIds": ["evidence-1"] }
     },
     {
       "name": "basing-watch",

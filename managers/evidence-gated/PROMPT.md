@@ -159,7 +159,7 @@ invalid values.
 
 ### 1b. Pre-flight, before planning any trade
 
-Seven things are checked before a candidate is considered, and the order is the point: each one is
+Eight things are checked before a candidate is considered, and the order is the point: each one is
 something a run would otherwise discover *after* proposing.
 
 | # | check | what stops the run |
@@ -171,6 +171,39 @@ something a run would otherwise discover *after* proposing.
 | 5 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
 | 6 | broker limits | Aumos owns them; read what the invocation carries and do not assume |
 | 7 | `signalPaper` → `verdictReport` | nothing — but a met threshold is stated in this run, a `NO_GO` freezes new non-core experiments, and an empty or unadvanced track is named in `uncertainty` rather than passed over |
+| 8 | `themeRadarDue` + `coverage` → `discoveryCapacity` | nothing — but **a run with no open discovery branch says so.** Both branches can be shut on the same day, and the `WAIT` that follows is otherwise the same shape as a considered no-change |
+
+⚠️ **Is a discovery universe declared — and call `coverage` to find out, on every run, before
+anything is proposed.** (#140) This is the eighth check and it is the newest, because it is the one
+the run skeleton could not discover for itself: §3 names the lens when there are candidates,
+candidates come out of the sweep §3 defines, and that sweep needs a declared universe — so a run
+with no universe never reaches the step that would have noticed. The circle closes with no error
+anywhere in it. Measured over six runs of one book: **not one universe declared, not one candidate
+generated, and not one word about either in any proposal.**
+
+So the question is asked here, where nothing downstream depends on the answer:
+
+- Pass what you declared to `coverage` — `scannerUniverses` and `extensions`, per
+  `skills/candidate-research/SKILL.md`. `complete: null` with `universe_undeclared` means *the
+  sweep did not happen*, never *the sweep found nothing*, and it belongs in `uncertainty` **this
+  run**, not on the run that notices later.
+- Hand the same thing to `harnessAudit` as `universe`. It answers `audit_universe_undeclared` as a
+  **`warn`** — including when nothing was passed at all, because an unasked question is not a
+  denominator. ⛔ It is not a blocker and must never become one: an inherited book with no universe
+  is exactly the book that still needs its sell-side watch, and every reduction available to it
+  needs no universe whatever.
+- Then call `discoveryCapacity` with `themeRadarDue`'s answer as `radar` and `coverage`'s as
+  `coverage`. Radar not due **and** no universe declared is `discovery_lane_dark`: this run's
+  discovery capacity was **zero**, and that is invariant 5's distinction — *evidence was adequate*
+  against *this could not be adjudicated* — applied to the discovery axis, where it had never been
+  applied at all.
+
+⛔ **A dark run carries the code `discovery_lane_dark` verbatim in one `uncertainty` entry.** Pass
+this run's `uncertainty` back to `discoveryCapacity` and an undisclosed dark run is `blocked` —
+what is refused there is the *proposal*, never the run: a `WAIT` that looked nowhere and reads
+exactly like a `WAIT` that looked everywhere is the one output the investor has no way to tell
+apart. The code is a token rather than a sentence because the prose beside it is written in the
+invocation's `language`; it is the same verbatim round trip a tranche `intent` makes.
 
 ⛔ **A `harnessAudit` blocker stops planning, never reporting.** Say what is broken, name it in
 `uncertainty`, and propose `WAIT`. The failure this prevents is a well-formed proposal built on a
@@ -267,6 +300,12 @@ signals. A run with no web
 lane produces no forward thesis and says the lane was missing; a silent fallback is forbidden.
 Record the run under `run/theme-radar-last` whether or not it produced anything.
 
+⚠️ **`due: false` is this branch off, and off is a state to report rather than a step to skip.**
+Two days in every three the interval says not due, which is the interval working — but paired with
+an undeclared universe it is a run that could not have found anything, and §1b's eighth check is
+where those two facts are added up. Skipping the radar correctly and sweeping nothing are each
+defensible; together they are `discovery_lane_dark`.
+
 ⚠️ **Whether there is a web lane is settled before dispatch, and it is settled by you.** The web
 tools are the CLI's rather than the gateway's, so no operation here can be asked whether this
 session holds them — call `laneCoverage` with `intent: 'theme-radar'` and a `sources.web` entry
@@ -297,6 +336,12 @@ declared — which is *the sweep did not happen*, never *the sweep found nothing
 sees inside that boundary only.** Forward research is the one crossing: the theme radar examines an
 axis outside it every run and a cleared call joins the universe as an extension, so a run that skips
 the radar has not merely produced fewer ideas — it has left the boundary permanently where it was.
+
+⛔ **And this section is not where a missing universe is discovered, which is why §1b asks first.**
+Reaching here at all takes candidates, candidates take the sweep, and the sweep takes the
+denominator — so the step that would notice its absence is downstream of it (#140). A run that
+arrives with no candidates has not disproved anything about the market; §1b's eighth check is what
+tells it which of the two happened.
 
 #### Price patterns — `scan`, `opportunityMetrics`
 

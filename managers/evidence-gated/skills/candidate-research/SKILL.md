@@ -213,6 +213,13 @@ those is a denominator this run did not read, presented as one it did.
 searched — and with nothing declared it means neither. `complete` is `null` in that case, and
 reporting it as a pass is the specific error this section exists to prevent.
 
+⛔ **And `complete: null` beside a radar that was not due is a run that could not have found
+anything.** The two branches shut on the same day is `discoveryCapacity`'s `discovery_lane_dark`,
+and it is reported rather than passed over: a `WAIT` produced with zero discovery capacity looks
+exactly like a `WAIT` produced by reviewing the market and declining it (#140). `PROMPT.md` §1b
+owns the check; what this page owns is the reason it can never be inferred from an empty candidate
+list — an empty list is what *both* runs produce.
+
 **The theme radar must add candidates from outside the universe, and this is not optional.** The
 mechanical scanners see inside the declared universe and nowhere else, so forward research is the
 only path across that boundary; `skills/theme-radar/SKILL.md` owns the requirement and states how

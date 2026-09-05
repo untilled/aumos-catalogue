@@ -2179,7 +2179,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 85)
+assert.equal(supportedOperations.length, 86)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -2690,6 +2690,10 @@ const cleanBook = {
   decisions: [{ asset: 'AAA', quantity: 10, orderReady: true, exitRegistered: true }],
   theses: [{ asset: 'AAA' }],
   watches: [{ subject: 'AAA', registeredAt: '2026-08-15T00:00:00Z' }],
+  // A book with a universe standing, because since #140 a pre-flight that was
+  // told nothing about the discovery denominator says so — and a "clean book"
+  // that never declared one is not clean, it is the failing run.
+  universe: { scannerUniverses: [['AAA', 'BBB']] },
 }
 const clean = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: cleanBook })
 assert.equal(clean.data.clearToPlan, true)
@@ -2805,6 +2809,113 @@ for (const named of ['lessonAudit', 'harnessAudit', 'exitCheck', 'trendState', '
 }
 assert.ok(/before any new buy is considered/i.test(preflightProse), 'exits are reported before purchases are considered — the ordering is the rule')
 assert.ok(/stops planning, never reporting/i.test(preflightProse), 'a blocker stops the plan and not the report')
+
+/**
+ * ── Both discovery branches shut on the same day (issue #140) ──────────────
+ *
+ * Six runs of one book proposed nothing the book had found itself, and the
+ * measured cause was not a rejection: the theme radar was not due (3-day
+ * interval, `ageDays` 0.60) **and** no universe had been declared, so the
+ * mechanical sweep had nothing to sweep. Each half was individually correct.
+ * Nothing added them up, and the run ended as a `WAIT` no investor could tell
+ * from a considered no-change.
+ *
+ * The checks here are the ways that run could not have been caught: nothing
+ * counted the lanes, nothing asked about the universe unless the run
+ * volunteered the question, and nothing required the answer to reach the
+ * proposal.
+ */
+covers('coverage/discovery-lane-dark')
+const radarNotDue = { due: false, reason: 'not-due', ageDays: 0.6 }
+const undeclaredCoverage = execute({ operation: 'coverage', asOf: methodology.asOf, input: { scannerUniverses: [], extensions: [], holdings: ['069500', '153130', 'SGOV'], dispositions: [], asOf: methodology.asOf } }).data
+const bothDark = execute({ operation: 'discoveryCapacity', asOf: methodology.asOf, input: { radar: radarNotDue, coverage: undeclaredCoverage } })
+assert.equal(bothDark.data.dark, true, 'the radar was not due and nothing was declared: this run could not have found anything')
+assert.equal(bothDark.data.capacity, 'none')
+assert.equal(bothDark.data.waitCharacter, 'cannot-adjudicate', 'which is invariant 5’s second kind of WAIT, on the axis it had never been applied to')
+assert.ok(bothDark.diagnostics.some((row) => row.code === 'discovery_lane_dark' && row.severity === 'unevaluated'), 'it is named, and it is named as a finding rather than a stop')
+assert.ok(bothDark.diagnostics.every((row) => row.severity !== 'blocked'), 'zero discovery never blocks: the sell-side watch and every reduction need no universe at all')
+const oneLaneOpen = execute({ operation: 'discoveryCapacity', asOf: methodology.asOf, input: { radar: { due: true, reason: 'interval-elapsed' }, coverage: undeclaredCoverage } })
+assert.equal(oneLaneOpen.data.dark, false, 'one open branch is not zero capacity — and it is still only one, which the info line says')
+assert.equal(oneLaneOpen.data.capacity, 'partial')
+const halfAsked = execute({ operation: 'discoveryCapacity', asOf: methodology.asOf, input: { radar: radarNotDue } })
+assert.equal(halfAsked.data.lanes.mechanicalSweep, 'unstated', 'a lane nobody asked about is not a lane that was open — defaulting the unasked half to open would reproduce the failure')
+assert.ok(halfAsked.diagnostics.some((row) => row.code === 'discovery_lane_unstated'), 'and the run is told which half it never stated')
+
+/**
+ * The verifier issue #140 asks for by name: a run whose `coverage` came back
+ * `complete: null` carries that fact in its `DecisionProposal.uncertainty`.
+ * The marker is the diagnostic code verbatim rather than a phrase, because the
+ * prose beside it is written in the invocation's `language` — an English
+ * matcher would pass every Korean run for the wrong reason.
+ */
+const discoveryCases = ampProposals.cases.filter((fixture) => fixture.discovery)
+assert.ok(discoveryCases.length >= 2, 'the fixture carries both shapes: a run that swept, and a dark one')
+for (const fixture of discoveryCases) {
+  const carried = fixture.proposal.rationale.uncertainty ?? []
+  const disclosure = execute({ operation: 'discoveryCapacity', asOf: methodology.asOf, input: { ...fixture.discovery, uncertainty: carried } })
+  assert.notEqual(disclosure.status, 'blocked', `${fixture.name} states whatever discovery capacity it had`)
+  if (fixture.discovery.coverage.complete !== null) continue
+  assert.equal(disclosure.data.disclosed, true, `${fixture.name} had none, and its uncertainty says so`)
+  const undisclosed = execute({ operation: 'discoveryCapacity', asOf: methodology.asOf, input: { ...fixture.discovery, uncertainty: carried.filter((row) => !row.includes('discovery_lane_dark')) } })
+  assert.equal(undisclosed.status, 'blocked', 'and the same proposal with that entry removed is refused — a check that cannot fail is not one')
+  assert.ok(undisclosed.diagnostics.some((row) => row.code === 'discovery_lane_dark_undisclosed'), 'what is refused is the proposal that had no discovery and does not say so, never the run')
+}
+
+/**
+ * ── The question is asked whether or not the run thinks to ask it ──────────
+ *
+ * `coverage` says all of this and says it only when it is called. The run that
+ * measured #140 called it voluntarily; a run that did not would have produced
+ * no diagnostic and no `uncertainty` entry at all. `harnessAudit` is in every
+ * pre-flight, so it carries the question now — as a `warn`, because a book with
+ * no universe still has a sell side to manage.
+ */
+covers('audit/universe-undeclared-is-a-warn')
+const noUniverseAudit = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, universe: { scannerUniverses: [], extensions: [] } } })
+assert.ok(noUniverseAudit.data.issues.some((row) => row.code === 'audit_universe_undeclared' && row.severity === 'warn'), 'a run that declared no universe is told so by the pre-flight that runs every time')
+assert.equal(noUniverseAudit.data.clearToPlan, true, 'and it never blocks: a blocker here would stop a book trimming a position because nobody screened the market it is not buying in')
+assert.equal(noUniverseAudit.data.universeDeclared, false)
+const { universe: _declared, ...bookWithNoUniverseInput } = cleanBook
+const unaskedAudit = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: bookWithNoUniverseInput })
+assert.ok(
+  unaskedAudit.data.issues.some((row) => row.code === 'audit_universe_undeclared' && row.stated === false),
+  'a run that passed nothing has not declared something: an unasked question is not a denominator',
+)
+assert.equal(unaskedAudit.data.universeDeclared, null, 'and the two are told apart in the record rather than merged')
+assert.ok(
+  execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, universe: { scannerUniverses: [['AAA', 'BBB']] } } })
+    .data.issues.every((row) => row.code !== 'audit_universe_undeclared'),
+  'a declared universe raises nothing, so the warn means what it says',
+)
+
+/**
+ * ── The forcing points are documents too, because prose is what failed ─────
+ *
+ * The run's orchestrator wrote a narrow dispatch prompt and both flows did
+ * exactly what they were told; that much is the model's. What is checked here
+ * is that no document leaves the model's framing decisive — the pre-flight
+ * asks, the dispatch list says it, and each sleeve owns the step instead of
+ * pointing at one.
+ */
+covers('audit/discovery-is-instructed-not-inferred')
+assert.ok(/Eight things are checked/.test(promptText), 'the pre-flight table grew by the check whose absence nothing downstream discovers')
+assert.ok(promptText.includes('discoveryCapacity') && promptText.includes('discovery_lane_dark'), '§1b names the operation and the code a dark run carries')
+assert.ok(
+  /candidates come out of the sweep §3 defines/.test(promptProse),
+  'and it states the circularity: the step that would notice a missing universe sits downstream of it',
+)
+const dispatchList = orchestrateSkill.slice(orchestrateSkill.indexOf('## Dispatching a flow'), orchestrateSkill.indexOf('### ⚠️ Settle the web lane'))
+assert.ok(/declare the sleeve's universe and run the discovery sweep/i.test(dispatchList), 'the dispatch list carries the discovery instruction, in the prompt the flow actually reads')
+assert.ok(
+  /omit it and the run stops/i.test(dispatchList),
+  'with the reason it needs stating more than the other items rather than less: omitting discovery does not stop the run, it silently finds nothing',
+)
+for (const sleeve of ['kr-sleeve', 'us-sleeve']) {
+  const sleeveSkill = await readFile(new URL(`../skills/${sleeve}/SKILL.md`, fixtureRoot), 'utf8')
+  assert.ok(/^## Declare the .+ universe, this run, before you sweep anything$/m.test(sleeveSkill), `${sleeve} owns the declaration as a step of its own rather than a pointer`)
+  assert.ok(sleeveSkill.includes('`scannerUniverses`') && sleeveSkill.includes('`extensions`'), `${sleeve} names what it passes to coverage`)
+  assert.ok(/never fall back to the holdings/.test(sleeveSkill.replace(/\s+/g, ' ')), `${sleeve} refuses the substitute denominator rather than leaving it open`)
+}
 
 /**
  * ── Declared thresholds (issue #70 §12–§15) ────────────────────────────────

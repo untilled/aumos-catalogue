@@ -137,7 +137,31 @@ function atTimeInstant(watch) {
   return at
 }
 
-export function harnessAudit({ positions = [], watches = [], theses = [], decisions = [], gateStaleDays = GATE_STALE_DAYS, managedSince = null, config = {}, asOf } = {}) {
+/**
+ * What this run declared to sweep, whichever shape it was handed.
+ *
+ * ⚠️ **`null` and `0` are different answers and both are findings.** A run that
+ * passes nothing has not told this call whether it declared a universe, and a
+ * run that passes empty lists has told it there was none — but the *consequence*
+ * is identical, which is why they share one warn and are separated only in the
+ * detail. The pre-flight question is "is a discovery denominator standing", and
+ * an unanswered question is not a yes.
+ *
+ * Both shapes arrive because both already exist: `coverage`'s own arguments
+ * (`scannerUniverses`, `extensions`) are what a run declares, and
+ * `coverage`'s answer (`screenedUniverseCount`) is what it got back. Requiring
+ * one of them would make this the second place the universe has to be spelled.
+ */
+function screenedCount(universe) {
+  if (universe === null || universe === undefined) return null
+  if (Number.isFinite(universe?.screenedUniverseCount)) return universe.screenedUniverseCount
+  const scanners = Array.isArray(universe?.scannerUniverses) ? universe.scannerUniverses : []
+  const extensions = Array.isArray(universe?.extensions) ? universe.extensions : []
+  if (!Array.isArray(universe?.scannerUniverses) && !Array.isArray(universe?.extensions)) return null
+  return new Set([...extensions, ...scanners.flatMap((rows) => (Array.isArray(rows) ? rows : []))]).size
+}
+
+export function harnessAudit({ positions = [], watches = [], theses = [], decisions = [], universe = null, gateStaleDays = GATE_STALE_DAYS, managedSince = null, config = {}, asOf } = {}) {
   const diagnostics = []
   const issues = []
   const add = (severity, code, subject, message, detail = {}) => {
@@ -224,6 +248,42 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
     diagnostics.push(diagnostic('audit_managed_since_missing', 'unevaluated', 'Without the mandate effective date, a position inherited at cold start cannot be told from one bought since; both are carried and neither is expanded', 'managedSince', { unexplained }))
   }
 
+  /**
+   * ── Is a discovery denominator standing at all (issue #140) ─────────────
+   *
+   * ⚠️ **This is the one pre-flight finding whose absence nothing downstream
+   * discovers, and the circularity is why.** `PROMPT.md` §3 names the lens when
+   * there are candidates; candidates come out of the sweep §3 defines; the
+   * sweep needs a declared universe — so a missing universe is never found,
+   * because the only step that would notice it sits downstream of it. The six
+   * measured runs never reached §3 and never reported not reaching it.
+   *
+   * `coverage` says the same thing better, and says it only when it is called.
+   * That was the whole gap: the run that measured this called `coverage` of its
+   * own accord and got `universe_undeclared`; a run that did not would have
+   * produced no diagnostic and no `uncertainty` entry at all. `harnessAudit`
+   * runs in every pre-flight, so the question is asked here whether or not
+   * anybody thought to ask it.
+   *
+   * ⛔ **A `warn`, never a blocker, and this is not caution about severity.**
+   * An inherited book with no universe still has to be managed on the sell
+   * side, and every reduction available to it needs no universe at all. A
+   * blocker here would stop a book from trimming a position because nobody
+   * screened the market it is not buying in.
+   */
+  const screened = screenedCount(universe)
+  if (screened === null || screened === 0) {
+    add(
+      'warn',
+      'audit_universe_undeclared',
+      null,
+      screened === null
+        ? 'Nothing says whether this run declared a discovery universe; an unasked question is not a denominator, and the sweep §3 defines cannot report its own absence'
+        : 'This run declared no discovery universe, so the mechanical sweep has nothing to sweep and coverage has nothing to be complete over; sell-side management continues',
+      { stated: screened !== null, screenedUniverseCount: screened },
+    )
+  }
+
   const blockers = issues.filter((row) => row.severity === 'blocker')
   /**
    * ⛔ New exposure **to these names** waits for the explanation; reducing risk
@@ -250,6 +310,8 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
       grandfathered,
       unexplained,
       managedSince: managedFrom,
+      universeDeclared: screened === null ? null : screened > 0,
+      screenedUniverseCount: screened,
       blocksExpansionOf,
       riskReducingAlwaysAllowed: true,
       meaning: 'a blocker stops planning, never reporting — say what is broken and WAIT; a warn is carried, and reducing risk is never blocked',
