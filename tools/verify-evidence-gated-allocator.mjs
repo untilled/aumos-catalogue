@@ -1681,6 +1681,99 @@ assert.equal(
 )
 
 /**
+ * ── Parked liquidity is not a loss path (issue #141) ───────────────────────
+ *
+ * The reported shape, at the reported numbers. `concentration` took
+ * `parkedLiquidity` on every row and read it nowhere, so the KRW parking
+ * symbol at 0.27052 was summed onto `krw-currency` like a bet and filled a
+ * 0.15 factor budget to 0.31258 by itself. Every won-denominated name was then
+ * `concentration_breach_expanded` — refused not because the book was
+ * concentrated but because its **cash** was denominated, by a country
+ * allocation cap the Mandate never declared.
+ *
+ * ⛔ The pair that pins the boundary is the last two cases: the same flag that
+ * takes the row off sector, theme, factor and heat leaves it on `position`,
+ * which is the Mandate's `maxPositionWeight`. Configuration and classification
+ * in this package may only ever be stricter than the Mandate, and a run that
+ * reads a liquidity label as permission to size past that cap is the one
+ * `skills/us-sleeve` records.
+ */
+covers('sizing/parked-liquidity-is-not-a-loss-path')
+const krwCaps = { position: 0.2, sector: 0.2, theme: 0.15, factor: 0.15, portfolioHeat: 0.06 }
+const parkedBook = [
+  { symbol: '153130', weight: 0.27052, parkedLiquidity: true, factors: ['krw-currency', 'ultra-short-duration'], sector: 'fixed-income', themes: ['parking'] },
+  { symbol: '069500', weight: 0.04206, core: true, factors: ['krw-currency', 'kr-equity-beta'], sector: 'index' },
+]
+const newKoreanName = { symbol: '036460', weight: 0.0134, factors: ['krw-currency', 'kr-equity-beta'], sector: 'utilities', stopLossPct: 0.12 }
+const parkedOnly = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: parkedBook, caps: krwCaps } })
+assert.equal(parkedOnly.data.exposures.factor['krw-currency'], 0.04206, 'the parking symbol spends none of the factor budget; what is left on the axis is the ETF that is actually in the market')
+assert.equal(parkedOnly.data.exposures.sector['fixed-income'], undefined, 'and none of a sector budget either — a cash equivalent is on no shared loss path')
+assert.deepEqual(parkedOnly.data.parkedLiquidityExcluded, ['153130'], 'and the exemption is named in the response rather than applied silently')
+const addingAKoreanName = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: parkedBook, proposed: [newKoreanName], caps: krwCaps } })
+assert.equal(addingAKoreanName.data.exposures.factor['krw-currency'], 0.05546, 'so an experiment-sized new Korean name lands far under the cap instead of at 0.32598')
+assert.equal(addingAKoreanName.diagnostics.some((row) => row.code === 'concentration_breach_expanded'), false, 'and nothing refuses it: the axis the book carried above its cap was the parking symbol, and it was never on that axis')
+assert.notEqual(addingAKoreanName.status, 'blocked')
+assert.equal(addingAKoreanName.data.heat.withProposed, 0.001608, 'parked liquidity carries no stop and contributes no heat — the prose said so before the code did')
+assert.equal(
+  addingAKoreanName.diagnostics.some((row) => row.code === 'portfolio_heat_stop_missing' && row.details?.symbol === '153130'),
+  false,
+  'and the gate stops asking how much the cash can lose, which it asked every run',
+)
+assert.deepEqual(
+  addingAKoreanName.data.breaches.map((row) => [row.kind, row.key, row.grandfathered]),
+  [['position', '153130', true]],
+  '⛔ and the one breach that remains is the Mandate\'s position cap on that same symbol: the exemption is from this package\'s shared-loss-path caps, never from an investor declaration',
+)
+assert.ok(addingAKoreanName.diagnostics.some((row) => row.code === 'concentration_grandfathered'), 'it is carried and reported every run, exactly as it was')
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: parkedBook, proposed: [{ ...parkedBook[0], weight: 0.3 }], caps: krwCaps } }).status,
+  'blocked',
+  'and growing it is still refused — parked liquidity is a classification, never a way to size past maxPositionWeight',
+)
+
+/**
+ * ── A factor label at twice its cap is a question about the label (#141) ───
+ *
+ * The package ships no factor taxonomy on purpose — what counts as one shared
+ * loss path is a judgement about the book — and the cost is that a string one
+ * run invented becomes a permanent allocation cap that nothing re-examines.
+ * ⛔ It never blocks: the label may be right, and a gate that refused a book
+ * for the *name* of its risk would be making the allocation decision this is
+ * asking about.
+ */
+covers('sizing/factor-label-unexamined')
+const inventedLabel = execute({
+  operation: 'concentration',
+  asOf: methodology.asOf,
+  input: {
+    positions: [
+      { symbol: 'AAA', weight: 0.2, factors: ['krw-currency'], stopLossPct: 0.05 },
+      { symbol: 'BBB', weight: 0.15, factors: ['krw-currency'], stopLossPct: 0.05 },
+    ],
+    caps: { ...krwCaps, position: 0.3, portfolioHeat: 0.5 },
+  },
+})
+const labelQuestion = inventedLabel.diagnostics.find((row) => row.code === 'concentration_factor_label_unexamined')
+assert.ok(labelQuestion, 'a single label at 0.35 against a 0.15 cap is asked about')
+assert.equal(labelQuestion.severity, 'unevaluated')
+assert.equal(labelQuestion.path, 'factors', 'and it points at the row field that carries the claim, not at the cap — the number is not what is in doubt')
+assert.equal(labelQuestion.details.multipleOfCap, 2.33)
+assert.ok(labelQuestion.message.includes('a denomination is not a loss path'), 'and the counterexample is in the message, in the same words config.schema.json uses')
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'AAA', weight: 0.2, factors: ['ai-capex'], stopLossPct: 0.05 }], caps: { ...krwCaps, position: 0.3, portfolioHeat: 0.5 } } })
+    .diagnostics.some((row) => row.code === 'concentration_factor_label_unexamined'),
+  false,
+  'an ordinary breach at 1.33x is not asked about — concentration_breach already says it, and a doubt raised on every breach is tuned out',
+)
+assert.equal(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'AAA', weight: 0.4, factors: ['krw-currency'] }], caps: { position: 0.5, sector: 0.5, theme: 0.5 } } })
+    .diagnostics.some((row) => row.code === 'concentration_factor_label_unexamined'),
+  false,
+  'and with no factor cap declared there is no multiple to be twice of; that is concentration_cap_missing and stays it',
+)
+assert.equal(METHODOLOGY.factorLabelReviewMultiple, 2, 'the multiple is a package constant, not a setting: it is a claim about when a label stops being a measurement')
+
+/**
  * Pacing warns and never blocks. (approved 2026-07-10, P5)
  */
 covers('audit/new-single-pacing')

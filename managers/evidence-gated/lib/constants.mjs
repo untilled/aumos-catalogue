@@ -54,6 +54,27 @@ export const METHODOLOGY = Object.freeze({
    * three cannot come to disagree about what the tolerance is.
    */
   grandfather: Object.freeze({ enabled: true, blocksNewNonCoreWhenBreached: true }),
+  /**
+   * The multiple of its own cap at which a single factor label stops being a
+   * measurement and becomes a question about the label. (#141)
+   *
+   * This package ships no factor taxonomy, for the same reason it ships no
+   * universe: what counts as one shared loss path is a judgement about the
+   * book, and a list frozen here would be this methodology asserting one. The
+   * cost is that a string a run invented becomes a permanent allocation cap,
+   * carried forward in Brief prose, and nothing ever looks at it again —
+   * `krw-currency` was one, and it stood at 2.08× its cap.
+   *
+   * ⚠️ **2 is chosen because a lower number would fire on a book that is
+   * merely concentrated, and that is already said.** An axis at 1.2× its cap
+   * is a breach, and `concentration_breach` reports it as one; asking *"is
+   * this label real"* there would put a doubt about the taxonomy on top of
+   * every ordinary breach and be tuned out within a run or two. At twice the
+   * budget the arithmetic no longer reads as a book that drifted over a limit
+   * — a cap nobody could have been operating under is far more often a label
+   * that catches more than a loss path does.
+   */
+  factorLabelReviewMultiple: 2,
   /** Days after `asOf` an undeclared WATCH expiry is derived at. */
   watchExpiryDays: 30,
   /**

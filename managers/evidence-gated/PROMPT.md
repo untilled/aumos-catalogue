@@ -419,6 +419,13 @@ Mandate's** — `mandate.constraints.maxPositionWeight` is `caps.position` and `
 and `mandate.constraints.maxDrawdown` is `caps.portfolioHeat`. Neither is a config key: one axis
 declared twice in two numbers only ever tells a run which number to believe by accident. On top of
 them apply the configured sector/theme/factor thresholds, which may be stricter and never looser.
+⚠️ **Mark a cash-equivalent holding `parkedLiquidity: true` on the row.** Those three axes and heat
+measure a shared loss path, and parked cash is on none — unmarked, the parking symbol spends a
+factor budget it cannot lose money to and refuses every other name denominated the same way. ⛔ It
+never comes off `caps.position`: that one is the Mandate's, and a classification in this package is
+never an exemption from an investor declaration. ⚠️ A `factors` label is a claim that several
+holdings die together; **a denomination is not a loss path**, and a label standing at twice its cap
+is returned as `concentration_factor_label_unexamined` for this run to answer, not to size around.
 ⛔ **A cap the Mandate does not declare is `unevaluated`, and that is not a pass** — say so in
 `uncertainty` rather than sizing as though the limit were absent.
 `targetWeight` is never negative. An `insufficient` or `observing`

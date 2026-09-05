@@ -21,9 +21,22 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    candidate does not. A factor is a shared loss path that crosses sectors — declare it on the row as
    `factors` so a cross-sector complex cannot pass under a sector cap. An axis whose cap nobody
    declared — in the Mandate or in configuration — comes back unevaluated, never as a pass.
+   ⚠️ **A denomination is not a loss path.** The currency a name is quoted in, its venue and that
+   venue's country are not factors; labelling one turns this cap into a country allocation decision
+   the Mandate never made. A label at twice its cap comes back
+   `concentration_factor_label_unexamined` — a question to answer in the report, never a block.
 3. Apply the configured sector, theme and factor caps on top of the Mandate's. Configuration may
    be stricter than the Mandate and never looser. If classification is uncertain, use the more
-   conservative applicable bucket and disclose it.
+   conservative applicable bucket and disclose it. ⚠️ **Declare `parkedLiquidity: true` on a row
+   held as a cash equivalent, and it leaves these three axes** — a parking symbol is held to be
+   *out* of the market, so it is on no shared loss path and spends none of a sector, theme or
+   factor budget. `concentration` names what it excluded in `parkedLiquidityExcluded`.
+   ⛔ **It does not leave the position axis, and no classification ever will.** `maxPositionWeight`
+   is the Mandate's, the Kernel refuses a proposal over it, and this package can only be stricter
+   than the Mandate — a parking symbol above it is a breach, grandfathered and reported like any
+   other. A run that read a liquidity label as permission to size past that cap is what
+   `skills/us-sleeve` records: parked liquidity is a classification, never an exemption from an
+   investor declaration.
 3a. Pass current holdings as `positions` and this run's targets as `proposed`. ⚠️ **`proposed` is
    the target state for the symbols it names, not an increment**: a row for a symbol already held
    *replaces* that holding, and a symbol nobody names keeps the weight it has. That is how a TRIM
@@ -38,9 +51,11 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    inversion #109 recorded: the audit's answer to an over-cap position was *do not plan*.
 3b. Apply portfolio heat — total loss if every stop fired at once, capped at the Mandate's
    `maxDrawdown`. Weight caps do not measure it: two books with identical weights
-   have different heat when their stops sit in different places. Declare `stopLossPct` and `core` on
-   each row; core DCA and parked liquidity carry no stop and are excluded, and a non-core row with no
-   declared stop is unevaluated rather than zero risk. Over the cap, a run that adds new non-core risk
+   have different heat when their stops sit in different places. Declare `stopLossPct`, `core` and
+   `parkedLiquidity` on each row; core DCA and parked liquidity carry no stop and are excluded — the
+   flag has to be on the row, or the parking symbol comes back `portfolio_heat_stop_missing` every
+   run for a stop it can never have — and a non-core row with no declared stop is unevaluated rather
+   than zero risk. Over the cap, a run that adds new non-core risk
    is blocked while a book already over on its holdings alone warns — the same grandfathering
    reading the weight caps use, from the same place.
 4. Apply evidence maturity. `insufficient` and `observing` lenses are capped at the experimental
