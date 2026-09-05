@@ -267,6 +267,26 @@ fixture asserts the difference so it cannot be undone silently.
   touched level **submits a `WAIT`**: one that says it was woken, what it found, what still
   needs a closed bar, and what it re-armed. Staying silent is available in mechanism and is
   scored as a crash.
+- **The cap that binds is not the cap the investor declared, and promotion is a multi-year
+  wait.** While a lens is unpromoted every single name is held to the experimental ceiling
+  and, in the control arm, to 1% — so a declared `maxPositionWeight` of 0.20 operates at
+  0.01. `effectivePositionCap` computes that comparison and every applying run discloses it
+  (`position_cap_reduced_by_maturity`), which closes the asymmetry against
+  `concentration_cap_missing`; what it does not do is shorten the wait.
+  `promotionGate` wants 30 samples, 10 clusters and **3 regimes**, and only the first two
+  respond to a higher candidate rate — a regime turns on the calendar. Two consequences are
+  stated rather than hidden: for that period the book is in practice an ETF allocator with a
+  bounded experiment beside it (`README.md` says so before installation), and whether an
+  intermediate rung should exist between 1% and full promotion is an open methodology
+  question this revision deliberately does not answer.
+  ([#151](https://github.com/untilled/aumos-catalogue/issues/151))
+- **A venue floor can close the control arm outright.** `experimentalPositionFloor` is the
+  smallest order worth placing in a venue, and on a small book it can exceed the lane's
+  own 1% cell — USD 200 against USD 148.66 on a USD 14,866.44 book — after which no US name
+  enters that lane at any share price. `experimental_floor_exceeds_cap` names it and carries
+  the resolving NAV. It is the middle of three nested readings of the same floor;
+  `experimental_floor_unreachable` is wider and #149's `experimental_ladder_unreachable` is
+  narrower, and the outermost that fires is the one to act on.
 - Source vendors relay their own response shapes; this manager, not Aumos, checks dates
   and freshness.
 - CLI web observations are not replay-canonical Evidence.
