@@ -172,11 +172,14 @@ silent omission needs stating *more* than a loud one, not less.
 So every dispatch prompt carries this, adjusted to the flow's markets:
 
 ```
-Declare this sleeve's universe for this run before any sweep — enumerate the market from
-the vendor listing route, screen it, add the theme-radar extensions, and pass both to
+Declare this sleeve's universe for this run before any sweep — call researchUniverse for
+the curated seed, verify current listing eligibility, add persisted research extensions, and pass both to
 `coverage` (`scannerUniverses`, `extensions`) and to `harnessAudit` (`universe`).
-Then run the price-pattern sweep over it. If you could not enumerate, you have no
-universe: say so in `uncertainty` and never substitute the holdings for one.
+Collect dated filings, catalysts and events, then run both the price-pattern sweep and upsideRadar.
+Scan holdings' news/disclosures through granted web and installed filing sources every cycle.
+Return researchActivity ({source, granted, attempts, succeeded}) and each radar lane's exclusions
+and starvation. Persist the roster/Evidence references with researchState. If the roster cannot
+be read or eligibility cannot be checked, report that scope gap in uncertainty; never substitute holdings.
 ```
 
 ⚠️ **A narrow `task` is not a narrow mandate, and this is where the failure was yours.** The run
@@ -217,6 +220,10 @@ prompt, and the run's only discovery lane closed for it.
 
 A flow returns Evidence ids, proposed targets and its own `uncertainty`. Treat it as a
 **proposal to you**, not a decision:
+
+Collect each flow's `researchActivity` and radar lane coverage. Rerun `harnessAudit` with the
+actual route activity before submitting; carry `lane_not_queried`, `lane_query_failed`,
+`audit_research_unverified` and `radar_lane_starved` into the final uncertainty where applicable.
 
 - ⚠️ **An Evidence id you cannot find in this run's own reads is not usable.** Only what the
   gateway observed is a record. A flow that names a figure without an id has given you prose,

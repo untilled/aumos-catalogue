@@ -372,7 +372,7 @@ export function resolveWakeFlow({ summary, intent, watchId } = {}) {
  * nothing in either saying which one read the close. That is the state #87
  * existed to remove.
  *
- * So the manager writes down what it armed. Three rows, replaced every run rather
+ * So the manager writes down what the journal confirms it armed. Rows are replaced every run rather
  * than appended to, in the same shape `run/watch-alerts` uses for the same
  * reason (#88): a key that grows is the ledger `memory-contract` forbids.
  *
@@ -422,7 +422,7 @@ const armedKey = (row) => {
   return instant === null ? null : `${row?.flow}|${instant}`
 }
 
-export function reconcileArmedReviews({ previous = null, sequence = [], armed: misplacedArmed, asOf } = {}) {
+export function reconcileArmedReviews({ previous = null, sequence = [], journalArmed = null, armed: misplacedArmed, asOf } = {}) {
   const diagnostics = []
   /**
    * ⛔ **The record arrives under `previous`, and a run that passed it at the
@@ -439,7 +439,19 @@ export function reconcileArmedReviews({ previous = null, sequence = [], armed: m
   if (misplacedArmed !== undefined) {
     diagnostics.push(diagnostic('armed_state_misplaced', 'blocked', 'The standing arms arrive as `previous` — the whole value read from `run/armed-reviews` — not as a top-level `armed`. Read at the top level they are invisible, and every standing review is re-armed', 'armed', { received: Array.isArray(misplacedArmed) ? misplacedArmed.length : null }))
   }
-  const recorded = Array.isArray(previous?.armed) ? previous.armed : []
+  const remembered = Array.isArray(previous?.armed) ? previous.armed : []
+  for (const [index, row] of [...remembered, ...sequence, ...(journalArmed ?? [])].entries()) {
+    const instant = armedInstant(row)
+    const label = typeof row?.atLabel === 'string' ? row.atLabel.replace(/(\d{2})h(\d{2})m(\d{2})s UTC$/, '$1:$2:$3Z').replace(' ', 'T') : null
+    if (!DISPATCHABLE_FLOWS.includes(row?.flow) || !Number.isSafeInteger(instant) || !Number.isFinite(new Date(instant).getTime()) || (row?.atLabel !== undefined && Date.parse(label) !== instant) || (row?.at && Date.parse(row.at) !== instant)) {
+      diagnostics.push(diagnostic('armed_instant_mismatch', 'blocked', 'Review epoch and human-readable instant must agree; never repair an epoch by hand', `reviews[${index}]`))
+    }
+  }
+  // Only host journal receipts attest to arming. A planned sequence is not a receipt.
+  const recorded = Array.isArray(journalArmed) ? journalArmed : []
+  if (journalArmed === null && remembered.length) diagnostics.push(diagnostic('armed_journal_unverified', 'unevaluated', 'Memory alone cannot suppress a review; read actual decisions[].armed from the host journal', 'journalArmed'))
+  const phantom = remembered.filter((row) => !recorded.some((receipt) => armedKey(receipt) === armedKey(row)))
+  if (Array.isArray(journalArmed) && phantom.length) diagnostics.push(diagnostic('armed_journal_mismatch', 'unevaluated', 'Memory claims arms absent from the host journal; journal wins and these rows do not suppress toArm', 'previous.armed', { phantom }))
   const stillOpen = recorded.filter((row) => {
     const instant = armedInstant(row)
     return instant !== null && instant > Date.parse(asOf)
@@ -468,11 +480,12 @@ export function reconcileArmedReviews({ previous = null, sequence = [], armed: m
    * the next run re-armed all three. A review does not stop standing because
    * this run had no reason to mention it; it stops standing when it fires.
    *
-   * So the state is the union: everything still open, plus everything armed
-   * now. A row leaves it by its instant passing, and by nothing else.
+   * Since #148 the host journal is authoritative: only confirmed, still-open
+   * receipts survive. Proposed rows stay pending until submission is confirmed.
+   * A phantom memory row is removed even if its instant has not passed.
    */
   const nextArmed = []
-  for (const row of [...stillOpen, ...toArm]) {
+  for (const row of stillOpen) {
     const instant = armedInstant(row)
     if (instant === null) continue
     if (nextArmed.some((kept) => kept.flow === row.flow && kept.atEpochMs === instant)) continue
@@ -493,7 +506,9 @@ export function reconcileArmedReviews({ previous = null, sequence = [], armed: m
       duplicateFlows: duplicates,
       superseded,
       stillOpen,
-      nextState: {
+      pending: toArm,
+      persistenceRequiresJournal: true,
+      nextState: diagnostics.some((row) => row.severity === 'blocked') ? null : {
         schemaVersion: 2,
         updatedAsOf: asOf ?? null,
         armed: nextArmed,

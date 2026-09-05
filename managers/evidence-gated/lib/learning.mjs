@@ -36,15 +36,7 @@ import { METHODOLOGY } from './constants.mjs'
  * oversold scanners. Beating the index is not the bar; beating the index *and*
  * the bot is.
  */
-const SETUP_COHORTS = {
-  thesis_call: 'llm-research',
-  thesis_watch: 'llm-research',
-  thesis_rejected: 'llm-research',
-  rs_leader_pullback: 'mechanical-baseline',
-  rs_breakout: 'mechanical-baseline',
-  mean_reversion: 'mechanical-baseline',
-  trend_pullback: 'mechanical-baseline',
-}
+import { PAPER_SETUP_COHORTS as SETUP_COHORTS } from './input-contracts.mjs'
 
 /**
  * The challenge verdict decides the setup, and there is exactly one mapping.
@@ -320,6 +312,10 @@ export function signalPaper({ rows = [], state = {}, admissions = [], horizons =
   const priorWindows = state?.openWindows ?? []
   const matured = []
   for (const [index, row] of rows.entries()) {
+    if (typeof row?.symbol !== 'string' || !row.symbol || !Number.isFinite(Date.parse(row?.signalAt))) {
+      diagnostics.push(diagnostic('paper_row_metadata_missing', 'blocked', 'A paper row needs symbol and signalAt copied from its registered window', `rows[${index}]`))
+      continue
+    }
     if (!SETUP_COHORTS[row?.setup]) {
       diagnostics.push(diagnostic('paper_setup_unknown', 'blocked', 'Every paper row names a published setup', `rows[${index}].setup`, { setup: row?.setup ?? null }))
       continue
@@ -469,7 +465,7 @@ export function signalPaper({ rows = [], state = {}, admissions = [], horizons =
       bySetup: summarize(bySetup),
       byCohort: summarize(byCohort),
       ruleVersions: versions,
-      nextState: { schemaVersion: 1, updatedAsOf: asOf ?? null, closed, openWindows, maturedThisRun: matured },
+      nextState: diagnostics.some((row) => row.severity === 'blocked') ? null : { schemaVersion: 1, updatedAsOf: asOf ?? null, closed, openWindows, maturedThisRun: matured },
       openWindowCount: openWindows.length,
       maturedThisRun: matured,
       registeredThisRun: registered,

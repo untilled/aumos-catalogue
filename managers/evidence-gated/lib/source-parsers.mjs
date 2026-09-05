@@ -202,7 +202,7 @@ export function normalizeSecSubmissions(payload, asOf) {
 
 const WEB_RESEARCH_INTENTS = new Set(['theme-radar', 'variant-view', 'consensus-difference', 'policy-macro'])
 
-export function laneCoverage({ lane, sources = {}, intent = 'review' }) {
+export function laneCoverage({ lane, sources = {}, intent = 'review', activity = null }) {
   const diagnostics = []
   const rules = {
     kr: { fundamental: ['toss', 'open-dart'], price: ['toss'], research: ['web'] },
@@ -225,10 +225,18 @@ export function laneCoverage({ lane, sources = {}, intent = 'review' }) {
       : WEB_RESEARCH_INTENTS.has(intent)
         ? 'research'
         : 'price'
-  const required = rules[lane]?.[category] ?? []
+  const available = (source) => ['fresh', 'available'].includes(sources[source]?.status)
+  const researchFallback = ['news', 'corporate-actions', 'consensus', 'holding-news'].includes(intent)
+  const webFallback = !available('alpaca') && available('web')
+  const required = researchFallback ? [lane === 'kr' || intent === 'consensus' || webFallback ? 'web' : 'alpaca'] : [...(rules[lane]?.[category] ?? [])]
+  if (category === 'fundamental' && lane === 'us' && webFallback) required.splice(required.indexOf('alpaca'), 1, 'web')
   const unavailable = required.filter((source) => !['fresh', 'available'].includes(sources[source]?.status))
   if (unavailable.length) diagnostics.push(diagnostic('lane_source_blocked', category === 'price' && intent === 'review' ? 'unevaluated' : 'blocked', 'Required source is missing or stale for this lane and intent', 'sources', { lane, intent, unavailable }))
-  return { data: { lane, intent, required, unavailable, judgement: unavailable.length ? 'unable' : 'reviewable', action: unavailable.length ? 'WAIT' : 'CONTINUE' }, diagnostics }
+  const unqueried = activity === null ? [] : required.filter((source) => available(source) && !(activity[source]?.attempts > 0))
+  if (unqueried.length) diagnostics.push(diagnostic('lane_not_queried', 'unevaluated', 'The lane was granted but was not queried; this is not source absence', 'activity', { unqueried }))
+  const failed = activity === null ? [] : required.filter((source) => activity[source]?.attempts > 0 && activity[source]?.succeeded !== true)
+  if (failed.length) diagnostics.push(diagnostic('lane_query_failed', 'unevaluated', 'The lane was queried but no usable response was obtained', 'activity', { failed }))
+  return { data: { lane, intent, required, unavailable, unqueried, failed, degradesTo: required.includes('web') && webFallback ? 'web' : null, judgement: unavailable.length ? 'unable' : unqueried.length || failed.length ? 'unevaluated' : 'reviewable', action: unavailable.length || unqueried.length || failed.length ? 'WAIT' : 'CONTINUE' }, diagnostics }
 }
 
 export function validateAdjustment(series, corporateActions = []) {

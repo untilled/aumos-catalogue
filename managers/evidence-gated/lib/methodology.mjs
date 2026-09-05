@@ -176,6 +176,7 @@ export function validateThesis(input) {
 
 export function thesisSentinel({ invalidations = [], evidence = [], priorVerdicts = [] }) {
   const diagnostics = []
+  if (!invalidations.length) diagnostics.push(diagnostic('sentinel_rules_missing', 'unevaluated', 'No invalidation was evaluated; an empty rule set cannot establish an intact thesis', 'invalidations'))
   const evidenceById = new Map(evidence.map((row) => [row.id, row]))
   const evaluations = invalidations.map((rule, index) => {
     const observation = evidenceById.get(rule.evidenceId)
@@ -187,11 +188,11 @@ export function thesisSentinel({ invalidations = [], evidence = [], priorVerdict
     if (rule.kind === 'price_below' && finite(observation.value) && finite(rule.level)) met = observation.value < rule.level
     else if (rule.kind === 'price_above' && finite(observation.value) && finite(rule.level)) met = observation.value > rule.level
     else if (rule.kind === 'metric' && finite(observation.value) && finite(rule.level)) met = rule.operator === 'above' ? observation.value > rule.level : observation.value < rule.level
-    else if (rule.kind === 'time' && observation.availableAt) met = Date.parse(observation.availableAt) >= Date.parse(rule.at)
+    else if (rule.kind === 'time' && Number.isFinite(Date.parse(observation.availableAt)) && Number.isFinite(Date.parse(rule.at))) met = Date.parse(observation.availableAt) >= Date.parse(rule.at)
     if (met === null) diagnostics.push(diagnostic('sentinel_rule_unevaluated', 'unevaluated', 'Rule and evidence are not comparable', `invalidations[${index}]`))
     return { id: rule.id ?? `rule-${index}`, state: met === null ? 'unevaluated' : met ? 'met' : 'not-met', evidenceId: observation.id }
   })
-  const verdict = evaluations.some((row) => row.state === 'met') ? 'threatened' : evaluations.some((row) => row.state === 'unevaluated') ? 'watch' : 'intact'
+  const verdict = !evaluations.length ? 'unevaluated' : evaluations.some((row) => row.state === 'met') ? 'threatened' : evaluations.some((row) => row.state === 'unevaluated') ? 'watch' : 'intact'
   let consecutiveThreatened = 0
   for (const row of [...priorVerdicts].sort((a, b) => Date.parse(b.asOf) - Date.parse(a.asOf))) {
     if (row.verdict !== 'threatened') break
@@ -327,8 +328,8 @@ export function upsideRadar({ candidates = [], asOf }) {
     const reasons = {}
     for (const verdict of excluded) reasons[verdict.reason] = (reasons[verdict.reason] ?? 0) + 1
     const dominant = Object.entries(reasons).sort((a, b) => b[1] - a[1])[0] ?? null
-    const starved = Boolean(dominant && rows.length && dominant[1] / rows.length >= 0.8 && /no-valid-point-in-time-filing|no-catalyst-registered|no-event-in-the-last-30-days/.test(dominant[0]))
-    if (starved) diagnostics.push(diagnostic('radar_lane_starved', 'unevaluated', 'This lane excluded almost every candidate for one missing input; it is unfed rather than empty', 'candidates', { lane, reason: dominant[0], of: rows.length }))
+    const starved = rows.length === 0 || Boolean(dominant && dominant[1] / rows.length >= 0.8 && /no-valid-point-in-time-filing|no-catalyst-registered|no-event-in-the-last-30-days/.test(dominant[0]))
+    if (starved) diagnostics.push(diagnostic('radar_lane_starved', 'unevaluated', 'This lane received no candidates or excluded almost every candidate for missing input; it is unfed rather than empty', 'candidates', { lane, reason: dominant?.[0] ?? 'no-candidates-supplied', of: rows.length }))
     return [lane, { ruleVersion: RADAR_LANES[lane], included: verdicts.length - excluded.length, excluded: excluded.length, reasons, starved }]
   }))
   return { data: { ranked, unranked: rows.filter((row) => !row.eligible), lanes: laneCoverage, branch: 'fundamental-and-event', rankMeaning: 'research-priority-only' }, diagnostics }

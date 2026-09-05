@@ -5,6 +5,13 @@ description: Run versioned scanner, sizing, coverage, evidence, calibration, att
 
 # Deterministic metrics
 
+Call `inputContracts` to read strict input keys and operation-specific vocabulary before composing
+calls. Unknown keys in the guarded operations are blocked. `thesisSentinel` uses snake_case
+`price_below`, `price_above`, `metric`, `time`; thesis/WATCH triggers have a different wire shape.
+`concentration` accepts `themes: []`, `exitCheck` accepts a scalar `price`, and `globalAllocation`
+accepts `targets: [{key, weight}]`. Empty sentinel rules yield `unevaluated`, never `intact`.
+A blocked stateful calculation returns no writable `nextState`; retain the old memory revision.
+
 In an Aumos run, call `mcp__evidence-gated-metrics__calculate` whenever a supported quantitative
 result affects a Decision. It exposes the same deterministic core without interactive Bash approval.
 Do not recalculate the same algorithm in prose.
@@ -49,6 +56,9 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `sleeveNav` | KRW/USD/SGOV net asset value and the FX that joins them |
 | `targetWeight` | desired portfolio weight under maturity and caps |
 | `experimentalCeiling` | the ceiling an unpromoted lens is held to — the ratio or the venue's minimum executable amount, whichever is larger, bounded |
+| `inputContracts` | guarded operation keys and evaluator vocabulary |
+| `researchUniverse` | pinned KR/US curated roster plus dated, evidenced extensions; current eligibility must be checked |
+| `researchState` | bounded research roster and Evidence references; no source payload cache |
 | `legacySizeSuggestion` | the ported Kelly-gated heuristic and its mode label |
 | `concentration` | position/sector/theme/factor caps and portfolio heat |
 | `newSinglePacing` | three approved pacing warnings; never blocks |

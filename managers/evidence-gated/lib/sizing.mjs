@@ -564,7 +564,8 @@ export function globalAllocation({ targets = [], availableWeight = 1, currentWei
   const keys = new Set()
   let allocated = 0
   for (const [index, target] of targets.entries()) {
-    if (!target?.key || keys.has(target.key)) diagnostics.push(diagnostic('global_target_duplicate', 'blocked', 'Each sleeve/cash target must be unique', `targets[${index}].key`))
+    if (typeof target?.key !== 'string' || !target.key) diagnostics.push(diagnostic('global_target_key_missing', 'blocked', 'Each target needs a string key and numeric weight', `targets[${index}].key`))
+    else if (keys.has(target.key)) diagnostics.push(diagnostic('global_target_duplicate', 'blocked', 'Each sleeve/cash target must be unique', `targets[${index}].key`))
     else keys.add(target.key)
     if (!finite(target?.weight) || target.weight < 0) diagnostics.push(diagnostic('global_target_invalid', 'blocked', 'Target weight must be non-negative', `targets[${index}].weight`))
     else allocated += target.weight
@@ -651,11 +652,23 @@ export const SINGLE_NAME_TRANCHES = {
 /** A tranche waits on a date or on a price. `immediate` is the one that does not wait. */
 const TRANCHE_CONDITION_KINDS = new Set(['immediate', 'at-time', 'price-below', 'price-above'])
 
-export function entryTranchePlan({ symbol = null, lens = null, maturity = null, price, plannedTotalWeight = null, tranches = [], asOf } = {}) {
+export function entryTranchePlan({ symbol = null, lens = null, maturity = null, price, plannedTotalWeight = null, tranches = [], execution = null, asOf } = {}) {
   const diagnostics = []
   const findings = []
   const add = (kind, label, message, detail = {}) => findings.push({ kind, symbol, label, message, ...detail })
   const asOfInstant = Date.parse(asOf)
+  if (SINGLE_NAME_TRANCHES.stagingRequiredMaturities.includes(maturity)) {
+    if (!execution || !finite(execution.portfolioNav) || execution.portfolioNav <= 0 || !finite(execution.lotSize) || execution.lotSize <= 0 || !execution.positionCurrency || execution.portfolioNavCurrency !== execution.positionCurrency || !finite(price) || price <= 0 || !finite(plannedTotalWeight) || plannedTotalWeight <= 0) {
+      diagnostics.push(diagnostic('experimental_ladder_unevaluated', 'unevaluated', 'Ladder executability needs positive price, final capped weight, broker lotSize and portfolioNav expressed in positionCurrency', 'execution'))
+    } else {
+      const budget = plannedTotalWeight * execution.portfolioNav
+      const minimum = price * execution.lotSize * SINGLE_NAME_TRANCHES.planned
+      if (budget + 1e-6 < minimum) diagnostics.push(diagnostic('experimental_ladder_unreachable', 'blocked', 'The capped position cannot fund one executable lot per rung; do not enlarge the cap or describe this as gate-passing paper selection', 'plannedTotalWeight', { budget, minimum, lotSize: execution.lotSize, price, requiredRungs: SINGLE_NAME_TRANCHES.planned }))
+      for (const [index, row] of tranches.entries()) {
+        if (finite(row.weight) && row.weight * execution.portfolioNav + 1e-6 < price * execution.lotSize) diagnostics.push(diagnostic('tranche_below_minimum_lot', 'blocked', 'This rung cannot buy one executable lot at the observed price', `tranches[${index}].weight`))
+      }
+    }
+  }
 
   /**
    * The lane separation, as a refusal rather than a sentence. A cash
