@@ -205,7 +205,7 @@ ledger, credential, network, database or order access.
 | | |
 |---|---|
 | **Markets** | Korean and US equities, ETFs and cash. Long-only |
-| **Connections and data sources** | a complete US single-name lane links Toss and Alpaca to this fund and installs `sec-edgar`. A complete Korean single-name fundamental lane additionally requires `open-dart`, published in this catalogue alongside this package. `openbb-fmp` is optional and only supplements long price history |
+| **Connections and data sources** | the US single-name lane links Toss and installs `sec-edgar`; Alpaca supplies news/actions, with granted web research as fallback. A complete Korean single-name fundamental lane additionally requires `open-dart`, published in this catalogue alongside this package. `openbb-fmp` is optional and only supplements long price history |
 | **The book** | live positions, cash and fills, which stay owned by Aumos and the broker connector — not by this package |
 | **Settings** | thresholds the methodology compares against, including the price-conflict tolerance (5% by default). None of them can loosen your Mandate |
 | **Your approval** | **it proposes and never trades.** Quantities, order type, limits, approval and execution are Aumos's, and a person approves every order |
@@ -218,7 +218,7 @@ can say which of them this fund or machine lacks.
 |---|---|---|
 | Toss connection | existing evidence and thesis review | new price signal and target calculation |
 | `sec-edgar` | the Korean and ETF lane | a new US fundamental BUY or promotion |
-| Alpaca connection | SEC and Toss review | a new judgement needing news or action confirmation |
+| Alpaca connection | SEC and Toss review; news/actions through granted web research with dated URLs | news/action claims if web is also unavailable or cannot confirm the observation |
 | `open-dart` | Korean ETF and price/weight management | a new Korean single-name fundamental BUY or promotion |
 | CLI web | core, exit and weight management | theme radar, variant view, consensus difference, policy and macro claims |
 

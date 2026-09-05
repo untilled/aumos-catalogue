@@ -1,4 +1,5 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
+import { INPUT_VOCABULARY } from './input-contracts.mjs'
 
 /**
  * ── Declared thresholds, and the drift they exist to catch (issue #70 §12) ─
@@ -256,7 +257,7 @@ export function ruleVersions({ registry = {}, rows = [], axis = null } = {}) {
   if (stale.length) {
     diagnostics.push(diagnostic('rule_version_superseded', 'unevaluated', 'Rows carry a superseded version of this axis; they stay valid on their own terms and are counted separately', 'rows', { axis, current, stale }))
   }
-  return { data: { axes: RULE_VERSION_AXES, declared, versionsInRows, current, stale, poolable: versionsInRows.length <= 1 }, diagnostics }
+  return { data: { axes: RULE_VERSION_AXES, vocabulary: INPUT_VOCABULARY, declared, versionsInRows, current, stale, poolable: versionsInRows.length <= 1 }, diagnostics }
 }
 
 /**

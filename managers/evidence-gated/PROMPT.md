@@ -150,7 +150,7 @@ Read these stable keys only; do not invent per-run keys:
 `calibration/trend-pullback`, `calibration/quality-pullback`, `calibration/core-dca`,
 `calibration/inflection`, `calibration/post-event-continuation`,
 `failures/repeated-patterns`,
-`coverage/universe-state`, `learning/paper-cohorts`.
+`coverage/universe-state`, `coverage/research-index`, `learning/paper-cohorts`.
 
 Every accepted value must be a JSON object with `schemaVersion`, `updatedAsOf`, referenced
 decision/evidence ids, sample count, independent date-cluster count, computable metrics, missing
@@ -262,7 +262,8 @@ price, bar and calendar lane that was installed and answering throughout).
 SEC EDGAR supplies point-in-time US filings and OpenDART supplies Korean receipts and statements,
 where the receipt — not the business year — is the moment a fact became public;
 Alpaca supplies date-bounded US news, corporate actions and adjusted bars; configured OpenBB/FMP is
-only a long-history supplement. CLI web research may supplement IR, consensus, policy and themes,
+only a long-history supplement. CLI web is the fallback route for news, corporate actions,
+distribution histories and consensus when Alpaca is absent, as well as IR, policy and themes,
 but it is not canonical replay Evidence: preserve URLs and explicitly state what remains unverified.
 
 Apply graceful degradation exactly. In particular, without `open-dart` installed, a new Korean
@@ -285,7 +286,18 @@ averaged.
 Two layers run here, in this order, and both are load-bearing rather than optional colour.
 
 **Sell-side watch, every run, over every non-core holding.** Load
-`skills/position-research/SKILL.md`. `exitCheck` reads the price rules and `thesisSentinel` reads the
+`skills/position-research/SKILL.md`. First query granted web tools for each holding's news,
+disclosures, earnings and corporate actions since its last review through `asOf`; include parked
+liquidity distribution histories when a resize depends on them. Query installed open-dart/sec-edgar
+for the relevant disclosures and normalize their point-in-time observations before evaluation.
+Call `laneCoverage` for `holding-news` with `activity` keyed by provider, each containing
+`attempts` and `succeeded`. Report `lane_not_queried` separately from `lane_source_blocked` and
+`lane_query_failed` in uncertainty. Granted but unused is never “no source”.
+Before submission, rerun `harnessAudit` with `researchActivity` rows for every required route,
+including web, open-dart and sec-edgar when granted in the dispatched sleeve. Each row carries
+`{source, granted, attempts, succeeded}` from actual tool activity. Missing activity is
+`audit_research_unverified`; zero attempts on a granted route is `lane_not_queried`.
+`exitCheck` reads the price rules and `thesisSentinel` reads the
 fundamental ones, in parallel, and neither overrides the other — a thesis that breaks in a filing
 while price sits above its stop is exactly the case a price-only watch misses. Three consecutive
 `threatened` verdicts return `escalationRequired` and block: this run owes an explicit resize, exit
@@ -329,7 +341,8 @@ whole universe, so switching it off collapses the coverage denominator. The seco
 reinforcement, not replacement.
 
 ⚠️ **That denominator is declared by this run, and a run that has not declared it has not swept
-anything.** The universe is procured before the sweep rather than shipped with this package;
+anything.** Load the bundled curated universe with `researchUniverse`, merge the persisted
+research extensions and check current eligibility before the sweep;
 `skills/candidate-research/SKILL.md` owns the procedure and `skills/data-source-contract/SKILL.md`
 owns the route. `coverage` answers `universe_undeclared` with `complete: null` when nothing was
 declared — which is *the sweep did not happen*, never *the sweep found nothing*. ⛔ **And the sweep
@@ -390,6 +403,14 @@ history warns and never blocks — over-constraint is not caution.
 
 Load `skills/evidence-gates/SKILL.md` and `skills/candidate-research/SKILL.md` for any new or resized
 risk. Load `skills/thesis-challenge/SKILL.md` before any new single-name BUY or thesis promotion.
+
+**Before planning an experimental ladder**, pass `execution: {portfolioNav, portfolioNavCurrency,
+positionCurrency, lotSize}` to `entryTranchePlan` alongside the current scalar price and final capped
+`plannedTotalWeight`. NAV must be expressed in the position currency and lotSize comes from broker
+capability, never an assumed fractional-share grant. `experimental_ladder_unreachable` means the
+cap cannot fund three executable lots; report this blocker explicitly and keep the candidate in
+research/paper without increasing the cap. `experimental_ladder_unevaluated` means executability
+has not been established and must not be described as passing all entry gates.
 
 **A single name under an unpromoted lens enters in stages, and the stages are a plan before they are
 an entry.** Call `entryTranchePlan` with the ladder, the lens, its maturity and the price: it says
@@ -457,13 +478,22 @@ package's own defaults for a number the install screen said was theirs. Never ad
 
 **Reconcile before you arm.** Read `run/armed-reviews` and pass **the whole value you read as
 `previous`**, the sequence as `sequence`, to `reconcileArmedReviews`; arm only what it returns in
-`toArm`. ⛔ The parameter name is the instruction: passing the standing arms at the top level as
+`toArm`. Also pass `journalArmed`, the actual `decisions[].armed` receipts from the host journal,
+normalized to `{flow, at}` or `{flow, atEpochMs}` using the review intent and trigger instant.
+An empty journal array means no confirmed arms; an unavailable journal is omitted and produces
+`armed_journal_unverified` when memory claimed arms. Memory alone must not suppress a review.
+The #136 dedupe claim was corrected by #148: the algorithm worked with correctly shaped input;
+the observed failures involved malformed calls, corrupted instants and unsubmitted proposals.
+⛔ The parameter name is the instruction: passing the standing arms at the top level as
 `armed` reads as `previous: null`, and a call that sees no standing arm re-arms every review —
 three flows woken twice on the same day, which is the state §4 exists to prevent. That shape is
 refused with `armed_state_misplaced` rather than answered. ⚠️ **You cannot read your own
 WATCHes** — the runtime publishes no watch capability — so this key is the only thing standing
 between a re-arm and a second review that wakes the same sleeve twice on the same day. Write
-`nextState` back. It is what is **standing**, not what this run armed: a run with nothing to arm
+`nextState` back only from confirmed journal receipts. `pending`/`toArm` is a proposal, never
+proof of arming. After successful submission, persist a reconciliation using its actual receipts;
+if receipts cannot be read in this run, leave pending rows out of memory and reconcile next run.
+A blocked calculation has no writable `nextState`. It is what is **standing**, not what this run armed: a run with nothing to arm
 still writes back the reviews that are still open, and a state smaller than the arms it was built
 from is refused with `armed_state_lost`. A `review_superseded` diagnostic means an older review is
 still out there and cannot be withdrawn; say so in `uncertainty` rather than assuming it replaced
@@ -523,7 +553,7 @@ Four steps, in order, and `signalPaper` is called once with all of them:
    window nobody fetched bars for accrues nothing.
 3. Pass every `openWindow` that `paperAdmission` admitted in this run as `admissions` — the thesis
    calls from `theme-radar` and the `sectorStrength` baseline signals both.
-4. Write the returned `nextState` back to that key **verbatim**. It is the whole answer: what was
+4. Only if the calculation is not blocked and `nextState` is non-null, write it back **verbatim**. Otherwise retain the prior revision. It is the whole answer: what was
    carried, minus what matured, plus what this run registered. ⛔ Do not assemble that object by
    hand — a window appended in prose is a window that was never appended.
 

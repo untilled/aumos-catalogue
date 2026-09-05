@@ -17,7 +17,7 @@ const inputSchema = {
     },
     input: {
       type: 'object',
-      description: 'Operation-specific structured input. Missing values must remain missing.',
+      description: 'Operation-specific structured input. Call inputContracts for supported keys and vocabulary. Missing values must remain missing; unknown keys are rejected for guarded operations. Never persist a null nextState.',
     },
   },
 }
@@ -70,4 +70,3 @@ export function handleMcpRequest(request) {
   if (request.method.startsWith('notifications/')) return null
   return failure(id, -32601, 'Method not found')
 }
-

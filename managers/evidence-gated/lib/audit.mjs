@@ -161,7 +161,7 @@ function screenedCount(universe) {
   return new Set([...extensions, ...scanners.flatMap((rows) => (Array.isArray(rows) ? rows : []))]).size
 }
 
-export function harnessAudit({ positions = [], watches = [], theses = [], decisions = [], universe = null, gateStaleDays = GATE_STALE_DAYS, managedSince = null, config = {}, asOf } = {}) {
+export function harnessAudit({ positions = [], watches = [], theses = [], decisions = [], universe = null, researchActivity = null, gateStaleDays = GATE_STALE_DAYS, managedSince = null, config = {}, asOf } = {}) {
   const diagnostics = []
   const issues = []
   const add = (severity, code, subject, message, detail = {}) => {
@@ -170,6 +170,11 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
   }
 
   const held = new Set(positions.map(subjectOf).filter(Boolean))
+  if (researchActivity === null) add('warn', 'audit_research_unverified', null, 'No collection activity was supplied; a WAIT cannot claim that news and filings were checked')
+  for (const row of researchActivity ?? []) {
+    if (row?.granted === true && !(row.attempts > 0)) add('warn', 'lane_not_queried', row.source ?? null, 'This research route was granted but not queried; do not report source absence')
+    else if (row?.granted === true && row.succeeded !== true) add('warn', 'lane_query_failed', row.source ?? null, 'This research route was queried but yielded no usable response')
+  }
   const claimed = new Set(theses.filter((row) => row?.status !== 'closed').map(subjectOf).filter(Boolean))
 
   for (const watch of watches) {
@@ -240,8 +245,8 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
       )
       continue
     }
-    if (finite(decision.quantity) && finite(position.quantity) && decision.quantity !== position.quantity) {
-      add('blocker', 'audit_position_mismatch', symbol, 'The recorded decision and the portfolio disagree about the size held', { decided: decision.quantity, held: position.quantity })
+    if (decision.quantity !== undefined) {
+      diagnostics.push(diagnostic('audit_decision_quantity_unsupported', 'unevaluated', 'DecisionProposal specifies target weights; execution quantities belong to the Planner and cannot be reconciled from a proposal', 'decisions', { subject: symbol }))
     }
   }
   if (unexplained.length && !managedFrom) {

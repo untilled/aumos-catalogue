@@ -1,0 +1,423 @@
+{
+  "version": 1,
+  "updated_at": "2026-07-03",
+  "market": "us",
+  "currency": "USD",
+  "description": "US large/liquid single-stock candidate pool for contrarian and pullback scans. This is a screening universe, not an approved buy list.",
+  "symbols": [
+    {
+      "symbol": "AAPL",
+      "name": "Apple",
+      "sector": "Technology"
+    },
+    {
+      "symbol": "ABBV",
+      "name": "AbbVie",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "ABT",
+      "name": "Abbott Laboratories",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "ADBE",
+      "name": "Adobe"
+    },
+    {
+      "symbol": "AMAT",
+      "name": "Applied Materials",
+      "sector": "Semiconductor Equipment"
+    },
+    {
+      "symbol": "AMD",
+      "name": "Advanced Micro Devices",
+      "sector": "Semiconductors"
+    },
+    {
+      "symbol": "AMT",
+      "name": "American Tower",
+      "sector": "Real Estate"
+    },
+    {
+      "symbol": "AMZN",
+      "name": "Amazon.com",
+      "sector": "Consumer Discretionary"
+    },
+    {
+      "symbol": "APD",
+      "name": "Air Products and Chemicals",
+      "sector": "Materials"
+    },
+    {
+      "symbol": "ASML",
+      "name": "ASML",
+      "sector": "Semiconductor Equipment"
+    },
+    {
+      "symbol": "AVGO",
+      "name": "Broadcom",
+      "sector": "Semiconductors"
+    },
+    {
+      "symbol": "AXP",
+      "name": "American Express",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "BAC",
+      "name": "Bank of America",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "BKNG",
+      "name": "Booking Holdings",
+      "sector": "Consumer Discretionary"
+    },
+    {
+      "symbol": "BLK",
+      "name": "BlackRock",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "C",
+      "name": "Citigroup",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "CAT",
+      "name": "Caterpillar",
+      "sector": "Industrials"
+    },
+    {
+      "symbol": "CMCSA",
+      "name": "Comcast"
+    },
+    {
+      "symbol": "COP",
+      "name": "ConocoPhillips",
+      "sector": "Energy"
+    },
+    {
+      "symbol": "COST",
+      "name": "Costco Wholesale",
+      "sector": "Consumer Staples"
+    },
+    {
+      "symbol": "CRM",
+      "name": "Salesforce"
+    },
+    {
+      "symbol": "CVS",
+      "name": "CVS Health",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "CVX",
+      "name": "Chevron",
+      "sector": "Energy"
+    },
+    {
+      "symbol": "DE",
+      "name": "Deere",
+      "sector": "Industrials"
+    },
+    {
+      "symbol": "DHR",
+      "name": "Danaher",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "DIS",
+      "name": "Walt Disney",
+      "sector": "Communication Services"
+    },
+    {
+      "symbol": "DUK",
+      "name": "Duke Energy",
+      "sector": "Utilities"
+    },
+    {
+      "symbol": "EQIX",
+      "name": "Equinix",
+      "sector": "Real Estate"
+    },
+    {
+      "symbol": "FCX",
+      "name": "Freeport-McMoRan",
+      "sector": "Materials"
+    },
+    {
+      "symbol": "GE",
+      "name": "GE Aerospace",
+      "sector": "Industrials"
+    },
+    {
+      "symbol": "GOOGL",
+      "name": "Alphabet",
+      "sector": "Communication Services"
+    },
+    {
+      "symbol": "GS",
+      "name": "Goldman Sachs",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "HD",
+      "name": "Home Depot",
+      "sector": "Consumer Discretionary"
+    },
+    {
+      "symbol": "HON",
+      "name": "Honeywell",
+      "sector": "Industrials"
+    },
+    {
+      "symbol": "HUM",
+      "name": "Humana",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "INTC",
+      "name": "Intel",
+      "sector": "Semiconductors"
+    },
+    {
+      "symbol": "ISRG",
+      "name": "Intuitive Surgical",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "JNJ",
+      "name": "Johnson & Johnson",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "JPM",
+      "name": "JPMorgan Chase",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "KO",
+      "name": "Coca-Cola",
+      "sector": "Consumer Staples"
+    },
+    {
+      "symbol": "LIN",
+      "name": "Linde",
+      "sector": "Materials"
+    },
+    {
+      "symbol": "LLY",
+      "name": "Eli Lilly",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "LMT",
+      "name": "Lockheed Martin",
+      "sector": "Industrials"
+    },
+    {
+      "symbol": "LOW",
+      "name": "Lowe's",
+      "sector": "Consumer Discretionary"
+    },
+    {
+      "symbol": "LRCX",
+      "name": "Lam Research",
+      "sector": "Semiconductor Equipment"
+    },
+    {
+      "symbol": "MA",
+      "name": "Mastercard",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "MCD",
+      "name": "McDonald's",
+      "sector": "Consumer Discretionary"
+    },
+    {
+      "symbol": "MDLZ",
+      "name": "Mondelez",
+      "sector": "Consumer Staples"
+    },
+    {
+      "symbol": "MDT",
+      "name": "Medtronic",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "META",
+      "name": "Meta Platforms",
+      "sector": "Communication Services"
+    },
+    {
+      "symbol": "MRK",
+      "name": "Merck",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "MS",
+      "name": "Morgan Stanley",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "MSFT",
+      "name": "Microsoft",
+      "sector": "Technology"
+    },
+    {
+      "symbol": "NEE",
+      "name": "NextEra Energy",
+      "sector": "Utilities"
+    },
+    {
+      "symbol": "NEM",
+      "name": "Newmont",
+      "sector": "Materials"
+    },
+    {
+      "symbol": "NFLX",
+      "name": "Netflix",
+      "sector": "Communication Services"
+    },
+    {
+      "symbol": "NKE",
+      "name": "Nike",
+      "sector": "Consumer Discretionary"
+    },
+    {
+      "symbol": "NVDA",
+      "name": "NVIDIA",
+      "sector": "Semiconductors"
+    },
+    {
+      "symbol": "O",
+      "name": "Realty Income",
+      "sector": "Real Estate"
+    },
+    {
+      "symbol": "PEP",
+      "name": "PepsiCo",
+      "sector": "Consumer Staples"
+    },
+    {
+      "symbol": "PFE",
+      "name": "Pfizer",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "PG",
+      "name": "Procter & Gamble",
+      "sector": "Consumer Staples"
+    },
+    {
+      "symbol": "PLD",
+      "name": "Prologis",
+      "sector": "Real Estate"
+    },
+    {
+      "symbol": "PYPL",
+      "name": "PayPal",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "QCOM",
+      "name": "Qualcomm",
+      "sector": "Semiconductors"
+    },
+    {
+      "symbol": "RTX",
+      "name": "RTX",
+      "sector": "Industrials"
+    },
+    {
+      "symbol": "SBUX",
+      "name": "Starbucks",
+      "sector": "Consumer Discretionary"
+    },
+    {
+      "symbol": "SHW",
+      "name": "Sherwin-Williams",
+      "sector": "Materials"
+    },
+    {
+      "symbol": "SLB",
+      "name": "Schlumberger",
+      "sector": "Energy"
+    },
+    {
+      "symbol": "SO",
+      "name": "Southern Company",
+      "sector": "Utilities"
+    },
+    {
+      "symbol": "TGT",
+      "name": "Target",
+      "sector": "Consumer Staples"
+    },
+    {
+      "symbol": "TMO",
+      "name": "Thermo Fisher Scientific",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "TMUS",
+      "name": "T-Mobile US",
+      "sector": "Communication Services"
+    },
+    {
+      "symbol": "TSLA",
+      "name": "Tesla",
+      "sector": "Consumer Discretionary"
+    },
+    {
+      "symbol": "TSM",
+      "name": "Taiwan Semiconductor Manufacturing",
+      "sector": "Semiconductors"
+    },
+    {
+      "symbol": "UNH",
+      "name": "UnitedHealth Group",
+      "sector": "Health Care"
+    },
+    {
+      "symbol": "UNP",
+      "name": "Union Pacific",
+      "sector": "Industrials"
+    },
+    {
+      "symbol": "UPS",
+      "name": "UPS",
+      "sector": "Industrials"
+    },
+    {
+      "symbol": "V",
+      "name": "Visa",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "VZ",
+      "name": "Verizon",
+      "sector": "Communication Services"
+    },
+    {
+      "symbol": "WFC",
+      "name": "Wells Fargo",
+      "sector": "Financials"
+    },
+    {
+      "symbol": "WMT",
+      "name": "Walmart",
+      "sector": "Consumer Staples"
+    },
+    {
+      "symbol": "XOM",
+      "name": "Exxon Mobil",
+      "sector": "Energy"
+    }
+  ],
+  "updated": "2026-07-24",
+  "note": " | 2026-07-24: data/screen_universe.json과 합집합으로 통합 (두 유니버스 분기가 93종목 사각지대를 만든 사고 이후). bin/coverage-check가 파일 간 정합성을 매 실행 검사한다 — 한쪽만 편집하지 말 것."
+}

@@ -21,19 +21,28 @@ narrowly around the holdings — which is what happened for six consecutive runs
 of which declared a universe and none of which generated a candidate (#140). What the prompt does
 not mention, a fresh context does not do.
 
-1. **Enumerate XKRX** from the vendor listing route — `skills/data-source-contract/SKILL.md` owns
-   the route and its filters, and `skills/candidate-research/SKILL.md` §"Declaring the universe"
-   owns the procedure. Read them there; do not compose a call from this page.
+1. **Load the curated roster** with `researchUniverse` for this sleeve, then verify current
+   eligibility from the listing provider. Load extensions from `coverage/research-index`.
+   Follow `skills/candidate-research/SKILL.md` for procurement and persistence.
 2. **Pass the screen and the extensions to `coverage`** as `scannerUniverses` and `extensions`,
    and pass the same thing to `harnessAudit` as `universe`.
 3. **Report what you got.** `complete: null` with `universe_undeclared` is *the sweep did not
    happen*, and it goes back to the orchestrator in your `uncertainty` — never as a clean sleeve.
 
-⚠️ **A narrow prompt does not narrow the universe.** A dispatch about one standing RESIZE is still
-a run of this sleeve, and this sleeve sweeps XKRX. If the listing lane is down you have no
-universe and you say so; ⛔ you never fall back to the holdings, to a previous run's
-`coverage/universe-state` or to a list from model knowledge — each is a denominator you did not
-read, reported as one you did.
+## Collect observations and run both discovery branches
+
+Never invent a denominator: never fall back to the holdings or a list from model knowledge.
+
+Every cycle, scan each holding's news, disclosures, earnings and corporate actions using granted
+web plus installed OpenDART/SEC. Include distributions for liquidity ETFs when a trigger needs them.
+Alpaca absence activates web fallback; it does not close news. Report attempted and unused routes
+through `laneCoverage` activity and return its diagnostic codes in uncertainty.
+
+Fetch and normalize point-in-time filings for the curated research names before calling
+`upsideRadar` on them. Also run the price-pattern `scan` branch; neither branch substitutes for
+the other. Return all radar lanes' included/excluded counts and `radar_lane_starved` diagnostics.
+Use `researchState` to carry the bounded roster and Evidence references; source payloads must be
+refetched until host source storage is available. The roster is not a claim of full-market coverage.
 
 ## Your tools
 

@@ -149,7 +149,7 @@ export function entryQualityGate({ bars = [], lenses = [], noNewLow = {} }) {
   const rows = bars.filter((bar) => finite(bar?.close))
   const packet = indicatorPacket(rows)
   if (!packet || rows.length < RECENT_WINDOW_BARS || packet.rsi14 === null) {
-    diagnostics.push(diagnostic('entry_quality_unverified', 'unevaluated', 'Entry quality cannot be read without scan history; absent data warns rather than blocks', 'bars', { count: rows.length }))
+    diagnostics.push(diagnostic('entry_quality_unverified', 'unevaluated', 'Entry quality needs historical OHLC bars (at least 60), not prior runs or a scanHistory field; fetch bars through asOf even on the first run', 'bars', { count: rows.length }))
     return { data: { state: null, passed: null, blocking: false }, diagnostics }
   }
   const lows = rows.map((bar) => (finite(bar.low) ? bar.low : bar.close))

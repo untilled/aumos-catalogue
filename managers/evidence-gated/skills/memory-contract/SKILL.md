@@ -26,9 +26,24 @@ Use only:
 - `calibration/core-dca`
 - `failures/repeated-patterns`
 - `coverage/universe-state`
+- `coverage/research-index`
 - `learning/paper-cohorts`
 
 Do not generate a key per run, asset or date.
+
+`coverage/research-index` is a bounded exception for a research roster, not source caching.
+Use `researchState({previous, observations})` and persist only a non-null `nextState`.
+It carries at most 200 symbol/market rows with observation dates, up to eight Evidence ids,
+sector and an extension flag; no prices, filings, portfolio weights or source bodies.
+`researchUniverse` reads the bundled 74-name KR / 83-name US seed and validated extensions.
+Refetch filing data from installed sources each run until the host provides queryable source
+storage; an Evidence id is a reference, not a promise that its payload can be read back.
+Capacity failure preserves the prior revision and requires explicit roster review.
+
+For `run/armed-reviews`, `reconcileArmedReviews` now persists only `journalArmed` receipts.
+`toArm`/`pending` never proves submission. Confirm against actual host `decisions[].armed` and
+never hand-write epoch values. Missing or contradictory receipts must appear in uncertainty.
+The earlier #136 dedupe diagnosis was refuted in #148; correct input dedupes correctly.
 
 ### The key that stands in for a read path
 
@@ -42,9 +57,11 @@ armed half an hour apart each run the Korean sleeve and each seal a judgement �
 same book, on the same day, neither saying which one read the close.
 
 Three rows, and the state written back is what is **standing** — every review still open, plus
-what this run armed. ⛔ Not a copy of this run's sequence: a run with nothing to arm would then
-write an empty list over three live reviews, and the next run re-arms all three. A row leaves by
-its instant passing and by nothing else, which is what keeps the key from growing.
+what the host journal confirms was armed. A calculated sequence remains pending until confirmed.
+⛔ Not a copy of this run's sequence: a run with nothing to arm would then
+write an empty list over three live reviews, and the next run re-arms all three. A row leaves when
+its instant passes or the host journal disproves the memory claim. A missing journal is explicitly
+unverified; this bridge cannot prove whether an outstanding WATCH was cancelled or already fired.
 
 ### The encoding, and why the instant is a number
 

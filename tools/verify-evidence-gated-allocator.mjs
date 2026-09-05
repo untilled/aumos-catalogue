@@ -1,4 +1,5 @@
 import nodeAssert from 'node:assert/strict'
+import './verify-evidence-gated-input-regressions.mjs'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated/lib/index.mjs'
@@ -431,6 +432,7 @@ const naverPlan = {
   lens: 'mean-reversion',
   maturity: 'observing',
   price: 180_000,
+  execution: { portfolioNav: 30_000_000, portfolioNavCurrency: 'KRW', positionCurrency: 'KRW', lotSize: 1 },
   plannedTotalWeight: 0.03,
   tranches: [
     { label: 'T1', weight: 0.01, condition: { kind: 'immediate' }, filled: true },
@@ -797,9 +799,11 @@ assert.equal(releasedReview.data.actualConfirmed, true, 'a sourced release with 
 assert.equal(releasedReview.data.comparisons.operatingIncome.consensusSurprisePct, research.irCycle.expectedConsensusSurprisePct)
 assert.equal(releasedReview.data.comparisons.operatingIncome.guidanceSurprisePct, research.irCycle.expectedGuidanceSurprisePct)
 
-const sentinelAfter = execute({ operation: 'thesisSentinel', asOf: researchAsOf, input: research.irCycle.sentinelAfterRelease })
+const { expectedVerdict: afterExpected, ...afterInput } = research.irCycle.sentinelAfterRelease
+const sentinelAfter = execute({ operation: 'thesisSentinel', asOf: researchAsOf, input: afterInput })
 assert.equal(sentinelAfter.data.verdict, research.irCycle.sentinelAfterRelease.expectedVerdict, 'the actual result updates the fundamental sentinel')
-const sentinelUnverified = execute({ operation: 'thesisSentinel', asOf: researchAsOf, input: research.irCycle.sentinelWhenUnverified })
+const { expectedVerdict: unverifiedExpected, ...unverifiedInput } = research.irCycle.sentinelWhenUnverified
+const sentinelUnverified = execute({ operation: 'thesisSentinel', asOf: researchAsOf, input: unverifiedInput })
 assert.equal(sentinelUnverified.data.verdict, research.irCycle.sentinelWhenUnverified.expectedVerdict, 'an unevaluable invalidation is watch, never intact')
 
 for (const lane of research.webAbsentLanes) {
@@ -901,11 +905,11 @@ const rearmAsOf = '2026-08-28T18:00:00.000Z'
 const firstArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: null, sequence: rearmSequence } })
 assert.deepEqual(firstArm.data.toArm.map((row) => row.flow), ['kr-sleeve', 'us-sleeve'], 'with nothing recorded, every review in the sequence is armed')
 
-const secondArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: firstArm.data.nextState, sequence: rearmSequence } })
+const secondArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: firstArm.data.nextState, journalArmed: rearmSequence, sequence: rearmSequence } })
 assert.deepEqual(secondArm.data.toArm, [], 'a review already armed for that flow and instant is not armed again — since #87 a duplicate wake dispatches the sleeve a second time and seals a second judgement on the same day')
 assert.deepEqual(secondArm.data.duplicateFlows, ['kr-sleeve', 'us-sleeve'], 'and it names which ones')
 
-const movedArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: firstArm.data.nextState, sequence: [{ flow: 'kr-sleeve', at: '2026-08-31T07:30:00.000Z' }] } })
+const movedArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: secondArm.data.nextState, journalArmed: rearmSequence, sequence: [{ flow: 'kr-sleeve', at: '2026-08-31T07:30:00.000Z' }] } })
 assert.ok(movedArm.diagnostics.some((row) => row.code === 'review_superseded'), 'a review that moved leaves the old one out there — with no read path it cannot be withdrawn, and pretending it replaced itself is the assumption this key exists to refuse')
 assert.deepEqual(movedArm.data.toArm.map((row) => row.at), ['2026-08-31T07:30:00.000Z'], 'the new instant is still armed')
 
@@ -2272,7 +2276,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 86)
+assert.equal(supportedOperations.length, 89)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -2779,8 +2783,9 @@ assert.ok(/no source for that yet/i.test(promptProse), 'and the honest limit bes
 covers('audit/harness-audit-blockers')
 const auditAsOf = '2026-08-20T00:00:00Z'
 const cleanBook = {
+  researchActivity: [{ source: 'web', granted: true, attempts: 1, succeeded: true }],
   positions: [{ symbol: 'AAA', quantity: 10 }],
-  decisions: [{ asset: 'AAA', quantity: 10, orderReady: true, exitRegistered: true }],
+  decisions: [{ asset: 'AAA', targetWeight: 0.1, orderReady: true, exitRegistered: true }],
   theses: [{ asset: 'AAA' }],
   watches: [{ subject: 'AAA', registeredAt: '2026-08-15T00:00:00Z' }],
   // A book with a universe standing, because since #140 a pre-flight that was
@@ -2796,8 +2801,8 @@ assert.ok(orphaned.data.issues.some((row) => row.code === 'audit_watch_orphan'),
 assert.equal(orphaned.data.clearToPlan, false)
 assert.ok(
   execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, decisions: [{ asset: 'AAA', quantity: 4, orderReady: true, exitRegistered: true }] } })
-    .data.issues.some((row) => row.code === 'audit_position_mismatch'),
-  'a size disagreement makes the denominator every weight uses wrong',
+    .diagnostics.some((row) => row.code === 'audit_decision_quantity_unsupported'),
+  'proposal quantity is an unsupported input, not an execution mismatch',
 )
 const untracked = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, decisions: [] } })
 assert.ok(untracked.data.issues.some((row) => row.code === 'audit_position_untracked'), 'a held position no decision explains is still reported')
@@ -2858,8 +2863,8 @@ assert.deepEqual(
 )
 assert.ok(
   execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, decisions: [{ asset: 'AAA', quantity: 4, orderReady: true, exitRegistered: true }] } })
-    .data.clearToPlan === false,
-  'the check beside it is untouched: a recorded size that disagrees with the book is still a blocker',
+    .data.clearToPlan === true,
+  'proposal quantities cannot establish a position mismatch; Planner owns execution',
 )
 const disabledGrandfather = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...coldStart, config: { grandfather: { enabled: false } } } })
 assert.deepEqual(disabledGrandfather.data.grandfathered, [], 'the investor can turn the tolerance off, and then nothing is carried as inherited')
@@ -3495,14 +3500,14 @@ const misplaced = execute({ operation: 'reconcileArmedReviews', asOf: standingAs
 assert.equal(misplaced.status, 'blocked', 'the standing arms passed at the top level are refused rather than read as an empty carry — the run that did this re-armed three standing reviews and woke each sleeve twice')
 assert.ok(misplaced.diagnostics.some((row) => row.code === 'armed_state_misplaced'), 'and the refusal names the shape, so the next reader is not left to infer it from a `toArm` that looks ordinary')
 
-const reconciled = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, sequence: standingSequence } })
+const reconciled = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, journalArmed: standingSequence, sequence: standingSequence } })
 assert.deepEqual(reconciled.data.toArm, [], 'passed as `previous`, an identical sequence arms nothing — this is the case the issue reproduced and the shape is the whole difference')
 assert.deepEqual(reconciled.data.duplicateFlows, ['kr-sleeve', 'us-sleeve', 'allocate'], 'and each standing flow is named')
 
-const quietRun = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, sequence: [] } })
+const quietRun = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, journalArmed: standingSequence, sequence: [] } })
 assert.equal(quietRun.data.nextState.armed.length, 3, 'a run with nothing to arm still writes back the three reviews that are standing — a review does not stop standing because this run had no reason to mention it')
 assert.equal(
-  execute({ operation: 'reconcileArmedReviews', asOf: '2026-09-09T00:00:00.000Z', input: { previous: armedState, sequence: [] } }).data.nextState.armed.length,
+  execute({ operation: 'reconcileArmedReviews', asOf: '2026-09-09T00:00:00.000Z', input: { previous: armedState, journalArmed: standingSequence, sequence: [] } }).data.nextState.armed.length,
   0,
   'and it leaves the state when its instant passes, which is the only way out — that is what keeps the key from growing',
 )
@@ -3522,7 +3527,7 @@ assert.ok(
   reconciled.data.nextState.armed.every((row) => typeof row.atEpochMs === 'number' && row.at === undefined),
   'the state written back carries epoch milliseconds and no RFC 3339 string — a string here is a value the host refuses to hand back, and the key is unreadable in proportion to how well it is filled',
 )
-const legacyArmed = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: { schemaVersion: 1, armed: standingSequence.map((row) => ({ flow: row.flow, at: row.at })) }, sequence: standingSequence } })
+const legacyArmed = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: { schemaVersion: 1, armed: standingSequence.map((row) => ({ flow: row.flow, at: row.at })) }, journalArmed: standingSequence, sequence: standingSequence } })
 assert.deepEqual(legacyArmed.data.toArm, [], 'a key written by the version before this one is still read — a migration that begins by discarding the record is the loss this function exists to prevent')
 assert.ok(
   reconciled.data.toArm.every((row) => row.at === undefined || typeof row.at === 'string'),
@@ -3627,7 +3632,7 @@ assert.equal(
 )
 for (const [operation, input] of [
   ['signalPaper', { state: { openWindows: [carriedWindow] }, rows: [], admissions: [] }],
-  ['reconcileArmedReviews', { previous: armedState, sequence: [] }],
+  ['reconcileArmedReviews', { previous: armedState, journalArmed: standingSequence, sequence: [] }],
 ]) {
   const answer = execute({ operation, asOf: paperAsOf, input })
   assert.ok(

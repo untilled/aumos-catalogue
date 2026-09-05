@@ -1,4 +1,6 @@
 import { result, diagnostic } from './diagnostics.mjs'
+import { validateInput, INPUT_KEYS, INPUT_VOCABULARY } from './input-contracts.mjs'
+import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
 import { sleeveNav, targetWeight, experimentalCeiling, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
@@ -16,6 +18,9 @@ import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport,
 import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence, resolveWakeFlow, resolveTrancheWake, reconcileArmedReviews } from './schedule.mjs'
 
 const operations = {
+  researchUniverse: (input, asOf) => researchUniverse({ ...input, asOf }),
+  researchState: (input, asOf) => researchState({ ...input, asOf }),
+  inputContracts: () => ({ data: { keys: INPUT_KEYS, vocabulary: INPUT_VOCABULARY }, diagnostics: [] }),
   indicators(input, asOf) {
     const normalized = normalizeBars(input?.bars, asOf)
     return { data: { bars: normalized.bars, indicators: indicatorPacket(normalized.bars) }, diagnostics: normalized.diagnostics }
@@ -115,7 +120,7 @@ export function execute(request) {
   const diagnostics = []
   const operation = request?.operation
   const asOf = request?.asOf
-  if (typeof operation !== 'string' || !(operation in operations)) {
+  if (typeof operation !== 'string' || !Object.hasOwn(operations, operation)) {
     diagnostics.push(diagnostic('operation_unknown', 'blocked', 'A supported operation is required', 'operation', { supported: Object.keys(operations) }))
     return result(operation ?? null, asOf ?? null, null, diagnostics)
   }
@@ -124,7 +129,11 @@ export function execute(request) {
     return result(operation, asOf ?? null, null, diagnostics)
   }
   try {
+    const shapeDiagnostics = validateInput(operation, request.input ?? {})
+    if (shapeDiagnostics.length) return result(operation, asOf, null, shapeDiagnostics)
     const output = operations[operation](request.input ?? {}, asOf)
+    // A rejected calculation must never offer a replacement for durable memory.
+    if (output?.data?.nextState && output.diagnostics?.some((row) => row.severity === 'blocked')) output.data.nextState = null
     return result(operation, asOf, output?.data ?? null, [...diagnostics, ...(output?.diagnostics ?? [])])
   } catch (error) {
     diagnostics.push(diagnostic('operation_failed', 'blocked', 'Deterministic operation failed', 'input', { name: error?.name, message: error?.message }))

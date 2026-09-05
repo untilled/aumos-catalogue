@@ -25,6 +25,14 @@ every later run a diagnostic rule that reproduces the same wrong answer.
 
 ## Responsibility and endpoints
 
+Granted web is the fallback for news, corporate actions, distribution history and consensus when
+Alpaca is absent. This changes the route, not whether the research is performed. Preserve URL,
+publishedAt, capturedAt, units and period; web remains non-canonical replay evidence and never
+replaces required OpenDART/SEC filings or Toss prices. After collection call `laneCoverage` with
+`intent: "holding-news"` (or `news`, `corporate-actions`, `consensus`) and `activity` such as
+`{"web":{"attempts":2,"succeeded":true}}`. Zero calls is `lane_not_queried`; a failed call is
+`lane_query_failed`; a missing route is `lane_source_blocked`. Carry these codes in uncertainty.
+
 **Two tools, and which one you use is decided by where the credential lives.** 토스 and Alpaca are
 **logins the investor already made**, so their calls go through `connection_request` and you are
 handed no key; SEC EDGAR and 금융감독원 are documents with keys of their own, so their calls go
@@ -47,7 +55,7 @@ is what makes the wrong turn look right.
 | Alpaca login | `connection_request` | bars, news, corporate actions | `end` is filled at `asOf` if you leave it out; snapshots are always current and never canonical replay evidence |
 | `openbb-fmp` | `/api/v1/equity/price/historical` only | optional long history; set `end_date`, record provider and adjustment |
 | `open-dart` | `/api/corpCode.xml`, `/api/company.json`, `/api/list.json`, `/api/fnlttSinglAcntAll.json`, `/api/fnlttSinglAcnt.json` | the **receipt** is the moment: `rcept_no` begins with the receipt date and `rcept_dt` repeats it; a business year is not a disclosure date |
-| CLI web | IR, consensus, policy, macro, industry/theme context | supplementary and non-canonical; retain URL/access time and disclose replay gap |
+| CLI web | fallback news, corporate actions, distributions, consensus; IR, policy, macro, industry/theme context | active fallback when Alpaca is absent; non-canonical, retain URL/access time and disclose replay gap |
 
 ### Toss's two time formats, and the one enum this package guessed
 
@@ -68,11 +76,11 @@ asked for the 200, so it is not evidence here. A weekly or monthly spelling may 
 package does not know it, so a run that needs one is varying a parameter — the section below, not a
 value copied out of this table.
 
-### The listing route, which is where the universe comes from
+### The listing route, which checks current eligibility
 
 `/api/v1/stocks/all` is the one route here that answers with a **roster** rather than with a
-reading, and it is how a run declares the universe it is about to sweep
-(`skills/candidate-research/SKILL.md` owns that procedure; this row is the call it makes). It takes
+reading. Use it to check the curated roster's current eligibility or declare a broader sweep
+(`skills/candidate-research/SKILL.md` owns that procedure). It takes
 four filters — `market`, `status`, `securityType`, `commonShare` — and a run states which it passed,
 because a screen nobody wrote down is not a declared universe.
 

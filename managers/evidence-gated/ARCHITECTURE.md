@@ -66,7 +66,9 @@ empty result), and XBRL statements follow the periodic report, so a quarter anno
 preliminarily has no statement — a gap to record, never one to fill with the preliminary
 figures.
 
-CLI web is supplementary for IR, consensus, policy, macro and theme context. It is not
+CLI web is the fallback for news, corporate actions, distributions and consensus when Alpaca is
+absent, and supplies IR, policy, macro and theme context. Every holding is scanned each cycle.
+Granted-but-unused routes are `lane_not_queried`, distinct from absent or failed routes. It is not
 canonical replay Evidence: a run records checked URLs, access time and unverified scope.
 Failure is explicit and never silently replaced with model knowledge.
 
@@ -85,7 +87,10 @@ kept as provenance. There is no macro score: a regime call is a Brief judgement 
 
 ## Memory contract
 
-The package uses fifteen stable keys documented in `skills/memory-contract/SKILL.md`. Values
+The package uses the stable keys documented in `skills/memory-contract/SKILL.md`, including a
+bounded `coverage/research-index` of names and Evidence references. Bundled KR 74 / US 83 rosters
+provide a reproducible research scope; host source storage is still needed for a fundamental cache.
+Confirmed journal arms, not planned sequences, govern the review-memory record. Values
 are JSON objects with schema version, update instant, supporting Decision/Evidence ids,
 sample/independent cluster counts, computable metrics, missing fields and maturity status.
 Writes reuse a key and create a new revision only when an aggregate changes. A historical
