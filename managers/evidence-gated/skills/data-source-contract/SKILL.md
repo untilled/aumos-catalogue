@@ -5,9 +5,23 @@ description: Route Toss, SEC EDGAR, Alpaca, optional OpenBB/FMP and web research
 
 # Data-source contract
 
-Read `source_request`'s `Allowed:` list before the first request. Never guess a path, and never
-discover a required source only after doing work that assumes it exists. Pass the invocation's exact
-`asOf` on every call even when a vendor endpoint also needs its own end date.
+Read **both** tools' `Allowed:` lists before the first request — `source_request`'s and
+`connection_request`'s. Never guess a path, and never discover a required source only after doing
+work that assumes it exists. Pass the invocation's exact `asOf` on every call even when a vendor
+endpoint also needs its own end date.
+
+⛔ **A vendor absent from one list is not an absent vendor.** The table below is the whole reason:
+the split is by where the credential lives, not by what the data is, so market data sits behind
+`connection_request` and filings behind `source_request`. Measured on
+`run_3a48eaaa505241d5af94fb490d7c23c6`: four runs of five abandoned every price, bar and calendar
+judgement — `trendState`, `exitCheck`, `entryQualityGate`, `crossCheckPrice`, `scan`,
+`opportunityMetrics`, `indicators`, `relativeStrength`, `sectorStrength`, the `signalPaper` scoring
+and the session procurement for `nextReviewSequence` — after reading only `source_request`'s list
+and concluding the Toss route was gone. It was installed with twenty paths throughout, and no call
+was ever made. ⚠️ **A miss in one list is not a route failure**, so the sibling-route test below
+does not apply to it: there is no failed call to interpret. Look in the other list first, and never
+write the miss to the Brief or to `failures/repeated-patterns` — a run that files it there hands
+every later run a diagnostic rule that reproduces the same wrong answer.
 
 ## Responsibility and endpoints
 
@@ -16,6 +30,14 @@ discover a required source only after doing work that assumes it exists. Pass th
 handed no key; SEC EDGAR and 금융감독원 are documents with keys of their own, so their calls go
 through `source_request`. A vendor whose login this fund does not hold has no tool at all — that is
 a different thing from a call that failed.
+
+⚠️ **There are two Toss's in this table and only one of them is a tool call.** The 토스 *login* is
+market data and is reached through `connection_request`. The Toss *broker connector* — portfolio,
+cash, fills, the order path — is Kernel-owned and reached through neither tool. ⛔ Do not read
+"Toss is market data, not the broker connector" as an argument about which tool: it is an argument
+about which Toss, and following it into `source_request` lands on a list Toss was never on.
+`connection_request`'s own first line is *"Ask a broker the investor has already connected"*, which
+is what makes the wrong turn look right.
 
 | provider | tool | catalogue endpoints used here | time meaning |
 |---|---|---|---|

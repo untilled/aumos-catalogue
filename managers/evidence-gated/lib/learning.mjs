@@ -1,4 +1,4 @@
-import { diagnostic, finite, round } from './diagnostics.mjs'
+import { diagnostic, finite, round, stateLoss } from './diagnostics.mjs'
 import { forwardOutcome } from './outcomes.mjs'
 import { METHODOLOGY } from './constants.mjs'
 
@@ -282,8 +282,39 @@ function mergeAdmissions(openWindows, admissions, diagnostics, asOf) {
   return registered
 }
 
-export function signalPaper({ rows = [], state = {}, admissions = [], horizons = [5, 20, 60], asOf } = {}) {
+/**
+ * ── The carried track arrives as `state`, and the shape that is not it (#137) ─
+ *
+ * ⛔ **`signalPaper({ openWindows: [...] })` used to succeed.** It read
+ * `state.openWindows`, found nothing, returned `trackStatus: 'empty'` with
+ * `paper_track_empty` — whose wording is *"a run that registered nothing"* —
+ * and a `nextState` with `openWindows: []`. §5 then says to write that back
+ * **verbatim** and forbids assembling it by hand, so a run reading canon
+ * exactly deletes the track and records the deletion as a cold start. Measured
+ * on `run_3a48eaaa505241d5af94fb490d7c23c6`, where `learning/paper-cohorts`
+ * held exactly one window (139260) and it is this book's only forward research
+ * sample — and the paper track is the only path to the 30-sample promotion
+ * gate (#118), so the erasure resets that gate silently and permanently.
+ *
+ * Three things made it look like normal operation: it did not refuse, the
+ * diagnostic argued the opposite of what happened, and the prompt insisted on
+ * writing the result back. So all three are answered — the misplaced shape is
+ * refused here, `paper_track_empty` now names the input, and `PROMPT.md` §5
+ * names the parameter.
+ *
+ * ⛔ **Refused, not aliased.** Accepting a top-level `openWindows` as a synonym
+ * would take one run's input and leave the next caller — passing `closed`, or a
+ * key this package adds later — in the same silence. There is one shape and it
+ * says so.
+ */
+const MISPLACED_STATE_KEYS = ['openWindows', 'closed', 'maturedThisRun']
+
+export function signalPaper({ rows = [], state = {}, admissions = [], horizons = [5, 20, 60], asOf, ...rest } = {}) {
   const diagnostics = []
+  const misplaced = MISPLACED_STATE_KEYS.filter((key) => rest[key] !== undefined)
+  if (misplaced.length) {
+    diagnostics.push(diagnostic('paper_state_misplaced', 'blocked', 'The carried track arrives as `state` — the whole value read from `learning/paper-cohorts` — not as top-level fields. Read at the top level it is invisible, and the `nextState` this would return is the erasure of the track', 'state', { misplaced }))
+  }
   const scored = []
   const closed = JSON.parse(JSON.stringify(state?.closed ?? {}))
   const priorWindows = state?.openWindows ?? []
@@ -357,7 +388,14 @@ export function signalPaper({ rows = [], state = {}, admissions = [], horizons =
   }
   const trackStatus = openWindows.length === 0 && Object.keys(closed).length === 0 ? 'empty' : 'accruing'
   if (trackStatus === 'empty') {
-    diagnostics.push(diagnostic('paper_track_empty', 'unevaluated', 'The paper track holds no window and no closed sum. It is the only path to the 30-sample promotion gate, so an empty track is a run that registered nothing rather than a run with nothing to say', 'state', { registeredThisRun: registered.length }))
+    /**
+     * ⚠️ **The second sentence is new, and the first one is why.** (#137) This
+     * message argued that an empty track is a run that registered nothing —
+     * which is true of a cold start and false of the failure that was actually
+     * happening, a carried track handed in under the wrong key. A run reading
+     * it was confirmed in the diagnosis opposite to the one it needed.
+     */
+    diagnostics.push(diagnostic('paper_track_empty', 'unevaluated', 'The paper track holds no window and no closed sum. It is the only path to the 30-sample promotion gate, so an empty track is a run that registered nothing rather than a run with nothing to say — unless the track was carried in under the wrong key: check that the value read from `learning/paper-cohorts` was passed as `state` before recording this as a cold start', 'state', { registeredThisRun: registered.length }))
   }
 
   const bucket = () => ({ samples: 0, sumExcess: 0, sumReturn: 0, wins: 0, absoluteWins: 0, absoluteSamples: 0 })
@@ -407,6 +445,20 @@ export function signalPaper({ rows = [], state = {}, admissions = [], horizons =
       }
     }
   }
+  /**
+   * The general rule (#137): what was carried in comes back out, minus only
+   * the windows this run can name as matured. `stateLoss` states it once for
+   * both this and `reconcileArmedReviews`.
+   */
+  const windowLoss = stateLoss({
+    code: 'paper_windows_lost',
+    path: 'nextState.openWindows',
+    before: priorWindows.map((window) => window?.symbol ?? null),
+    after: openWindows.map((window) => window?.symbol ?? null),
+    accountedFor: matured,
+    message: 'A window carried into this run is missing from the state it would write back, and nothing matured it. The track is the only path to the promotion gate, so a state smaller than the one read is a sample deleted rather than a run with nothing to say',
+  })
+  if (windowLoss) diagnostics.push(windowLoss)
   const versions = [...new Set(scored.map((entry) => entry.ruleVersion))]
   if (versions.length > 1) {
     diagnostics.push(diagnostic('paper_rule_versions_mixed', 'unevaluated', 'Rows judged under different rule versions are reported together but must not be pooled into one verdict', 'rows', { versions }))

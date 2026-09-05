@@ -148,6 +148,10 @@ reaches a vendor this machine has a key filed for; `connection_request` reaches 
 **connected**, and the manager is handed nothing. Telling a flow to fetch prices through the first
 one is telling it to use a source this fund no longer has.
 
+⛔ **And a vendor missing from one list is not a missing vendor** — it is a vendor behind the other
+tool. `PROMPT.md` §2 now loads this paragraph rather than only citing it at dispatch, because the
+run that concluded the Toss lane was gone had not reached dispatch yet.
+
 ⛔ **Do not hand a flow your private memory.** The namespace is this instance and the flows
 share it; a flow that was told what a calibration key says will write about it in prose, and
 prose is not what `skills/memory-contract/SKILL.md` accepts.

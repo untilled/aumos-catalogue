@@ -187,6 +187,22 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   무장할 `intent`를 돌려주고, `resolveTrancheWake`가 발화한 plan의 이벤트 summary에서 그 마커를
   다시 읽는다 — 읽을 것이 그것밖에 없기 때문이다.
   ([#120](https://github.com/untilled/aumos-catalogue/issues/120))
+- **미래나 날짜를 담은 durable 키는 되읽을 수 없다.** `memory_read`는 ISO-8601 모양이면서 `asOf`
+  보다 뒤인 문자열이 하나라도 있으면 결과 전체를 거부하고, 매칭 패턴은 **날짜만 있는 형태도**
+  포함한다 — bare `2026-09-05`는 그 날의 **끝**과 비교된다. SEC의 `filed`가 뜻하는 것이 그것이기
+  때문이다. `run/armed-reviews`는 구조적으로 미래이고 `run/watch-alerts`는 현재 세션을 이름으로
+  담았으므로, 둘 다 정상 동작에서 거부됐다. `untilled/aumos#659` 이전에는 거부가 키 단위가 아니라
+  읽기 단위였고, 그래서 오염된 키 하나가 키 없는 네임스페이스 읽기 전체를 죽였다. 그 읽기는 이제
+  엔트리 단위로 접히고 떨군 키를 `omitted.keys`로 이름 대서 돌려준다. ⚠️ **그 키 자체는 여전히
+  읽히지 않는다.** 달라진 것은 나머지 네임스페이스가 산다는 것과 부재가 더 이상 조용하지 않다는
+  것이다 — 그래서 여기 인코딩도 «대신»이 아니라 «함께» 바뀌었다. 패키지 쪽 답은 타임스탬프 모양의
+  문자열을 쓰지 않는 것이다: 실제로 순간인 값에는 epoch ms, 애초에 순간이 아니었던 필드에는
+  `session-` 접두사 라벨. ⛔ 나머지 절반은 면제가 아니었고, 그것은 열린 채 남은 것이 아니라
+  결정된 것이다 — 어느 필드가 예정인가는 매니저의 사적 스키마이고, 그것을 아는 게이트웨이는 모든
+  매니저의 필드 목록이라는 두 번째 표다.
+  ([#136](https://github.com/untilled/aumos-catalogue/issues/136),
+  [untilled/aumos#658](https://github.com/untilled/aumos/issues/658),
+  [untilled/aumos#659](https://github.com/untilled/aumos/issues/659))
 - **페이퍼 트랙은 인스턴스 사설 메모리에 산다 — 담을 수 있는 곳이 그것뿐이기 때문이다.** 페이퍼
   콜은 주문도 체결도 없으므로 Decision이 아니고, 런타임은 `thesis:write`를 내지 않으며
   `thesis:read`는 도구를 하나도 주지 않는다. 그래서 `learning/paper-cohorts`가 누적 합과 열린 관측

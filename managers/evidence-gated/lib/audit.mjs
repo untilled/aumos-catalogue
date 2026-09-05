@@ -95,6 +95,48 @@ function subjectOf(row) {
   return typeof value?.symbol === 'string' ? value.symbol || null : null
 }
 
+/**
+ * The instant an `at-time` WATCH is armed against, or `null` for any other
+ * trigger.
+ *
+ * ⚠️ **This is the distinction `audit_watch_subjectless` did not draw, and the
+ * gap it left is a run blocking its own successor.** (#138) A subjectless
+ * *price* WATCH really cannot be evaluated — "below what, on what" has no
+ * answer — but a time WATCH carries its entire condition in `at`: the firing
+ * instant **is** the condition, and it retires by firing. The rule refused both
+ * as one, so the market review this package arms every run — `owner`, `flow`,
+ * `task`, `at`, `session`, `rule`, `intent`, and by design no `subject`, because
+ * a market review is about the sleeve rather than a name — came back as three
+ * blockers on the *next* run's pre-flight. Canon armed it and canon then refused
+ * to plan because of it. Measured on `run_3a48eaaa505241d5af94fb490d7c23c6`:
+ * four of five runs opened with this blocker standing.
+ *
+ * ⛔ The exemption is keyed on the trigger and not on the `market-review:`
+ * marker, which was the other way to close it. The marker would exempt exactly
+ * this package's reviews and leave every other subjectless time promise — an
+ * earnings checkpoint armed as an `at-time` WATCH, which `PROMPT.md` §4
+ * requires — a blocker for a reason that is not true of it either. What makes a
+ * time WATCH evaluable is that it is a time WATCH.
+ *
+ * ⛔ And it is not closed by giving the review a `subject`. The three-way
+ * separation the run measured found that a held, claimed symbol passes: an
+ * `allocate` review would then be recorded as being about 069500, which is not
+ * what it is about. Passing the gate by making the record wrong is worse than
+ * the gate.
+ *
+ * Both shapes are read because both arrive: a proposal's trigger is
+ * `{ kind: 'at-time', at }`, and a row straight out of `nextReviewSequence`
+ * carries a bare `at` and no trigger at all. A run that passes the sequence
+ * through unchanged is the case #138 measured.
+ */
+function atTimeInstant(watch) {
+  const kind = watch?.trigger?.kind ?? watch?.triggerKind ?? null
+  if (kind !== null && kind !== 'at-time') return null
+  const at = watch?.trigger?.at ?? watch?.at ?? null
+  if (typeof at !== 'string' || !Number.isFinite(Date.parse(at))) return null
+  return at
+}
+
 export function harnessAudit({ positions = [], watches = [], theses = [], decisions = [], gateStaleDays = GATE_STALE_DAYS, managedSince = null, config = {}, asOf } = {}) {
   const diagnostics = []
   const issues = []
@@ -109,7 +151,12 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
   for (const watch of watches) {
     const subject = subjectOf(watch)
     if (!subject) {
-      add('blocker', 'audit_watch_subjectless', null, 'A revisit promise with no subject can never be evaluated or retired')
+      const at = atTimeInstant(watch)
+      if (at === null) {
+        add('blocker', 'audit_watch_subjectless', null, 'A revisit promise with no subject can never be evaluated or retired')
+        continue
+      }
+      add('warn', 'audit_watch_subjectless_at_time', null, 'A time-triggered promise carries no subject; the firing instant is its whole condition, so it is evaluable and it retires by firing — but nothing in it says what it is about', { at })
       continue
     }
     if (!held.has(subject) && !claimed.has(subject)) {
