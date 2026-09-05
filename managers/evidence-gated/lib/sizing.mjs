@@ -283,6 +283,13 @@ export function legacySizeSuggestion(input) {
  * than zero — reading a missing stop as "no risk" is exactly the direction this
  * gate exists to refuse.
  *
+ * ⚠️ **`parkedLiquidity` was in that sentence and not in this code until #141.**
+ * Only `core` was skipped, so a parking row reached the stop test, declared no
+ * stop — it has none to declare — and came back `portfolio_heat_stop_missing`
+ * every run: the gate reported *"nobody said how much this can lose"* about the
+ * one holding in the book whose answer is *"it is the cash"*. Prose and
+ * computation disagreed, and the computation is what ran.
+ *
  * Above the cap, a run that also proposes new non-core risk is blocked; a book
  * that is already over on its holdings alone warns instead. ⚠️ That rule used
  * to be written here in literals, which is why `config.grandfather` could be
@@ -302,7 +309,7 @@ function portfolioHeat({ positions, proposed, cap, grandfather, diagnostics }) {
   const contribution = (rows, label, report = true) => {
     let total = 0
     for (const row of rows) {
-      if (row?.core) continue
+      if (row?.core || row?.parkedLiquidity === true) continue
       if (!finite(row?.weight)) continue
       if (!finite(row?.stopLossPct)) {
         if (report) diagnostics.push(diagnostic('portfolio_heat_stop_missing', 'unevaluated', 'A non-core row without a stop distance cannot contribute measured heat; it is not zero risk', `${label}.stopLossPct`, { symbol: row?.symbol ?? null }))
@@ -359,6 +366,12 @@ function portfolioHeat({ positions, proposed, cap, grandfather, diagnostics }) {
  * is refused while `blocksNewNonCoreWhenBreached` holds. Turning `enabled` off
  * restores the older, blunter reading in which any breach refuses — including
  * one the book arrived with. (#109)
+ *
+ * ⚠️ **`parkedLiquidity` is read here since #141, and it moves exactly three
+ * axes.** Sector, theme and factor are this package's and this config's caps
+ * on a *shared loss path*, and a cash equivalent is not on one; the position
+ * axis is the Mandate's `maxPositionWeight` and is untouched. The comment in
+ * `accumulate` states the boundary and why it stops there.
  */
 export function concentration({ positions = [], proposed = [], caps = {}, config = {} }) {
   const diagnostics = []
@@ -375,6 +388,34 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
       if (!finite(row?.weight) || row.weight < 0) continue
       if (nonCoreOnly && row?.core) continue
       totals.position.set(row.symbol, (totals.position.get(row.symbol) ?? 0) + row.weight)
+      /**
+       * ⚠️ **Parked liquidity leaves the shared-loss-path axes here, and stays
+       * on the position axis one line above. That boundary is the whole of
+       * #141 and it is not a rounding of it.**
+       *
+       * `parkedLiquidity` arrived on every row and was read by nothing, so the
+       * KRW parking symbol — 153130 at 0.27052 of the book — was summed onto
+       * `krw-currency` like any other holding and filled a 0.15 factor budget
+       * to 0.31258 on its own. Everything quoted in won was then refused as
+       * `concentration_breach_expanded`: not because the book was concentrated,
+       * but because its **cash** was denominated. Sector, theme and factor ask
+       * *"how much of this book dies down one path"*, and a cash equivalent
+       * held to not be in the market is not on any path. Counting it there did
+       * not measure a risk; it spent a budget.
+       *
+       * ⛔ **`position` is deliberately not in this exemption.** That axis is
+       * the Mandate's `maxPositionWeight`, the Kernel refuses a proposal over
+       * it, and nothing in this package may waive it — `skills/us-sleeve`
+       * records the run that read a *"reserve liquidity"* label as permission
+       * to size past it. Configuration and classification can only ever make
+       * this manager stricter than the Mandate. So 153130 at 0.27052 against
+       * 0.20 is still a breach, still grandfathered, still reported every run,
+       * and a run that reads this exemption as licence to grow it has read it
+       * backwards. What is exempted here are the caps this package and its
+       * config own, on axes that name a shared loss path; what is not exempted
+       * is the investor's own declaration about a single name.
+       */
+      if (row?.parkedLiquidity === true) continue
       if (row.sector) totals.sector.set(row.sector, (totals.sector.get(row.sector) ?? 0) + row.weight)
       for (const theme of row.themes ?? []) totals.theme.set(theme, (totals.theme.get(theme) ?? 0) + row.weight)
       /**
@@ -429,6 +470,35 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
     }
   }
   /**
+   * ── The label is a claim, and nothing was checking it (#141) ─────────────
+   *
+   * The factor axis is the only cap in this package whose **subject** the
+   * package does not define. Sector and theme names arrive from the same
+   * place, but a sector is read off the listing and a theme is prose the
+   * investor can see in Brief; a factor is a string a run wrote down, and from
+   * the next run onward it is an allocation limit with the investor's number
+   * attached to it. `krw-currency` is what that produced — a currency of
+   * quotation labelled as a shared loss path, standing at 0.31258 against a
+   * 0.15 budget, so every won-denominated name in the market was refused by a
+   * cap the investor never declared. No `blocked` is added here: the label may
+   * well be right, and a gate that refused a book for the *name* of its risk
+   * would be inventing exactly the kind of allocation decision this diagnostic
+   * exists to make visible. It asks, in the report, once per run, per label.
+   */
+  const factorReviewCap = caps.factor
+  if (finite(factorReviewCap) && factorReviewCap > 0) {
+    for (const [key, weight] of totals.factor.entries()) {
+      if (weight < factorReviewCap * METHODOLOGY.factorLabelReviewMultiple) continue
+      diagnostics.push(diagnostic(
+        'concentration_factor_label_unexamined',
+        'unevaluated',
+        'One factor label alone stands at twice its cap or more. That is a question about the label before it is a finding about the book: say what shared loss path it names, or withdraw it if it is a currency of quotation, a venue or a listing country — a denomination is not a loss path, and capping one is a country allocation decision the Mandate never made',
+        'factors',
+        { factor: key, weight: round(weight), cap: factorReviewCap, multipleOfCap: round(weight / factorReviewCap, 2) },
+      ))
+    }
+  }
+  /**
    * ⚠️ **The direction is read before the tolerance.** `enabled: false` is a
    * request not to tolerate a breach; it is never a request to refuse the trim
    * that resolves one. Reading the tolerance first put the inversion #109 is
@@ -461,6 +531,13 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
       grandfatheredBreaches: breaches.filter((row) => row.grandfathered),
       blocksExpansionOf: grandfather.blocksNewNonCoreWhenBreached ? breaches.filter((row) => row.grandfathered).map((row) => ({ kind: row.kind, key: row.key })) : [],
       riskReducingAlwaysAllowed: true,
+      /**
+       * ⚠️ Named rather than silently dropped. An exemption nobody can see in
+       * the response is the same shape as the flag nobody read: the run has to
+       * be able to say which rows left the sector, theme, factor and heat
+       * axes, and that they are still on the position axis. (#141)
+       */
+      parkedLiquidityExcluded: [...new Set([...standing, ...proposed].filter((row) => row?.parkedLiquidity === true).map((row) => row?.symbol ?? null))],
       heat,
       exposures: Object.fromEntries(Object.entries(totals).map(([kind, map]) => [kind, Object.fromEntries([...map].map(([key, weight]) => [key, round(weight)]))])),
     },
