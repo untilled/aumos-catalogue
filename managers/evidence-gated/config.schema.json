@@ -36,7 +36,7 @@
           "minimum": 0.05,
           "maximum": 0.3,
           "default": 0.15,
-          "description": "Cap on one shared loss path across sectors — the cross-sector complex a sector cap cannot see. Positions declare their factors; an undeclared factor is unevaluated, never zero."
+          "description": "Cap on one shared loss path across sectors — the cross-sector complex a sector cap cannot see. Positions declare their factors; an undeclared factor is unevaluated, never zero. ⚠️ A denomination is not a loss path. The currency a holding is quoted in, the venue it lists on and the country of that venue are not shared loss paths, and putting this cap on one of them makes a country allocation decision the Mandate never made — a krw-currency label once stood at 0.31 against this 0.15 and refused every won-denominated name in the market, on a book whose own parked cash had filled the axis. The factor a row declares names what would take several holdings down together; if the label would still be true of a holding that cannot lose money to it, it is not one."
         }
       }
     },

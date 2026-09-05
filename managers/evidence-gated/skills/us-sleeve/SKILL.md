@@ -11,7 +11,11 @@ Brief classifies SGOV as reserve liquidity; an unnamed symbol is an ordinary pos
 no setting that makes one reserve liquidity, and naming a symbol anywhere waives no cap.** A
 `reserveLiquiditySymbols` key was declared and read by nothing, and a run read it as permission to
 size past `maxPositionWeight` — configuration in this package can only ever be stricter than the
-Mandate, and parked liquidity is a classification, never an exemption. **You never spend KR sleeve capacity**
+Mandate, and parked liquidity is a classification, never an exemption from an investor declaration.
+⚠️ What the classification does do, since #141, is keep a cash equivalent off the axes that measure a
+**shared loss path** — `concentration`'s sector, theme and factor caps and portfolio heat, which are
+this package's and its config's. Declare `parkedLiquidity: true` on the row and it leaves those four;
+it stays on `maxPositionWeight` exactly as before. **You never spend KR sleeve capacity**
 and you never propose a cross-market `REBALANCE`.
 
 Run steps 1–5 of `PROMPT.md` over XNAS/XNYS only, then hand back what §"What a flow must

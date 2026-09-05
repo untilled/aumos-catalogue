@@ -17,7 +17,7 @@
     "research": ["thesis-metadata", "research-gate", "challenge-block", "resize-lens", "thesis-field-contract", "single-name-tranche-plan", "tranche-plan-not-cash-deployment"],
     "scanner": ["buy-radar", "opportunity-five-axis", "trend", "upside-radar", "quality-pullback-lens", "entry-quality-gate", "eq-v2-window-artifact", "mean-reversion-unconfirmed", "sector-rank-and-regime", "research-queue", "bot-baseline-never-traded", "radar-lanes", "radar-lane-starvation", "lens-envelope-reachability", "lens-envelope-is-the-scanner-source", "regime-tag-provenance", "baseline-signals-are-admissible"],
     "schedule": ["dst-holiday-early-close", "late-missing-duplicate-outage", "theme-radar-due", "theme-radar-workflow-wired", "wake-flow-dispatch", "configured-buffers-reach-the-calculation", "stated-cadence-draws-the-calendar", "dispatch-gaps-and-rearm-dedupe", "armed-state-is-what-stands"],
-    "sizing": ["legacy-sizing", "specialist-budget", "global-denominator", "factor-concentration", "grandfathered-caps", "executable-experimental-ceiling", "control-arm-limits"],
+    "sizing": ["legacy-sizing", "specialist-budget", "global-denominator", "factor-concentration", "grandfathered-caps", "executable-experimental-ceiling", "control-arm-limits", "parked-liquidity-is-not-a-loss-path", "factor-label-unexamined"],
     "source-parsers": ["sec-dart-asof", "adjustment-conflict"],
     "watch": ["future-at-time", "already-met", "producerless-event-rejected", "bounded-retry", "expiry-forced-review", "expiry-before-trigger", "drift-already-met", "no-new-low-dual-lens", "cluster-block", "intraday-cadence-and-near", "tranche-intent-round-trip", "session-label-is-not-a-timestamp"]
   }
