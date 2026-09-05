@@ -41,7 +41,32 @@ Since #87 that costs more than it did: every wake dispatches one flow, so two `k
 armed half an hour apart each run the Korean sleeve and each seal a judgement — two rows on the
 same book, on the same day, neither saying which one read the close.
 
-Three rows, replaced every run rather than appended to, so the key does not grow.
+Three rows, and the state written back is what is **standing** — every review still open, plus
+what this run armed. ⛔ Not a copy of this run's sequence: a run with nothing to arm would then
+write an empty list over three live reviews, and the next run re-arms all three. A row leaves by
+its instant passing and by nothing else, which is what keeps the key from growing.
+
+### The encoding, and why the instant is a number
+
+```json
+{ "schemaVersion": 2, "updatedAsOf": "…", "armed": [{ "flow": "kr-sleeve", "atEpochMs": 1788735600000 }] }
+```
+
+⚠️ **`atEpochMs`, not RFC 3339, and this is the canonical shape.** `memory_read` refuses a result
+carrying any **string** timestamp later than `asOf` — `post-as-of-timestamp` — and this key holds
+future instants by construction, so the better it was filled the more certainly it was refused.
+Measured on `run_3a48eaaa505241d5af94fb490d7c23c6`: three armed rows, three violations, the read
+refused; and because the refusal is per read rather than per key, the run's first keyless
+`memory_read` died with it and twelve keys had to be fetched one at a time. Only an empty key came
+back cleanly.
+
+The guard walks strings, so the instant is written as a number. The meaning is identical and the
+key becomes readable. `reconcileArmedReviews` writes this shape and reads either it or the RFC 3339
+rows an earlier version wrote. ⛔ It is not agreement with the rule — a key whose whole content is
+scheduled is a shape the guard has no good answer for, and that half is `untilled/aumos`'s.
+
+⚠️ **`toArm` keeps RFC 3339.** It leaves in a `DecisionProposal`, where AMP takes strings and this
+guard does not run. Only what is written back to memory changes shape.
 
 ⛔ **A bridge, not the fix.** Private memory is scoped to this instance, so a new instance starts
 blind and this record can drift from the WATCHes Aumos actually holds. Two copies of one fact
@@ -50,8 +75,17 @@ diverge. The fix is a read path and it is not this package's to publish. (#97)
 ### The key that lasts one session
 
 `run/watch-alerts` is what stops the same WATCH from waking somebody four times as a price
-wobbles across its level. It holds `sessionDate` and the `sessionKey`s that already alerted in
-**that** session, and when the date changes the list is replaced rather than appended to.
+wobbles across its level. It holds a `session` label and the `sessionKey`s that already alerted in
+**that** session, and when the session rolls the list is replaced rather than appended to.
+
+⚠️ **The label is `session-YYYY-MM-DD`, and the prefix is load-bearing.** The field held a bare
+date until 0.4.18, and a bare date is a timestamp to the host: the pattern `memory_read` matches
+deliberately includes the date-only form, because SEC's `filed` is written that way and *"some time
+on the 5th"* can be later than an `asOf` earlier in the 5th — so a date-only value is compared
+against the **end** of the day it names. Every session date this manager writes is on or after
+`asOf`'s UTC date, so all three flows were refused, and the key survived only by never having been
+written. ⛔ Not epoch milliseconds: this field answers *which session*, not *which instant*, and a
+number would claim a moment it does not have. `sessionKey` already had this shape.
 
 That bound is the whole design. A key that accumulated every alert ever raised would be the
 ledger this document forbids two sections up, and it would grow without limit for a fact that

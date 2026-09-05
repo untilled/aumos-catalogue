@@ -1,4 +1,4 @@
-import { diagnostic, MANAGER_ID, ALLOCATOR_FLOW, DISPATCHABLE_FLOWS } from './diagnostics.mjs'
+import { diagnostic, finite, stateLoss, MANAGER_ID, ALLOCATOR_FLOW, DISPATCHABLE_FLOWS } from './diagnostics.mjs'
 
 function partsAt(instant, timeZone) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -381,14 +381,73 @@ export function resolveWakeFlow({ summary, intent, watchId } = {}) {
  * WATCHes Aumos actually holds. Two copies of one fact diverge; the fix is a
  * read path, and that is Aumos's to publish. (#97)
  */
-export function reconcileArmedReviews({ previous = null, sequence = [], asOf } = {}) {
+/**
+ * ── The encoding, and why an instant in this key is a number (#136) ────────
+ *
+ * ⚠️ **This key holds future instants by design, and that is exactly what made
+ * it unreadable.** Aumos rejects a `memory_read` whose result carries any
+ * **string** timestamp later than `asOf` — `post-as-of-timestamp` — so a
+ * correctly filled `run/armed-reviews` was refused in proportion to how well it
+ * was filled, and only an empty one came back. Measured on
+ * `run_3a48eaaa505241d5af94fb490d7c23c6`: three armed rows, three violations,
+ * the whole read refused. Worse, the run's first keyless `memory_read` died on
+ * this one key and twelve keys had to be fetched one at a time.
+ *
+ * The guard walks strings. So the instant is stored as **epoch milliseconds**,
+ * a number, and `skills/memory-contract/SKILL.md` carries that encoding as
+ * canon. The meaning is unchanged and the key becomes readable.
+ *
+ * ⛔ This is a package-side accommodation of a host rule, not agreement with
+ * it: a schedule key whose whole content is future is a shape the guard has no
+ * good answer for, and the exemption belongs in the host. `untilled/aumos` owns
+ * that half.
+ *
+ * ⚠️ **`toArm` is not re-encoded.** It leaves in a `DecisionProposal` as an
+ * `at-time` trigger, where RFC 3339 is what AMP takes and the guard does not
+ * run. Only what is written back to memory changes shape.
+ *
+ * A row written before this — `{ flow, at }` with a string — is still read,
+ * because an instance's key was written by the version before this one and a
+ * migration that starts by discarding the record is the loss this whole
+ * function exists to prevent.
+ */
+function armedInstant(row) {
+  if (finite(row?.atEpochMs)) return row.atEpochMs
+  const parsed = Date.parse(row?.at)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const armedKey = (row) => {
+  const instant = armedInstant(row)
+  return instant === null ? null : `${row?.flow}|${instant}`
+}
+
+export function reconcileArmedReviews({ previous = null, sequence = [], armed: misplacedArmed, asOf } = {}) {
   const diagnostics = []
-  const armed = Array.isArray(previous?.armed) ? previous.armed : []
-  const stillOpen = armed.filter((row) => Number.isFinite(Date.parse(row?.at)) && Date.parse(row.at) > Date.parse(asOf))
+  /**
+   * ⛔ **The record arrives under `previous`, and a run that passed it at the
+   * top level was told nothing.** (#136) `reconcileArmedReviews({ armed: [...],
+   * sequence: [...] })` read `previous` as `null`, saw no standing arm, and
+   * returned every review as `toArm` — so the run re-armed three reviews that
+   * were already standing and woke each sleeve twice, which is the state #87
+   * existed to remove. The call succeeded and looked ordinary.
+   *
+   * That is the same defect as §5's `signalPaper` shape, one function over, and
+   * it is closed the same way: name the parameter in the prose, and refuse the
+   * shape that is not it rather than treating it as an empty carry.
+   */
+  if (misplacedArmed !== undefined) {
+    diagnostics.push(diagnostic('armed_state_misplaced', 'blocked', 'The standing arms arrive as `previous` — the whole value read from `run/armed-reviews` — not as a top-level `armed`. Read at the top level they are invisible, and every standing review is re-armed', 'armed', { received: Array.isArray(misplacedArmed) ? misplacedArmed.length : null }))
+  }
+  const recorded = Array.isArray(previous?.armed) ? previous.armed : []
+  const stillOpen = recorded.filter((row) => {
+    const instant = armedInstant(row)
+    return instant !== null && instant > Date.parse(asOf)
+  })
   const duplicates = []
   const toArm = []
   for (const row of sequence) {
-    const match = stillOpen.find((open) => open.flow === row.flow && open.at === row.at)
+    const match = stillOpen.find((open) => open.flow === row.flow && armedInstant(open) === armedInstant(row))
     if (match) {
       duplicates.push(row.flow)
       continue
@@ -398,19 +457,46 @@ export function reconcileArmedReviews({ previous = null, sequence = [], asOf } =
   if (duplicates.length) {
     diagnostics.push(diagnostic('review_already_armed', 'info', 'A review at this instant is already armed for this flow; arming it again would wake the sleeve twice', 'sequence', { flows: duplicates }))
   }
-  const superseded = stillOpen.filter((open) => sequence.some((row) => row.flow === open.flow && row.at !== open.at))
+  const superseded = stillOpen.filter((open) => sequence.some((row) => row.flow === open.flow && armedInstant(row) !== armedInstant(open)))
   if (superseded.length) {
     diagnostics.push(diagnostic('review_superseded', 'info', 'A previously armed review is being replaced by one at a different instant; the old one cannot be withdrawn without a read path', 'previous', { superseded }))
   }
+  /**
+   * ⚠️ **`armed` is what is standing, not what this run happened to arm.**
+   * (#136) It was `sequence.map(...)` — a copy of this run's sequence — so a
+   * run with nothing to arm wrote an empty `armed` over three live reviews and
+   * the next run re-armed all three. A review does not stop standing because
+   * this run had no reason to mention it; it stops standing when it fires.
+   *
+   * So the state is the union: everything still open, plus everything armed
+   * now. A row leaves it by its instant passing, and by nothing else.
+   */
+  const nextArmed = []
+  for (const row of [...stillOpen, ...toArm]) {
+    const instant = armedInstant(row)
+    if (instant === null) continue
+    if (nextArmed.some((kept) => kept.flow === row.flow && kept.atEpochMs === instant)) continue
+    nextArmed.push({ flow: row.flow, atEpochMs: instant })
+  }
+  nextArmed.sort((a, b) => a.atEpochMs - b.atEpochMs)
+  const loss = stateLoss({
+    code: 'armed_state_lost',
+    path: 'nextState.armed',
+    before: stillOpen.map(armedKey),
+    after: nextArmed.map(armedKey),
+    message: 'A standing review is missing from the state this run would write back; a record smaller than the arms it was built from is a review nobody can dedupe against and a sleeve woken twice',
+  })
+  if (loss) diagnostics.push(loss)
   return {
     data: {
       toArm,
       duplicateFlows: duplicates,
       superseded,
+      stillOpen,
       nextState: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         updatedAsOf: asOf ?? null,
-        armed: sequence.map((row) => ({ flow: row.flow, at: row.at })),
+        armed: nextArmed,
       },
     },
     diagnostics,

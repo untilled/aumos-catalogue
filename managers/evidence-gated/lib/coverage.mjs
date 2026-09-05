@@ -374,25 +374,70 @@ export function evaluateWatch({ watch, observation = {}, blocks = [], alertedSes
  * revision — which is the same rule every other key here follows: a revision
  * records that an aggregate moved, not that a run happened.
  */
+/**
+ * The session this key is bounded by, written so it is not mistaken for an
+ * instant.
+ *
+ * ⚠️ **A bare date is a timestamp to the host, and this key held one.** (#136)
+ * `memory_read` refuses a result carrying a string later than `asOf`, and the
+ * pattern it matches deliberately includes the date-only form — SEC's `filed`
+ * is written that way and *"some time on the 5th"* really can be after an `asOf`
+ * earlier in the 5th. So a date-only field is compared against the **end** of
+ * that day, and a session label is refused on the day it names.
+ *
+ * That is not an edge case here: every session date this manager writes is on
+ * or after `asOf`'s UTC date, because KST and ET are both ahead of UTC or the
+ * session is today's. Measured against the host's own matcher — `allocate` at
+ * 08:00 KST (`asOf` 23:00Z the previous day, session tomorrow's date),
+ * `kr-sleeve` at 15:45 KST and `us-sleeve` at 16:00 ET (both today's date,
+ * refused because the end of today is after `asOf`) — **all three flows are
+ * refused.** The key survived only by never having been written.
+ *
+ * ⛔ The host is right and this is not a workaround of a bug. Nothing at the
+ * gateway can tell a date that means *published some time that day* from a date
+ * that means *the name of a session*; teaching it to would mean a second table
+ * listing every manager's fields, which `untilled/aumos#658` rejects for that
+ * reason.
+ *
+ * So the field stops being timestamp-shaped, because it was never a timestamp:
+ * it answers *which session*, not *which instant*. `sessionKey` has had that
+ * shape all along — `` `${id}|${date}` `` does not match the host's anchored
+ * pattern — and this is the same move on the field beside it.
+ *
+ * ⛔ **Not epoch milliseconds.** That is right for `run/armed-reviews`, whose
+ * `at` genuinely is an instant. A session label written as a number would claim
+ * to be a moment it is not, and pick one of the day's 86,400,000 by fiat.
+ *
+ * ⚠️ **One run's dedupe is lost at the changeover, and it cannot be rescued.**
+ * An entry written under the old shape is unreadable *by the read path* — it
+ * never arrives, so there is nothing for a tolerant reader to be tolerant of,
+ * and a legacy branch here would be a branch that cannot execute. `at` →
+ * `atEpochMs` is the opposite case and does read both. The cost is one session
+ * in which a level that brushes twice wakes somebody twice.
+ */
+const sessionLabel = (sessionDate) => `session-${sessionDate}`
+
 export function watchAlertState({ previous = null, sessionDate, alerting = [], asOf } = {}) {
   const diagnostics = []
   if (typeof sessionDate !== 'string' || sessionDate.length === 0) {
     diagnostics.push(diagnostic('watch_alert_session_missing', 'unevaluated', 'A session date is what bounds this key; without one the alerts of two days would merge', 'sessionDate'))
     return { data: null, diagnostics }
   }
-  const carried = previous?.sessionDate === sessionDate && Array.isArray(previous?.alerted) ? previous.alerted : []
-  if (previous?.sessionDate !== undefined && previous.sessionDate !== sessionDate) {
-    diagnostics.push(diagnostic('watch_alert_session_rolled', 'info', 'A new session replaces the previous session’s alerts rather than appending to them', 'sessionDate', { from: previous.sessionDate, to: sessionDate }))
+  const session = sessionLabel(sessionDate)
+  const carried = previous?.session === session && Array.isArray(previous?.alerted) ? previous.alerted : []
+  if (previous?.session !== undefined && previous.session !== session) {
+    diagnostics.push(diagnostic('watch_alert_session_rolled', 'info', 'A new session replaces the previous session’s alerts rather than appending to them', 'sessionDate', { from: previous.session, to: session }))
   }
   const added = alerting.filter((key) => typeof key === 'string' && key.length > 0 && !carried.includes(key))
   const alerted = [...carried, ...new Set(added)].sort()
-  const changed = alerted.length !== carried.length || previous?.sessionDate !== sessionDate
+  const changed = alerted.length !== carried.length || previous?.session !== session
   return {
     data: {
       changed,
       alerted,
       newlyAlerted: [...new Set(added)].sort(),
-      nextState: { schemaVersion: 1, updatedAsOf: asOf ?? null, sessionDate, alerted },
+      session,
+      nextState: { schemaVersion: 2, updatedAsOf: asOf ?? null, session, alerted },
     },
     diagnostics,
   }

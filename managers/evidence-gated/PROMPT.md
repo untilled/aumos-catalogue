@@ -209,8 +209,24 @@ the first run after a broker is connected, *every* holding is unexplained by def
 
 ### 2. Select the lane and collect evidence
 
-Load `skills/data-source-contract/SKILL.md`. Confirm installed endpoints before relying on them.
-Toss is market data, not the Toss broker connector. SEC EDGAR supplies point-in-time US filings and OpenDART supplies Korean receipts and statements,
+Load `skills/data-source-contract/SKILL.md`, and with it the ⚠️ *"The two are not interchangeable
+and the difference is the credential"* paragraph of `skills/orchestrate/SKILL.md` — it has been
+right about this the whole time, and it was read only at dispatch, which is after the point where
+the wrong turn is taken. Confirm installed endpoints before relying on them, and confirm them
+against **both** tools: which one a vendor is behind is decided by where the
+credential lives, and a source absent from one list is routinely present in the other.
+Toss market data is reached through `connection_request` — the login the investor already
+connected — and never through `source_request`; the Toss **broker connector** (portfolio, cash,
+fills, the order path) is Kernel-owned and neither tool reaches it. ⚠️ Those are two different
+Toss's, and reading the second as the whole of Toss is what sends a run to the wrong allowlist:
+`connection_request`'s own description opens *"Ask a broker the investor has already connected"*,
+so "Toss is not the broker connector" reads as "Toss must be `source_request`", where it is not.
+⛔ **Not finding a vendor in one tool's `Allowed:` list is not evidence the source was removed.**
+Check the other list before concluding anything, and never promote a lookup miss to a lane
+closure in the Brief or in `failures/repeated-patterns` — a wrong diagnosis recorded there is
+inherited by every later run as a rule (measured: four runs of five abandoned judgement for a
+price, bar and calendar lane that was installed and answering throughout).
+SEC EDGAR supplies point-in-time US filings and OpenDART supplies Korean receipts and statements,
 where the receipt — not the business year — is the moment a fact became public;
 Alpaca supplies date-bounded US news, corporate actions and adjusted bars; configured OpenBB/FMP is
 only a long-history supplement. CLI web research may supplement IR, consensus, policy and themes,
@@ -387,14 +403,34 @@ closes. **Pass the invocation's config to `nextReviewSequence`** — `schedule.k
 and `usCloseBufferMinutes` are the investor's, and a run that omits them silently substitutes the
 package's own defaults for a number the install screen said was theirs. Never add 24 hours or reuse a fixed UTC close across DST, holidays or early closes.
 
-**Reconcile before you arm.** Read `run/armed-reviews`, pass it and the sequence to
-`reconcileArmedReviews`, and arm only what it returns in `toArm`. ⚠️ **You cannot read your own
+**Reconcile before you arm.** Read `run/armed-reviews` and pass **the whole value you read as
+`previous`**, the sequence as `sequence`, to `reconcileArmedReviews`; arm only what it returns in
+`toArm`. ⛔ The parameter name is the instruction: passing the standing arms at the top level as
+`armed` reads as `previous: null`, and a call that sees no standing arm re-arms every review —
+three flows woken twice on the same day, which is the state §4 exists to prevent. That shape is
+refused with `armed_state_misplaced` rather than answered. ⚠️ **You cannot read your own
 WATCHes** — the runtime publishes no watch capability — so this key is the only thing standing
 between a re-arm and a second review that wakes the same sleeve twice on the same day. Write
-`nextState` back. A `review_superseded` diagnostic means an older review is still out there and
-cannot be withdrawn; say so in `uncertainty` rather than assuming it replaced itself.
+`nextState` back. It is what is **standing**, not what this run armed: a run with nothing to arm
+still writes back the reviews that are still open, and a state smaller than the arms it was built
+from is refused with `armed_state_lost`. A `review_superseded` diagnostic means an older review is
+still out there and cannot be withdrawn; say so in `uncertainty` rather than assuming it replaced
+itself.
 
-**Arm each one with the `intent` and the `rule` `nextReviewSequence` returns**, verbatim.
+⚠️ **The instants in that key are epoch milliseconds, not RFC 3339.** `run/armed-reviews` holds
+future instants by design and `memory_read` refuses a result carrying any *string* timestamp after
+`asOf`, so a correctly filled key was refused in proportion to how well it was filled — and the
+refusal took the whole namespace read with it, not just this key. `reconcileArmedReviews` writes
+`atEpochMs` and reads either encoding; `skills/memory-contract/SKILL.md` carries the shape. ⛔ Do
+not translate it back to a string when writing, and do not hand-assemble the value.
+
+**Arm each one with the `intent` and the `rule` `nextReviewSequence` returns**, verbatim, and
+with **no `subject`**. ⛔ A market review is about the sleeve, not about a name, and there is no
+`AssetRef` that means "the sleeve" — so giving it a held symbol to satisfy a gate makes the record
+say the review is about that symbol, which is false. `harnessAudit` carries a subjectless
+`at-time` WATCH as a warn (`audit_watch_subjectless_at_time`) rather than a blocker: the firing
+instant is the whole condition and it retires by firing. Subjectless remains a **blocker** for
+every other trigger, where it really is unevaluable.
 `rule` is `{ cron, timeZone }` and goes on the `at-time` trigger beside `at`. ⚠️ **It arms
 nothing.** `at` is still the entire schedule — Aumos wakes on it and on nothing else — and the
 rule is there so the investor's calendar can draw the weeks this manager has not judged yet
@@ -426,9 +462,13 @@ make by one run.
 
 Four steps, in order, and `signalPaper` is called once with all of them:
 
-1. Read `learning/paper-cohorts`. Empty is valid on a first run and is not a reason to stop.
-2. Fetch bars for **every** symbol in its `openWindows`, and pass them as `rows` — a carried window
-   nobody fetched bars for accrues nothing.
+1. Read `learning/paper-cohorts` and pass **the whole value you read as `state`**. ⛔ Not as a
+   top-level `openWindows` — that arrives under a key `signalPaper` does not read, so the track
+   looks empty, and the `nextState` it returns then deletes it. That shape is refused with
+   `paper_state_misplaced`. Empty is valid on a first run and is not a reason to stop; an empty
+   answer from a key that was **not** empty is the failure this step names.
+2. Fetch bars for **every** symbol in its `state.openWindows`, and pass them as `rows` — a carried
+   window nobody fetched bars for accrues nothing.
 3. Pass every `openWindow` that `paperAdmission` admitted in this run as `admissions` — the thesis
    calls from `theme-radar` and the `sectorStrength` baseline signals both.
 4. Write the returned `nextState` back to that key **verbatim**. It is the whole answer: what was
@@ -438,8 +478,10 @@ Four steps, in order, and `signalPaper` is called once with all of them:
 The closed sums carry the history and the matured windows drop out, so the key stays small.
 
 ⚠️ **An empty or unadvanced track says so, and this run repeats it.** `trackStatus: 'empty'` with
-`paper_track_empty` means nothing has ever been registered; `paper_windows_unscored` names windows
-that were carried and not looked at. Put either in `uncertainty` naming the reason. Neither blocks —
+`paper_track_empty` means nothing has ever been registered — **or that the track was passed under
+the wrong key**, which is the same output and the opposite situation, so check step 1's shape
+before recording a cold start. `paper_windows_unscored` names windows that were carried and not
+looked at. Put either in `uncertainty` naming the reason. Neither blocks —
 a cold start is not an error — but a run that reported the track as unchanged when what happened is
 that nobody walked it has made the skip invisible, which is the failure this step exists to prevent.
 

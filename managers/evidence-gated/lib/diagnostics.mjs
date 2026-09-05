@@ -38,6 +38,41 @@ export function diagnostic(code, severity, message, path, details = {}) {
   return { code, severity, message, ...(path ? { path } : {}), details }
 }
 
+/**
+ * ── The general rule: a carried collection is never smaller on the way out ──
+ *
+ * ⚠️ **Two operations lost a run's durable state the same way, and neither
+ * said anything.** (#136, #137) `signalPaper` read `state.openWindows` while
+ * `PROMPT.md` §5 read as though the windows arrived at the top level, and
+ * `reconcileArmedReviews` read `previous.armed` while §4 named neither
+ * parameter — so both were handed the collection under a key they do not read,
+ * both saw an empty carry, and both returned a `nextState` that was the erasure
+ * of it. Then both prompts say to write that `nextState` back **verbatim**, so
+ * the erasure is committed by a run following canon exactly.
+ *
+ * Making the two functions read their input correctly is not the whole fix,
+ * because the *next* caller who gets the shape wrong is told nothing again. So
+ * the invariant is stated once, here, and both sites assert it: **whatever went
+ * in comes back out, minus only what this run can name a reason for.** A
+ * `nextState` that is silently smaller than the collection it was built from is
+ * a loss of record, and a loss of record is `blocked` — not `unevaluated`,
+ * because there is no reading of it under which writing that state is correct.
+ *
+ * `accountedFor` is the reasons: a matured paper window, a review whose instant
+ * has passed. Anything else that went missing is the bug this catches.
+ *
+ * ⛔ It does not catch the misplaced *input* — nothing here can see a key that
+ * was never read. Each caller rejects the shapes it knows are wrong; this
+ * catches the loss whatever caused it.
+ */
+export function stateLoss({ code, path, before = [], after = [], accountedFor = [], message }) {
+  const kept = new Set(after)
+  const excused = new Set(accountedFor)
+  const lost = [...new Set(before)].filter((id) => id !== null && id !== undefined && !kept.has(id) && !excused.has(id))
+  if (!lost.length) return null
+  return diagnostic(code, 'blocked', message, path, { lost, carriedIn: before.length, carriedOut: after.length })
+}
+
 export function missing(code, path, message = `Required value is missing: ${path}`) {
   return diagnostic(code, 'unevaluated', message, path)
 }

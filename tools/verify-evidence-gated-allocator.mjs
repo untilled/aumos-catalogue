@@ -3202,6 +3202,289 @@ for (const regime of ['risk-on', 'risk-off', 'mixed']) {
 }
 assert.ok(/not re-tagged/i.test(calibrationRegime), 'and states that a recorded regime is not re-tagged')
 
+/**
+ * ── One run's measurements, and four ways a package refused itself ────────
+ *
+ * Everything below was measured on `run_3a48eaaa505241d5af94fb490d7c23c6`,
+ * `asOf` 2026-09-05T04:54:30.794Z, against 0.4.17. They are four issues and one
+ * shape: **an operation and the prose that calls it disagreed about where a
+ * value goes**, and every one of them failed by succeeding — no refusal, a
+ * clean-looking answer, and a durable record written from it.
+ */
+
+/**
+ * The lane that was installed the whole time. (#135)
+ *
+ * §2 said *"Toss is market data, not the Toss broker connector"*, meaning do not
+ * confuse the price feed with the order path. Read as a routing rule it says the
+ * opposite of what is true: `connection_request`'s own description opens *"Ask a
+ * broker the investor has already connected"*, so a run that has just been told
+ * Toss is not a broker connector goes to `source_request` — where Toss has never
+ * been, because the split is by credential and not by data.
+ *
+ * Then the cost compounds. The run promoted a lookup miss to
+ * `toss-market-source-removed-no-price-or-calendar-route-remains`, severity
+ * `lane-closed`, state CONFIRMED, into `failures/repeated-patterns` **with a
+ * diagnostic rule attached** — *"read the granted source list off
+ * `source_request`'s own tool description at the start of every run"*. A run
+ * following that rule reaches the same wrong answer forever. Four runs of five
+ * abandoned every price, bar and calendar judgement on a lane answering
+ * throughout, with twenty paths installed and no call ever made.
+ *
+ * ⚠️ This is prose, and it is checked as prose, because that is where the defect
+ * is: `skills/data-source-contract/SKILL.md:23` was **correct** the whole time.
+ */
+covers('audit/both-tool-allowlists-are-read')
+const routingProse = await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')
+const sourceContractSkill = await readFile(new URL('../skills/data-source-contract/SKILL.md', fixtureRoot), 'utf8')
+assert.ok(
+  /both[\s\S]{0,80}tools/i.test(sourceContractSkill.slice(0, sourceContractSkill.indexOf('## Responsibility'))),
+  "the contract opens by reading both tools' allowlists — it opened by reading only `source_request`'s, which is the list Toss is not on",
+)
+assert.ok(
+  routingProse.includes('`connection_request`') && routingProse.includes('never through `source_request`'),
+  'and §2 routes Toss by name rather than leaving the reader to infer a tool from a sentence about connectors',
+)
+for (const [needle, why] of [
+  ['Kernel-owned', 'the broker connector is named as the thing neither tool reaches, so "not the broker connector" cannot be read as "therefore the other tool"'],
+  ['not evidence the source was removed', 'a miss in one list is not an absent vendor — this is the step that became a CONFIRMED lane closure'],
+  ['failures/repeated-patterns', 'and the run is told not to file that conclusion where every later run will inherit it as a rule'],
+]) {
+  assert.ok(routingProse.includes(needle), `§2 states "${needle}": ${why}`)
+}
+assert.ok(
+  routingProse.includes('The two are not interchangeable'),
+  "§2 loads orchestrate's credential paragraph rather than citing it only at dispatch — it was already right, and it was read after the point where the wrong turn is taken",
+)
+
+/**
+ * The state that is what stands, not what this run happened to arm. (#136)
+ *
+ * ⚠️ **The issue names a cause that is not the one.** It reports that
+ * `reconcileArmedReviews` does not read `armed` at all. It does — the parameter
+ * is `previous`, and `previous.armed` is compared row by row. What the run
+ * passed was `{ armed: [...] }` at the top level, so `previous` was `null`, the
+ * standing arms were invisible, and every review came back in `toArm`. The
+ * observed failure is real and the diagnosis is not: it is a **misplaced input**,
+ * the same defect as #137 one function over, and the existing dedupe assertions
+ * a hundred lines up pass because they always passed the shape correctly.
+ *
+ * So this block is deliberately written in the shape the run used. An assertion
+ * that passes `previous` correctly is an assertion that was already green.
+ *
+ * What is a real defect in the operation is the state it wrote back:
+ * `nextState.armed` was `sequence.map(...)`, a copy of this run's sequence, so a
+ * run with nothing to arm erased the record of three live reviews and the next
+ * run armed them all again — two judgements on one book on one day, which is
+ * the state #87 removed.
+ */
+covers('schedule/armed-state-is-what-stands')
+const standingAsOf = '2026-09-05T04:54:30.794Z'
+const standingSequence = [
+  { flow: 'kr-sleeve', at: '2026-09-06T23:00:00.000Z' },
+  { flow: 'us-sleeve', at: '2026-09-07T07:00:00.000Z' },
+  { flow: 'allocate', at: '2026-09-08T20:45:00.000Z' },
+]
+const armedState = { schemaVersion: 2, updatedAsOf: standingAsOf, armed: standingSequence.map((row) => ({ flow: row.flow, atEpochMs: Date.parse(row.at) })) }
+
+const misplaced = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { armed: standingSequence, sequence: standingSequence } })
+assert.equal(misplaced.status, 'blocked', 'the standing arms passed at the top level are refused rather than read as an empty carry — the run that did this re-armed three standing reviews and woke each sleeve twice')
+assert.ok(misplaced.diagnostics.some((row) => row.code === 'armed_state_misplaced'), 'and the refusal names the shape, so the next reader is not left to infer it from a `toArm` that looks ordinary')
+
+const reconciled = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, sequence: standingSequence } })
+assert.deepEqual(reconciled.data.toArm, [], 'passed as `previous`, an identical sequence arms nothing — this is the case the issue reproduced and the shape is the whole difference')
+assert.deepEqual(reconciled.data.duplicateFlows, ['kr-sleeve', 'us-sleeve', 'allocate'], 'and each standing flow is named')
+
+const quietRun = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, sequence: [] } })
+assert.equal(quietRun.data.nextState.armed.length, 3, 'a run with nothing to arm still writes back the three reviews that are standing — a review does not stop standing because this run had no reason to mention it')
+assert.equal(
+  execute({ operation: 'reconcileArmedReviews', asOf: '2026-09-09T00:00:00.000Z', input: { previous: armedState, sequence: [] } }).data.nextState.armed.length,
+  0,
+  'and it leaves the state when its instant passes, which is the only way out — that is what keeps the key from growing',
+)
+
+/**
+ * The encoding, and the read the key was designed to fail.
+ *
+ * `run/armed-reviews` holds future instants by construction, and `memory_read`
+ * refuses a result carrying any **string** timestamp after `asOf`. The better
+ * the key was filled, the more certainly it was refused; only an empty one came
+ * back. The refusal is per read rather than per key, so the run's first keyless
+ * `memory_read` died on this one key and twelve keys were fetched one at a time.
+ *
+ * The guard walks strings, so the instant is written as a number.
+ */
+assert.ok(
+  reconciled.data.nextState.armed.every((row) => typeof row.atEpochMs === 'number' && row.at === undefined),
+  'the state written back carries epoch milliseconds and no RFC 3339 string — a string here is a value the host refuses to hand back, and the key is unreadable in proportion to how well it is filled',
+)
+const legacyArmed = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: { schemaVersion: 1, armed: standingSequence.map((row) => ({ flow: row.flow, at: row.at })) }, sequence: standingSequence } })
+assert.deepEqual(legacyArmed.data.toArm, [], 'a key written by the version before this one is still read — a migration that begins by discarding the record is the loss this function exists to prevent')
+assert.ok(
+  reconciled.data.toArm.every((row) => row.at === undefined || typeof row.at === 'string'),
+  '`toArm` keeps RFC 3339: it leaves in a DecisionProposal, where AMP takes strings and this guard does not run',
+)
+
+/**
+ * The session label, which was a bare date and therefore a timestamp. (#136)
+ *
+ * ⚠️ **The issue points at `run/watch-alerts` as "the same shape" and it is a
+ * different one — but it is caught too, for a reason the issue does not state.**
+ * The key holds no future instant at all. It holds a session date, always the
+ * current session. What matters is that the host's matcher accepts the
+ * **date-only** form — SEC's `filed` is written that way, and *"some time on the
+ * 5th"* really can be later than an `asOf` earlier in the 5th — so a date-only
+ * value is compared against the **end** of the day it names.
+ *
+ * Every session date this manager writes is on or after `asOf`'s UTC date:
+ * `allocate` wakes at 08:00 KST, which is 23:00Z the previous day, and both
+ * sleeves wake inside the session they name. So all three flows are refused, not
+ * one in two. The key survived 0.4.17 only by never having been written.
+ *
+ * ⛔ Not epoch milliseconds. This field answers *which session*, not *which
+ * instant*, and a number would claim a moment it does not have; `sessionKey` has
+ * had the right shape all along.
+ */
+covers('watch/session-label-is-not-a-timestamp')
+const hostTimestampShaped = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d{1,9})?(?:Z|[+-]\d{2}:?\d{2})?)?$/
+const labelled = execute({ operation: 'watchAlertState', asOf: '2026-09-05T06:45:00.000Z', input: { previous: null, sessionDate: '2026-09-05', alerting: ['nvda-entry|2026-09-05'] } })
+assert.ok(
+  !hostTimestampShaped.test(labelled.data.nextState.session),
+  'the session is stored as a label the host does not read as an instant — a bare date is compared against the end of its own day, so every flow wrote a value its next read would refuse',
+)
+assert.ok(
+  labelled.data.nextState.alerted.every((key) => !hostTimestampShaped.test(key)),
+  'and the session keys were never timestamp-shaped, which is where the label got its shape from',
+)
+assert.equal(
+  Object.values(labelled.data.nextState).filter((value) => typeof value === 'string' && hostTimestampShaped.test(value) && Date.parse(value) > Date.parse('2026-09-05T06:45:00.000Z')).length,
+  0,
+  'nothing in the value this run writes back is a string the next run cannot read — the refusal takes the whole keyless read with it, not just this key',
+)
+assert.equal(
+  execute({ operation: 'watchAlertState', asOf: '2026-09-05T06:45:00.000Z', input: { previous: labelled.data.nextState, sessionDate: '2026-09-05', alerting: ['nvda-entry|2026-09-05'] } }).data.changed,
+  false,
+  'and the dedupe still works across the new shape — the level brushed twice in one session is still one event',
+)
+
+/**
+ * The carried track, and the erasure that reads as a cold start. (#137)
+ *
+ * §5 says to fetch bars for every symbol in `openWindows` and to write the
+ * returned `nextState` back **verbatim**, forbidding a hand-assembled value. Read
+ * literally it puts the carried track at the top level; `signalPaper` reads
+ * `state.openWindows`. The two calls below differ by exactly one layer of
+ * wrapping.
+ *
+ * Three things made the failure look like normal operation: it did not refuse,
+ * the `paper_track_empty` wording argues *"a run that registered nothing"* —
+ * which is the opposite diagnosis — and §5 then insists the result be written
+ * back. The book it was measured on holds exactly one paper sample, and the paper
+ * track is the only path to the 30-sample promotion gate (#118), so the erasure
+ * resets that gate silently and permanently.
+ */
+covers('learning/paper-state-arrives-as-state')
+const carriedWindow = { symbol: '139260', setup: 'thesis_call', cohort: 'llm-research', ruleVersion: 'tc-v1', signalAt: '2026-09-04T14:30:14.135Z', benchmark: null }
+const paperAsOf = '2026-09-05T04:54:30.794Z'
+const misplacedTrack = execute({ operation: 'signalPaper', asOf: paperAsOf, input: { openWindows: [carriedWindow], rows: [], admissions: [] } })
+assert.equal(misplacedTrack.status, 'blocked', 'the carried track passed at the top level is refused — it returned `ok` with an emptied track, and §5 says to write that back verbatim')
+assert.ok(misplacedTrack.diagnostics.some((row) => row.code === 'paper_state_misplaced'), 'and the refusal names the shape rather than answering as though the track were empty')
+
+const carriedTrack = execute({ operation: 'signalPaper', asOf: paperAsOf, input: { state: { openWindows: [carriedWindow] }, rows: [], admissions: [] } })
+assert.equal(carriedTrack.data.trackStatus, 'accruing', 'passed as `state`, the same window is carried — one layer of wrapping is the whole difference between a track and a cold start')
+assert.deepEqual(carriedTrack.data.nextState.openWindows, [carriedWindow], 'and the state written back still holds it')
+assert.ok(
+  /wrong key/.test(carriedTrack.diagnostics.concat(misplacedTrack.diagnostics).find((row) => row.code === 'paper_track_empty')?.message ?? ''),
+  'the empty-track message names the input shape as a possibility — it argued only the opposite one, confirming a run in the diagnosis it needed to doubt',
+)
+
+/**
+ * ⚠️ **The general rule, and it is why these two were fixed together.** A
+ * `nextState` smaller than the collection it was built from is a loss of record,
+ * and both prompts say to write that state back verbatim. Reading the input
+ * correctly is not the whole fix, because the next caller who gets the shape
+ * wrong is told nothing again — so the invariant is asserted rather than assumed,
+ * at both sites, and it is `blocked`: there is no reading under which writing
+ * that state is correct.
+ */
+assert.equal(
+  execute({ operation: 'signalPaper', asOf: paperAsOf, input: { state: { openWindows: [carriedWindow] }, rows: [], admissions: [] } })
+    .data.nextState.openWindows.length,
+  1,
+  'what was carried in comes back out',
+)
+for (const [operation, input] of [
+  ['signalPaper', { state: { openWindows: [carriedWindow] }, rows: [], admissions: [] }],
+  ['reconcileArmedReviews', { previous: armedState, sequence: [] }],
+]) {
+  const answer = execute({ operation, asOf: paperAsOf, input })
+  assert.ok(
+    !answer.diagnostics.some((row) => row.code === 'paper_windows_lost' || row.code === 'armed_state_lost'),
+    `${operation} carries its input through, and says so under one rule rather than two — the loss guard is shared because the defect was`,
+  )
+}
+
+/**
+ * The trap canon set for itself. (#138)
+ *
+ * `nextReviewSequence` returns `owner`, `flow`, `task`, `at`, `session`, `rule`
+ * and `intent`, and **no `subject`** — a market review is about the sleeve, and
+ * AMP has no `AssetRef` that means "the sleeve". `harnessAudit` called a
+ * subjectless WATCH a blocker, `PROMPT.md` §1b says a blocker stops planning and
+ * §Orchestration says it stops dispatch. So a run arming the canonical sequence
+ * blocked its own successor, and a standing WATCH cannot be withdrawn — four of
+ * five runs opened with three of these, and the book's brief recorded that no new
+ * exposure could be proposed until 2026-09-08.
+ *
+ * ⛔ **The subject is not the way out.** A three-way separation measured that a
+ * held, claimed symbol passes — so an `allocate` review would be recorded as
+ * being about 069500, which is not what it is about. Passing a gate by making the
+ * record false is worse than the gate.
+ *
+ * ⛔ **And the exemption is keyed on the trigger, not on the `market-review:`
+ * marker.** The marker would exempt this package's reviews and leave every other
+ * subjectless time promise a blocker — an earnings checkpoint armed as an
+ * `at-time` WATCH, which §4 requires — for a reason that is not true of it
+ * either. Splitting the rule by trigger kind is the real distinction: a
+ * subjectless *price* WATCH genuinely cannot be evaluated, and a time WATCH
+ * carries its whole condition in `at` and retires by firing.
+ */
+covers('audit/time-watch-is-evaluable-without-subject')
+const canonicalSequence = execute({
+  operation: 'nextReviewSequence',
+  asOf: globalIntegration.asOf,
+  input: {
+    krSessions: [{ date: '2026-09-01', openLocal: '09:00', closeLocal: '15:30', timeZone: 'Asia/Seoul', isOpen: true }],
+    usSessions: [{ date: '2026-09-01', openLocal: '09:30', closeLocal: '16:00', timeZone: 'America/New_York', isOpen: true }],
+    globalReview: { date: '2026-09-02', time: '09:00', timeZone: 'Asia/Seoul' },
+  },
+}).data.sequence
+assert.ok(canonicalSequence.every((row) => row.subject === undefined), 'the sequence carries no subject, which is the fact both sides of the trap rest on')
+const armedAudit = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, watches: canonicalSequence } })
+assert.equal(armedAudit.data.clearToPlan, true, "arming exactly what `nextReviewSequence` returns leaves the next run clear to plan — this is the assertion whose absence let canon block itself")
+assert.equal(
+  armedAudit.data.issues.filter((row) => row.severity === 'blocker').length,
+  0,
+  'and none of the three is a blocker; a standing WATCH cannot be withdrawn, so the block lasted until each review fired',
+)
+assert.ok(
+  armedAudit.diagnostics.some((row) => row.code === 'audit_watch_subjectless_at_time'),
+  'it is still said, as a warn — the promise is evaluable but nothing in it names what it is about, and that is worth carrying rather than blocking',
+)
+assert.ok(
+  armedAudit.data.issues.every((row) => row.code !== 'audit_watch_orphan'),
+  'and it is not then failed for being an orphan, which is the second half of the same trap: cash currencies were the other shape measured, and they orphan by definition',
+)
+const subjectlessPrice = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, watches: [{ trigger: { kind: 'price-below', threshold: 196 }, registeredAt: '2026-08-15T00:00:00Z' }] } })
+assert.equal(subjectlessPrice.data.clearToPlan, false, 'a subjectless *price* WATCH is still a blocker — "below what, on what" has no answer, and that is the case the rule was written for')
+assert.ok(subjectlessPrice.diagnostics.some((row) => row.code === 'audit_watch_subjectless'))
+const explicitAtTime = execute({ operation: 'harnessAudit', asOf: auditAsOf, input: { ...cleanBook, watches: [{ trigger: { kind: 'at-time', at: '2026-09-30T07:00:00.000Z' }, registeredAt: '2026-08-15T00:00:00Z' }] } })
+assert.equal(explicitAtTime.data.clearToPlan, true, 'an earnings checkpoint armed as a bare `at-time` trigger is exempt too — what makes a time WATCH evaluable is that it is a time WATCH, not that this package armed it')
+assert.ok(
+  routingProse.includes('audit_watch_subjectless_at_time'),
+  'and §4 says to arm with no subject rather than leaving a run to find the gate and satisfy it with a symbol that makes the record false',
+)
+
 assertCoverageWasEarned()
 
 console.log(`evidence-gated contract fixtures passed (${parity.cases.length} legacy-parity cases)`)

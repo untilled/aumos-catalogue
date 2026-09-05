@@ -143,8 +143,11 @@ one is a lie.
 a person for.
 
 Those keys live in `run/watch-alerts`, and `watchAlertState` folds a run's results into the next
-revision of it. Read the key, pass its `alerted` list as `alertedSessionKeys`, then hand back the
-`sessionKey`s that did alert; write `nextState` only when it returns `changed: true`. ⚠️ **It holds
+revision of it. Read the key, pass **the whole value as `previous`** and its `alerted` list as
+`alertedSessionKeys`, then hand back the `sessionKey`s that did alert; write `nextState` only when
+it returns `changed: true`. ⚠️ **The session is stored as a `session-YYYY-MM-DD` label, not as a
+bare date** — `skills/memory-contract/SKILL.md` says why — so pass the session date and write back
+what the function returns rather than assembling the value. ⚠️ **It holds
 one session and no history** — when the session date rolls the list is replaced, because a key that
 accumulated every alert ever raised would be the ledger `memory-contract` forbids, growing without
 bound for a fact that stops mattering at the closing bell.
