@@ -167,7 +167,7 @@ something a run would otherwise discover *after* proposing.
 | 1 | `lessonAudit` | nothing — but proposing a change already waiting for the investor is repeating yourself |
 | 2 | `harnessAudit` | **a blocker stops planning.** Orphaned WATCHes, size disagreements, order-ready decisions with no registered exit. A held position no decision explains is a **`warn`**, not a blocker |
 | 3 | `calibration` | low maturity does not stop the run; it frames what it may claim, and caps size at the experimental ceiling — `experimentalCeiling`, not the ratio alone |
-| 4 | `exitDiscipline` over every non-core holding and every proposed entry | **a due stop this run does not act on is `blocked`.** The time stop is unconditional — 40 trading days from entry, whatever the position is doing — and an entry with no registered stop and review date is refused |
+| 4 | `exitDiscipline` over every non-core holding and every proposed entry | **a due stop this run does not act on is `blocked`.** The time stop is unconditional — 40 trading days from entry, whatever the position is doing — and an entry with no registered stop and review date is refused: pass `entryProposed: true` with the entry, `entryProposed: false` for a holding review |
 | 5 | `exitCheck` over every non-core holding | nothing — but **its SELL and TRIM candidates are reported before any new buy is considered.** Selling what is broken comes before buying what is interesting, and a run that plans purchases first will find reasons not to revisit that order |
 | 6 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
 | 7 | broker limits | Aumos owns them; read what the invocation carries and do not assume |
@@ -216,7 +216,24 @@ mapping is the same shape as the close buffers `nextReviewSequence` takes:
 
 | operation input | what the invocation calls it |
 |---|---|
-| `managedSince` | `mandate.effectiveFrom` |
+| `harnessAudit.managedSince` | `mandate.effectiveFrom` |
+| `nextReviewSequence.config.schedule.krCloseBufferMinutes` | `config.schedule.krCloseBufferMinutes` |
+| `nextReviewSequence.config.schedule.usCloseBufferMinutes` | `config.schedule.usCloseBufferMinutes` |
+| `crossCheckPrice.config.priceConflictTolerance` | `config.priceConflictTolerance` |
+| `effectivePositionCap.mandatePositionCap` · `singleNameBudget.mandatePositionCap` · `concentration.caps.position` | `mandate.constraints.maxPositionWeight` |
+| `effectiveCashFloor.mandateCashFloor` · `singleNameBudget.mandateCashFloor` | `mandate.constraints.cashFloor` |
+| `exitDiscipline.mandateMaxDrawdown` · `concentration.caps.portfolioHeat` | `mandate.constraints.maxDrawdown` |
+| `experimentalCeiling.experimentalPositionFloor` | `config.experimentalPositionFloor`, keyed per venue currency |
+
+⛔ **The nesting is part of the mapping and it is where this goes wrong.** The close buffers are read
+from `config.schedule`, and a run that hands them at the top of `config` used to get the package's
+own 30/45 with nothing said — #91's *"the number on the install screen governed nothing"*, arriving
+from the caller's side this time, and invisible on a book whose investor happened to type 30 and 45.
+That shape is refused now, and a buffer nobody declared at all comes back as
+`schedule_buffer_defaulted` / `info` with `bufferSource` beside the answer. **Read the shape from
+`inputContracts` rather than from this table**: it publishes every operation's keys, their types,
+and the nested shapes — `config.schedule`, `researchActivity[]`, `scannerUniverses[][]` — that a key
+list cannot show.
 
 ⛔ **Grandfathering is not a setting and there is nothing to pass for it.** *Existing exposure is
 carried and new exposure is not* is this methodology's rule, held once in `lib/constants.mjs`, and
@@ -298,6 +315,19 @@ Before submission, rerun `harnessAudit` with `researchActivity` rows for every r
 including web, open-dart and sec-edgar when granted in the dispatched sleeve. Each row carries
 `{source, granted, attempts, succeeded}` from actual tool activity. Missing activity is
 `audit_research_unverified`; zero attempts on a granted route is `lane_not_queried`.
+
+⚠️ **`succeeded` answers *did this route yield any usable response*, and it takes the count as well
+as the flag.** (#157) `attempts: 10, succeeded: 3` is three usable answers out of ten queries and is
+read as such; `true` is the same fact with the count thrown away. **`attempts` is what decides which
+of the two facts this section separates gets reported** — `attempts: 0` is `lane_not_queried`,
+whatever `succeeded` says, and `succeeded: 0` over `attempts: 3` is `lane_query_failed`. A count
+larger than its own `attempts` is refused rather than guessed at, and a shortfall short of zero is
+`lane_query_partial` / `info`: a note about the run, never a warning against it. ⛔ The reading this
+closes cost a whole run: `succeeded: 3` used to come back as three `lane_query_failed`, so a flow
+that queried web, open-dart and toss-market and got answers from all three reported that it had
+checked nothing — and `audit_research_unverified` and `lane_query_failed` mean *this WAIT cannot
+claim it looked at news and filings*. That sentence then travels into `uncertainty`, into the Brief,
+and into the next run.
 `exitCheck` reads the price rules and `thesisSentinel` reads the
 fundamental ones, in parallel, and neither overrides the other — a thesis that breaks in a filing
 while price sits above its stop is exactly the case a price-only watch misses. Three consecutive

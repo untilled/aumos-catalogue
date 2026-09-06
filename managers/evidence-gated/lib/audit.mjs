@@ -1,4 +1,5 @@
 import { diagnostic, finite, round, grandfatherPolicy } from './diagnostics.mjs'
+import { laneOutcome } from './input-contracts.mjs'
 
 /**
  * ── Pre-flight: what has to be true before a run plans a trade (issue #70 §7) ─
@@ -166,14 +167,32 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
   const issues = []
   const add = (severity, code, subject, message, detail = {}) => {
     issues.push({ severity, code, subject, message, ...detail })
-    diagnostics.push(diagnostic(code, severity === 'blocker' ? 'blocked' : 'unevaluated', message, 'input', { subject, ...detail }))
+    diagnostics.push(diagnostic(code, severity === 'blocker' ? 'blocked' : severity === 'info' ? 'info' : 'unevaluated', message, 'input', { subject, ...detail }))
   }
 
   const held = new Set(positions.map(subjectOf).filter(Boolean))
   if (researchActivity === null) add('warn', 'audit_research_unverified', null, 'No collection activity was supplied; a WAIT cannot claim that news and filings were checked')
+  /**
+   * ⚠️ **`succeeded` is read as a count as well as a flag** (issue #157).
+   * `PROMPT.md` §2b writes it beside `attempts`, so a run that queried three
+   * routes and got three answers wrote `succeeded: 3` and was told all three
+   * had failed — measured against the same call with booleans, three
+   * `lane_query_failed` warnings that should not exist and a `warningCount` of
+   * 6 against 3. `audit_research_unverified` and `lane_query_failed` mean *this
+   * WAIT cannot claim it checked news and filings*, so the run did the
+   * research and reported that it had not, and that sentence is inherited
+   * through the Brief. `laneOutcome` reads either form; `attempts` alone still
+   * decides `lane_not_queried`, which keeps §2b's two facts apart.
+   */
   for (const row of researchActivity ?? []) {
-    if (row?.granted === true && !(row.attempts > 0)) add('warn', 'lane_not_queried', row.source ?? null, 'This research route was granted but not queried; do not report source absence')
-    else if (row?.granted === true && row.succeeded !== true) add('warn', 'lane_query_failed', row.source ?? null, 'This research route was queried but yielded no usable response')
+    if (row?.granted !== true) continue
+    const outcome = laneOutcome(row)
+    if (!(outcome.attempts > 0)) add('warn', 'lane_not_queried', row.source ?? null, 'This research route was granted but not queried; do not report source absence')
+    else if (outcome.succeeded !== true) {
+      add('warn', 'lane_query_failed', row.source ?? null, 'This research route was queried but yielded no usable response', { attempts: outcome.attempts, successCount: outcome.successCount })
+    } else if (outcome.successCount !== null && outcome.successCount < outcome.attempts) {
+      add('info', 'lane_query_partial', row.source ?? null, 'This research route answered some of the queries it was sent; the lane is not failed and the shortfall is worth reporting', { attempts: outcome.attempts, successCount: outcome.successCount })
+    }
   }
   const claimed = new Set(theses.filter((row) => row?.status !== 'closed').map(subjectOf).filter(Boolean))
 
@@ -290,6 +309,8 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
   }
 
   const blockers = issues.filter((row) => row.severity === 'blocker')
+  /** ⚠️ An `info` row is a report and not a warning; counting it as one would put a partially answered lane back into the warning total #157 measured. */
+  const notes = issues.filter((row) => row.severity === 'info')
   /**
    * ⛔ New exposure **to these names** waits for the explanation; reducing risk
    * never waits at all. Blocking a trim of a position already over its cap is
@@ -310,7 +331,8 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
     data: {
       issues,
       blockerCount: blockers.length,
-      warningCount: issues.length - blockers.length,
+      warningCount: issues.length - blockers.length - notes.length,
+      noteCount: notes.length,
       clearToPlan: blockers.length === 0,
       grandfathered,
       unexplained,

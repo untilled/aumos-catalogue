@@ -317,6 +317,7 @@ export function exitDiscipline({
   mandateMaxDrawdown = null,
   heldPortfolioHeat = 0,
   registration = null,
+  entryProposed = null,
   proposedExits = null,
   asOf = null,
 } = {}) {
@@ -420,14 +421,55 @@ export function exitDiscipline({
     ...(registeredStopPct === null ? ['stop'] : []),
     ...(registeredReviewBy === null ? ['reviewBy'] : []),
   ]
-  if (registration !== null && missingRegistration.length) {
-    diagnostics.push(diagnostic(
-      'exit_rules_unregistered',
-      'blocked',
-      'An entry registers its stop and its review date before it is an entry; the closed outcome is what this discipline is for, and a promise to review later is the prose the source refused to accept',
-      `registration.${missingRegistration[0]}`,
-      { symbol, missing: missingRegistration, timeStopTradingDays: limitDays, dueAt },
-    ))
+  /**
+   * ── Which call this is, because the answer differs (issue #158) ───────────
+   *
+   * `skills/deterministic-metrics` and `PROMPT.md` §1b both say an entry with
+   * no registered stop and review date is **refused**, and omitting
+   * `registration` entirely returned `given: false`, `missing: [stop, reviewBy]`
+   * and **no diagnostic at all** — so the one place the discipline is actually
+   * enforced was reachable only by a caller who already knew to pass a partial
+   * registration. #155 made omission mean *unadjudicated*, which is this
+   * package's rule everywhere else and is right for the call this operation
+   * makes most often: the every-run sweep over holdings, where the manager
+   * **cannot** read the registration back at all — it holds no watch-read
+   * capability, which `HOST-FOLLOWUPS.md` records under #97. Blocking there
+   * would refuse every existing-position review in the book.
+   *
+   * ⛔ So the two calls are separated by saying which one it is, rather than by
+   * guessing from an absence. `entryProposed: true` is an entry, and an entry
+   * owes its stop and review date whether the registration is partial or
+   * missing entirely — the documents' rule, enforced. `entryProposed: false` is
+   * the holding review and stays silent. Not passing it at all leaves the
+   * requirement **unjudged and says so**, which is what the failing run needed
+   * and did not get: the fact that no entry was checked is now in the answer
+   * instead of being invisible.
+   *
+   * It is the same round trip `discovery_lane_dark` and
+   * `position_cap_reduction_undisclosed` make, and for the same reason: the
+   * operation cannot see the proposal, so the caller states it and the answer
+   * is judged rather than assumed.
+   */
+  if (missingRegistration.length) {
+    if (entryProposed === false) {
+      // A holding review: the registration is the host's to hand back and it cannot.
+    } else if (registration === null && entryProposed === null) {
+      diagnostics.push(diagnostic(
+        'exit_registration_unjudged',
+        'unevaluated',
+        'No registration was passed and this call did not say whether it is proposing an entry, so the rule that an entry registers its stop and review date before it is an entry was not applied — that is unjudged, not satisfied; pass entryProposed with the registration for a new entry, or entryProposed: false for a review of a holding whose registration this manager cannot read back',
+        'registration',
+        { symbol, missing: missingRegistration, timeStopTradingDays: limitDays, dueAt },
+      ))
+    } else {
+      diagnostics.push(diagnostic(
+        'exit_rules_unregistered',
+        'blocked',
+        'An entry registers its stop and its review date before it is an entry; the closed outcome is what this discipline is for, and a promise to review later is the prose the source refused to accept',
+        registration === null ? 'registration' : `registration.${missingRegistration[0]}`,
+        { symbol, missing: missingRegistration, timeStopTradingDays: limitDays, dueAt, entryProposed },
+      ))
+    }
   }
   if (registeredStopPct !== null && stopPct !== null && registeredStopPct < stopPct - 1e-12) {
     diagnostics.push(diagnostic(
@@ -487,7 +529,15 @@ export function exitDiscipline({
         derivedCeilingPct: derivedCeiling === null ? null : round(-derivedCeiling),
         heatHeadroom: heatHeadroom === null ? null : round(heatHeadroom),
       },
-      registration: { given: registration !== null, stopPct: registeredStopPct === null ? null : round(registeredStopPct), reviewBy: registeredReviewBy, missing: missingRegistration },
+      registration: {
+        given: registration !== null,
+        stopPct: registeredStopPct === null ? null : round(registeredStopPct),
+        reviewBy: registeredReviewBy,
+        missing: missingRegistration,
+        entryProposed,
+        /** `true` registered, `false` refused, `null` nobody said whether this is an entry. */
+        judged: missingRegistration.length === 0 ? true : entryProposed === null && registration === null ? null : entryProposed === false ? null : false,
+      },
       watchesToRegister,
       exitDue: due,
       exitProposed,

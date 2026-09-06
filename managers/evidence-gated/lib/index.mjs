@@ -1,5 +1,5 @@
 import { result, diagnostic } from './diagnostics.mjs'
-import { validateInput, INPUT_KEYS, INPUT_VOCABULARY } from './input-contracts.mjs'
+import { validateInput, INPUT_KEYS, INPUT_CONTRACTS, NESTED_CONTRACTS, GUARDED_OPERATIONS, INPUT_VOCABULARY } from './input-contracts.mjs'
 import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
@@ -20,7 +20,25 @@ import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry,
 const operations = {
   researchUniverse: (input, asOf) => researchUniverse({ ...input, asOf }),
   researchState: (input, asOf) => researchState({ ...input, asOf }),
-  inputContracts: () => ({ data: { keys: INPUT_KEYS, vocabulary: INPUT_VOCABULARY }, diagnostics: [] }),
+  /**
+   * ⚠️ Every registered operation is published, not the eleven a past issue
+   * happened to reach (#158). `keys` stays what it was — the name a run may
+   * already be reading — and `contracts` adds the type of each key and the mode
+   * that governs an unknown one, `nested` the shapes a key list cannot show
+   * (`config.schedule`, `researchActivity[]`), `guarded` the operations that
+   * refuse an unknown key outright.
+   */
+  inputContracts: () => ({
+    data: {
+      keys: INPUT_KEYS,
+      contracts: INPUT_CONTRACTS,
+      nested: NESTED_CONTRACTS,
+      guarded: GUARDED_OPERATIONS,
+      operationCount: Object.keys(INPUT_CONTRACTS).length,
+      vocabulary: INPUT_VOCABULARY,
+    },
+    diagnostics: [],
+  }),
   indicators(input, asOf) {
     const normalized = normalizeBars(input?.bars, asOf)
     return { data: { bars: normalized.bars, indicators: indicatorPacket(normalized.bars) }, diagnostics: normalized.diagnostics }
@@ -50,7 +68,7 @@ const operations = {
   entryTranchePlan: (input, asOf) => entryTranchePlan({ ...input, asOf }),
   specialistBudget,
   globalAllocation,
-  coverage: coverageState,
+  coverage: (input, asOf) => coverageState({ ...input, asOf }),
   discoveryCapacity,
   validateWatch: (input, asOf) => validateWatch(input?.watch, input?.current, asOf, input?.config),
   evaluateWatch: (input, asOf) => evaluateWatch({ ...input, asOf }),
@@ -107,7 +125,7 @@ const operations = {
   normalizeDartFinancials: (input, asOf) => normalizeDartFinancials(input, asOf),
   normalizeSecSubmissions: (input, asOf) => normalizeSecSubmissions(input, asOf),
   laneCoverage,
-  validateAdjustment,
+  validateAdjustment: (input) => validateAdjustment(input?.series, input?.corporateActions),
   zonedDateTimeToUtc: (input) => ({ data: { instant: zonedDateTimeToUtc(input?.date, input?.time, input?.timeZone) }, diagnostics: [] }),
   nextMarketReview: (input, asOf) => nextMarketReview({ ...input, asOf }),
   earningsCheckpoint: (input, asOf) => earningsCheckpoint(input?.observation, input?.marketSession, { ...input?.config, asOf }),
@@ -135,8 +153,15 @@ export function execute(request) {
     return result(operation, asOf ?? null, null, diagnostics)
   }
   try {
-    const shapeDiagnostics = validateInput(operation, request.input ?? {})
-    if (shapeDiagnostics.length) return result(operation, asOf, null, shapeDiagnostics)
+    /**
+     * ⚠️ A refused shape returns no data; a **reported** one still answers.
+     * `input_key_unread` says which part of the call was not read (#158) and
+     * the answer it did compute is still the answer — withholding it would
+     * turn a published contract into a stricter gate than the operation is.
+     */
+    const shapeDiagnostics = validateInput(operation, request.input ?? {}, asOf)
+    if (shapeDiagnostics.some((row) => row.severity === 'blocked')) return result(operation, asOf, null, shapeDiagnostics)
+    diagnostics.push(...shapeDiagnostics)
     const output = operations[operation](request.input ?? {}, asOf)
     // A rejected calculation must never offer a replacement for durable memory.
     if (output?.data?.nextState && output.diagnostics?.some((row) => row.severity === 'blocked')) output.data.nextState = null

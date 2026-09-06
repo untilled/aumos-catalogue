@@ -114,7 +114,22 @@ export function experimentalCeiling(input = {}) {
     binding: 'ratio',
     units: { floorAmount: 'currency-major-units', ratioCeiling: 'portfolio-weight', floorWeight: 'portfolio-weight', experimentalCeiling: 'portfolio-weight' },
   }
-  if (!floors || typeof floors !== 'object') return { data, diagnostics }
+  /**
+   * ⛔ **An absent floor used to return silently** (issue #158). The KRW leg of
+   * a real run came back `floorAmount: null`, `binding: 'ratio'`, status `ok`
+   * and not one diagnostic, because `experimentalPositionFloor` had arrived as
+   * a bare `300000` rather than `{ KRW: 300000 }` — the exact shape of this
+   * package's dominant failure pattern, a wrong input answered with a confident
+   * number computed from defaults. The arithmetic the run wanted was
+   * 300,000 / 1352.5 / 14,866.44 = 0.01491921, a **floor** binding, and what it
+   * got was the ratio. The bare amount is refused by the published contract;
+   * the *absent* one is reported here, because the ratio-only answer is a real
+   * answer to a smaller question and the caller has to be able to tell.
+   */
+  if (!floors || typeof floors !== 'object') {
+    diagnostics.push(diagnostic('experimental_floor_unevaluated', 'unevaluated', 'No minimum executable amount was declared, so this is the experimental ratio alone and the venue floor is unjudged rather than absent; it is declared per venue currency as { KRW: 300000, USD: 200 }', 'experimentalPositionFloor', { currency: currency ?? null }))
+    return { data, diagnostics }
+  }
   const amount = finite(floors[currency]) ? floors[currency] : null
   if (amount === null) {
     diagnostics.push(diagnostic('experimental_floor_unevaluated', 'unevaluated', 'A minimum executable amount is declared per venue currency, so the currency of the position being sized is required and has to be one the floor names', 'positionCurrency', { currency: currency ?? null, declared: Object.keys(floors) }))
@@ -1122,7 +1137,18 @@ export function specialistBudget({ managerId = MANAGER_ID, flow, market, current
   if (managerId !== MANAGER_ID) diagnostics.push(diagnostic('manager_id_unknown', 'blocked', 'This package publishes one manager id', 'managerId', { managerId, expected: MANAGER_ID }))
   if (!SLEEVE_FLOW_MARKETS[flow]) diagnostics.push(diagnostic('flow_unknown', 'blocked', 'A sleeve flow is required; the allocator flow does not take a sleeve budget', 'flow', { flow, supported: Object.keys(SLEEVE_FLOW_MARKETS) }))
   else if (!SLEEVE_FLOW_MARKETS[flow].includes(market)) diagnostics.push(diagnostic('specialist_market_not_owned', 'blocked', 'Sleeve flow cannot allocate outside its market lane', 'market', { flow, market }))
-  if (![currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight].every(finite)) diagnostics.push(diagnostic('sleeve_budget_missing', 'unevaluated', 'Current sleeve, Brief budget and requested target are required', 'input'))
+  /**
+   * ⚠️ **Which of the three is missing, by name** (issue #158). `kr-sleeve`
+   * tried three spellings of the budget key against one `sleeve_budget_missing`
+   * whose `path` was `input`, gave up, and left `withinBriefBudget` at `null` —
+   * so the run's compliance with its own sleeve budget was never checked at
+   * all. The unknown key is refused by the published contract; this says which
+   * declared key the operation is still waiting for.
+   */
+  const missingWeights = Object.entries({ currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight })
+    .filter(([, value]) => !finite(value))
+    .map(([key]) => key)
+  if (missingWeights.length) diagnostics.push(diagnostic('sleeve_budget_missing', 'unevaluated', 'Current sleeve, Brief budget and requested target are required, and the sleeve budget is the Brief\'s `sleeveBudgetWeight`', missingWeights[0], { missing: missingWeights }))
   if ([currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight].filter(finite).some((value) => value < 0)) diagnostics.push(diagnostic('sleeve_weight_negative', 'blocked', 'Sleeve weights cannot be negative', 'input'))
   const increase = finite(requestedTargetWeight) && finite(currentSleeveWeight) ? requestedTargetWeight - currentSleeveWeight : null
   if (!emergencyExit && finite(requestedTargetWeight) && finite(sleeveBudgetWeight) && requestedTargetWeight > sleeveBudgetWeight) diagnostics.push(diagnostic('specialist_sleeve_budget_exceeded', 'blocked', 'Specialist must ask Global for cross-market budget', 'requestedTargetWeight', { sleeveBudgetWeight }))
