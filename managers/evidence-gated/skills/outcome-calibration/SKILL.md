@@ -105,6 +105,29 @@ book against it alongside `baselineTrack`, and report it when the answer is no �
 only measures its own decisions against each other can be internally consistent and still behind the
 index for years.
 
+## Where a closed decision actually lands
+
+⚠️ **Call `closedOutcomeSamples` rather than assembling the samples by hand.** It turns closed
+decisions into the rows `calibrationSummary` counts — one sample per decision, dated on the day it
+closed, measured in active return — and refuses the ones that cannot be scored. ⛔ A closed decision
+with no benchmark comparison is **unmeasured, not flat**: it comes back
+`closed_outcome_sample_incomplete` and is dropped, because a zero-filled sample is a measurement
+nobody made. Until this operation existed the conversion lived only in the sentence below, and a
+rule that exists only in prose is a rule that did not run — the same shape as the paper track that
+held zero rows across every run (#118).
+
+⛔ **There are two maturity axes and a closed real trade feeds exactly one of them.**
+
+| axis | fed by | moves |
+|---|---|---|
+| `calibrationSummary` → `learning/evidence-maturity` · `calibration/*` | closed real decisions | `maturityStatus`, and so the experimental ceiling |
+| `promotionGate` — 30 · 3 · 10 | matured **paper** windows in the `promote` cohort | promotion of a lens |
+
+A realized trade has a fill, a cost and a size; a paper row has none of them and was registered
+before the outcome was known. Pooling them is the sample contamination §6 forbids, so
+`closed_outcome_not_a_paper_sample` says the boundary every run rather than leaving it to be found
+by looking for your trades in the wrong count.
+
 Update `learning/evidence-maturity`, `learning/closed-decision-summary`, the applicable
 `calibration/*` key and `failures/repeated-patterns` only when an outcome changes an aggregate. Store
 the Decision/Evidence ids that support each update. A repeated failure may produce a rule proposal,

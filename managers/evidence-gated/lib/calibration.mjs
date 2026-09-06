@@ -47,6 +47,117 @@ export function calibrationSummary({ samples = [], minimumSamples = METHODOLOGY.
   }
 }
 
+/**
+ * ── Where a closed position actually lands (issue #153, #118) ─────────────
+ *
+ * The exit discipline exists to produce closed outcomes. Before adding it, the
+ * question worth answering is whether a closed outcome reaches the gate anybody
+ * is waiting on — because the port has **two** maturity axes and they are fed
+ * from different places, which no document said plainly:
+ *
+ * | axis | what feeds it | what it moves |
+ * |---|---|---|
+ * | `calibrationSummary` → `learning/evidence-maturity` | **closed real decisions**, one sample each | `maturityStatus`, and therefore the experimental ceiling |
+ * | `promotionGate` (30 · 3 · 10) | **matured paper windows** in the `promote` cohort (`signalPaper`) | promotion of a lens |
+ *
+ * ⛔ **A closed real position does not become a `promotionGate` sample, and
+ * must not.** That gate measures a forward record registered before the outcome
+ * was known; a realized trade has a fill, a cost and a size, and pooling the two
+ * would be the sample contamination §6 forbids in the source's own words. The
+ * two axes stay separate and this operation says so in its output rather than
+ * leaving a run to discover it by looking for its trades in the wrong place.
+ *
+ * ⚠️ **What was genuinely broken is the first row, and this closes it.** The
+ * conversion from a closed decision to a calibration sample lived in a sentence
+ * in `skills/outcome-calibration` — *"update `learning/evidence-maturity` and
+ * the applicable `calibration/*` key"* — with no operation performing it, which
+ * is the same shape as the paper-track registration that held zero rows across
+ * every run (#118). A rule that only exists in prose is a rule that did not run.
+ *
+ * ⛔ A row that cannot be scored is dropped **and reported**, never zero-filled:
+ * a closed decision with no benchmark comparison is not a zero active return,
+ * it is a decision nobody measured.
+ */
+export function closedOutcomeSamples({ outcomes = [], lens = null, asOf } = {}) {
+  const diagnostics = []
+  const asOfInstant = Date.parse(asOf)
+  const samples = []
+  const rejected = []
+  for (const [index, row] of (Array.isArray(outcomes) ? outcomes : []).entries()) {
+    const at = `outcomes[${index}]`
+    const date = typeof row?.closedAt === 'string' ? row.closedAt.slice(0, 10) : typeof row?.date === 'string' ? row.date.slice(0, 10) : null
+    /** Percent in, fraction out — `calibrationSummary` counts in fractions. */
+    const activeReturn = finite(row?.activeReturn)
+      ? row.activeReturn
+      : finite(row?.activeReturnPct)
+        ? row.activeReturnPct / 100
+        : finite(row?.grossReturnPct) && finite(row?.benchmarkReturnPct)
+          ? (row.grossReturnPct - row.benchmarkReturnPct) / 100
+          : null
+    const rowLens = row?.lens ?? null
+    if (date === null || !Number.isFinite(Date.parse(date))) {
+      rejected.push({ at, reason: 'no-close-date' })
+      diagnostics.push(diagnostic('closed_outcome_sample_incomplete', 'unevaluated', 'A closed outcome is a sample on the day it closed; without that date it cannot be clustered and does not count toward maturity', `${at}.closedAt`, { decisionId: row?.decisionId ?? null }))
+      continue
+    }
+    if (Number.isFinite(asOfInstant) && Date.parse(date) > asOfInstant) {
+      diagnostics.push(diagnostic('closed_outcome_post_as_of', 'blocked', 'A closed outcome dated after this invocation did not exist when the run was asked; it is refused rather than counted', `${at}.closedAt`, { closedAt: date, asOf }))
+      continue
+    }
+    if (rowLens === null) {
+      rejected.push({ at, reason: 'no-lens' })
+      diagnostics.push(diagnostic('closed_outcome_sample_incomplete', 'unevaluated', 'Maturity is measured per lens, so a sample that does not name the lens it came from cannot be pooled into one', `${at}.lens`, { decisionId: row?.decisionId ?? null }))
+      continue
+    }
+    if (lens !== null && rowLens !== lens) continue
+    if (activeReturn === null) {
+      rejected.push({ at, reason: 'no-active-return' })
+      diagnostics.push(diagnostic('closed_outcome_sample_incomplete', 'unevaluated', 'Active return is the measurement this axis counts, and a closed decision with no benchmark comparison is unmeasured rather than flat; give activeReturnPct, or the gross and benchmark returns it comes from', `${at}.activeReturnPct`, { decisionId: row?.decisionId ?? null }))
+      continue
+    }
+    samples.push({
+      date,
+      activeReturn: round(activeReturn),
+      lens: rowLens,
+      decisionId: row?.decisionId ?? null,
+      ...(Array.isArray(row?.probabilities) ? { probabilities: row.probabilities } : {}),
+      ...(Number.isInteger(row?.outcomeIndex) ? { outcomeIndex: row.outcomeIndex } : {}),
+    })
+  }
+  const summary = calibrationSummary({ samples })
+  diagnostics.push(...summary.diagnostics)
+  /**
+   * Said every run, once, because the pooling it refuses is silent when it
+   * happens: a run that reports its trades under the promotion gate's sample
+   * count has not broken anything visible until the gate opens on the wrong
+   * evidence.
+   */
+  diagnostics.push(diagnostic(
+    'closed_outcome_not_a_paper_sample',
+    'info',
+    "Closed real outcomes move the lens maturity axis and never promotionGate, which counts matured paper windows in the promote cohort; the two are kept apart on purpose and a run that pools them would open a gate on evidence it was not measuring",
+    'outcomes',
+    { reaches: ['calibrationSummary', 'learning/evidence-maturity'], doesNotReach: ['promotionGate'], accepted: samples.length },
+  ))
+  return {
+    data: {
+      samples,
+      accepted: samples.length,
+      rejected,
+      lens,
+      maturityStatus: summary.data.status,
+      sampleCount: summary.data.sampleCount,
+      independentDateClusterCount: summary.data.independentDateClusterCount,
+      summary: summary.data,
+      reaches: ['calibrationSummary', 'learning/evidence-maturity'],
+      doesNotReach: ['promotionGate'],
+      /** The memory key this belongs in; the run writes it, this computes it. */
+      memoryKey: lens === null ? 'learning/evidence-maturity' : `calibration/${lens}`,
+    },
+    diagnostics,
+  }
+}
+
 export function benjaminiHochberg(rows, alpha = 0.05) {
   const valid = rows.map((row, originalIndex) => ({ ...row, originalIndex })).filter((row) => finite(row?.pValue))
   const sorted = valid.sort((a, b) => a.pValue - b.pValue)

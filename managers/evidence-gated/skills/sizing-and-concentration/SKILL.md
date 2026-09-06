@@ -124,6 +124,26 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    cap's is, and a proposal that does not carry it is `cash_floor_raise_undisclosed` / `blocked`.
    ⚠️ **A floor is not a target.** `cashFloor` 0.10 is permission to go there, never an instruction
    to fill to it; `headroomWeight` is what *may* be deployed.
+4c. **The single-name total comes from the Mandate, not from this package.** Call
+   `singleNameBudget` with `mandateCashFloor`, `mandatePositionCap`, the book's `positions` and
+   this run's `proposed`. What `cashFloor` leaves is the range the single-name lanes may hold
+   together, `maxPositionWeight` is the per-name limit inside it, and `concentration` decides the
+   shape. ⚠️ The source's 28% single-name total is **not ported**: it was one piece of an allocation
+   that also carried a 50% core ETF lane, and the investor answered #153 §3 with (a) — the cash that
+   is left is carried by single names, with no parking sleeve standing in for the ETF lane. ⛔ Both
+   Mandate numbers missing is `single_name_budget_unevaluated`, which is *"nobody said"* and not
+   *"no limit"*; there is no package constant behind it to fall back on, and that is the point —
+   after #133 and #153 no sizing constant here answers a question the investor is asked. ⚠️ **A
+   budget is not a target.** `remainingWeight` is what the Mandate permits, never what the book
+   should hold. Pass `controlArmWeight` and hand the returned `controlArmRemainingWeight` to
+   `controlArmLane` as `experimentTotalRemainingWeight` — the control arm spends inside this budget
+   rather than beside it.
+4d. **Every entry registers how it will be closed.** Call `exitDiscipline` for the candidate and
+   copy `watchesToRegister` into the same proposal as the BUY; without a stop and a review date the
+   entry is `exit_rules_unregistered` / `blocked`. The stop distance is the control arm's approved
+   −8% in that lane and derived from the Mandate's `maxDrawdown` in every other, so a large position
+   carries a tighter stop than a 1% one — the two lanes holding different numbers is the rule
+   working, not an inconsistency. `skills/evidence-gates` carries the rest.
 5. Compare with cash and benchmark alternatives. A target is the desired portfolio weight, not an
    order quantity, and it is never negative.
 

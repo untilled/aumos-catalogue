@@ -690,6 +690,15 @@ export function controlArmLane({ positions = [], proposed = [], experimentTotalR
      * "we will review this" into a WATCH `exitCheck` is already looking at, so
      * an unregistered entry is refused rather than promised.
      */
+    /**
+     * ⚠️ **This flag is an assertion and `exitDiscipline` is what checks it
+     * (#153).** A row saying `exitRegistered: true` says a run believes the
+     * stop was written down; `exitDiscipline` computes the stop and the review
+     * date, returns the two WATCH rows the entry copies into its proposal, and
+     * refuses the entry that carries neither. Both stay: this one refuses an
+     * unregistered control-arm entry at the lane, that one says what the
+     * registration has to be.
+     */
     if (row.exitRegistered !== true) {
       diagnostics.push(diagnostic('control_arm_exit_unregistered', 'blocked', 'A control-arm entry registers its time stop and hard stop before it is an entry; closed outcomes are what this lane is for', `${where}.exitRegistered`, { timeStopTradingDays: CONTROL_ARM.timeStopTradingDays, hardStopPct: CONTROL_ARM.hardStopPct }))
     }

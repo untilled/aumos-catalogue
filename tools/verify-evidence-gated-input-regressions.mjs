@@ -324,4 +324,148 @@ assert.equal(has(floor({ mandateCashFloor: 0.1, projectedCashWeight: 0.2, method
 // And this methodology declares no such floor today, so the row is empty rather than silent.
 assert.deepEqual(METHODOLOGY.methodologyCashFloors, [])
 
+/**
+ * #153 §3: the total the investor's own numbers leave, and the discipline that
+ * makes the samples arrive.
+ *
+ * Same book, same declarations — NAV USD 14,866.44, 57% cash, `cashFloor` 0.10,
+ * `maxPositionWeight` 0.20, **`maxDrawdown` undeclared** — plus the source's
+ * approved exit rule: 40 trading days and −8%, the second of which was computed
+ * against the control arm's 1% cell and is not carried anywhere else unchanged.
+ */
+const budget = (extra = {}) => run('singleNameBudget', { mandateCashFloor: 0.1, mandatePositionCap: 0.2, ...extra })
+
+// The total is what the Mandate's own cash floor leaves, and nothing else.
+const emptyBook = budget()
+assert.equal(emptyBook.data.deployableWeight, 0.9)
+assert.equal(emptyBook.data.perNameCap, 0.2)
+assert.equal(emptyBook.data.source, 'mandate-derived')
+assert.equal(emptyBook.data.portedTotalCap, null, "the source's 28% is not ported and its absence is a decision")
+assert.equal(has(emptyBook, 'single_name_budget_unevaluated'), false)
+// A tighter floor is a smaller lane, with no package constant in the way.
+assert.equal(budget({ mandateCashFloor: 0.5 }).data.deployableWeight, 0.5)
+// Either Mandate number missing is "nobody said", never an unlimited lane.
+for (const missing of [{ mandateCashFloor: undefined }, { mandatePositionCap: undefined }]) {
+  const undeclared = run('singleNameBudget', { mandateCashFloor: 0.1, mandatePositionCap: 0.2, ...missing })
+  assert.ok(has(undeclared, 'single_name_budget_unevaluated'))
+  assert.equal(undeclared.diagnostics.find((row) => row.code === 'single_name_budget_unevaluated').severity, 'unevaluated')
+}
+// The 57% cash book: held singles against the deployable range, and what is left.
+const deployed = budget({ positions: [{ symbol: '035420', weight: 0.2 }, { symbol: '036460', weight: 0.13 }, { symbol: 'SGOV', weight: 0.1, parkedLiquidity: true }, { symbol: '069500', weight: 0.1, core: true }] })
+assert.equal(deployed.data.heldSingleNameWeight, 0.33, 'core and parked rows are not single names')
+assert.equal(deployed.data.remainingWeight, 0.57)
+// Over the range and adding is refused; over it and standing still is carried.
+const over = budget({ positions: [{ symbol: 'A', weight: 0.9 }], proposed: [{ symbol: 'B', weight: 0.1 }] })
+assert.ok(has(over, 'single_name_budget_exceeded'))
+assert.equal(over.diagnostics.find((row) => row.code === 'single_name_budget_exceeded').severity, 'blocked')
+const carriedOver = budget({ positions: [{ symbol: 'A', weight: 0.95 }] })
+assert.ok(has(carriedOver, 'single_name_budget_carried'))
+assert.equal(has(carriedOver, 'single_name_budget_exceeded'), false, 'a trim is never the thing refused')
+// The control arm spends inside the budget rather than beside it.
+assert.equal(budget({ controlArmWeight: 0.02 }).data.controlArmRemainingWeight, 0.04)
+assert.equal(budget({ controlArmWeight: 0.02 }).data.controlArmLaneTotalMaxWeight, 0.06)
+
+/**
+ * The exit discipline. `time_stop_reached` reads the entry date and nothing
+ * else — no `reviewBy`, no catalyst, no benchmark.
+ */
+const entered = (extra = {}) => run('exitDiscipline', { symbol: 'DKS', lane: 'control-arm', entryDate: '2026-07-01', entryPrice: 100, price: 99, ...extra })
+const held47 = entered()
+assert.equal(held47.data.timeStop.timeStopTradingDays, 40, "the source's approved holding period")
+assert.equal(held47.data.timeStop.tradingDaysHeld, 47)
+assert.equal(held47.data.timeStop.reached, true)
+assert.ok(has(held47, 'time_stop_reached'))
+assert.equal(held47.data.action, 'SELL')
+// Nothing about the thesis is consulted: no review date is passed anywhere above.
+assert.equal(has(entered({ entryDate: '2026-08-25' }), 'time_stop_reached'), false)
+// A position with no entry date is unjudged, never "not reached".
+const noEntry = run('exitDiscipline', { symbol: 'DKS', lane: 'control-arm', entryPrice: 100, price: 99 })
+assert.ok(has(noEntry, 'exit_discipline_unevaluated'))
+assert.equal(noEntry.data.timeStop.reached, null)
+// A caller with a real session calendar overrides the weekday approximation.
+assert.equal(entered({ tradingDaysHeld: 12 }).data.timeStop.basis, 'caller-trading-calendar')
+assert.equal(has(entered({ tradingDaysHeld: 12 }), 'time_stop_basis_approximated'), false)
+
+// The control arm keeps the source's −8%, because that is the cell it was computed for.
+assert.equal(METHODOLOGY.exitDiscipline.timeStopTradingDays, 40)
+assert.equal(METHODOLOGY.exitDiscipline.maximumHardStopPct, -0.08)
+assert.equal(METHODOLOGY.controlArm.hardStopPct, METHODOLOGY.exitDiscipline.maximumHardStopPct, 'one copy, two readers')
+const armStop = entered({ price: 91 })
+assert.equal(armStop.data.hardStop.stopPct, -0.08)
+assert.equal(armStop.data.hardStop.stopLevel, 92)
+assert.equal(armStop.data.hardStop.source, 'control-arm-approved')
+assert.ok(has(armStop, 'hard_stop_breached'))
+
+/**
+ * ⛔ The main lane does not inherit −8%: `maxDrawdown` is undeclared on this
+ * book, so there is nothing to derive from and nothing is invented.
+ */
+const mainLaneStop = run('exitDiscipline', { symbol: '035420', lane: 'main', entryDate: '2026-08-25', entryPrice: 100, price: 99, positionWeight: 0.2 })
+assert.equal(mainLaneStop.data.hardStop.stopPct, null)
+assert.equal(mainLaneStop.data.hardStop.breached, null, 'unjudged on this axis, not unstopped')
+assert.ok(has(mainLaneStop, 'hard_stop_unevaluated'))
+const unevaluatedStop = mainLaneStop.diagnostics.find((row) => row.code === 'hard_stop_unevaluated')
+assert.equal(unevaluatedStop.severity, 'unevaluated')
+assert.equal(unevaluatedStop.details.unlocksWith, 'mandate.constraints.maxDrawdown', 'the diagnostic names what resolves it')
+// Declared, it is derived from the heat budget left for this position's weight.
+const derived = run('exitDiscipline', { symbol: '035420', lane: 'main', entryDate: '2026-08-25', entryPrice: 100, price: 99, positionWeight: 0.2, mandateMaxDrawdown: 0.06, heldPortfolioHeat: 0.05 })
+assert.equal(derived.data.hardStop.stopPct, -0.05, '(0.06 − 0.05) / 0.20')
+assert.equal(derived.data.hardStop.source, 'mandate-max-drawdown')
+assert.equal(derived.data.hardStop.stopLevel, 95)
+// ⛔ The derivation only tightens: −8% stays the ceiling on the answer.
+assert.equal(run('exitDiscipline', { symbol: '035420', lane: 'main', entryDate: '2026-08-25', entryPrice: 100, price: 99, positionWeight: 0.2, mandateMaxDrawdown: 0.5 }).data.hardStop.stopPct, -0.08)
+// A registered stop wider than the derived bound is refused before it can fire.
+const tooWide = run('exitDiscipline', { symbol: '035420', lane: 'main', entryDate: '2026-08-25', entryPrice: 100, price: 99, positionWeight: 0.2, mandateMaxDrawdown: 0.06, heldPortfolioHeat: 0.05, registration: { stopPct: 0.08, reviewBy: '2026-10-20' } })
+assert.ok(has(tooWide, 'hard_stop_exceeds_budget'))
+assert.equal(tooWide.diagnostics.find((row) => row.code === 'hard_stop_exceeds_budget').severity, 'blocked')
+
+// Registration happens at entry or the entry is refused, and it is two WATCH rows.
+const unregistered = entered({ entryDate: '2026-08-25', registration: { reviewBy: '2026-10-20' } })
+assert.ok(has(unregistered, 'exit_rules_unregistered'))
+assert.deepEqual(unregistered.diagnostics.find((row) => row.code === 'exit_rules_unregistered').details.missing, ['stop'])
+assert.equal(has(entered({ entryDate: '2026-08-25', registration: { stopPct: 0.08, reviewBy: '2026-10-20' } }), 'exit_rules_unregistered'), false)
+const freshEntry = entered({ entryDate: '2026-08-25' })
+assert.deepEqual(freshEntry.data.watchesToRegister.map((row) => row.kind), ['price-below', 'at-time'])
+assert.equal(freshEntry.data.watchesToRegister[1].at, freshEntry.data.timeStop.dueAt, 'the dated row is the time stop itself')
+for (const watch of freshEntry.data.watchesToRegister) {
+  assert.equal(run('validateWatch', { watch: { ...watch, symbol: 'DKS' }, current: { price: 99 } }).status, 'ok', 'the rows an entry copies are rows validateWatch accepts')
+}
+// A due stop the proposal does not act on is the prose this replaced.
+assert.equal(entered().data.exitProposed, null, 'unjudged before the proposal exists')
+assert.equal(has(entered(), 'exit_due_unactioned'), false)
+assert.ok(has(entered({ proposedExits: [] }), 'exit_due_unactioned'))
+assert.equal(entered({ proposedExits: [] }).diagnostics.find((row) => row.code === 'exit_due_unactioned').severity, 'blocked')
+assert.equal(has(entered({ proposedExits: ['DKS'] }), 'exit_due_unactioned'), false)
+assert.equal(has(entered({ proposedExits: [{ symbol: 'DKS' }] }), 'exit_due_unactioned'), false)
+
+/**
+ * And where the closed outcome lands once the discipline produces one.
+ */
+const closed = run('closedOutcomeSamples', {
+  outcomes: [
+    { decisionId: 'dec-1', lens: 'mean-reversion', closedAt: '2026-08-03', activeReturnPct: -3.2 },
+    { decisionId: 'dec-2', lens: 'mean-reversion', closedAt: '2026-08-20', grossReturnPct: 2, benchmarkReturnPct: 1 },
+    { decisionId: 'dec-3', lens: 'mean-reversion', closedAt: '2026-08-24' },
+    { decisionId: 'dec-4', closedAt: '2026-08-25', activeReturnPct: 1 },
+    { decisionId: 'dec-5', lens: 'mean-reversion', activeReturnPct: 1 },
+  ],
+})
+assert.equal(closed.data.accepted, 2)
+assert.deepEqual(closed.data.samples.map((row) => row.activeReturn), [-0.032, 0.01], 'percent in, fraction out')
+assert.equal(closed.diagnostics.filter((row) => row.code === 'closed_outcome_sample_incomplete').length, 3)
+assert.deepEqual([...closed.data.rejected.map((row) => row.reason)].sort(), ['no-active-return', 'no-close-date', 'no-lens'])
+assert.equal(closed.data.maturityStatus, 'insufficient', 'two samples is not a lens')
+// ⛔ The axis boundary is stated every run, because pooling is silent when it happens.
+assert.ok(has(closed, 'closed_outcome_not_a_paper_sample'))
+assert.deepEqual(closed.data.reaches, ['calibrationSummary', 'learning/evidence-maturity'])
+assert.deepEqual(closed.data.doesNotReach, ['promotionGate'])
+assert.equal(closed.data.memoryKey, 'learning/evidence-maturity')
+assert.equal(run('closedOutcomeSamples', { outcomes: [], lens: 'mean-reversion' }).data.memoryKey, 'calibration/mean-reversion')
+// A future close is refused rather than counted.
+assert.ok(has(run('closedOutcomeSamples', { outcomes: [{ decisionId: 'dec-6', lens: 'mean-reversion', closedAt: '2099-01-01', activeReturnPct: 1 }] }), 'closed_outcome_post_as_of'))
+// The samples it produces are the ones calibrationSummary counts.
+assert.equal(run('calibration', { samples: closed.data.samples }).data.sampleCount, 2)
+// And promotionGate still counts only matured paper windows, which these are not.
+assert.equal(run('promotionGate', { rows: closed.data.samples }).data.byRuleVersion?.length ?? 0, 0)
+
 console.log('evidence-gated issues #145–153 regression tests passed')

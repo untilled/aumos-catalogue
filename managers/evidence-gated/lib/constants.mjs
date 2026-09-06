@@ -27,7 +27,55 @@
  * reachable from `tools/verify-evidence-gated-allocator.mjs`; it is not an
  * invitation for a run to pass one, and the flow skills do not name any.
  */
+/**
+ * ── The exit discipline, read by both lanes (issue #153) ──────────────────
+ *
+ * The source approved these on 2026-07-29 with the reason written beside them:
+ * *"무기한 보유는 청산 증거를 만들지 못해 레인 목적과 충돌한다"* — an
+ * indefinitely held position produces no closed outcome, and closed outcomes are
+ * what every maturity axis in this package is waiting for. 40 trading days is
+ * twice the paper track's own d20 maturation, chosen so a mean-reversion setup
+ * has time to express itself and no longer than that.
+ *
+ * ⚠️ **`hardStopPct` is a *maximum* distance here, not the distance.** The
+ * source computed −8% against a **1%** lane cell — *"종목당 1% × −8% = 계좌
+ * −0.08%"* — and #153 opened a lane where a name may be 20% of the book, where
+ * the same −8% is 1.6% of the account on one position. So the main lane derives
+ * its stop from the Mandate's `maxDrawdown`, which is the declared limit on that
+ * axis and the one `portfolioHeat` already reads, and this number is only ever
+ * the ceiling on the answer. ⛔ The derivation can tighten it and can never widen
+ * it: a value with an approval history is the widest thing this package will
+ * propose.
+ *
+ * They live outside the object below so `controlArm` and `exitDiscipline` read
+ * one copy rather than two — the drift this file's opening paragraph is about.
+ */
+const EXIT_DISCIPLINE = Object.freeze({
+  timeStopTradingDays: 40,
+  maximumHardStopPct: -0.08,
+})
+
 export const METHODOLOGY = Object.freeze({
+  /**
+   * ── What is left here, and why none of it is the investor's question (#153) ─
+   *
+   * The investor's three sizing axes are declared in the Mandate and read from
+   * it: `maxPositionWeight` (#133), `maxDrawdown` (#133) and `cashFloor` (#153).
+   * The single-name **total** was the last candidate for a package constant —
+   * the source's `experiment_total_max_pct_account`, 28% — and it is deliberately
+   * not ported: that number was one piece of an allocation that also held a 50%
+   * core ETF target, and in an account without that lane it does not mean the
+   * same thing. `singleNameBudget` derives the total from `cashFloor` and
+   * `maxPositionWeight` instead, so the investor's own two numbers decide it and
+   * a change on the fund-settings screen moves the manager.
+   *
+   * ⛔ **So nothing below answers a question the investor is asked.** Each
+   * remaining value is a claim this methodology makes about *evidence* — how
+   * many samples a lens needs, how large an unproven claim may be, how long a
+   * control-arm position is held before it must produce an outcome — and the
+   * argument for each is beside it. Changing one is a package revision with a
+   * reviewer, which is a stronger gate than a config field, not a weaker one.
+   */
   /** Complete samples before a lens leaves `observing`. */
   minimumLensSamples: 10,
   /**
@@ -81,9 +129,15 @@ export const METHODOLOGY = Object.freeze({
     singleMaxWeight: 0.01,
     laneTotalMaxWeight: 0.06,
     maxConcurrentPositions: 6,
-    timeStopTradingDays: 40,
-    hardStopPct: -0.08,
+    timeStopTradingDays: EXIT_DISCIPLINE.timeStopTradingDays,
+    hardStopPct: EXIT_DISCIPLINE.maximumHardStopPct,
   }),
+  /**
+   * The exit rule both lanes are held to, and the ceiling on the stop distance.
+   * `exitDiscipline` in `lib/envelopes.mjs` is what enforces it; the control arm
+   * reads the same two numbers above, because there is one copy of each.
+   */
+  exitDiscipline: EXIT_DISCIPLINE,
   /**
    * Cash floors this methodology adds on top of the Mandate's `cashFloor`.
    *

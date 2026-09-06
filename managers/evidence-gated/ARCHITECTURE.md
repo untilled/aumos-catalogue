@@ -290,6 +290,36 @@ fixture asserts the difference so it cannot be undone silently.
   intermediate rung should exist between 1% and full promotion.
   ([#151](https://github.com/untilled/aumos-catalogue/issues/151),
   [#153](https://github.com/untilled/aumos-catalogue/issues/153))
+- **Positions close on a rule, and the rule reads the entry date.** The port kept two time
+  stops and both are conditional on a `reviewBy` a run had to have written — `exitCheck`'s
+  `time_stop` (the review date arrived and price never got above entry) and `timeStopPolicy`
+  (the review date arrived, the catalyst never happened and it trailed its benchmark). A
+  position nobody wrote a review date for is invisible to both, which is how a book reaches
+  **zero closed outcomes** while two time-stop operations report nothing wrong. `exitDiscipline`
+  is unconditional: 40 trading days after entry the position is closed whatever it is doing
+  (`time_stop_reached`), and where more than one fires this one answers — an exit that is
+  already due is not a review to extend. ⚠️ **The stop distance is two numbers now, on
+  purpose.** The source's −8% was computed against a 1% cell; in a lane where a name may be
+  20% of the book the same −8% is −1.6% of the account on one position, so every lane but the
+  control arm derives its stop from the Mandate's `maxDrawdown` against the position's weight,
+  with −8% as the ceiling on the answer. ⛔ The investor has declared no `maxDrawdown`, so
+  outside the control arm the answer today is `hard_stop_unevaluated` and **no number is
+  invented for it**. Registration is the part that must not be prose: `watchesToRegister`
+  returns the `price-below` and `at-time` rows an entry copies into its own proposal, an entry
+  without them is `exit_rules_unregistered`, and a due stop this run does not act on is
+  `exit_due_unactioned`. ⚠️ The package can arm a WATCH and cannot read one back, so the
+  discipline is re-derived from the entry date every run rather than trusted to a WATCH armed
+  weeks ago; that read path is the host's and is recorded in `HOST-FOLLOWUPS.md`.
+  ([#153](https://github.com/untilled/aumos-catalogue/issues/153))
+- **The single-name total is derived from the Mandate, and no constant is left that answers an
+  investor's question.** The source capped non-core singles at 28%; that number belonged to an
+  allocation carrying a 50% core ETF target, and the investor decided the ETF lane leaves this
+  account, so it is **not ported**. `singleNameBudget` derives the range from `cashFloor` and
+  holds each name to `maxPositionWeight`, with `concentration` deciding the shape — a change on
+  the fund-settings screen moves the manager, and an undeclared number is
+  `single_name_budget_unevaluated` rather than an unlimited lane. This finishes the line #133
+  began: every value left in `lib/constants.mjs` is a claim about evidence.
+  ([#153](https://github.com/untilled/aumos-catalogue/issues/153))
 - **The cash floor is the investor's, and this package no longer keeps a copy of it.**
   `coreDca.reserveFloorWeight` held 0.15 while the Mandate declared `cashFloor` 0.10, and the
   package read only its own number — one axis said twice, and unlike the position cap it was

@@ -581,6 +581,135 @@ export function effectiveCashFloor(input = {}) {
   }
 }
 
+/**
+ * ── What the single-name lanes may hold together (issue #153 §3) ──────────
+ *
+ * The source capped non-core singles at 28% of the account
+ * (`experiment_total_max_pct_account`, approved 2026-07-08). ⛔ **That number is
+ * deliberately not ported.** It was one piece of an allocation that also carried
+ * a 50% core ETF target and a 15% minimum cash, and the investor has since
+ * decided that the ETF lane leaves this account entirely — in a book without
+ * that lane, 28% is not the same statement it was. Porting it would have been
+ * carrying a number across without the arithmetic that produced it, which is the
+ * failure `experimentalPositionCeiling` already recorded once (#121).
+ *
+ * The investor answered §3 with **(a)**: the cash that is left is carried by
+ * single names, and no parking sleeve stands in for the ETF lane. With it came
+ * the source of the limit — **the Mandate, not a package constant**:
+ *
+ * ```
+ * deployable = 1 − cashFloor            (what the investor's own floor leaves)
+ * per name   = maxPositionWeight        (the investor's own single-name limit)
+ * shape      = concentration sector/theme/factor
+ * ```
+ *
+ * ⚠️ **This is the end of the line #133 started.** `concentration.position`
+ * became `maxPositionWeight`, `concentration.portfolioHeat` became
+ * `maxDrawdown`, `coreDca.reserveFloorWeight` became `cashFloor` (#153), and
+ * this was the last sizing number that could have been a package constant
+ * answering a question the investor is asked on a screen. There is now none:
+ * every remaining constant in `lib/constants.mjs` is a claim about evidence, and
+ * `METHODOLOGY`'s own header says so.
+ *
+ * ⛔ **A floor is not a target, and a budget is not an instruction.** The
+ * deployable range is what the Mandate *permits*, never what the book should
+ * hold; nothing here proposes filling it. And a Mandate that declares neither
+ * number leaves this `unevaluated` — *"nobody said"* is not *"no limit"*, the
+ * same rule `concentration_cap_missing` and `cash_floor_unevaluated` follow.
+ *
+ * ⚠️ The control arm spends **inside** this budget rather than beside it, which
+ * is what the source said too (`counts_against_experiment_total: true`).
+ * `controlArmRemainingWeight` is what `controlArmLane` takes as
+ * `experimentTotalRemainingWeight`, so the two answers cannot disagree.
+ */
+export function singleNameBudget(input = {}) {
+  const diagnostics = []
+  const cashFloorReport = effectiveCashFloor({ mandateCashFloor: input?.mandateCashFloor })
+  const floor = cashFloorReport.data.effectiveFloor
+  const perName = finite(input?.mandatePositionCap) ? Math.max(0, input.mandatePositionCap) : null
+  const missing = [
+    ...(floor === null ? ['cashFloor'] : []),
+    ...(perName === null ? ['maxPositionWeight'] : []),
+  ]
+  if (missing.length) {
+    diagnostics.push(diagnostic(
+      'single_name_budget_unevaluated',
+      'unevaluated',
+      "The single-name total is derived from the Mandate — what cashFloor leaves, held per name to maxPositionWeight — and this package ships no constant to fall back on; an undeclared limit is unjudged rather than unlimited",
+      missing[0] === 'cashFloor' ? 'mandateCashFloor' : 'mandatePositionCap',
+      { missing, derivedFrom: ['cashFloor', 'maxPositionWeight'] },
+    ))
+  }
+
+  const singleName = (row) => row?.core !== true && row?.parkedLiquidity !== true && finite(row?.weight) && row.weight >= 0
+  const positions = Array.isArray(input?.positions) ? input.positions : []
+  const proposed = Array.isArray(input?.proposed) ? input.proposed : []
+  /** `proposed` restates a held symbol rather than stacking on it — the #109 contract. */
+  const restated = new Set(proposed.map((row) => row?.symbol).filter((symbol) => symbol !== undefined && symbol !== null))
+  const total = (rows) => rows.filter(singleName).reduce((sum, row) => sum + row.weight, 0)
+  const held = total(positions)
+  const withProposed = total(positions.filter((row) => !restated.has(row?.symbol))) + total(proposed)
+
+  const deployable = floor === null ? null : round(1 - floor)
+  const remaining = deployable === null ? null : round(deployable - withProposed)
+  const overCap = deployable !== null && withProposed > deployable + 1e-12
+  const adding = withProposed > held + 1e-12
+  if (overCap && adding) {
+    diagnostics.push(diagnostic(
+      'single_name_budget_exceeded',
+      'blocked',
+      "This run would hold more in single names than the Mandate's own cash floor leaves to deploy; the limit is the investor's declaration rather than a package number, and it is raised on the fund-settings screen and nowhere else",
+      'proposed',
+      { deployableWeight: deployable, withProposed: round(withProposed), heldWeight: round(held), cashFloor: floor },
+    ))
+  } else if (overCap) {
+    diagnostics.push(diagnostic(
+      'single_name_budget_carried',
+      'unevaluated',
+      'The book already holds more in single names than the cash floor leaves to deploy; existing exposure is carried and new exposure is not, and a trim that reduces it is never the thing refused',
+      'positions',
+      { deployableWeight: deployable, heldWeight: round(held), withProposed: round(withProposed) },
+    ))
+  }
+  /**
+   * Reported and not re-refused: the position axis is `concentration`'s, it is
+   * the Mandate's `maxPositionWeight`, and a second gate on one number is the
+   * duplication #133 removed. This says which rows are over it so the budget's
+   * reader does not have to run the other operation to find out.
+   */
+  const overPerName = perName === null ? [] : [...positions.filter((row) => !restated.has(row?.symbol)), ...proposed]
+    .filter((row) => singleName(row) && row.weight > perName + 1e-12)
+    .map((row) => ({ symbol: row?.symbol ?? null, weight: round(row.weight) }))
+
+  const controlArmWeight = finite(input?.controlArmWeight) ? Math.max(0, input.controlArmWeight) : null
+  const laneTotal = METHODOLOGY.controlArm.laneTotalMaxWeight
+  const controlArmRemaining = controlArmWeight === null
+    ? null
+    : round(Math.min(laneTotal - controlArmWeight, remaining === null ? laneTotal - controlArmWeight : remaining))
+
+  return {
+    data: {
+      deployableWeight: deployable,
+      perNameCap: perName,
+      heldSingleNameWeight: round(held),
+      proposedSingleNameWeight: round(withProposed),
+      remainingWeight: remaining,
+      overPerNameCap: overPerName,
+      cashFloor: floor,
+      /** ⚠️ Named so nobody re-reads its absence as an omission. */
+      source: 'mandate-derived',
+      portedTotalCap: null,
+      portedTotalCapNote: "the source's 28% belonged to an allocation with a 50% core ETF lane and is not ported; the investor answered #153 §3 with (a) and the Mandate is the source of the limit",
+      controlArmLaneTotalMaxWeight: laneTotal,
+      controlArmRemainingWeight: controlArmRemaining,
+      controlArmSpendsInside: true,
+      budgetIsNotATarget: true,
+      units: { deployableWeight: 'portfolio-weight', perNameCap: 'portfolio-weight', remainingWeight: 'portfolio-weight' },
+    },
+    diagnostics: [...cashFloorReport.diagnostics.filter((row) => row.code !== 'cash_floor_projection_missing'), ...diagnostics],
+  }
+}
+
 export function targetWeight(input) {
   const diagnostics = []
   const expected = input?.expectedActiveReturn
