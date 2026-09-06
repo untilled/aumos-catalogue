@@ -3,17 +3,17 @@ import { validateInput, INPUT_KEYS, INPUT_VOCABULARY } from './input-contracts.m
 import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
-import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, effectiveCashFloor, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
+import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
-import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
+import { calibrationSummary, closedOutcomeSamples, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
 import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
 import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap, exitCheck } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { harnessAudit, lessonAudit } from './audit.mjs'
-import { lensEnvelope, clusterBlock, timeStopPolicy, ruleVersions, policyLint } from './envelopes.mjs'
+import { lensEnvelope, clusterBlock, timeStopPolicy, exitDiscipline, ruleVersions, policyLint } from './envelopes.mjs'
 import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport, controlArmLane } from './learning.mjs'
 import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence, resolveWakeFlow, resolveTrancheWake, reconcileArmedReviews } from './schedule.mjs'
 
@@ -42,6 +42,7 @@ const operations = {
   experimentalCeiling,
   effectivePositionCap: (input, asOf) => effectivePositionCap({ ...input, asOf }),
   effectiveCashFloor,
+  singleNameBudget,
   legacySizeSuggestion,
   concentration,
   entryQualityGate,
@@ -59,6 +60,7 @@ const operations = {
   crossCheckPrice,
   validateMacro: (input, asOf) => validateMacroObservations({ ...input, asOf }),
   calibration: calibrationSummary,
+  closedOutcomeSamples: (input, asOf) => closedOutcomeSamples({ ...input, asOf }),
   clusters: (input) => ({ data: { clusters: independentDateClusters(input?.dates, input?.gapDays) }, diagnostics: [] }),
   brier: (input) => ({ data: { score: brierScore(input?.probabilities, input?.outcomeIndex) }, diagnostics: [] }),
   bhFdr: (input) => ({ data: { rows: benjaminiHochberg(input?.rows ?? [], input?.alpha) }, diagnostics: [] }),
@@ -84,6 +86,7 @@ const operations = {
   lensEnvelope,
   clusterBlock: (input, asOf) => clusterBlock({ ...input, asOf }),
   timeStopPolicy: (input, asOf) => timeStopPolicy({ ...input, asOf }),
+  exitDiscipline: (input, asOf) => exitDiscipline({ ...input, asOf }),
   ruleVersions,
   policyLint,
   harnessAudit: (input, asOf) => harnessAudit({ ...input, asOf }),

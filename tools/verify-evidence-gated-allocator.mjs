@@ -2276,7 +2276,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 92)
+assert.equal(supportedOperations.length, 95)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -2996,7 +2996,7 @@ assert.ok(
  * pointing at one.
  */
 covers('audit/discovery-is-instructed-not-inferred')
-assert.ok(/Eight things are checked/.test(promptText), 'the pre-flight table grew by the check whose absence nothing downstream discovers')
+assert.ok(/Nine things are checked/.test(promptText), 'the pre-flight table grew by the check whose absence nothing downstream discovers, and again by the exit discipline (#153)')
 assert.ok(promptText.includes('discoveryCapacity') && promptText.includes('discovery_lane_dark'), '§1b names the operation and the code a dark run carries')
 assert.ok(
   /candidates come out of the sweep §3 defines/.test(promptProse),

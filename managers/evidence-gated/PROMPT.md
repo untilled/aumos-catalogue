@@ -159,7 +159,7 @@ invalid values.
 
 ### 1b. Pre-flight, before planning any trade
 
-Eight things are checked before a candidate is considered, and the order is the point: each one is
+Nine things are checked before a candidate is considered, and the order is the point: each one is
 something a run would otherwise discover *after* proposing.
 
 | # | check | what stops the run |
@@ -167,14 +167,15 @@ something a run would otherwise discover *after* proposing.
 | 1 | `lessonAudit` | nothing — but proposing a change already waiting for the investor is repeating yourself |
 | 2 | `harnessAudit` | **a blocker stops planning.** Orphaned WATCHes, size disagreements, order-ready decisions with no registered exit. A held position no decision explains is a **`warn`**, not a blocker |
 | 3 | `calibration` | low maturity does not stop the run; it frames what it may claim, and caps size at the experimental ceiling — `experimentalCeiling`, not the ratio alone |
-| 4 | `exitCheck` over every non-core holding | nothing — but **its SELL and TRIM candidates are reported before any new buy is considered.** Selling what is broken comes before buying what is interesting, and a run that plans purchases first will find reasons not to revisit that order |
-| 5 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
-| 6 | broker limits | Aumos owns them; read what the invocation carries and do not assume |
-| 7 | `signalPaper` → `verdictReport` | nothing — but a met threshold is stated in this run, a `NO_GO` freezes new non-core experiments, and an empty or unadvanced track is named in `uncertainty` rather than passed over |
-| 8 | `themeRadarDue` + `coverage` → `discoveryCapacity` | nothing — but **a run with no open discovery branch says so.** Both branches can be shut on the same day, and the `WAIT` that follows is otherwise the same shape as a considered no-change |
+| 4 | `exitDiscipline` over every non-core holding and every proposed entry | **a due stop this run does not act on is `blocked`.** The time stop is unconditional — 40 trading days from entry, whatever the position is doing — and an entry with no registered stop and review date is refused |
+| 5 | `exitCheck` over every non-core holding | nothing — but **its SELL and TRIM candidates are reported before any new buy is considered.** Selling what is broken comes before buying what is interesting, and a run that plans purchases first will find reasons not to revisit that order |
+| 6 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
+| 7 | broker limits | Aumos owns them; read what the invocation carries and do not assume |
+| 8 | `signalPaper` → `verdictReport` | nothing — but a met threshold is stated in this run, a `NO_GO` freezes new non-core experiments, and an empty or unadvanced track is named in `uncertainty` rather than passed over |
+| 9 | `themeRadarDue` + `coverage` → `discoveryCapacity` | nothing — but **a run with no open discovery branch says so.** Both branches can be shut on the same day, and the `WAIT` that follows is otherwise the same shape as a considered no-change |
 
 ⚠️ **Is a discovery universe declared — and call `coverage` to find out, on every run, before
-anything is proposed.** (#140) This is the eighth check and it is the newest, because it is the one
+anything is proposed.** (#140) This is the last check and it is the newest, because it is the one
 the run skeleton could not discover for itself: §3 names the lens when there are candidates,
 candidates come out of the sweep §3 defines, and that sweep needs a declared universe — so a run
 with no universe never reaches the step that would have noticed. The circle closes with no error
@@ -314,7 +315,7 @@ Record the run under `run/theme-radar-last` whether or not it produced anything.
 
 ⚠️ **`due: false` is this branch off, and off is a state to report rather than a step to skip.**
 Two days in every three the interval says not due, which is the interval working — but paired with
-an undeclared universe it is a run that could not have found anything, and §1b's eighth check is
+an undeclared universe it is a run that could not have found anything, and §1b's last check is
 where those two facts are added up. Skipping the radar correctly and sweeping nothing are each
 defensible; together they are `discovery_lane_dark`.
 
@@ -353,7 +354,7 @@ the radar has not merely produced fewer ideas — it has left the boundary perma
 ⛔ **And this section is not where a missing universe is discovered, which is why §1b asks first.**
 Reaching here at all takes candidates, candidates take the sweep, and the sweep takes the
 denominator — so the step that would notice its absence is downstream of it (#140). A run that
-arrives with no candidates has not disproved anything about the market; §1b's eighth check is what
+arrives with no candidates has not disproved anything about the market; §1b's last check is what
 tells it which of the two happened.
 
 #### Price patterns — `scan`, `opportunityMetrics`
@@ -461,6 +462,16 @@ holdings die together; **a denomination is not a loss path**, and a label standi
 is returned as `concentration_factor_label_unexamined` for this run to answer, not to size around.
 ⛔ **A cap the Mandate does not declare is `unevaluated`, and that is not a pass** — say so in
 `uncertainty` rather than sizing as though the limit were absent.
+
+⛔ **The single-name total is the Mandate's as well, and this package ships no constant for it.**
+Call `singleNameBudget` with `mandateCashFloor`, `mandatePositionCap`, the book's `positions` and
+this run's `proposed`: what `cashFloor` leaves is the range the single-name lanes may hold together,
+`maxPositionWeight` binds each name inside it, and `concentration` decides the shape. The source's
+28% single-name total is **not ported** — it belonged to an allocation with a 50% core ETF lane, and
+the investor answered #153 §3 with (a): the cash that is left is carried by single names, with no
+parking sleeve in place of the ETF lane. A missing Mandate number is `single_name_budget_unevaluated`
+and never an unlimited lane. ⚠️ A budget is what the Mandate permits, never what the book should
+hold. Hand `controlArmRemainingWeight` to `controlArmLane` as `experimentTotalRemainingWeight`.
 
 ⛔ **The cash axis is the Mandate's too, and it is checked against the plan rather than the book.**
 Call `effectiveCashFloor` with `mandateCashFloor` — the Mandate's `cashFloor`, which this package

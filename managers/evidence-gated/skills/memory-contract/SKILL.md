@@ -175,7 +175,11 @@ must not overwrite history. Preserve referenced ids, missingness and status. Nev
 - active Thesis/invalidation or raw Evidence body;
 - portfolio-wide Brief content;
 - order/fill state;
-- a gate that must execute;
+- a gate that must execute — ⚠️ **including the exit discipline's stop and review date.** The
+  source kept them in `data/exit_rules.json`; this package has no such file, may not build one
+  here, and would be building a per-position table that is both a hidden portfolio database and a
+  gate. `exitDiscipline` re-derives them from the entry date every run and returns
+  `watchesToRegister` for the entry's own proposal instead;
 - copied current filing/news data;
 - an automatically adopted rule or threshold;
 - an unconfirmed diagnosis of a source or a route.

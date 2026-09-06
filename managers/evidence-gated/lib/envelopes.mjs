@@ -1,5 +1,6 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
 import { INPUT_VOCABULARY } from './input-contracts.mjs'
+import { METHODOLOGY } from './constants.mjs'
 
 /**
  * ── Declared thresholds, and the drift they exist to catch (issue #70 §12) ─
@@ -214,6 +215,289 @@ export function timeStopPolicy({ positions = [], asOf } = {}) {
     }
   }
   return { data: { verdicts, exitCandidates: verdicts.filter((row) => row.verdict === 'exit-candidate').map((row) => row.symbol) }, diagnostics }
+}
+
+/**
+ * ── The exit discipline, which is unconditional (issue #153) ──────────────
+ *
+ * The source methodology wrote this rule down with its reason attached:
+ * *"무기한 보유는 청산 증거를 만들지 못해 레인 목적과 충돌한다."* A position
+ * held indefinitely produces no closed outcome, every maturity axis in this
+ * package is waiting for closed outcomes, and the port arrived with **zero** of
+ * them. The buying side came across and the selling discipline did not.
+ *
+ * ⚠️ **What did come across is conditional, and that is the defect.** Two
+ * operations already look at a review date and neither one closes anything:
+ *
+ * | operation | asks | fires when | severity |
+ * |---|---|---|---|
+ * | `exitCheck` `time_stop` | did the thesis have its window? | the **review date** arrived *and* price never got above entry | a candidate |
+ * | `timeStopPolicy` | was the thesis tested? | the **review date** arrived *and* the catalyst never happened *and* it trailed its benchmark | `unevaluated` |
+ * | `exitDiscipline` `time_stop_reached` | has the holding period run out? | **40 trading days since entry**, and nothing else | the exit is due |
+ *
+ * ⛔ **The boundary is the input each one reads, and the ordering follows from
+ * it.** The first two read a `reviewBy` a run had to have written, and both ask
+ * a question *about the thesis*; a position nobody wrote a review date for is
+ * invisible to both, which is exactly how a book reaches zero closed outcomes
+ * while two time-stop operations report nothing wrong. This one reads the entry
+ * date, which every position has, and asks nothing about the thesis at all.
+ * **Where more than one fires, this one answers**: the other two argue about
+ * whether to extend a review, and an exit that is already due is not a review
+ * to extend. They keep their own outputs — a thesis that failed its catalyst
+ * test is still worth recording as that — but they never postpone this.
+ *
+ * ── The stop distance is not the source's, except in the lane it was set for ─
+ *
+ * The source's −8% was computed against a **1%** cell: *"종목당 1% × −8% = 계좌
+ * −0.08%. 6종목 전부 손절해도 계좌 −0.48%."* #153 opened a lane where one name
+ * may be 20% of the book, and −8% there is −1.6% of the account on a single
+ * position — six of them would be −9.6%, which is above every heat cap this
+ * package has ever been given. Carrying the number across unchanged would be
+ * carrying its arithmetic and not its meaning.
+ *
+ * So the main lane **derives** the distance from the axis the investor declared:
+ * `portfolioHeat` is `Σ weight × stopLossPct` against the Mandate's
+ * `maxDrawdown`, so the widest stop a position of weight *w* may carry is
+ * `(maxDrawdown − heat already held) / w`. ⛔ The source's −8% remains the
+ * ceiling on the answer: the derivation only ever tightens, and a value with an
+ * approval history is the widest thing this package proposes.
+ *
+ * ⚠️ **The investor has not declared `maxDrawdown`, and no number is invented
+ * for it.** With nothing to derive from, the distance comes back `null` and
+ * `hard_stop_unevaluated` says which declaration would resolve it — the shape
+ * `cash_floor_unevaluated` uses, and the shape this package uses for every cap
+ * nobody has set. The control arm is unaffected: its cell is 1% and the source's
+ * −8% is valid there, so that lane is fully judged today. ⚠️ **Two lanes holding
+ * two different stop distances is the correct state**, not an inconsistency —
+ * the number is a function of position size, and the two lanes are sized by
+ * different things on purpose.
+ *
+ * ── Registration, which is the part that must not be prose ────────────────
+ *
+ * The source's own words: *"각 진입 시 data/exit_rules.json에 stop·review_by를
+ * 기입한다 — exit-check가 그때부터 감시한다. 산문 약속으로 두지 않는다."* This
+ * package has no such file and cannot write one: it holds `thesis:read` and no
+ * `thesis:write`, and the runtime maps that grant to an empty tool list. What it
+ * does have is the proposal: a WATCH leaves in a `DecisionProposal`, and the
+ * Wake Engine evaluates it from then on. So `watchesToRegister` returns the two
+ * rows an entry owes — a `price-below` at the stop level and an `at-time` at the
+ * time stop — in `validateWatch`'s own vocabulary, to be copied into the same
+ * proposal as the BUY. An entry proposed without them is `exit_rules_unregistered`
+ * / `blocked`: the discipline is registered at entry or the entry is refused,
+ * which is what the source meant by not leaving it in prose.
+ *
+ * ⚠️ **The read-back is still missing and is the host's** — a manager can arm a
+ * WATCH and cannot read one back, which `HOST-FOLLOWUPS.md` already records
+ * under #97. This operation therefore re-derives the discipline from the entry
+ * date every run rather than trusting that a WATCH armed weeks ago still stands.
+ */
+const TRADING_DAY_MS = 86_400_000
+
+function weekdaysBetween(fromDay, toDay) {
+  let cursor = Date.parse(fromDay)
+  const end = Date.parse(toDay)
+  if (!Number.isFinite(cursor) || !Number.isFinite(end)) return null
+  let days = 0
+  while (cursor < end) {
+    cursor += TRADING_DAY_MS
+    const weekday = new Date(cursor).getUTCDay()
+    if (weekday >= 1 && weekday <= 5) days += 1
+  }
+  return days
+}
+
+export function exitDiscipline({
+  symbol = null,
+  lane = null,
+  entryDate = null,
+  tradingDaysHeld = null,
+  entryPrice = null,
+  price = null,
+  positionWeight = null,
+  mandateMaxDrawdown = null,
+  heldPortfolioHeat = 0,
+  registration = null,
+  proposedExits = null,
+  asOf = null,
+} = {}) {
+  const diagnostics = []
+  const limitDays = METHODOLOGY.exitDiscipline.timeStopTradingDays
+  const maximumStop = Math.abs(METHODOLOGY.exitDiscipline.maximumHardStopPct)
+  const controlArm = lane === 'control-arm'
+
+  /**
+   * ⚠️ Trading days, counted as weekdays when the caller has no calendar to
+   * hand. Holidays make the weekday count the **larger** of the two, so the
+   * approximation reaches the limit a few sessions early rather than late — the
+   * safe direction for a rule whose purpose is that positions close — and the
+   * basis is named in the output rather than left to be assumed.
+   */
+  let heldDays = Number.isInteger(tradingDaysHeld) && tradingDaysHeld >= 0 ? tradingDaysHeld : null
+  let basis = heldDays === null ? null : 'caller-trading-calendar'
+  if (heldDays === null && typeof entryDate === 'string' && typeof asOf === 'string') {
+    heldDays = weekdaysBetween(entryDate.slice(0, 10), asOf.slice(0, 10))
+    basis = heldDays === null ? null : 'weekday-approximation'
+  }
+  if (heldDays === null) {
+    diagnostics.push(diagnostic('exit_discipline_unevaluated', 'unevaluated', 'The holding period decides the time stop, and this run was given neither an entry date nor a trading-day count; the stop is unjudged rather than not reached', 'entryDate', { symbol, timeStopTradingDays: limitDays }))
+  } else if (basis === 'weekday-approximation') {
+    diagnostics.push(diagnostic('time_stop_basis_approximated', 'info', 'Trading days were counted as weekdays because no session calendar was supplied; holidays make this count the larger of the two, so the stop is reached no later than a true session count would reach it', 'tradingDaysHeld', { symbol, tradingDaysHeld: heldDays, basis }))
+  }
+  const timeStopReached = heldDays === null ? null : heldDays >= limitDays
+  const dueAt = typeof entryDate === 'string' && Number.isFinite(Date.parse(entryDate.slice(0, 10)))
+    ? new Date(Date.parse(entryDate.slice(0, 10)) + Math.ceil(limitDays / 5) * 7 * TRADING_DAY_MS).toISOString().slice(0, 10)
+    : null
+  if (timeStopReached) {
+    diagnostics.push(diagnostic(
+      'time_stop_reached',
+      'unevaluated',
+      'The holding period this lane allows has run out, so this position is closed regardless of how it is performing; the closed outcome is the product, a loss is a valid one, and this is not a review date to extend',
+      'entryDate',
+      { symbol, tradingDaysHeld: heldDays, timeStopTradingDays: limitDays, basis, lane },
+    ))
+  }
+
+  /**
+   * The stop distance. The control arm keeps the source's own number because
+   * the source's own arithmetic still holds there; every other lane derives it
+   * from the declared drawdown limit and can only come out tighter.
+   */
+  const heatHeadroom = finite(mandateMaxDrawdown) && finite(heldPortfolioHeat)
+    ? Math.max(0, mandateMaxDrawdown - heldPortfolioHeat)
+    : null
+  let stopPct = null
+  let stopSource = null
+  let derivedCeiling = null
+  if (controlArm) {
+    stopPct = -maximumStop
+    stopSource = 'control-arm-approved'
+  } else if (heatHeadroom !== null && finite(positionWeight) && positionWeight > 0) {
+    derivedCeiling = heatHeadroom / positionWeight
+    stopPct = -Math.min(maximumStop, derivedCeiling)
+    stopSource = derivedCeiling < maximumStop ? 'mandate-max-drawdown' : 'methodology-maximum'
+  } else {
+    diagnostics.push(diagnostic(
+      'hard_stop_unevaluated',
+      'unevaluated',
+      "Outside the control arm the stop distance is derived from the Mandate's maxDrawdown against this position's weight, and one of them was not declared; no distance is invented for it, and the position is unjudged on this axis rather than unstopped",
+      finite(mandateMaxDrawdown) ? 'positionWeight' : 'mandateMaxDrawdown',
+      {
+        symbol,
+        lane,
+        mandateMaxDrawdown: finite(mandateMaxDrawdown) ? round(mandateMaxDrawdown) : null,
+        positionWeight: finite(positionWeight) ? round(positionWeight) : null,
+        unlocksWith: finite(mandateMaxDrawdown) ? 'positionWeight' : 'mandate.constraints.maxDrawdown',
+        maximumHardStopPct: METHODOLOGY.exitDiscipline.maximumHardStopPct,
+      },
+    ))
+  }
+  const stopLevel = stopPct !== null && finite(entryPrice) && entryPrice > 0 ? round(entryPrice * (1 + stopPct), 6) : null
+  const hardStopBreached = stopLevel === null || !finite(price) ? null : price <= stopLevel
+  if (hardStopBreached) {
+    diagnostics.push(diagnostic(
+      'hard_stop_breached',
+      'unevaluated',
+      'The close is at or below the stop this entry registered; the position is closed on the rule rather than re-argued',
+      'price',
+      { symbol, price: round(price, 6), stopLevel, stopPct: round(stopPct), entryPrice: round(entryPrice, 6), stopSource },
+    ))
+  }
+
+  /**
+   * The registration, judged on what it actually carries. ⛔ A registration
+   * whose stop is wider than the derived bound is refused rather than reported:
+   * it is a position whose own loss budget exceeds the one the Mandate declares
+   * for the whole book, and accepting it would put the breach in the future
+   * where `portfolioHeat` cannot see it until it fires.
+   */
+  const registeredStopPct = finite(registration?.stopPct)
+    ? -Math.abs(registration.stopPct)
+    : finite(registration?.stopPrice) && finite(entryPrice) && entryPrice > 0
+      ? registration.stopPrice / entryPrice - 1
+      : null
+  const registeredReviewBy = typeof registration?.reviewBy === 'string' && Number.isFinite(Date.parse(registration.reviewBy)) ? registration.reviewBy.slice(0, 10) : null
+  const missingRegistration = [
+    ...(registeredStopPct === null ? ['stop'] : []),
+    ...(registeredReviewBy === null ? ['reviewBy'] : []),
+  ]
+  if (registration !== null && missingRegistration.length) {
+    diagnostics.push(diagnostic(
+      'exit_rules_unregistered',
+      'blocked',
+      'An entry registers its stop and its review date before it is an entry; the closed outcome is what this discipline is for, and a promise to review later is the prose the source refused to accept',
+      `registration.${missingRegistration[0]}`,
+      { symbol, missing: missingRegistration, timeStopTradingDays: limitDays, dueAt },
+    ))
+  }
+  if (registeredStopPct !== null && stopPct !== null && registeredStopPct < stopPct - 1e-12) {
+    diagnostics.push(diagnostic(
+      'hard_stop_exceeds_budget',
+      'blocked',
+      'The registered stop is further from the entry than this position may carry: at this weight the loss it permits is larger than the drawdown budget left for it, so the breach would be invisible to portfolioHeat until the day it fires',
+      'registration.stopPct',
+      { symbol, registeredStopPct: round(registeredStopPct), permittedStopPct: round(stopPct), positionWeight: finite(positionWeight) ? round(positionWeight) : null, heatHeadroom: heatHeadroom === null ? null : round(heatHeadroom), stopSource },
+    ))
+  }
+
+  /**
+   * The round trip, in the shape `position_cap_reduction_undisclosed` uses:
+   * handed this run's exits, a due stop that the proposal does not act on is
+   * `blocked`; not handed them, the question is unjudged rather than passed.
+   */
+  const due = timeStopReached === true || hardStopBreached === true
+  const exitProposed = Array.isArray(proposedExits)
+    ? proposedExits.some((row) => (typeof row === 'string' ? row : row?.symbol) === symbol)
+    : null
+  if (due && exitProposed === false) {
+    diagnostics.push(diagnostic(
+      'exit_due_unactioned',
+      'blocked',
+      'A stop this position is held to has been reached and this run proposes no exit for it; the discipline is what produces the closed outcomes every maturity axis here is waiting for, and a rule that is reported and not acted on is the prose it replaced',
+      'proposedExits',
+      { symbol, timeStopReached: timeStopReached === true, hardStopBreached: hardStopBreached === true },
+    ))
+  }
+
+  /**
+   * What the entry copies into its own proposal. Two rows, in `validateWatch`'s
+   * vocabulary, because a WATCH is the only registration path this package has.
+   */
+  const watchesToRegister = []
+  /**
+   * ⚠️ Both rows outlive the time stop by one day rather than expiring on it. A
+   * WATCH that expires at the instant it fires is a WATCH that may never fire,
+   * and a day is the smallest unit this vocabulary has — it is the boundary
+   * being avoided, not a grace period anybody chose.
+   */
+  const watchExpiry = dueAt === null ? null : new Date(Date.parse(dueAt) + TRADING_DAY_MS).toISOString().slice(0, 10)
+  if (stopLevel !== null) watchesToRegister.push({ kind: 'price-below', threshold: stopLevel, expiresAt: watchExpiry, reason: 'exit-discipline-hard-stop' })
+  if (dueAt !== null) watchesToRegister.push({ kind: 'at-time', at: dueAt, expiresAt: watchExpiry, reason: 'exit-discipline-time-stop' })
+
+  return {
+    data: {
+      symbol,
+      lane,
+      timeStop: { tradingDaysHeld: heldDays, timeStopTradingDays: limitDays, reached: timeStopReached, basis, dueAt },
+      hardStop: {
+        stopPct: stopPct === null ? null : round(stopPct),
+        stopLevel,
+        breached: hardStopBreached,
+        source: stopSource,
+        maximumHardStopPct: METHODOLOGY.exitDiscipline.maximumHardStopPct,
+        derivedCeilingPct: derivedCeiling === null ? null : round(-derivedCeiling),
+        heatHeadroom: heatHeadroom === null ? null : round(heatHeadroom),
+      },
+      registration: { given: registration !== null, stopPct: registeredStopPct === null ? null : round(registeredStopPct), reviewBy: registeredReviewBy, missing: missingRegistration },
+      watchesToRegister,
+      exitDue: due,
+      exitProposed,
+      /** ⛔ A candidate for the one proposal the investor still approves, never an order. */
+      candidateOnly: true,
+      action: due ? 'SELL' : 'NONE',
+      units: { stopPct: 'return-fraction', stopLevel: 'price-major-units', heatHeadroom: 'return-fraction' },
+    },
+    diagnostics,
+  }
 }
 
 /**

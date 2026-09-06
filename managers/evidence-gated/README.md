@@ -252,6 +252,15 @@ WAIT that says which one.
   regime turns on the calendar, so three of them is a multi-year wait no rate of activity
   shortens. If you want a manager that will put 20% of your book into one conviction name
   this quarter without one of them clearing that bar, it is not this one.
+- **Holding a name for as long as you like.** Every non-core position is closed **40 trading
+  days after it was entered**, whatever it is doing, and closed again earlier if it falls
+  through its registered stop. That is not a defect being disclosed: the whole methodology
+  sizes on closed outcomes, and a book that never closes anything keeps its own gates shut
+  forever — which is exactly the state this package was in, with zero closed samples. A loss
+  is a valid output here, because the output being bought is the record. ⚠️ An entry that does
+  not register its stop and its review date is refused, and a run that reports a due stop
+  without proposing the exit is refused too. If you want a manager that will sit in a position
+  for two years while the thesis matures, this is the wrong one.
 - **Short positions and leverage.** It is long-only.
 - **Its own newest layers.** The forward-research and sell-side layers are ported, but
   their track record is not: the comparison that answers *"do the team's calls beat the

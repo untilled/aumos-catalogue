@@ -1,6 +1,7 @@
 # Host dependencies after issues #145–153
 
-Version 0.4.23 separates the main lane from the maturity gate and reads the Mandate's `cashFloor`.
+Version 0.4.24 separates the main lane from the maturity gate, reads the Mandate's `cashFloor`,
+derives the single-name total from the Mandate and enforces the source's exit discipline.
 Three runtime facilities remain outside this catalogue package.
 
 ## Fundamental storage (#146)
@@ -87,19 +88,58 @@ left to diligence.
 ⛔ The dependency is a **disclosure** one and not a gating one. Nothing here waits on the host: the
 diagnostic fires today, and the proposal that does not carry both halves is refused today.
 
-## The lane split, and the two numbers it does not set (#153, requests 1–2)
+## The lane split, and the number that is now decided (#153, requests 1–3)
 
 The maturity ceiling was applied to both lanes and belongs to one; `variantViewCheck` is what tells
-them apart, from checked inputs rather than a claim. Nothing here is a host dependency — the
-operation runs today — but two numbers are deliberately **not** set by this revision and are
-recorded so nobody reads their absence as a decision:
+them apart, from checked inputs rather than a claim. Nothing there is a host dependency.
 
-- **What total the single-name lanes may reach together.** The source approved 28% (2026-07-08) and
-  a 15% minimum cash; the investor has since declared `cashFloor` 0.10 and asked for the ETF lane
-  to leave this account, which is a different arithmetic on a book whose cash is 57%. Issue #153 §3
-  puts three options to the investor and none of them is the package's to choose. The package's
-  existing totals are unchanged in the meantime.
-- **Whether the promotion ladder gets its middle rungs**, below.
+**The single-name total is no longer open.** The investor answered §3 with **(a)** — the cash that
+is left is carried by single names, and no parking sleeve stands in for the ETF lane — and set the
+source of the limit with it: the Mandate rather than a package constant. `singleNameBudget` derives
+the range from `cashFloor` and holds each name to `maxPositionWeight`. The source's 28% is **not
+ported**, and that is now a recorded decision rather than an open one: it was one piece of an
+allocation that also carried a 50% core ETF target, and in an account without that lane it is not
+the same statement. ⚠️ With it, no sizing constant in this package answers a question the investor
+is asked on a screen — the end of the line #133 began. What is still open is the promotion ladder's
+middle rungs, below.
+
+## The exit discipline needs a WATCH read path (#153, request 2 · #97)
+
+`exitDiscipline` enforces the source's rule — 40 trading days from entry, unconditionally, plus a
+stop distance derived from the Mandate's `maxDrawdown` outside the control arm — and registers it
+the only way this package can: `watchesToRegister` returns a `price-below` and an `at-time` row for
+the entry's own `DecisionProposal`. The source wrote its registration into a file
+(`data/exit_rules.json`) that `exit-check` then watched; this package has `thesis:read` and no
+`thesis:write`, and the runtime maps that grant to an empty tool list, so there is no such file and
+no equivalent.
+
+⛔ **Private memory is not the substitute and must not become one.** `skills/memory-contract`
+forbids exactly this shape — *"a gate that must execute"* and a hidden portfolio database — and a
+per-position stop table would be both. So the discipline is **re-derived from the entry date every
+run** rather than read back from state, which is correct but pays for the missing read path twice:
+a WATCH armed at entry cannot be confirmed still active, and the same #97 gap that costs duplicate
+scheduling costs an unverifiable stop here. The host still needs the asOf-aware read of active
+plans/watches described above; until it exists, the package discloses that the arm is unverified
+rather than assuming it stands.
+
+⚠️ **The stop distance itself waits on the investor, not the host.** `mandate.constraints.maxDrawdown`
+is undeclared, so outside the control arm the distance comes back `hard_stop_unevaluated` with the
+declaration that resolves it named in the diagnostic. No number is invented, and the control arm —
+whose 1% cell is what the source's −8% was computed against — is fully judged today.
+
+## Closed outcomes reach one maturity axis, not both (#153 · #118)
+
+`closedOutcomeSamples` turns a closed decision into the calibration sample that moves
+`maturityStatus`, which is the axis the experimental ceiling reads. That conversion previously
+existed only as a sentence in `skills/outcome-calibration` and no operation performed it — the same
+shape as the paper-track registration that held zero rows across every run.
+
+⛔ **It does not and must not reach `promotionGate`.** That gate counts matured *paper* windows in
+the `promote` cohort: rows registered before the outcome was known, with no fill, cost or size. A
+realized trade has all three, and pooling the two would open a promotion on evidence the gate was
+not measuring. `closed_outcome_not_a_paper_sample` states the boundary every run. Both axes still
+depend on the host for the underlying record — the Decision journal and Track Record are Aumos's,
+and this package keeps no ledger.
 
 ## The promotion ladder's middle rungs (#151, proposal 3)
 

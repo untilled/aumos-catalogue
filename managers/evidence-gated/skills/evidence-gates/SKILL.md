@@ -118,6 +118,38 @@ arm's own record: `evidenceSamples` rows from any cohort other than `llm-researc
 `control_arm_evidence_cited` / `blocked`. That is `expansionProhibited` at the lane door — the same
 rule `verdictReport` enforces one layer up, where a mechanical cohort gets no verdict at all.
 
+### The exit discipline, which is unconditional
+
+⚠️ **`controlArmLane`'s `exitRegistered: true` is a boolean a run can assert; `exitDiscipline` is
+what checks it.** Call it for every non-core holding and for every entry this run proposes.
+
+- **The time stop reads the entry date and nothing else.** 40 trading days after entry the position
+  is closed regardless of how it is doing — `time_stop_reached`. It is not a review to extend, and a
+  loss is a valid output because the output being bought is the closed outcome. ⛔ It does **not**
+  read a `reviewBy`: the two conditional time stops here (`exitCheck`'s `time_stop`, and
+  `timeStopPolicy`) both do, and a position nobody wrote a review date for is invisible to both —
+  which is how this book reached zero closed outcomes with two time-stop operations reporting
+  nothing wrong. Where more than one fires, `exitDiscipline` answers; the others keep their own
+  finding and never postpone it.
+- **The stop distance is not one number any more, and that is correct.** The control arm keeps the
+  source's approved −8%, which was computed against its 1% cell. Every other lane **derives** it
+  from the Mandate's `maxDrawdown` against this position's weight — the widest stop a position may
+  carry is the heat budget left for it divided by its weight — and the −8% is only the ceiling on
+  that answer. ⚠️ The investor has not declared `maxDrawdown`, so outside the control arm the answer
+  today is `hard_stop_unevaluated` and **no number is invented**; the diagnostic names the
+  declaration that resolves it. A registered stop wider than the derived bound is
+  `hard_stop_exceeds_budget` / `blocked` — that breach would otherwise be invisible to
+  `portfolioHeat` until the day it fired.
+- **Registration happens at entry or the entry is refused.** The source wrote *"산문 약속으로 두지
+  않는다"* and kept a file; this package has no `thesis:write` and no way to read a WATCH back, so
+  the registration path is the proposal itself. `watchesToRegister` returns the two rows an entry
+  owes — a `price-below` at the stop and an `at-time` at the time stop — and they are copied into
+  the same `DecisionProposal` as the BUY. A missing stop or review date is
+  `exit_rules_unregistered` / `blocked`.
+- **A reported stop that nobody acts on is the prose it replaced.** Pass this run's exits as
+  `proposedExits`; a due stop with no exit proposed for that symbol is `exit_due_unactioned` /
+  `blocked` — the proposal, never the run.
+
 ⛔ **A good result from this lane is never an argument for enlarging it.** `verdictReport` refuses to
 render a verdict on the mechanical cohort at all. Read a strong baseline as "our bar is high", not as
 "do more of this": expanding a control arm destroys the control, and after that no edge claim can be

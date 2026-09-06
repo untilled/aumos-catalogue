@@ -253,6 +253,31 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   중간 등급을 둘 것인가.
   ([#151](https://github.com/untilled/aumos-catalogue/issues/151),
   [#153](https://github.com/untilled/aumos-catalogue/issues/153))
+- **포지션은 규칙으로 닫히고, 그 규칙은 진입일을 읽는다.** 이식본의 시간 스톱 둘은 전부 조건부이고
+  둘 다 실행이 써둬야 하는 `reviewBy`에 의존한다 — `exitCheck`의 `time_stop`(리뷰 날짜 도래 +
+  진입가 미회복)과 `timeStopPolicy`(리뷰 날짜 도래 + 촉매 미실현 + 벤치마크 열위). 리뷰 날짜를
+  아무도 써두지 않은 포지션은 둘 다에게 보이지 않고, 그래서 시간 스톱 연산 둘이 아무 문제도 보고하지
+  않는 채로 장부의 **청산 표본이 0건**에 도달한다. `exitDiscipline`은 무조건이다 — 진입 후 40거래일이면
+  성과와 무관하게 청산이고(`time_stop_reached`), 여럿이 겹치면 이쪽이 답한다. 이미 도래한 청산은
+  연장할 리뷰가 아니다. ⚠️ **손절 폭이 이제 두 개인 것은 의도된 것이다.** 원본의 −8%는 1% 칸을 놓고
+  계산된 값이고, 한 종목이 장부의 20%까지 실릴 수 있는 레인에서 같은 −8%는 한 포지션이 계좌 −1.6%를
+  무는 것이다. 그래서 대조군을 제외한 모든 레인은 Mandate `maxDrawdown`을 그 포지션의 비중으로 나눠
+  손절 폭을 역산하고, −8%는 그 답의 천장으로만 남는다. ⛔ 투자자는 `maxDrawdown`을 아직 선언하지
+  않았으므로 대조군 밖의 오늘 답은 `hard_stop_unevaluated`이고 **숫자를 지어내지 않는다.** 산문으로
+  두면 안 되는 부분은 등록이다 — `watchesToRegister`가 진입이 자기 제안에 복사해 넣을 `price-below`·
+  `at-time` 행을 돌려주고, 그것 없는 진입은 `exit_rules_unregistered`, 도래한 스톱을 이 실행이 이행하지
+  않으면 `exit_due_unactioned`이다. ⚠️ 이 패키지는 WATCH를 걸 수는 있어도 되읽을 수 없으므로, 규율은
+  몇 주 전에 걸어둔 WATCH를 믿는 대신 매 실행 진입일에서 다시 계산된다. 그 읽기 경로는 호스트 몫이고
+  `HOST-FOLLOWUPS.md`가 기록한다.
+  ([#153](https://github.com/untilled/aumos-catalogue/issues/153))
+- **단일종목 총합은 Mandate에서 파생되고, 투자자가 답할 질문이 담긴 상수는 더 이상 남지 않는다.**
+  원본은 비코어 단일주를 28%로 묶었다. 그 값은 코어 ETF 목표 50%를 함께 들고 있던 배분의 한 조각이고,
+  투자자가 ETF 레인을 이 계좌 밖으로 옮기기로 했으므로 **이식하지 않는다.** `singleNameBudget`이
+  `cashFloor`가 남기는 범위를 계산하고 종목당은 `maxPositionWeight`가, 모양은 `concentration`이
+  잡는다 — 펀드 설정 화면의 변경이 매니저를 움직이고, 미선언은 무제한이 아니라
+  `single_name_budget_unevaluated`다. #133이 시작한 선의 종착점이며, `lib/constants.mjs`에 남은 값은
+  전부 증거에 대한 주장이다.
+  ([#153](https://github.com/untilled/aumos-catalogue/issues/153))
 - **현금 하한은 투자자의 것이고, 이 패키지는 더 이상 그 사본을 갖지 않는다.**
   Mandate가 `cashFloor` 0.10을 선언한 동안 `coreDca.reserveFloorWeight`는 0.15를 들고 있었고
   패키지는 자기 숫자만 읽었다 — 한 축이 두 번 선언됐고, 포지션 상한과 달리 공시조차 없었다. 그
