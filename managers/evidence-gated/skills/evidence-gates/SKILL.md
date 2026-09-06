@@ -121,6 +121,24 @@ per requirement, and `effectivePositionCap` carries it on `position_cap_reduced_
 `mainLane`. ⛔ Reporting the reason changes no threshold: the four requirements and `verified` are
 what they were, and `thesisComplete` is not waived for a candidate that has three of four.
 
+⚠️ **And when it says yes, it says whose word it is saying yes on** (#692). `consensusRefs` is the
+one requirement of the four whose input is on the web and nowhere else — a broker estimate or a
+price target is in no filing and on no exchange feed — and the only route the web has into
+`evidenceIds` is `observation_file`, which files the passage as the **manager's own testimony**.
+So `variantViewCheck` grades every accepted row: `aumos` (this host obtained it), `manager` (you
+filed it), `ungraded` (cited, markers not carried back) or `uncited` (nothing in the record stands
+behind it at all). `consensusStrongestAttestation` is the best grade the candidate has and
+`restsOnManagerAttestation` is true when that best grade is yours.
+
+⛔ **A manager-attested row satisfies the requirement, unchanged.** That is the trade the investor
+was asked for and chose — *file it, and I read the passage before I approve* — over keeping the
+lane shut or dropping the requirement. ⛔ **And it collapses into dropping the requirement the
+moment the grade stops travelling.** So when the main lane opens on one,
+`effectivePositionCap` returns `main_lane_rests_on_manager_attestation` and the proposal carries
+that code verbatim in one `rationale.risks` entry with the source URL and in one `uncertainty`
+entry; missing either is `main_lane_attestation_undisclosed` / `blocked`. `risks` is the slot
+because the approval screen renders `keyReasons` and `risks` and nothing else.
+
 ⚠️ **The requirement that binds is usually fillable, and the fill is a fetch.** `expectedUpsidePct`
 and `fairValueRange` come off `thesisValuation` — the bear/base/bull targets this page already
 requires, drivers checked against the filings — so a `thesisComplete` gap on a **filer** is work not

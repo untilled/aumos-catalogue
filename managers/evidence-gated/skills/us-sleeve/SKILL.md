@@ -85,6 +85,32 @@ been fed. Do these in order and report each one:
    both fields from the bear/base/bull targets. ⛔ Without them a complete variant view still reads
    `missing: ["thesisComplete"]` and a declared 20% cap operates at 1%.
 
+10. **`observation_file` on every consensus reading, then carry the id onto the row** (#692). This
+    is the step that turns a web reading into something the record holds. `variantViewCheck`'s
+    `consensusRefs` requirement is the **only one of the four whose input exists nowhere but the
+    web** — a broker estimate or a price target is in no filing and on no exchange feed — and your
+    `WebSearch`/`WebFetch` are the CLI's, so they issue no evidence id and `evidenceIds` takes
+    nothing else. For each consensus figure you will rely on: call `observation_file` with the URL,
+    the document's own title and publication date, and **the source's own words verbatim** in
+    `excerpt` (your reading goes in `reading`, beside the quotation, never instead of it), then put
+    the returned `evidenceId` — with `evidenceKind: "observation"` and
+    `evidenceSource: "manager:web-research"` — on the `consensusRefs` row and in the proposal's
+    `evidenceIds`. ⛔ A `publishedAt` after your `asOf` is refused, and a date with no time counts
+    as the **end** of that day; omit the date rather than guessing. ⛔ An excerpt over 64,000
+    characters is refused rather than truncated — file the passage the judgement rests on.
+    ⚠️ **The row is filed as your testimony and it is graded as such everywhere.** That is the
+    trade the investor accepted, and it holds only while the grade travels: when the main lane
+    opens on it, `effectivePositionCap` returns `main_lane_rests_on_manager_attestation` and the
+    proposal carries that code verbatim in one `rationale.risks` entry with the source URL and in
+    one `uncertainty` entry, or the sizing is `blocked`. `risks` is not optional politeness — it is
+    what the approval screen renders, and `uncertainty` is not on that screen at all.
+11. **`observationLedger` before you hand the flow back.** Pass what you filed
+    (`observations`), the ids the proposal will submit (`citedEvidenceIds`), and every web-read
+    value your judgement leant on (`claims: [{claim, value, usedFor, evidenceId}]`). ⛔ A value
+    used and uncited is `claim_evidence_missing` / `blocked` — that is the 2026-09-06 failure
+    verbatim, where the BOK base rate of 3.00% decided a `thesisSentinel` invalidation condition
+    and none of the 24 submitted ids supported it.
+
 Also run the price-pattern `scan` branch; neither branch substitutes for the other. Return all
 radar lanes' included/excluded counts, the `radar_lane_starved` diagnostics **with their
 `feedStage`/`feedCause`**, and the feed verdict — `fed-and-evaluated`, `fed-and-genuinely-empty`
@@ -109,6 +135,12 @@ produces no judgement at all.
 are the CLI's, not the gateway's, so the orchestrator states whether this session holds them.
 Named, they are yours and the web lane is open; unnamed, that lane is an absence like any other.
 ⛔ They are for research and never for discovering tools — that is what the sentence above bans.
+
+⚠️ **What they find is not evidence until you file it.** `observation_file` is the gateway tool
+that turns a reading into a citable row — see step 10 of the numbered branch above — and it is the
+only route by which anything you read on the web reaches `evidenceIds`. ⛔ **Reading a figure,
+judging on it, and citing nothing is the failure this manager is named after.** Run
+`observationLedger` before you hand back.
 
 If a tool you need was not named, that is an **absence to report**, not a thing to search for:
 say so in your `uncertainty` and degrade the way this file's rules say to. Reporting *I could

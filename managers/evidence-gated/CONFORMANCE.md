@@ -216,6 +216,26 @@ reports no session at all (aumos #453).
   that closes #160 is a run with keys reporting `mainLaneOpen: true` on a name it fetched.
   Meanwhile the measured state stays reported rather than papered over: three of four requirements
   met, `missing: ["thesisComplete"]`, declared `0.2` operating at `0.01`.
+- **No web observation has ever been filed through a live gateway (#692).** `observation_file`
+  (`untilled/aumos#693`) is the only route by which a consensus figure — the 20% lane's one web-only
+  requirement — can reach `evidenceIds` at all, and every case behind it here is a **fixture**:
+  `fixtures/observation-contract.json` freezes a receipt shape and a passage, and nothing in this
+  repository fetches a URL or calls the tool. ⚠️ **There is no live key and no network in the
+  environment this was written in**, so what the checks establish is the shape of the receipt, the
+  grade on the row, and the two host refusals mirrored locally (`publishedAt > asOf`, and an excerpt
+  over 64,000 characters refused rather than truncated). ⛔ What no check here can establish — and
+  what the host cannot establish either, and says so — is that the excerpt was ever at that URL.
+  That is the ceiling of a self-report, and it is the reason the row is graded as the manager's word
+  everywhere it appears. The gate that closes #692 for this package is a run with `observation:file`
+  granted and an Aumos at `>=0.3.32`, reporting a `consensusRefs` row carrying an evidence id the
+  gateway actually minted.
+- **And the disclosure this package writes has not been read by an investor yet.** When the main
+  lane opens on a manager-attested consensus row, `effectivePositionCap` requires
+  `main_lane_rests_on_manager_attestation` verbatim in `rationale.risks` and in `uncertainty`, and
+  refuses the sizing otherwise. `risks` was chosen because `apps/desktop/src/screens/Approvals.tsx`
+  renders `keyReasons` and `risks` and nothing else — measured, not assumed. ⛔ That reading is of a
+  host revision at the time of writing; if the approval screen changes, this choice has to be
+  re-measured rather than inherited. `HOST-FOLLOWUPS.md` records what would close it host-side.
 - The three packages of this collection have not yet been installed together against the same Toss-connected shadow
   portfolio for consecutive KR close → US close → Global review cycles.
 - ✅ *Partly resolved by the cycle above.* Real `memory_write` reached the store from all

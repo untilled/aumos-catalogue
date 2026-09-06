@@ -6,6 +6,7 @@ import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, 
 import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
+import { observationLedger } from './observation.mjs'
 import { calibrationSummary, closedOutcomeSamples, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
 import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
@@ -87,6 +88,14 @@ const operations = {
   researchGate,
   crossCheckPrice,
   validateMacro: (input, asOf) => validateMacroObservations({ ...input, asOf }),
+  /**
+   * ⚠️ Registered beside the other admission gates because it answers the one
+   * question they never asked (#692): of the things this run **read**, which
+   * ones did it end up citing? A value used to judge an invalidation condition
+   * and supported by none of the submitted ids is the 2026-09-06 failure, and
+   * it is now a computed finding rather than a note a run happened to make.
+   */
+  observationLedger: (input, asOf) => observationLedger({ ...input, asOf }),
   calibration: calibrationSummary,
   closedOutcomeSamples: (input, asOf) => closedOutcomeSamples({ ...input, asOf }),
   clusters: (input) => ({ data: { clusters: independentDateClusters(input?.dates, input?.gapDays) }, diagnostics: [] }),

@@ -1,12 +1,67 @@
 # Host dependencies after issues #145–153
 
-Version 0.4.29 reports what share of the book is bearing risk at all, and reads the Mandate's
-`objective` for the first time. 0.4.28 joined the filings to a fair value and separated a valuation
+Version 0.4.30 wires the one input the 20% lane could never be given — a consensus observation —
+and makes the grade it arrives at travel to the approval screen. 0.4.29 reported what share of the
+book is bearing risk at all, and read the Mandate's `objective` for the first time. 0.4.28 joined the filings to a fair value and separated a valuation
 gap that was never fetched from one no source can fill; 0.4.27 wired the fundamental discovery
 branch to its input; 0.4.26 before it stopped
 reading `decisions[].armed` as a receipt for a promise it cannot carry; 0.4.24 separated the main
 lane from the maturity gate, read the Mandate's `cashFloor`, derived the single-name total from the
 Mandate and enforced the source's exit discipline.
+
+## Web observations (#692) — ✅ the host built the route, and two things are still ours to watch
+
+**The dependency is discharged and the grade is the whole story.** `observation_file`
+(`untilled/aumos#693`, capability `observation:file`) is the one tool by which anything a manager
+reads on the web reaches `evidenceIds`. It matters here more than anywhere else: `consensusRefs` is
+one of `variantViewCheck`'s four requirements and the only one whose input exists on the web and
+nowhere else, so before #693 this methodology was **requiring an input whose only supply route it
+had closed** — and the account bought no single name in eight runs. The manifest declares the
+capability and `engines.aumos` moves to `>=0.3.32`.
+
+⚠️ **Measured, and it differs from what a reader would assume.** #693 merged 2026-09-06T14:48Z,
+after the `v0.3.31` tag was cut (09:56Z). `observation:file` is therefore in **no released binary
+yet** — `packages/amp/src/manifest.ts` at `v0.3.31` does not contain it — so the floor named above
+is the next release rather than the current one. Until `0.3.32` ships, an installed Aumos refuses
+this manifest **whole** rather than ignoring an unknown capability, which is the same failure mode
+`engines.aumos` has been moved for four times now.
+
+### ⛔ Still owed by the host: the grade does not reach the approval screen
+
+#693 draws the attestation grade in **`DecisionDetail`** (a first column on the evidence table) and
+in **`RunTimeline`** (a prefix on each evidence row). ⚠️ **Neither of those is where an investor
+approves.** `apps/desktop/src/screens/Approvals.tsx` renders `rationale.keyReasons` and
+`rationale.risks` and nothing else from the proposal — the evidence table is behind *open the sealed
+decision*, one click past the approve button, and `uncertainty` is not on that screen at all.
+
+That gap is why this package writes its disclosure into **`rationale.risks`** rather than into
+`effectiveConstraints` or `uncertainty` alone, and why `main_lane_attestation_undisclosed` is
+`blocked`. It is a workaround, and it works only for managers that choose to do it. **What would
+close it properly is host-side**, and one of these would do:
+
+- an attestation summary on the approval card itself — *"n of the m evidence rows behind this
+  proposal are the manager's own reading"* — drawn from `EvidenceView.attestedBy`, which #693
+  already derives and which `Approvals.tsx` does not currently read; or
+- `DecisionProposal.effectiveConstraints` accepting a non-numeric disclosure row. Today
+  `effectiveConstraintSchema` is a `strictObject` whose `field` is only `maxPositionWeight`,
+  `cashFloor` or `maxDrawdown`, and this package emits one **only when a cap was reduced** — which
+  is precisely what does not happen when the main lane opens. So there is no machine-readable slot
+  for *"this size rests on manager-attested evidence"*, and prose is the only carrier left.
+
+⛔ **Not asked for: a check that the excerpt was ever at that URL.** #693 names that as its ceiling
+and this package agrees. Fetching the page later cannot give an honest verdict once the page has
+changed, and a check that pretends to verify is worse than the caveat both sides already print.
+
+### ⛔ Still owed by the host: the vendored lint copy is behind
+
+`tools/lint/manager-package-manifest.schema.json` in this repository does not carry
+`observation:file` — #693 updated `catalogue-tools/lint/` in the Aumos repository and the copy here
+is re-vendored from there by `packages/package-lint/scripts/vendor.ts`. `tools/lint/VENDORED.md`
+forbids editing it here, so it is not edited here. ⚠️ **Measured: it does not fail this manifest
+either** — the capability enum is not enforced by the vendored runner at all (a deliberately bogus
+`kind` also passes), so the stale copy is silent rather than wrong. The real check runs at merge in
+the Aumos repository, where #693 already added the value. This is recorded so nobody reads the green
+tick here as the enum having been checked.
 
 ## Fundamental storage (#146) — ✅ the host built it, and this package now uses it
 

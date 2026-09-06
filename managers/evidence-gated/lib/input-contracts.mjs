@@ -36,6 +36,18 @@ export const INPUT_VOCABULARY = {
   filingFacts: ['revenue', 'operatingIncome', 'operatingIncomeYoy', 'marginDeltaYoy'],
   instrumentClasses: ['single-name-filer', 'non-filer-instrument', 'unknown'],
   memoryRuleKeys: ['failures/repeated-patterns', 'run/theme-radar-last'],
+  /**
+   * ⚠️ Whose word an Evidence row is (#692). `aumos` is a row this host obtained
+   * and signed for; `manager` is one filed through `observation_file`, which is
+   * the **only** route a web reading has into the record and therefore the only
+   * route `consensusRefs` — the 20% lane's one web-only requirement — can be
+   * met by. `ungraded` is a cited row whose markers were not carried back, and
+   * `uncited` is a figure with no evidence row behind it at all.
+   */
+  attestationGrades: ['aumos', 'manager', 'ungraded', 'uncited'],
+  managerObservationKind: 'observation',
+  managerObservationSource: 'manager:web-research',
+  observationExcerptLimit: 64_000,
   paperSetups: Object.keys(PAPER_SETUP_COHORTS),
 }
 
@@ -201,7 +213,7 @@ export const INPUT_CONTRACTS = {
     keys: {
       expectedActiveReturn: NUMBER, downsideReturn: NUMBER, conviction: NUMBER, mandatePositionCap: NUMBER,
       sectorHeadroom: NUMBER, themeHeadroom: NUMBER, maturityStatus: STRING, researchGate: STRING, challengeVerdict: STRING,
-      lane: STRING, thesis: OBJECT, evidenceSamples: ARRAY, promotion: OBJECT, uncertainty: ARRAY, effectiveConstraints: ARRAY,
+      lane: STRING, thesis: OBJECT, evidenceSamples: ARRAY, promotion: OBJECT, uncertainty: ARRAY, effectiveConstraints: ARRAY, risks: ARRAY,
       experimentalPositionCeiling: NUMBER, experimentalPositionCeilingMax: NUMBER, experimentalPositionFloor: OBJECT,
       positionCurrency: STRING, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
     },
@@ -218,6 +230,8 @@ export const INPUT_CONTRACTS = {
     keys: {
       mandatePositionCap: NUMBER, maturityStatus: STRING, lane: STRING, thesis: OBJECT, challengeVerdict: STRING,
       evidenceSamples: ARRAY, promotion: OBJECT, uncertainty: ARRAY, effectiveConstraints: ARRAY,
+      /** `risks` is what the approval screen renders, so it is where the attestation disclosure lands (#692). */
+      risks: ARRAY,
       experimentalPositionCeiling: NUMBER, experimentalPositionCeilingMax: NUMBER, experimentalPositionFloor: OBJECT,
       positionCurrency: STRING, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
     },
@@ -244,6 +258,12 @@ export const INPUT_CONTRACTS = {
   researchGate: { mode: 'open', keys: { lens: STRING, priceDeclineReason: ANY, opportunityCase: ANY, trapRisks: ANY, variantView: ANY, benchmarkAlternative: ANY, scenarios: ANY, minimumExpectedActiveReturn: NUMBER, challengeVerdict: STRING, sourceFresh: BOOLEAN, sourceConflict: BOOLEAN } },
   crossCheckPrice: { mode: 'named', keys: { tossPrice: NUMBER, webPrice: NUMBER, tolerance: NUMBER, config: OBJECT } },
   validateMacro: { mode: 'named', keys: { observations: ARRAY, webAvailable: BOOLEAN } },
+  /**
+   * `strict`, and for the reason the mode exists: this is a gate on whether the
+   * run cited what it read, so a key it does not read is a question it was not
+   * asked — and the answer would be about something else. (#692)
+   */
+  observationLedger: { mode: 'strict', keys: { observations: ARRAY, citedEvidenceIds: ARRAY, claims: ARRAY } },
 
   // ── Calibration, promotion and attribution ─────────────────────────────
   calibration: { mode: 'named', keys: { samples: ARRAY, minimumSamples: NUMBER, minimumClusters: NUMBER } },

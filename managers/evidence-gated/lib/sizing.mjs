@@ -453,6 +453,85 @@ export function effectivePositionCap(input = {}) {
     }
   }
 
+  /**
+   * ── The 20% lane standing on the manager's own word, said out loud (#692) ──
+   *
+   * ⚠️ **This is the half of `untilled/aumos#693` that is this package's.** The
+   * `consensusRefs` requirement can only be met from the web, and the only
+   * route the web now has into the record files the passage as the **manager's
+   * testimony**. So the main lane — up to the Mandate's `maxPositionWeight`,
+   * twenty times the control arm — can now open on a citation nobody but the
+   * manager ever saw. The investor was asked and chose that: ⑴ *file it, and I
+   * read the passage before I approve*, over ⑵ *keep the lane shut* and ⑶ *drop
+   * the requirement*.
+   *
+   * ⛔ **⑴ collapses into ⑶ the moment the grade stops travelling.** If a
+   * manager-attested consensus row opens 20% sizing and the proposal says
+   * nothing, the investor approves a size whose supporting evidence they were
+   * never told was self-reported — which is the requirement dropped, without
+   * anyone deciding to drop it. So it is not left to care.
+   *
+   * ── Measured: where the disclosure actually has to land ───────────────────
+   *
+   * The host draws the grade in `DecisionDetail`'s evidence table and in
+   * `RunTimeline` (#693). ⚠️ **Neither is the approval screen.** `Approvals.tsx`
+   * renders `rationale.keyReasons` and `rationale.risks` and nothing else from
+   * the proposal — the evidence table is one click away behind *open the sealed
+   * decision*, and `uncertainty` is not on that screen at all. So `risks` is
+   * the slot that reaches the investor **before** the approve button, and it is
+   * the one this obligation is written against; `uncertainty` is required
+   * beside it because that is what the run's later readers get.
+   *
+   * ⛔ **This adds an obligation and lowers nothing.** `variantViewCheck`'s four
+   * requirements, `verified`, the caps and the control arm's 1% / 6% are
+   * untouched: a manager-attested row satisfies `consensusRefs` exactly as it
+   * did a line above. What is refused is opening the lane **quietly**.
+   */
+  const restsOnManagerAttestation = mainLaneOpen && variant.data.restsOnManagerAttestation === true
+  const attestationCode = 'main_lane_rests_on_manager_attestation'
+  const attestationRefs = variant.data.managerAttestedRefs ?? []
+  let mainLaneAttestation = null
+  if (restsOnManagerAttestation) {
+    const carries = (value) => Array.isArray(value) ? value.some((entry) => typeof entry === 'string' && entry.includes(attestationCode)) : null
+    const risksDisclosed = carries(input?.risks)
+    const uncertaintyDisclosed = carries(input?.uncertainty)
+    const attestationDisclosed = risksDisclosed === null && uncertaintyDisclosed === null
+      ? null
+      : risksDisclosed !== false && uncertaintyDisclosed !== false
+    mainLaneAttestation = {
+      restsOnManagerAttestation: true,
+      grade: 'manager',
+      disclosureCode: attestationCode,
+      /** The passages the investor is being asked to take the manager's word for. */
+      refs: attestationRefs.map((row) => ({ metric: row.metric, sourceUrl: row.sourceUrl, evidenceId: row.evidenceId, publishedAt: row.publishedAt })),
+      /** Where the disclosure has to appear, and why each one. */
+      disclosureFields: ['risks', 'uncertainty'],
+      risksDisclosed,
+      uncertaintyDisclosed,
+      disclosed: attestationDisclosed,
+    }
+    diagnostics.push(diagnostic(
+      attestationCode,
+      'unevaluated',
+      `This candidate reaches the main lane on a consensus citation that is the manager’s own reading — filed through \`observation_file\`, graded as the manager’s word, fetched and verified by nothing in Aumos. The lane and the cap are unchanged and the requirement is genuinely met; what this says is whose word it is met on. Carry the code \`${attestationCode}\` verbatim in one \`rationale.risks\` entry with the source URL, because \`risks\` is what the approval screen shows, and in one \`uncertainty\` entry for the run’s later readers`,
+      'thesis.consensusRefs',
+      { refs: mainLaneAttestation.refs, disclosureFields: mainLaneAttestation.disclosureFields },
+    ))
+    if (attestationDisclosed === false) {
+      diagnostics.push(diagnostic(
+        'main_lane_attestation_undisclosed',
+        'blocked',
+        `This proposal is sized in the main lane on the manager’s own reading and does not say so where the investor reads before approving. Carry \`${attestationCode}\` verbatim in one \`rationale.risks\` entry and one \`uncertainty\` entry`,
+        risksDisclosed === false ? 'risks' : 'uncertainty',
+        {
+          missing: [...(risksDisclosed === false ? ['risks'] : []), ...(uncertaintyDisclosed === false ? ['uncertainty'] : [])],
+          code: attestationCode,
+          refs: mainLaneAttestation.refs,
+        },
+      ))
+    }
+  }
+
   return {
     data: {
       declaredCap: declared,
@@ -469,6 +548,8 @@ export function effectivePositionCap(input = {}) {
       resolvedLane,
       mainLaneOpen,
       ceilingApplies,
+      /** ⚠️ `null` when the lane is shut or its citation is not the manager's own. (#692) */
+      mainLaneAttestation,
       variantView: variant.data,
       maturityStatus: maturity,
       mustReport: reduced,
@@ -872,6 +953,8 @@ export function targetWeight(input) {
       positionCapReduced: capReport.data.reduced,
       positionCapUnlocksAt: capReport.data.unlocksAt,
       effectiveConstraints: capReport.data.effectiveConstraints,
+      /** Carried up so a run that only calls `targetWeight` still meets the obligation. (#692) */
+      mainLaneAttestation: capReport.data.mainLaneAttestation,
       units: { rawWeight: 'portfolio-weight', bindingCap: 'portfolio-weight', targetWeight: 'portfolio-weight', experimentalCeiling: 'portfolio-weight', declaredPositionCap: 'portfolio-weight', effectivePositionCap: 'portfolio-weight' },
     },
     diagnostics,

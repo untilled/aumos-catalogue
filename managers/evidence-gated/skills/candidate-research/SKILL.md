@@ -20,7 +20,7 @@ Six more decide whether it is **complete**. Each is a way of being wrong on the 
 | gap field | what its absence hides |
 |---|---|
 | `variantView` | that the claim is the consensus, in which case the price already has it |
-| `consensusRefs` | what you are differing *from* — each ref dated, sourced, and captured after it was published |
+| `consensusRefs` | what you are differing *from* — each ref dated, sourced, captured after it was published, and **filed with `observation_file` so the row names an `evidenceId`**: a consensus figure exists on the web and nowhere else, and an unfiled one is `consensus_ref_uncited` (#692) |
 | `catalysts` | when the claim gets tested, as a window rather than a hope |
 | `invalidationTriggers` | what would make you drop it, decided before you are attached to it, each with a `checkBy` |
 | `expectedUpsidePct` | the number you can be wrong about |

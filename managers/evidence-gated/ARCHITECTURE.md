@@ -59,6 +59,18 @@ source this machine lacks before a run discovers it. `openbb-fmp` is not named b
 optional. Naming a source does not narrow the source gateway — a run still sees every source
 installed on the machine.
 
+⚠️ **`observation:file` is the one capability that puts something *into* the record rather than
+reading something out of it** (`untilled/aumos#693`). CLI web is on the degradation table above as
+the route for consensus-difference claims, and until #693 that route ended nowhere: `WebSearch` and
+`WebFetch` are the CLI's tools, they never reach this gateway, and `evidenceIds` accepts only ids
+this gateway minted. `observation_file` takes the URL, the publication date and the source's own
+words verbatim, hashes the passage and returns an id. ⛔ Aumos fetches and verifies nothing, so the
+row is filed as the manager's testimony and carries two independent markers of it — kind
+`observation`, source `manager:web-research`. This package reads that grade in `variantViewCheck`,
+carries it through `effectivePositionCap` into the proposal's `rationale.risks`, and audits the
+other direction with `observationLedger`: a value read on the web and used in judgement without a
+submitted id behind it is refused.
+
 Three OpenDART behaviours are the manager's to handle, because Aumos relays unread:
 `corpCode.xml` answers with a ZIP (read `corp_code`/`stock_code` off `list.json`
 instead), errors arrive as a `status` field on an HTTP 200 (a quota refusal is not an

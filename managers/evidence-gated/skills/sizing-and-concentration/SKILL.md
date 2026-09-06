@@ -87,7 +87,14 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    `thesisValuation` from the scenario table, so on a filer the shortfall is an unmade fetch and
    `thesisGapSources` says so. ⛔ The control arm's 1% / 6% are the
    source's approved numbers and are not touched, `promotionGate` is not lowered, and a thesis
-   resting on the mechanical cohort is `control_arm_evidence_cited` / `blocked`. ⚠️ What total the
+   resting on the mechanical cohort is `control_arm_evidence_cited` / `blocked`. ⚠️ **And a main
+   lane opened on a consensus row you filed yourself says so at the approval point** (#692):
+   `observation_file` is the only route a web reading has into `evidenceIds`, the row is graded as
+   your testimony, and `effectivePositionCap` returns `main_lane_rests_on_manager_attestation` with
+   the source URLs. Carry that code verbatim in one `rationale.risks` entry and one `uncertainty`
+   entry — `risks` because that is what the approval screen shows — or the sizing is
+   `main_lane_attestation_undisclosed` / `blocked`. ⛔ It reduces no cap and waives no requirement;
+   it refuses opening the lane **quietly**. ⚠️ What total the
    single-name lanes may reach *together* is an open question this revision does not answer.
    Where the ceiling does apply: `insufficient` and `observing` lenses are capped at the experimental
    ceiling; `reviewable` is still not promoted and cannot expand solely because its sample threshold

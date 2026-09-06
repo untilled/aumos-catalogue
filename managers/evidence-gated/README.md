@@ -292,6 +292,29 @@ Both were one empty payload before, and the branch that reads them reported *sta
 `engines.aumos` therefore requires `>=0.3.30`; an older build refuses the whole manifest rather than
 ignoring an unknown capability. ⛔ Private memory is not and never becomes the cache.
 
+**And the other end of the same starvation: the 20% lane finally has a supply route.**
+`variantViewCheck` opens the main single-name lane on four requirements, and one of them —
+`consensusRefs`, a dated consensus observation — takes an input that exists **on the web and
+nowhere else**. Broker estimates and price targets are in no filing and on no exchange feed, and a
+manager's `WebSearch`/`WebFetch` are the CLI's tools: they never reach Aumos, so they issue no
+evidence id, and `evidenceIds` accepts nothing else. This methodology was requiring an input whose
+only supply route it had closed, and the account bought no single name in eight runs
+(`untilled/aumos#692`). `observation:file` (Aumos 0.3.32, `untilled/aumos#693`) is that route: the
+`observation_file` tool files the URL, the publication date and **the source's own words verbatim**,
+hashes the passage and returns an evidence id. `engines.aumos` therefore requires `>=0.3.32`.
+
+⚠️ **The row is this manager's testimony, and the package never lets that go quiet.** Aumos fetched
+nothing and verified nothing; the row is graded `observation` / `manager:web-research` at every step.
+So `variantViewCheck` publishes the grade of each accepted consensus row, and when the main lane
+opens on one the manager filed itself, `effectivePositionCap` returns
+`main_lane_rests_on_manager_attestation` and the proposal must carry that code verbatim in one
+`rationale.risks` entry with the source URL and in one `uncertainty` entry — `risks` because that is
+what the approval screen renders. Missing either is `main_lane_attestation_undisclosed` / `blocked`.
+⛔ Nothing about the four requirements, the caps or the control arm's 1% / 6% changes: what is
+refused is opening the lane **quietly**. And `observationLedger` closes the loop the other way — a
+value read on the web, used in judgement and supported by none of the submitted ids is
+`claim_evidence_missing` / `blocked`, which is the 2026-09-06 BOK-rate failure made into a finding.
+
 **Two declared capabilities currently serve nothing.** `thesis:read` and `evidence:read`
 are in the manifest vocabulary, and the current Aumos build maps each to an empty tool
 list, so a run gets no such tool. The prompt reads them *when available* and the manifest

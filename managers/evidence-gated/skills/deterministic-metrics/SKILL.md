@@ -37,7 +37,7 @@ the JSON remains the canonical explanation.
 
 ## The operations
 
-All 95, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
+All 105, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
 calling it wrong is not a discovery path — every flow skill tells you not to go looking, so the
 names have to be here. A name absent from this table is a name you cannot call.
 
@@ -56,7 +56,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `regimeTag` | a Brief regime call, canonicalized, attributed, and compared with the sector reading |
 | `entryQualityGate` | `falling_knife` blocks; eq-v2 and `no_new_low` dual lenses |
 | `upsideRadar` | the three fundamental/event lanes, with every exclusion explained and starvation reported, and — given `feed` — the stage that starved it |
-| `variantViewCheck` | whether a candidate's variant view is established — a complete thesis, a dated consensus citation and a cleared challenge — and therefore which lane may size it |
+| `variantViewCheck` | whether a candidate's variant view is established — a complete thesis, a dated consensus citation and a cleared challenge — and therefore which lane may size it, plus **whose word** each accepted consensus row is: Aumos obtained it, the manager filed it, or nothing in the record stands behind it |
 
 ### Sizing, concentration and budgets
 
@@ -86,6 +86,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `validateConsensus` | a quoted figure is dated, sourced, typed and unit-bearing |
 | `crossCheckPrice` | vendor vs web price; conflict retained, never averaged |
 | `validateMacro` | macro observations are dated and tiered; there is no macro score |
+| `observationLedger` | of what this run read on the web and filed with `observation_file`, which readings the proposal actually cites — and, for each value used in judgement, whether any submitted evidence id supports it |
 | `researchGate` | lens, why-cheap, traps, variant view, scenarios, active-return gate |
 | `validateThesis` | the thesis metadata contract; `complete` with gaps is refused |
 | `laneCoverage` | which lane a missing source closes, and what it degrades to |

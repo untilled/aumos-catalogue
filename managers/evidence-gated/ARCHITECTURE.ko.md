@@ -54,6 +54,16 @@ bar 시각. 항상 현재 상태를 돌려주는 스냅샷은 replay 소스가 �
 이 기계에 어느 소스가 없는지 말할 수 있다. `openbb-fmp`는 선택이라 적지 않았다. 소스를 이름 대는
 것이 소스 게이트웨이를 좁히지는 않는다 — 실행은 여전히 기계에 설치된 모든 소스를 본다.
 
+⚠️ **`observation:file`은 기록을 읽는 것이 아니라 기록에 넣는 유일한 권한이다**(`untilled/aumos#693`).
+위 degradation 표에서 CLI web은 컨센서스 차이 주장의 경로인데, #693 전까지 그 경로는 아무 데도
+닿지 않았다 — `WebSearch`·`WebFetch`는 CLI의 도구라 이 게이트웨이를 지나지 않고, `evidenceIds`는 이
+게이트웨이가 민팅한 id 말고는 받지 않는다. `observation_file`은 URL과 발행일과 원문 그대로의 구절을
+받아 해시를 덮고 id를 돌려준다. ⛔ Aumos는 아무것도 가져오지 않고 검증하지 않으므로, 그 행은 매니저의
+증언으로 기록되고 그 사실을 표지 둘로 나른다 — kind `observation`, source `manager:web-research`.
+이 패키지는 그 등급을 `variantViewCheck`에서 읽고, `effectivePositionCap`을 지나 제안의
+`rationale.risks`까지 나르며, 반대 방향은 `observationLedger`가 감사한다 — 웹에서 읽어 판단에 썼는데
+제출된 id가 받치지 않는 값은 거부된다.
+
 OpenDART의 동작 셋은 매니저의 몫이다. Aumos가 읽지 않고 중계하기 때문이다: `corpCode.xml`은
 ZIP으로 답하고(대신 `list.json`의 `corp_code`/`stock_code`를 읽는다), 오류가 HTTP 200의 `status`
 필드로 도착하며(한도 거절은 빈 결과가 아니다), XBRL 재무제표는 정기보고서를 따라오므로 잠정으로만
