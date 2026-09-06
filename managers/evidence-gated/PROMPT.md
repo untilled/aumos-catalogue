@@ -489,6 +489,32 @@ list and mean opposite things, and mixing them is the worst outcome this branch 
 
 `earningsCheckpoint` fills the rolling event window these lanes read.
 
+⚠️ **The same statements feed sizing, and that half of the wire was never connected** (#160). The
+2026-09-06 run built a full variant view and was answered `satisfied: [variantView, consensusRefs,
+challengeCleared]`, `missing: [thesisComplete]` — **three of four** — and the thesis gaps holding
+the fourth were `catalysts`, `invalidationTriggers`, `expectedUpsidePct` and `fairValueRange`.
+`effectivePositionCap` then turned a declared `0.2` into an effective `0.01`, a `reductionMultiple`
+of **20**. ⇒ The main lane was not shut; it had never been opened.
+
+⛔ **And this package invents no valuation method to open it.** The methodology already says where a
+fair value comes from and says it twice: `candidate-research` §Candidate record 5 asks for
+bear/base/bull with a **target**, a return and factual drivers, and `researchGate` already computes
+`Σ p·return` and blocks without it. So `thesisValuation` derives `fairValueRange` from the case
+targets and `expectedUpsidePct` from the weighted return, with each case's drivers read off the
+filings `radarCandidates` built — a number `validateThesis` was refusing a thesis for lacking while
+the same methodology computed it one operation away. There is no multiple and no discount rate here
+because the methodology names none; a case with no target is `fair_value_target_absent`, and a
+target resting on no readable filing fact still answers and is labelled `scenario_driver_ungrounded`.
+
+⛔ **An ETF and a listed company do not get the same diagnosis.** *No source can fill this* and *the
+source exists and was never called* produce an identical `gaps` list and mean opposite things — the
+same swap `radarCandidates` refuses one layer down. `thesisGapSources` splits them from the registry
+rather than by assertion: a symbol the registry resolved to a filer id is `single-name-filer` and
+its valuation gaps are **unfetched**; a symbol the registry was read and does not carry is
+`non-filer-instrument` and they are **unfillable**; a registry never read leaves the instrument
+`unknown`, which is not a licence to guess. This instance's `run/theme-radar-last` generalized from
+the first case to the second on 2026-09-04, and `refutedMemoryRules` now retracts that row.
+
 Entry quality is a gate, not a description. Call `entryQualityGate` before any single-name BUY or
 risk-increasing RESIZE: a `falling_knife` blocks, and a `mean-reversion` candidate with no
 `trend-pullback` beside it needs a confirmed pass state rather than an unconfirmed one.

@@ -183,6 +183,11 @@ vendor's own filer id (open-dart /api/corpCode.xml for corp_code, sec-edgar
 source_cache_read / source_cache_refresh → dartVendorStatus on every OpenDART response →
 radarCandidates → radarFeedDiagnosis → upsideRadar({candidates, feed}). The registry call is the
 one no run has ever made; without it nothing fetched can be addressed to a filer.
+The same statements feed sizing (#160): for any name that reaches a thesis, call thesisGapSources
+(is an open expectedUpsidePct / fairValueRange gap unfetched, or does this instrument have no filer
+at all?) and thesisValuation (fairValueRange and expectedUpsidePct off the bear/base/bull targets,
+drivers checked against the filings). Without them a complete variant view still reads
+missing: ["thesisComplete"] and the investor's declared 20% cap operates at 1%.
 Collect dated filings, catalysts and events, then run both the price-pattern sweep and upsideRadar.
 Scan holdings' news/disclosures through granted web and installed filing sources every cycle.
 Return researchActivity ({source, granted, attempts, succeeded}), each radar lane's exclusions and

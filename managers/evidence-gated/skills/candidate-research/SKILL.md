@@ -26,6 +26,21 @@ Six more decide whether it is **complete**. Each is a way of being wrong on the 
 | `expectedUpsidePct` | the number you can be wrong about |
 | `fairValueRange` | the low and the high, so the upside has something under it |
 
+⚠️ **The last two are derived, not invented, and the derivation is already in this page** (#160).
+§Candidate record 5 asks each scenario for a **target**, a return and factual drivers, and
+`researchGate` computes `Σ p·return` off exactly that table. `thesisValuation` is that arithmetic
+made addressable: the bear and bull targets are `fairValueRange`'s low and high, the weighted
+return is `expectedUpsidePct`, and each case's `drivers` are checked against the `filings`
+`radarCandidates` built for the name. ⛔ It publishes no multiple and no discount rate, because this
+methodology names none — a case with no target is reported, never filled in from a rule of thumb.
+
+⛔ **An open valuation gap is two different facts and they must not be written down as one.** For an
+ETF nothing publishes statements and the gap is unfillable; for a listed company `fnlttSinglAcntAll`
+(or SEC `companyfacts`) answers and the gap is merely **unfetched**. `thesisGapSources` decides
+which from the `mapCorporationCodes` registry rather than from a guess, and returns `unknown` where
+the registry was never read. This instance filed the ETF sentence as a general rule on 2026-09-04;
+`refutedMemoryRules` retracts it, and a run that reads `run/theme-radar-last` passes it there.
+
 ⛔ Declaring `evidenceStatus: 'complete'` with any gap open is refused as `thesis_false_complete`.
 `incomplete` with gaps is fine and normal — the gaps are returned and stay visible. The refusal is
 for claiming to have finished the work while the record shows otherwise, which is the one state that
@@ -157,7 +172,9 @@ Write the following in reasoning and, when a durable asset claim is created, its
 4. **Variant view** — exactly how the view differs from consensus; if it does not, prefer the
    benchmark. Include `what would prove us wrong` as an observable condition with a horizon.
 5. **Scenarios** — bear/base/bull probabilities totaling 100, target/return and factual drivers.
-   Compute probability-weighted return only when inputs exist.
+   Compute probability-weighted return only when inputs exist. Pass the table and the name's
+   `filings` to `thesisValuation`: this is where `fairValueRange` and `expectedUpsidePct` come
+   from, and each case's drivers are what tie its target to a statement rather than to a wish.
 6. **Benchmark alternative** — market/sector/broad ETF, its expected return basis and why the single
    name earns its extra idiosyncratic risk. Active expected return is candidate minus benchmark.
 7. **Catalyst and event risk** — dates known at `asOf`, next review and data that must arrive first.

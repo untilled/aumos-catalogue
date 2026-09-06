@@ -602,7 +602,8 @@ assert.equal(contracts.contracts.harnessAudit.keys.totalDecisions, 'number')
 assert.ok(/never a statement that the window is whole/.test(contracts.nested.harnessAudit.totalDecisions), 'and the published contract says what an absent face means, which is the half a type cannot carry')
 assert.equal(contracts.contracts.reconcileArmedReviews.keys.journalArmed, 'any', 'the refused parameter stays published so it can be named rather than silently dropped')
 assert.ok(contracts.guarded.includes('refutedMemoryRules'))
-assert.deepEqual(contracts.keys.refutedMemoryRules, ['patterns'])
+// ⚠️ `memory` joined it in #160: the second refuted rule is filed under `run/theme-radar-last`.
+assert.deepEqual(contracts.keys.refutedMemoryRules, ['patterns', 'memory'])
 
 /**
  * The five shapes the 2026-09-06 orchestrator sent to `nextReviewSequence`.
@@ -1039,3 +1040,273 @@ assert.equal(feedRun('fundamentalsPlan', { market: 'kr', symbols: ['005930'], co
 assert.equal(feedRun('radarCandidates', { market: 'XKRX', symbols: [] }).status, 'blocked')
 
 console.log('evidence-gated issue #146 fundamental-feed regression tests passed')
+
+/**
+ * ── #160: the valuation end of the same wiring ─────────────────────────────
+ *
+ * ⚠️ **Every vendor number below is a fixture and none of it has been observed
+ * against a live vendor.** No OpenDART `crtfc_key` and no SEC user-agent exists
+ * in this environment, so the statements these tests derive a fair value from
+ * are the shapes #164 pinned, not a response anyone received. ⛔ A vendor
+ * continuing to answer the way its documentation says is not established here,
+ * and #160 stays open until a run holding keys reports an open main lane.
+ *
+ * The measured facts these pin, from the 2026-09-06 sizing measurement:
+ * `variantViewCheck` satisfied three of four — `variantView`, `consensusRefs`,
+ * `challengeCleared` — `missing: ["thesisComplete"]`, gaps `catalysts`,
+ * `invalidationTriggers`, `expectedUpsidePct`, `fairValueRange`; and
+ * `effectivePositionCap` `declaredCap 0.2` → `effectiveCap 0.01`,
+ * `reductionMultiple 20`, `mainLaneOpen false`.
+ */
+const valAsOf = '2026-09-06T07:00:00Z'
+const valRun = (operation, input = {}) => execute({ operation, asOf: valAsOf, input })
+const valHas = (answer, code) => answer.diagnostics.some((row) => row.code === code)
+
+/** The thesis the run actually sent: complete but for the four gaps. */
+const measuredThesis = {
+  thesisId: 'th-316140',
+  asset: '316140',
+  createdAt: '2026-09-01T00:00:00Z',
+  coreClaim: 'Capital return is being underwritten by a CET1 the market is discounting',
+  horizonEnd: '2027-03-31T00:00:00Z',
+  evidenceStatus: 'incomplete',
+  variantView: 'Consensus reads the buyback as a one-off; the CET1 path makes it a run rate',
+  consensusRefs: [{ metric: 'net-income-2026', value: 965700000000, sourceUrl: 'https://example.invalid/consensus', publishedAt: '2026-08-20T00:00:00Z', capturedAt: '2026-09-01T00:00:00Z' }],
+}
+const measured = valRun('variantViewCheck', { thesis: measuredThesis, challengeVerdict: 'cleared' })
+assert.equal(measured.data.verified, false)
+assert.deepEqual(measured.data.satisfied, ['variantView', 'consensusRefs', 'challengeCleared'])
+assert.deepEqual(measured.data.missing, ['thesisComplete'])
+assert.deepEqual(measured.data.gaps, ['catalysts', 'invalidationTriggers', 'expectedUpsidePct', 'fairValueRange'])
+assert.equal(measured.data.lane, 'control-arm')
+
+/**
+ * Ask 4: `missing: ["thesisComplete"]` is one word covering three met
+ * requirements and one unmet one. The report says which, and what is
+ * outstanding on it — ⛔ without changing `verified` or the four requirements.
+ */
+assert.equal(measured.data.satisfiedCount, 3)
+assert.equal(measured.data.requirementCount, 4)
+assert.deepEqual(measured.data.requirements, ['thesisComplete', 'variantView', 'consensusRefs', 'challengeCleared'])
+const byRequirement = Object.fromEntries(measured.data.requirementReport.map((row) => [row.requirement, row]))
+assert.equal(byRequirement.thesisComplete.satisfied, false)
+assert.deepEqual(byRequirement.thesisComplete.gaps, ['catalysts', 'invalidationTriggers', 'expectedUpsidePct', 'fairValueRange'])
+assert.ok(/expectedUpsidePct/.test(byRequirement.thesisComplete.outstanding), 'the binding requirement names what is still open on it')
+for (const requirement of ['variantView', 'consensusRefs', 'challengeCleared']) {
+  assert.equal(byRequirement[requirement].satisfied, true)
+  assert.equal(byRequirement[requirement].outstanding, null)
+}
+assert.ok(measured.data.requirementReport.every((row) => typeof row.checkedBy === 'string' && row.checkedBy.length))
+
+/** The cap arithmetic the issue measured, unchanged, and now saying why. */
+const cap = valRun('effectivePositionCap', {
+  mandatePositionCap: 0.2,
+  maturityStatus: 'insufficient',
+  lane: 'main',
+  nav: { amount: 14866.44, currency: 'USD' },
+  thesis: measuredThesis,
+  challengeVerdict: 'cleared',
+})
+assert.equal(cap.data.effectiveCap, 0.01)
+assert.equal(cap.data.mainLaneOpen, false)
+assert.equal(cap.data.resolvedLane, 'control-arm')
+const capReduction = cap.diagnostics.find((row) => row.code === 'position_cap_reduced_by_maturity')
+assert.equal(capReduction.details.declared, 0.2)
+assert.equal(capReduction.details.effective, 0.01)
+assert.equal(capReduction.details.reductionMultiple, 20)
+assert.equal(capReduction.details.reason, 'lens_insufficient')
+// ⛔ The reason a twentyfold reduction binds is now readable one requirement at a time.
+assert.equal(capReduction.details.mainLane.satisfiedCount, 3)
+assert.equal(capReduction.details.mainLane.requirementCount, 4)
+assert.deepEqual(capReduction.details.mainLane.missing, ['thesisComplete'])
+assert.equal(capReduction.details.mainLane.requirementReport.find((row) => row.requirement === 'thesisComplete').gaps.length, 4)
+assert.ok(valHas(cap, 'main_lane_requires_variant_view'))
+assert.ok(cap.diagnostics.find((row) => row.code === 'main_lane_requires_variant_view').details.requirementReport)
+
+/**
+ * ── The derivation, and where it comes from ────────────────────────────────
+ *
+ * ⛔ Not a multiple this package chose. `candidate-research` §Candidate record 5
+ * asks for bear/base/bull with a target, a return and factual drivers, and
+ * `researchGate` already computes `Σ p·return`; `validateThesis` was refusing a
+ * thesis for not carrying a number the same methodology was already computing
+ * one operation away.
+ */
+const krFilings = [{
+  periodEnd: '2026-06-30',
+  availableAt: '2026-08-14T00:00:00Z',
+  revenue: 1000,
+  operatingIncome: 120,
+  operatingIncomeYoy: 500,
+  marginDeltaYoy: 8.6,
+  currency: 'KRW',
+  sourceType: 'opendart-full-financial-statements',
+}]
+const scenarios = {
+  bear: { probability: 0.25, target: 80, drivers: [{ metric: 'operatingIncomeYoy', evidenceId: 'ev-dart-1' }] },
+  base: { probability: 0.5, target: 120, drivers: [{ metric: 'revenue', evidenceId: 'ev-dart-1' }] },
+  bull: { probability: 0.25, target: 160, drivers: [{ metric: 'marginDeltaYoy', evidenceId: 'ev-dart-1' }] },
+}
+const valued = valRun('thesisValuation', { asset: '316140', market: 'kr', price: 100, scenarios, filings: krFilings })
+assert.equal(valued.data.basis, 'scenario-targets')
+assert.ok(/candidate-research/.test(valued.data.basisSource), 'the basis names the methodology sentence it was read out of')
+assert.deepEqual(valued.data.fairValueRange, { low: 80, high: 160, currency: 'KRW' })
+assert.equal(valued.data.expectedUpsidePct, 20)
+assert.equal(valued.data.grounded, true)
+assert.equal(valued.data.groundedCases, 3)
+assert.equal(valued.data.latestPeriodEnd, '2026-06-30')
+assert.deepEqual(valued.data.thesisFields, { expectedUpsidePct: 20, fairValueRange: { low: 80, high: 160 } })
+
+/** And the derived fields close the two gaps they were blocking. */
+const completed = valRun('validateThesis', {
+  ...measuredThesis,
+  evidenceStatus: 'complete',
+  catalysts: [{ event: 'Q3 disclosure', windowStart: '2026-11-01T00:00:00Z', windowEnd: '2026-11-20T00:00:00Z' }],
+  invalidationTriggers: [{ kind: 'price-below', level: 70, checkBy: '2026-12-31T00:00:00Z' }],
+  ...valued.data.thesisFields,
+})
+assert.equal(completed.data.complete, true)
+assert.deepEqual(completed.data.gaps, [])
+const opened = valRun('variantViewCheck', {
+  thesis: {
+    ...measuredThesis,
+    evidenceStatus: 'complete',
+    catalysts: [{ event: 'Q3 disclosure', windowStart: '2026-11-01T00:00:00Z', windowEnd: '2026-11-20T00:00:00Z' }],
+    invalidationTriggers: [{ kind: 'price-below', level: 70, checkBy: '2026-12-31T00:00:00Z' }],
+    ...valued.data.thesisFields,
+  },
+  challengeVerdict: 'cleared',
+})
+assert.equal(opened.data.verified, true, 'the lane opens on the requirements it always had, filled from the statements')
+assert.equal(opened.data.lane, 'main')
+assert.equal(opened.data.satisfiedCount, 4)
+
+/**
+ * ⛔ **The gate is not loosened anywhere.** Every requirement still binds on its
+ * own, with the derived fields present.
+ */
+const withFields = { ...measuredThesis, evidenceStatus: 'complete', catalysts: [{ event: 'Q3', windowStart: '2026-11-01T00:00:00Z', windowEnd: '2026-11-20T00:00:00Z' }], invalidationTriggers: [{ kind: 'price-below', level: 70, checkBy: '2026-12-31T00:00:00Z' }], ...valued.data.thesisFields }
+assert.equal(valRun('variantViewCheck', { thesis: withFields, challengeVerdict: 'conditional' }).data.verified, false)
+assert.equal(valRun('variantViewCheck', { thesis: { ...withFields, variantView: '' }, challengeVerdict: 'cleared' }).data.verified, false)
+assert.equal(valRun('variantViewCheck', { thesis: { ...withFields, consensusRefs: [] }, challengeVerdict: 'cleared' }).data.verified, false)
+assert.equal(valRun('variantViewCheck', { thesis: { ...withFields, expectedUpsidePct: undefined }, challengeVerdict: 'cleared' }).data.verified, false)
+assert.equal(
+  valRun('variantViewCheck', { thesis: withFields, challengeVerdict: 'cleared', evidenceSamples: [{ cohort: 'mechanical' }] }).data.verified,
+  false,
+  'and the control-arm leak guard still refuses its own cohort as the argument for size',
+)
+
+/** A target with nothing under it still answers — and says it is standing on nothing. */
+const ungrounded = valRun('thesisValuation', { asset: '316140', market: 'kr', price: 100, scenarios: { bear: { probability: 0.25, target: 80 }, base: { probability: 0.5, target: 120 }, bull: { probability: 0.25, target: 160 } }, filings: [] })
+assert.equal(ungrounded.data.expectedUpsidePct, 20, 'the arithmetic is the same; what changed is what stands under it')
+assert.equal(ungrounded.data.grounded, false)
+assert.ok(valHas(ungrounded, 'scenario_driver_ungrounded'))
+assert.ok(valHas(ungrounded, 'valuation_filings_absent'))
+// ⛔ And a missing target is never replaced by a multiple this package picked.
+const noTarget = valRun('thesisValuation', { asset: '316140', market: 'kr', price: 100, scenarios: { bear: { probability: 0.25, return: -0.2 }, base: { probability: 0.5, return: 0.2 }, bull: { probability: 0.25, return: 0.6 } }, filings: krFilings })
+assert.equal(noTarget.data.fairValueRange, null)
+assert.equal(noTarget.data.thesisFields, null)
+assert.equal(noTarget.data.expectedUpsidePct, 20, 'the weighted return still computes from the returns that were given')
+assert.ok(valHas(noTarget, 'fair_value_target_absent'))
+// A stated return and a target that do not describe the same price are two readings, never one average.
+const disagreeing = valRun('thesisValuation', { asset: '316140', market: 'kr', price: 100, scenarios: { ...scenarios, base: { probability: 0.5, target: 120, return: 0.05, drivers: ['revenue'] } }, filings: krFilings })
+assert.ok(valHas(disagreeing, 'scenario_target_return_disagree'))
+const disagreedCase = disagreeing.data.scenarios.find((row) => row.case === 'base')
+assert.equal(disagreedCase.statedReturn, 0.05)
+assert.equal(disagreedCase.impliedByTarget, 0.2)
+assert.equal(valRun('thesisValuation', { asset: 'X', market: 'kr', scenarios, filings: krFilings }).status, 'blocked', 'a fair value with no price to compare it against is not an upside')
+
+/**
+ * ── Ask 3: an ETF and a single name do not get the same diagnosis ──────────
+ *
+ * ⛔ *No source can fill this* and *the source was never called* produce the
+ * same four-item `gaps` list and mean opposite things — the same swap
+ * `radarCandidates` refuses one layer down. The class is **computed** off the
+ * registry rather than asserted.
+ */
+const gaps = ['catalysts', 'invalidationTriggers', 'expectedUpsidePct', 'fairValueRange']
+const filerMapping = { registrySize: 3800, mapped: [{ symbol: '316140', corporationCode: '00254045' }], unmapped: ['069500'] }
+const singleName = valRun('thesisGapSources', { asset: '316140', market: 'kr', gaps, mapping: filerMapping })
+assert.equal(singleName.data.instrumentClass, 'single-name-filer')
+assert.equal(singleName.data.unfetchedCount, 2)
+assert.equal(singleName.data.unfillableCount, 0)
+assert.equal(singleName.data.gaps.find((row) => row.gap === 'fairValueRange').state, 'source-exists-and-was-never-called')
+assert.ok(valHas(singleName, 'valuation_gap_is_unfetched_not_unfillable'))
+
+const etf = valRun('thesisGapSources', { asset: '069500', market: 'kr', gaps, mapping: filerMapping })
+assert.equal(etf.data.instrumentClass, 'non-filer-instrument')
+assert.equal(etf.data.unfillableCount, 2)
+assert.equal(etf.data.unfetchedCount, 0)
+assert.equal(etf.data.gaps.find((row) => row.gap === 'fairValueRange').state, 'no-source-exists-for-this-instrument')
+assert.ok(valHas(etf, 'valuation_gap_has_no_source_for_this_instrument'))
+assert.notEqual(
+  singleName.data.gaps.find((row) => row.gap === 'expectedUpsidePct').state,
+  etf.data.gaps.find((row) => row.gap === 'expectedUpsidePct').state,
+  'the same gaps list on two instruments is two findings, and collapsing them is what kept the lane shut',
+)
+
+// ⛔ With no registry read, the instrument is left unclassified rather than guessed at.
+const unclassified = valRun('thesisGapSources', { asset: '316140', market: 'kr', gaps })
+assert.equal(unclassified.data.instrumentClass, 'unknown')
+assert.equal(unclassified.data.classBasis, 'registry-never-read')
+assert.ok(valHas(unclassified, 'instrument_class_unknown'))
+assert.equal(unclassified.data.unfetchedCount, 0)
+assert.equal(unclassified.data.unfillableCount, 0)
+// A declaration answers where the registry was not read, and disputes are reported rather than reconciled.
+assert.equal(valRun('thesisGapSources', { asset: '069500', market: 'kr', gaps, instrumentType: 'etf' }).data.instrumentClass, 'non-filer-instrument')
+assert.ok(valHas(valRun('thesisGapSources', { asset: '316140', market: 'kr', gaps, mapping: filerMapping, instrumentType: 'etf' }), 'instrument_class_disputed'))
+// Once the statements are read, the gap is neither unfillable nor unfetched: it is underived.
+const answered = valRun('thesisGapSources', { asset: '316140', market: 'kr', gaps, mapping: filerMapping, feed: { fedCount: 1 }, filings: krFilings })
+assert.equal(answered.data.gaps.find((row) => row.gap === 'fairValueRange').state, 'source-answered-and-the-value-was-not-derived')
+// The gaps that no source fills for anybody stay the run's own work either way.
+assert.equal(singleName.data.gaps.find((row) => row.gap === 'invalidationTriggers').state, 'run-authored-and-unwritten')
+
+/**
+ * ── Ask 2: the instance's own generalization is retracted, not deleted ─────
+ *
+ * `run/theme-radar-last`, 2026-09-04. ⚠️ It is filed under a key that is not
+ * `failures/repeated-patterns`, which is why the valRetraction registry had to
+ * learn that the key belongs to the rule.
+ */
+const themeRadarLast = {
+  ranAt: '2026-09-04T11:00:00Z',
+  note: 'validateThesis returned complete:false with gaps expectedUpsidePct and fairValueRange that no granted source can fill',
+}
+const retracted = valRun('refutedMemoryRules', { patterns: [], memory: { 'run/theme-radar-last': themeRadarLast } })
+assert.equal(retracted.data.retractions.length, 1)
+const valRetraction = retracted.data.retractions[0]
+assert.equal(valRetraction.key, 'run/theme-radar-last')
+assert.equal(valRetraction.refutedRuleId, 'valuation-gaps-have-no-granted-source')
+assert.equal(valRetraction.refutedIn, '#160')
+assert.equal(valRetraction.writeAs.state, 'RETRACTED')
+assert.ok(/ETF/.test(valRetraction.correction) && /fnlttSinglAcntAll/.test(valRetraction.correction), 'the correction is the distinction, not the opposite blanket claim')
+assert.ok(valHas(retracted, 'memory_rule_refuted'))
+// ⛔ It retracts and does not delete: the original value is untouched and the row is additive.
+assert.equal(themeRadarLast.note, 'validateThesis returned complete:false with gaps expectedUpsidePct and fairValueRange that no granted source can fill')
+// The #156 rule is still matched under its own key, and neither key claims the other's rules.
+assert.deepEqual(retracted.data.appliesTo, ['failures/repeated-patterns', 'run/theme-radar-last'])
+const bothKeys = valRun('refutedMemoryRules', {
+  patterns: [{ id: 'armed-reviews-memory-claims-arms-the-decision-never-made', note: 'When they disagree, the journal wins.' }],
+  memory: { 'run/theme-radar-last': themeRadarLast },
+})
+assert.deepEqual(bothKeys.data.retractions.map((row) => row.refutedRuleId).sort(), ['armed-reviews-memory-claims-arms-the-decision-never-made', 'valuation-gaps-have-no-granted-source'])
+assert.equal(bothKeys.data.keysUnread.length, 0)
+// A key that was not read is named, because an unread rule still decides how this run is called.
+assert.deepEqual(valRun('refutedMemoryRules', { patterns: [] }).data.keysUnread, ['run/theme-radar-last'])
+assert.ok(valHas(valRun('refutedMemoryRules', {}), 'memory_rules_unread'))
+assert.equal(valRun('refutedMemoryRules', { memory: [] }).status, 'blocked', 'a value with no key beside it cannot be matched against the rules filed under that key')
+
+/** Every new operation publishes its contract, and refuses a key it does not read. */
+const valContracts = valRun('inputContracts').data
+for (const operation of ['thesisValuation', 'thesisGapSources']) {
+  assert.ok(valContracts.contracts[operation], `${operation} publishes its shape`)
+  assert.ok(valContracts.keys[operation].length, `${operation} publishes its keys`)
+  assert.ok(valContracts.guarded.includes(operation), `${operation} refuses a key it does not read`)
+  assert.ok(valContracts.nested[operation], `${operation} publishes the shapes a key list cannot show`)
+}
+assert.deepEqual(valContracts.vocabulary.scenarioCases, ['bear', 'base', 'bull'])
+assert.deepEqual(valContracts.vocabulary.instrumentClasses, ['single-name-filer', 'non-filer-instrument', 'unknown'])
+assert.deepEqual(valContracts.vocabulary.memoryRuleKeys, ['failures/repeated-patterns', 'run/theme-radar-last'])
+assert.equal(valRun('thesisValuation', { asset: 'X', price: 100, multiple: 12 }).status, 'blocked', 'a multiple is not a key this package reads, and is refused rather than absorbed')
+
+console.log('evidence-gated issue #160 valuation-wiring regression tests passed')

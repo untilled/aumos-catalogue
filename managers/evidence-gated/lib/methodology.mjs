@@ -262,13 +262,55 @@ export function variantViewCheck({ thesis = null, challengeVerdict = null, evide
   }
 
   const verified = missing.length === 0 && controlArmCited.length === 0
+
+  /**
+   * ── Which of the four, and why that one (issue #160, ask 4) ───────────────
+   *
+   * `missing: ["thesisComplete"]` hides that the other **three** were met. On
+   * the 2026-09-06 measurement that one word is the whole difference between a
+   * declared 20% cap and an effective 1%, and the investor reading it cannot
+   * tell whether nothing was done or almost everything was. So every
+   * requirement reports its own state, what checked it, and — when it is
+   * unmet — the narrowest statement available of what is still outstanding.
+   *
+   * ⛔ It reports; it does not relax. The four requirements, their checks and
+   * `verified` are byte-for-byte what they were.
+   */
+  const thesisGaps = thesisReport?.data?.gaps ?? null
+  const outstanding = {
+    thesisComplete: thesisGaps === null
+      ? 'no thesis was supplied, so validateThesis was never run'
+      : thesisGaps.length
+        ? `validateThesis returns gaps: ${thesisGaps.join(', ')}`
+        : 'validateThesis returns no gaps but evidenceStatus is not `complete`',
+    variantView: 'the thesis carries no non-empty `variantView` statement',
+    consensusRefs: consensusRefs.length
+      ? `${consensusRefs.length} consensus row(s) were given and none survived the point-in-time check (metric, finite value, sourceUrl, publishedAt <= capturedAt and <= asOf)`
+      : 'no consensus row was given, so there is nothing the view differs from',
+    challengeCleared: `challengeVerdict is ${challengeVerdict ?? 'absent'} rather than \`cleared\``,
+  }
+  const checkedBy = {
+    thesisComplete: 'validateThesis().complete',
+    variantView: 'a non-empty statement on the thesis',
+    consensusRefs: 'one dated, sourced, point-in-time row',
+    challengeCleared: "challengeVerdict === 'cleared'",
+  }
+  const requirementReport = VARIANT_VIEW_REQUIREMENTS.map((requirement) => ({
+    requirement,
+    satisfied: satisfied.includes(requirement),
+    checkedBy: checkedBy[requirement],
+    outstanding: satisfied.includes(requirement) ? null : outstanding[requirement],
+    /** ⚠️ Only the thesis requirement decomposes further; the other three are one fact each. */
+    gaps: requirement === 'thesisComplete' ? thesisGaps : null,
+  }))
+
   if (!verified) {
     diagnostics.push(diagnostic(
       'variant_view_unverified',
       'unevaluated',
-      'No variant view is established for this candidate, so it is a mechanical entry and is sized as one: the main lane is what a checked variant view opens, and an unchecked one is not a smaller version of a checked one',
+      `No variant view is established for this candidate, so it is a mechanical entry and is sized as one: the main lane is what a checked variant view opens, and an unchecked one is not a smaller version of a checked one. ${satisfied.length} of ${VARIANT_VIEW_REQUIREMENTS.length} requirements are met and ${missing.length ? `what is outstanding is ${missing.join(', ')}` : 'the evidence cited is the control arm\'s own'}`,
       'thesis',
-      { missing, satisfied, gaps: thesisReport?.data?.gaps ?? null, consensusRefsAccepted: accepted.length },
+      { missing, satisfied, gaps: thesisGaps, consensusRefsAccepted: accepted.length, requirementReport },
     ))
   }
   return {
@@ -277,6 +319,10 @@ export function variantViewCheck({ thesis = null, challengeVerdict = null, evide
       requirements: VARIANT_VIEW_REQUIREMENTS,
       satisfied,
       missing,
+      /** Per requirement rather than per verdict, so the one that binds is nameable. (#160) */
+      requirementReport,
+      satisfiedCount: satisfied.length,
+      requirementCount: VARIANT_VIEW_REQUIREMENTS.length,
       gaps: thesisReport?.data?.gaps ?? null,
       consensusRefsAccepted: accepted.length,
       consensusRefsGiven: consensusRefs.length,

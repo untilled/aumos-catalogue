@@ -113,6 +113,20 @@ with a metric, a value, a source URL and `publishedAt` ≤ `capturedAt` ≤ `asO
 §4 maturity ceiling stop applying — the Mandate's `maxPositionWeight` and every concentration cap
 still bind, and an explicit `lane: 'control-arm'` still holds the name to 1%.
 
+⚠️ **And when it says no, it says which of the four and what is outstanding on it** (#160). The
+2026-09-06 run met three — `variantView`, `consensusRefs`, `challengeCleared` — and read back
+`missing: ["thesisComplete"]`, one word covering the fact that almost everything had been done and
+that the whole of a twentyfold cap reduction hung on two derivable fields. `requirementReport` is
+per requirement, and `effectivePositionCap` carries it on `position_cap_reduced_by_maturity` under
+`mainLane`. ⛔ Reporting the reason changes no threshold: the four requirements and `verified` are
+what they were, and `thesisComplete` is not waived for a candidate that has three of four.
+
+⚠️ **The requirement that binds is usually fillable, and the fill is a fetch.** `expectedUpsidePct`
+and `fairValueRange` come off `thesisValuation` — the bear/base/bull targets this page already
+requires, drivers checked against the filings — so a `thesisComplete` gap on a **filer** is work not
+yet done rather than a source that does not exist. `thesisGapSources` is what tells those apart, and
+it decides from the registry rather than from an assumption about the instrument.
+
 ⛔ **The leak this closes on the other side.** A thesis may not reach the main lane on the control
 arm's own record: `evidenceSamples` rows from any cohort other than `llm-research` come back
 `control_arm_evidence_cited` / `blocked`. That is `expansionProhibited` at the lane door — the same
