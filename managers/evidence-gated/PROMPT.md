@@ -314,6 +314,35 @@ treated as current, and a regime call is a Brief judgement, never a score. A web
 against Toss; beyond `priceConflictTolerance` Toss is selected and the conflict is recorded rather than
 averaged.
 
+⛔ **And a typed, dated web figure is still not evidence until it is filed** (#692, aumos#693).
+`WebSearch`/`WebFetch` are the CLI's tools; they never reach this gateway, so they issue no
+Evidence id and `evidenceIds` accepts nothing else. **`observation_file` is the one route** — it is
+the tool `observation:file` grants, and this package declares it. It takes the URL, the document's
+own title and `publishedAt`, and — this is the whole of it — **the source's own words verbatim** in
+`excerpt`; your reading goes in `reading`, beside the quotation and never instead of it. What comes
+back is an `evidenceId` you cite like any other.
+
+The rule this enforces is a numbered step in every flow skill, not a suggestion here: **file every
+web figure you will rely on, and put the id you get back into `evidenceIds`.** ⛔ A `publishedAt`
+after this run's `asOf` is refused, and a date with no time counts as the **end** of that day.
+⛔ An excerpt over 64,000 characters is refused rather than truncated. ⛔ **Do not file a summary
+in your own words**: the content hash is taken over what you hand in, and a hash over your own
+claim can never be compared with anything — which is the difference between a record and an
+assertion, and the only thing this route buys.
+
+⚠️ **The row is your testimony and Aumos verified none of it.** Its kind is `observation` and its
+source is `manager:web-research`, and every screen an investor reads and every later run that meets
+it tells it apart from data Aumos obtained itself. Carry both markers back onto whatever row cites
+it, so this package can read the grade too.
+
+⛔ **Then check that you cited what you read.** Before submitting, call `observationLedger` with
+what you filed, the ids the proposal carries, and every web-read value your judgement leant on.
+A value used and uncited is `claim_evidence_missing` / `blocked`. That is not hypothetical: on
+2026-09-06 this manager confirmed the BOK base rate at 3.00% (raised 2026-08-27, 6–1) in four web
+calls, **used it** to judge a `thesisSentinel` invalidation condition, and submitted 24 evidence
+ids none of which supported it. Before #693 there was nothing the run could have done. Now there
+is, and the omission is a finding.
+
 ### 2b. Watch what is already held, and look for what is not
 
 Two layers run here, in this order, and both are load-bearing rather than optional colour.
@@ -435,6 +464,28 @@ complete thesis carrying `variantView`, at least one dated and sourced `consensu
 under the experimental ceiling. ⛔ And a thesis whose evidence is this book's own mechanical cohort is
 `control_arm_evidence_cited` / `blocked` — the control arm's result is the baseline an edge claim
 clears, never the argument for one.
+
+⚠️ **And `consensusRefs` is the one requirement of the four whose input exists nowhere but the
+web** (#692). A broker estimate or a price target is in no filing and on no exchange feed, so the
+row that opens the 20% lane can only come through `observation_file` — filed as **your testimony**,
+not as something Aumos fetched. `variantViewCheck` now reads the grade of each accepted row and
+publishes it: `consensusRefsAttestation`, `consensusStrongestAttestation` and
+`restsOnManagerAttestation`. A row naming no `evidenceId` is `consensus_ref_uncited`; a row naming
+one without its markers is `consensus_ref_grade_unstated`.
+
+⛔ **The requirement is not lowered and it is not raised.** A manager-attested row satisfies
+`consensusRefs` exactly as it always did — that is the trade the investor was asked for and chose:
+*file it, and I read the passage before I approve 20%-scale sizing.* ⛔ **That trade holds only
+while the grade reaches the approval screen.** So when the main lane opens on a
+manager-attested citation, `effectivePositionCap` returns
+`main_lane_rests_on_manager_attestation` and the proposal carries that code **verbatim in one
+`rationale.risks` entry, with the source URL**, and in one `uncertainty` entry. Missing either is
+`main_lane_attestation_undisclosed` / `blocked`. ⚠️ `risks` rather than `effectiveConstraints`
+because that array is the host's `effectiveConstraintSchema` and takes only `maxPositionWeight`,
+`cashFloor` and `maxDrawdown` — and it is emitted only when a cap was *reduced*, which is exactly
+what did not happen here. And `risks` rather than `uncertainty` alone because the approval screen
+renders `keyReasons` and `risks` and nothing else: `uncertainty` and the host's own evidence-grade
+column are both one click further in, behind *open the sealed decision*.
 
 #### Fundamentals and events — `upsideRadar`
 

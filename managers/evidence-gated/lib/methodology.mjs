@@ -1,5 +1,6 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
 import { PAPER_SETUP_COHORTS } from './input-contracts.mjs'
+import { attestationCounts, attestationOf, MANAGER_OBSERVATION_SOURCE, strongestAttestation } from './observation.mjs'
 
 /**
  * ── One trigger vocabulary, two shapes that mean different things (§25) ────
@@ -247,6 +248,78 @@ export function variantViewCheck({ thesis = null, challengeVerdict = null, evide
   record('consensusRefs', accepted.length > 0)
   record('challengeCleared', challengeVerdict === 'cleared')
 
+  /**
+   * ── Whose word the 20% lane is standing on (issue #692, catalogue side) ───
+   *
+   * `consensusRefs` is the one requirement of the four whose input **can only
+   * come from the web.** Broker estimates and price targets are in no filing
+   * and on no exchange feed, and until `untilled/aumos#693` the CLI's own web
+   * tools issued no evidence id, so the row this check accepts was a URL typed
+   * into a thesis with nothing in the record behind it. That is the supply
+   * route #693 opened, and it opened it in one grade: `observation_file` files
+   * the passage as the **manager's testimony**, not as something Aumos fetched.
+   *
+   * ⚠️ **The investor was asked and chose that trade** — a manager-attested
+   * `consensusRefs` row satisfies the requirement, and the investor reads the
+   * passage before approving 20%-scale sizing. So the requirement is **not**
+   * raised here: `accepted` is byte-for-byte what it was, `verified` is
+   * unchanged, and a manager-attested row counts exactly as it did.
+   *
+   * ⛔ **What is added is that the grade is never silent.** The trade the
+   * investor accepted was ⑴ *"file it, and I will read it before I approve"*,
+   * and a grade that stays inside this function turns that into ⑶ *"drop the
+   * requirement"* without anybody choosing it. So the grade of each accepted
+   * row is computed, the strongest one is published, and — when the strongest
+   * one this lane has is the manager's own word — it is said in a diagnostic
+   * that `effectivePositionCap` turns into a disclosure obligation.
+   *
+   * An `uncited` row is the pre-#693 shape and is now a reported gap rather
+   * than an unremarkable one: the supply route exists, so a consensus figure
+   * with no evidence id behind it is a choice.
+   */
+  const acceptedGrades = accepted.map((row) => attestationOf(row))
+  const consensusRefsAttestation = attestationCounts(acceptedGrades)
+  const consensusStrongestAttestation = strongestAttestation(acceptedGrades)
+  const consensusRefRows = accepted.map((row, index) => ({
+    index,
+    metric: row.metric,
+    sourceUrl: row.sourceUrl,
+    publishedAt: row.publishedAt,
+    evidenceId: typeof row?.evidenceId === 'string' && row.evidenceId.trim().length ? row.evidenceId.trim() : null,
+    attestation: acceptedGrades[index],
+  }))
+  const managerAttestedRefs = consensusRefRows.filter((row) => row.attestation === 'manager')
+  const restsOnManagerAttestation = consensusStrongestAttestation === 'manager'
+  const uncitedRefs = consensusRefRows.filter((row) => row.attestation === 'uncited')
+  if (uncitedRefs.length) {
+    diagnostics.push(diagnostic(
+      'consensus_ref_uncited',
+      'unevaluated',
+      'These consensus rows passed the point-in-time check and name no evidence id, so nothing in the record stands behind them. Since untilled/aumos#693 there is a route: file the source’s own words with `observation_file` and carry the id it returns back onto the row',
+      'thesis.consensusRefs',
+      { rows: uncitedRefs.map((row) => ({ index: row.index, metric: row.metric, sourceUrl: row.sourceUrl })) },
+    ))
+  }
+  const ungradedRefs = consensusRefRows.filter((row) => row.attestation === 'ungraded')
+  if (ungradedRefs.length) {
+    diagnostics.push(diagnostic(
+      'consensus_ref_grade_unstated',
+      'unevaluated',
+      'These consensus rows name an evidence id and say nothing about what kind of row it is, so whether this lane rests on the manager’s own reading cannot be answered here. Carry `evidenceKind` and `evidenceSource` back from the filing receipt',
+      'thesis.consensusRefs',
+      { rows: ungradedRefs.map((row) => ({ index: row.index, evidenceId: row.evidenceId })) },
+    ))
+  }
+  if (restsOnManagerAttestation) {
+    diagnostics.push(diagnostic(
+      'consensus_ref_manager_attested',
+      'unevaluated',
+      `The strongest consensus citation this candidate has is the manager’s own reading, filed through \`observation_file\` and sourced \`${MANAGER_OBSERVATION_SOURCE}\`. Aumos fetched none of it and verified none of it; the requirement is met and the grade travels with it. If this opens the main lane, the proposal says so where the investor reads before approving`,
+      'thesis.consensusRefs',
+      { rows: managerAttestedRefs.map((row) => ({ metric: row.metric, sourceUrl: row.sourceUrl, evidenceId: row.evidenceId, publishedAt: row.publishedAt })) },
+    ))
+  }
+
   const citedCohorts = [...new Set((Array.isArray(evidenceSamples) ? evidenceSamples : [])
     .map((row) => row?.cohort ?? PAPER_SETUP_COHORTS[row?.setup] ?? null)
     .filter((cohort) => typeof cohort === 'string'))]
@@ -326,6 +399,17 @@ export function variantViewCheck({ thesis = null, challengeVerdict = null, evide
       gaps: thesisReport?.data?.gaps ?? null,
       consensusRefsAccepted: accepted.length,
       consensusRefsGiven: consensusRefs.length,
+      /** Whose word each accepted row is, and the best grade among them. (#692) */
+      consensusRefRows,
+      consensusRefsAttestation,
+      consensusStrongestAttestation,
+      managerAttestedRefs,
+      /**
+       * True when the best citation this candidate has is the manager's own
+       * reading. `effectivePositionCap` reads it and requires the proposal to
+       * say so at the approval point; it changes no requirement and no cap.
+       */
+      restsOnManagerAttestation,
       challengeVerdict: challengeVerdict ?? null,
       citedCohorts,
       controlArmEvidenceCited: controlArmCited.length > 0,

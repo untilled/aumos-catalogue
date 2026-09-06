@@ -3,7 +3,7 @@
   "id": "evidence-gated",
   "publisher": "aumos",
   "name": "Evidence-Gated Allocator",
-  "version": "0.4.29",
+  "version": "0.4.30",
   "description": "One evidence-gated methodology run as three market flows: a Korean sleeve, a US sleeve, and the allocator that sets their budgets and proposes the cross-market rebalance. The flows are subagents of one manager; only the orchestrator submits.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
@@ -36,7 +36,7 @@
     "notice": "./NOTICE.md"
   },
   "engines": {
-    "aumos": ">=0.3.30"
+    "aumos": ">=0.3.32"
   },
   "ampVersion": 1,
   "contributes": {
@@ -110,6 +110,10 @@
       "reason": "A stale or never-fetched filing is refreshed for the named filer only, so the branch is fed on the run that needs it rather than reporting starvation it could have resolved."
     },
     {
+      "kind": "observation:file",
+      "reason": "Broker consensus estimates and price targets exist on the web and in no filing and on no exchange feed, and `variantViewCheck` will not open the 20% single-name lane without a dated consensus citation. `observation_file` is the only route by which a reading reaches `evidenceIds` at all: the source's own words, its URL and its publication date are filed and hashed, so what the lane rests on is something an auditor can go and check. The row is filed as this manager's testimony rather than as an Aumos observation, and every proposal it sizes says so where the investor reads before approving."
+    },
+    {
       "kind": "connection:passthrough",
       "connectors": [
         "toss",
@@ -126,6 +130,7 @@
     "optionalSkills": [
       "source_cache_read",
       "source_cache_refresh",
+      "observation_file",
       "portfolio_read",
       "thesis_read",
       "evidence_read",

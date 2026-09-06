@@ -266,6 +266,27 @@ flowchart TB
 `engines.aumos`는 `>=0.3.30`을 요구한다 — 더 낮은 빌드는 모르는 권한을 무시하는 대신 매니페스트
 전체를 거부한다. ⛔ 사설 메모리는 캐시가 아니며 앞으로도 되지 않는다.
 
+**그리고 같은 굶주림의 반대편 — 20% 레인에 드디어 공급 경로가 생겼다.**
+`variantViewCheck`는 요구 넷으로 메인 단일종목 레인을 열고, 그중 하나인 `consensusRefs`—날짜와
+출처가 있는 컨센서스 관측—은 **웹에서만 오는** 입력이다. 증권사 추정치와 목표주가는 공시에도
+거래소 피드에도 없고, 매니저의 `WebSearch`/`WebFetch`는 CLI의 것이라 Aumos를 지나지 않으므로
+Evidence id를 만들지 않는다 — 그리고 `evidenceIds`는 그 말고는 아무것도 받지 않는다. 이 방법론은
+공급 경로를 자기가 막은 입력을 요구하고 있었고, 그 계좌는 8개 실행 동안 단일 종목을 한 주도 사지
+않았다(`untilled/aumos#692`). `observation:file`(Aumos 0.3.32, `untilled/aumos#693`)가 그 경로다:
+`observation_file` 도구가 URL과 발행일과 **원문 그대로의 구절**을 기록하고 해시를 덮어 Evidence id를
+돌려준다. 그래서 `engines.aumos`는 `>=0.3.32`를 요구한다.
+
+⚠️ **그 행은 이 매니저의 증언이고, 패키지는 그 사실을 조용하게 두지 않는다.** Aumos는 아무것도
+가져오지 않았고 아무것도 검증하지 않았다 — 행은 모든 단계에서 `observation` / `manager:web-research`로
+등급된다. 그래서 `variantViewCheck`는 수립된 컨센서스 행 각각의 등급을 게시하고, 매니저가 직접 기록한
+행 위에서 메인 레인이 열리면 `effectivePositionCap`이 `main_lane_rests_on_manager_attestation`을
+돌려주며, 제안은 그 코드를 `rationale.risks` 항목 하나에 출처 URL과 함께, 그리고 `uncertainty` 항목
+하나에 그대로 실어야 한다 — `risks`인 이유는 승인 화면이 그것을 그리기 때문이다. 둘 중 하나라도
+빠지면 `main_lane_attestation_undisclosed` / `blocked`다. ⛔ 요구 넷도, 캐도, 대조군의 1% / 6%도
+바뀌지 않는다 — 거부하는 것은 레인을 **조용히** 여는 것이다. 그리고 `observationLedger`가 반대 방향의
+고리를 닫는다 — 웹에서 읽고 판단에 썼는데 제출된 어느 id도 받치지 않는 값은
+`claim_evidence_missing` / `blocked`이며, 그것이 2026-09-06 BOK 금리 실패를 진단으로 만든 것이다.
+
 **선언된 권한 둘은 현재 아무것도 서빙하지 않는다.** `thesis:read`와 `evidence:read`는 매니페스트
 어휘에 있고, 현재 Aumos 빌드는 각각을 빈 도구 목록으로 매핑하므로 실행에 그 도구가 생기지 않는다.
 프롬프트가 *가능할 때* 읽는다고 적고 매니페스트가 둘을 `optionalSkills`에 두는 이유가 정확히

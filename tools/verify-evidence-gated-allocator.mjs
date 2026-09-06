@@ -42,6 +42,7 @@ const krSource = JSON.parse(await readFile(new URL('kr/source.json', fixtureRoot
 const usSchedule = JSON.parse(await readFile(new URL('us/schedule.json', fixtureRoot), 'utf8'))
 const globalIntegration = JSON.parse(await readFile(new URL('global/integration.json', fixtureRoot), 'utf8'))
 const research = JSON.parse(await readFile(new URL('research-contract.json', fixtureRoot), 'utf8'))
+const observationContract = JSON.parse(await readFile(new URL('observation-contract.json', fixtureRoot), 'utf8'))
 
 /**
  * ── Coverage names that have to be earned (issue #70 §4) ───────────────────
@@ -554,7 +555,7 @@ for (const [group, checks] of Object.entries(groupCoverage.groups)) assert.ok(ch
  */
 covers('audit/package-boundary-scan', 'owner-cutover/no-order-code')
 assert.equal(manifest.network.mode, 'deny', 'manager package cannot access the network directly')
-assert.equal(manifest.engines.aumos, '>=0.3.30', 'runtime requires the current invocation and package-MCP contracts, and — since untilled/aumos#671 and #683 — an Aumos whose capability enum has `source-cache:read` and `source-cache:write` in it, which is the release that gave `upsideRadar` somewhere to be fed from (#146). ⚠️ The floor moved from `>=0.3.18` for the third time for the **same** reason, and the reason has not changed once: `capabilities[].kind` is a closed enum, so a value an older build does not know is not an unknown key that gets stripped — the **whole manifest** is refused and this package drops out of that build\'s catalogue with nobody told. It was `>=0.3.18` because of untilled/aumos#576 and `connection:passthrough`. ⚠️ The floor moved from `>=0.3.17` for the **same** reason it moved the time before, one field over: `capabilities[].kind` is a closed enum, so a value an older build does not know is not an unknown key that gets stripped — the **whole manifest** is refused and this package drops out of that build\'s catalogue with nobody told. It was `>=0.3.17` because of untilled/aumos#540 and an Aumos that reads `schedule` as a **list**. ⚠️ The floor moved from `>=0.3.15` for a sharper reason than the one it replaced: `schedule` is a key 0.3.16 already knows and reads as a single object, so a list is not an unknown key that gets stripped — it is a known key of the wrong shape, and the **whole manifest** is refused. An older build drops this package from its catalogue without the author being told (#233 measured that failure). The `rule` floor this line used to state is gone with the field: nothing reads a plan\'s `rule` any more, and AMP still accepts it precisely so an older-schema package is not refused')
+assert.equal(manifest.engines.aumos, '>=0.3.32', 'runtime requires the current invocation and package-MCP contracts, and — since untilled/aumos#693 — an Aumos whose capability enum has `observation:file` in it, which is the release that gave `variantViewCheck`\'s `consensusRefs` requirement a supply route at all (#692): broker estimates and price targets are on the web and in no filing and on no exchange feed, and `observation_file` is the only tool that turns a web reading into an evidence id. ⚠️ **Measured rather than assumed**: the tool merged after the `v0.3.31` tag and is in no released binary yet, so the floor is the next release, `0.3.32`. It was `>=0.3.30` because of untilled/aumos#671 and #683 and an Aumos whose capability enum has `source-cache:read` and `source-cache:write` in it, which is the release that gave `upsideRadar` somewhere to be fed from (#146). ⚠️ The floor has now moved for the fourth time for the **same** reason, and the reason has not changed once. ⚠️ The floor moved from `>=0.3.18` for the third time for the **same** reason, and the reason has not changed once: `capabilities[].kind` is a closed enum, so a value an older build does not know is not an unknown key that gets stripped — the **whole manifest** is refused and this package drops out of that build\'s catalogue with nobody told. It was `>=0.3.18` because of untilled/aumos#576 and `connection:passthrough`. ⚠️ The floor moved from `>=0.3.17` for the **same** reason it moved the time before, one field over: `capabilities[].kind` is a closed enum, so a value an older build does not know is not an unknown key that gets stripped — the **whole manifest** is refused and this package drops out of that build\'s catalogue with nobody told. It was `>=0.3.17` because of untilled/aumos#540 and an Aumos that reads `schedule` as a **list**. ⚠️ The floor moved from `>=0.3.15` for a sharper reason than the one it replaced: `schedule` is a key 0.3.16 already knows and reads as a single object, so a list is not an unknown key that gets stripped — it is a known key of the wrong shape, and the **whole manifest** is refused. An older build drops this package from its catalogue without the author being told (#233 measured that failure). The `rule` floor this line used to state is gone with the field: nothing reads a plan\'s `rule` any more, and AMP still accepts it precisely so an older-schema package is not refused')
 assert.equal(manifest.capabilities.some((row) => /order|broker|database/i.test(row.kind)), false, 'manager package declares no order/broker/database capability')
 /**
  * ⚠️ **Two assertions stood here and the collection split retired them.**
@@ -2403,7 +2404,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 104)
+assert.equal(supportedOperations.length, 105)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -3842,6 +3843,194 @@ assert.ok(
   routingProse.includes('audit_watch_subjectless_at_time'),
   'and §4 says to arm with no subject rather than leaving a run to find the gate and satisfy it with a symbol that makes the record false',
 )
+
+/**
+ * ── The 20% lane now has a supply route, and it is the manager's own word ──
+ *
+ * `untilled/aumos#693` opened `observation_file`: the one tool by which anything
+ * a manager reads on the web reaches `evidenceIds` at all. It matters here
+ * because `consensusRefs` — one of `variantViewCheck`'s four requirements, and
+ * the gate on the 20% single-name lane — takes an input that exists on the web
+ * and **nowhere else**. Broker estimates and price targets are in no filing and
+ * on no exchange feed, so before #693 this methodology was requiring an input
+ * whose only supply route it had closed, and the account bought no single name
+ * in eight runs.
+ *
+ * ⚠️ **The investor was asked and chose ⑴** — fill `consensusRefs` at
+ * manager-attested grade, and read the passage before approving 20%-scale
+ * sizing — over ⑵ leave the lane shut and ⑶ drop the requirement. ⛔ **⑴ becomes
+ * ⑶ silently if the grade stops travelling**, so these three cases are about
+ * the grade and not about the gate: `verified`, the four requirements and every
+ * cap are asserted unchanged, and what is added is that the lane cannot open
+ * quietly.
+ */
+covers('research/consensus-ref-attestation')
+const observationAsOf = observationContract.asOf
+const consensusFixtures = observationContract.consensusRefs
+const thesisWith = (...refs) => ({ ...methodology.thesis, consensusRefs: refs })
+const checkWith = (...refs) => execute({
+  operation: 'variantViewCheck',
+  asOf: observationAsOf,
+  input: { thesis: thesisWith(...refs), challengeVerdict: 'cleared' },
+})
+
+const managerOnly = checkWith(consensusFixtures.managerAttested)
+assert.equal(managerOnly.data.verified, true, 'a manager-attested consensus row satisfies the requirement — that is the trade the investor chose, and lowering or raising the bar here would be choosing a different one for them')
+assert.deepEqual([...managerOnly.data.satisfied].sort(), ['challengeCleared', 'consensusRefs', 'thesisComplete', 'variantView'], 'and all four requirements are what they were')
+assert.equal(managerOnly.data.restsOnManagerAttestation, true, 'the grade is published rather than left inside the function')
+assert.equal(managerOnly.data.consensusStrongestAttestation, 'manager')
+assert.deepEqual(managerOnly.data.consensusRefsAttestation, { aumos: 0, manager: 1, ungraded: 0, uncited: 0 })
+assert.ok(managerOnly.diagnostics.some((row) => row.code === 'consensus_ref_manager_attested'), 'and it is said out loud')
+assert.equal(
+  managerOnly.diagnostics.find((row) => row.code === 'consensus_ref_manager_attested').details.rows[0].sourceUrl,
+  consensusFixtures.managerAttested.sourceUrl,
+  'with the URL, because "take the manager’s word for it" is only checkable if the reader is told where to go',
+)
+
+const vendorBeside = checkWith(consensusFixtures.managerAttested, consensusFixtures.vendorAttested)
+assert.equal(vendorBeside.data.restsOnManagerAttestation, false, 'a vendor row beside it means the lane does not *rest* on the manager’s word — the strongest citation is what the lane stands on')
+assert.equal(vendorBeside.data.consensusStrongestAttestation, 'aumos')
+
+const uncitedRefCheck = checkWith(consensusFixtures.uncited)
+assert.equal(uncitedRefCheck.data.verified, true, 'an uncited row still satisfies the requirement — this change adds no gate; the pre-#693 shape is not retroactively refused')
+assert.equal(uncitedRefCheck.data.consensusStrongestAttestation, 'uncited')
+assert.ok(uncitedRefCheck.diagnostics.some((row) => row.code === 'consensus_ref_uncited'), 'but it is now reported: since #693 a consensus figure with no evidence row behind it is a choice rather than an impossibility')
+
+const ungradedRefCheck = checkWith(consensusFixtures.ungraded)
+assert.equal(ungradedRefCheck.data.consensusStrongestAttestation, 'ungraded', 'an id with no markers cannot be graded here at all, and saying so is not the same as saying it is vendor evidence')
+assert.ok(ungradedRefCheck.diagnostics.some((row) => row.code === 'consensus_ref_grade_unstated'))
+
+/**
+ * ⚠️ **Where the disclosure has to land was measured, not assumed.** The host
+ * draws the grade in `DecisionDetail`'s evidence table and in `RunTimeline`
+ * (#693) — and `Approvals.tsx` renders `rationale.keyReasons` and
+ * `rationale.risks` and nothing else from the proposal. So the evidence table
+ * is one click past the approve button and `uncertainty` is not on that screen
+ * at all, which is why `risks` is the slot this obligation is written against.
+ */
+covers('sizing/main-lane-attestation-disclosed')
+const attestationCapInput = {
+  mandatePositionCap: 0.2,
+  maturityStatus: 'observing',
+  lane: 'main',
+  thesis: thesisWith(consensusFixtures.managerAttested),
+  challengeVerdict: 'cleared',
+}
+const undisclosedCap = execute({ operation: 'effectivePositionCap', asOf: observationAsOf, input: { ...attestationCapInput, risks: [], uncertainty: [] } })
+assert.equal(undisclosedCap.data.effectiveCap, 0.2, 'the cap is the Mandate’s and is not reduced — this refuses silence, not size')
+assert.equal(undisclosedCap.data.mainLaneOpen, true)
+assert.equal(undisclosedCap.status, 'blocked', 'opening the 20% lane on the manager’s own reading without saying so is refused')
+assert.ok(undisclosedCap.diagnostics.some((row) => row.code === 'main_lane_attestation_undisclosed'))
+assert.deepEqual(
+  undisclosedCap.diagnostics.find((row) => row.code === 'main_lane_attestation_undisclosed').details.missing,
+  ['risks', 'uncertainty'],
+  'and both halves are named: `risks` is what the approval screen shows, `uncertainty` is what the run’s later readers get',
+)
+
+const disclosedCap = execute({
+  operation: 'effectivePositionCap',
+  asOf: observationAsOf,
+  input: { ...attestationCapInput, risks: observationContract.disclosure.risks, uncertainty: observationContract.disclosure.uncertainty },
+})
+assert.notEqual(disclosedCap.status, 'blocked', 'disclosed, the same sizing stands')
+assert.equal(disclosedCap.data.effectiveCap, 0.2, 'at the same cap')
+assert.equal(disclosedCap.data.mainLaneAttestation.disclosed, true)
+assert.equal(disclosedCap.data.mainLaneAttestation.refs[0].evidenceId, consensusFixtures.managerAttested.evidenceId, 'and the proposal can point at the row the investor is being asked to take on trust')
+
+const vendorCap = execute({
+  operation: 'effectivePositionCap',
+  asOf: observationAsOf,
+  input: { ...attestationCapInput, thesis: thesisWith(consensusFixtures.vendorAttested), risks: [], uncertainty: [] },
+})
+assert.equal(vendorCap.data.mainLaneAttestation, null, 'a lane opened on vendor evidence owes no such disclosure — an obligation that fired on the ordinary case would be noise, and noise is how a real one gets scrolled past')
+assert.notEqual(vendorCap.status, 'blocked')
+
+/**
+ * ── Read it, judged on it, cited nothing (issue aumos#692, measured) ───────
+ *
+ * The 2026-09-06 run confirmed the BOK base rate at 3.00% (raised 2026-08-27,
+ * 6-1) in four web calls, used the value to judge a `thesisSentinel`
+ * invalidation condition, and submitted 24 evidence ids **not one of which
+ * supported it**. Before #693 there was nothing it could have done. After #693
+ * the same run can still do the same thing, so the obligation is computed.
+ */
+covers('audit/observation-filed-not-cited')
+const bok = observationContract.bokRateCase
+const unfiledClaim = execute({
+  operation: 'observationLedger',
+  asOf: bok.asOf,
+  input: { observations: [], citedEvidenceIds: ['ev_quote_1', 'ev_filing_2'], claims: [bok.claim] },
+})
+assert.equal(unfiledClaim.status, 'blocked', 'a value used in judgement and supported by none of the submitted ids is the failure this operation is named after')
+assert.ok(unfiledClaim.diagnostics.some((row) => row.code === 'claim_evidence_missing'))
+assert.deepEqual(unfiledClaim.data.claimsUncited, ['bokBaseRatePct'])
+
+const filedNotCited = execute({
+  operation: 'observationLedger',
+  asOf: bok.asOf,
+  input: { observations: [bok.observation], citedEvidenceIds: ['ev_quote_1'], claims: [{ ...bok.claim, evidenceId: bok.observation.evidenceId }] },
+})
+assert.ok(filedNotCited.diagnostics.some((row) => row.code === 'claim_evidence_not_carried'), 'filing it and then not submitting the id is the same silence one step later')
+assert.deepEqual(filedNotCited.data.filedNotCited, [bok.observation.evidenceId])
+
+const citedLedger = execute({
+  operation: 'observationLedger',
+  asOf: bok.asOf,
+  input: {
+    observations: [bok.observation],
+    citedEvidenceIds: ['ev_quote_1', bok.observation.evidenceId],
+    claims: [{ ...bok.claim, evidenceId: bok.observation.evidenceId, evidenceKind: 'observation', evidenceSource: 'manager:web-research' }],
+  },
+})
+assert.equal(citedLedger.status, 'ok', 'filed and cited, the run has nothing outstanding here')
+assert.equal(citedLedger.data.everyClaimCited, true)
+assert.equal(citedLedger.data.strongestClaimAttestation, 'manager', "and the grade is the manager's own word, which is what it is — this operation never upgrades it")
+
+/**
+ * ⛔ The host contract, mirrored so a run learns it before the round trip
+ * rather than after. Both of these are refusals in `observation_file` itself
+ * and the host's refusal is the one that binds; what is bought here is a
+ * sentence in the run's own vocabulary.
+ */
+const overLimit = execute({
+  operation: 'observationLedger',
+  asOf: bok.asOf,
+  input: { observations: [{ ...bok.observation, excerptChars: 64001 }], citedEvidenceIds: [bok.observation.evidenceId], claims: [] },
+})
+assert.ok(overLimit.diagnostics.some((row) => row.code === 'observation_excerpt_over_limit'), 'over 64,000 characters is a refusal and never a truncation — a hash over a fragment filed as a whole document is worse than no row')
+const postAsOfObservation = execute({
+  operation: 'observationLedger',
+  asOf: bok.asOf,
+  input: { observations: [{ ...bok.observation, publishedAt: '2026-09-07T00:00:00Z' }], citedEvidenceIds: [bok.observation.evidenceId], claims: [] },
+})
+assert.ok(postAsOfObservation.diagnostics.some((row) => row.code === 'observation_post_as_of'), 'and the TimeGate applies here exactly as it does in the tool')
+
+/**
+ * ⚠️ **The manifest half of the same wire.** The tool is only served to a
+ * package that declared the capability, so a `consensusRefs` row can be filed
+ * from this manager only while this entry stands.
+ */
+const observationCapability = manifest.capabilities.find((row) => row.kind === 'observation:file')
+assert.ok(observationCapability, 'the capability is declared — without it `observation_file` is not merely refused, it is absent from `tools/list`')
+assert.ok(
+  /consensus/i.test(observationCapability.reason) && /testimony|own reading|manager/i.test(observationCapability.reason),
+  'and its reason names both what it is for and what grade the row carries, because the install screen is where an investor decides whether to grant it',
+)
+assert.ok(manifest.requires.optionalSkills.includes('observation_file'), 'the tool is listed beside the other gateway skills this package calls')
+assert.equal(manifest.engines.aumos, '>=0.3.32', 'and the engine floor is the release that introduced it — a manifest declaring `observation:file` stops parsing on any older binary')
+
+const observationProse = [
+  await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8'),
+  await readFile(new URL('../skills/kr-sleeve/SKILL.md', fixtureRoot), 'utf8'),
+  await readFile(new URL('../skills/us-sleeve/SKILL.md', fixtureRoot), 'utf8'),
+]
+for (const text of observationProse) {
+  assert.ok(text.includes('observation_file'), 'the filing step is named where a run reads, not only in this package’s own source')
+  assert.ok(text.includes('observationLedger'), 'and so is the check that it was cited — #146 measured what happens to a step that lives only in prose')
+}
+for (const text of observationProse.slice(1)) {
+  assert.ok(/^1[01]\. \*\*/m.test(text), 'and in the sleeve skills it is a numbered step in the branch checklist, which is the shape #146 had to be rewritten into')
+}
 
 assertCoverageWasEarned()
 
