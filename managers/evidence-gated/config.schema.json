@@ -84,13 +84,6 @@
           "default": 0.5,
           "description": "Cash and short-bond weight required before the first tranche executes. Deploying from a thin cash position turns the reserve into the tranche."
         },
-        "reserveFloorWeight": {
-          "type": "number",
-          "minimum": 0.05,
-          "maximum": 0.5,
-          "default": 0.15,
-          "description": "Cash weight that must survive every tranche. A plan whose arithmetic breaches this floor is not a plan, it is a hope about the next deposit."
-        },
         "monthlyTrancheMaxWeight": {
           "type": "number",
           "minimum": 0.01,

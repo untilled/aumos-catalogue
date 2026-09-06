@@ -367,8 +367,9 @@ tells it which of the two happened.
   between 30 and 50 — the band `trend-pullback` (which stops at -20%) and `mean-reversion` (which
   needs two oversold signals a name above its MA200 rarely has) both drop. Judge whether the markdown
   is a price the business does not deserve, not whether the trend is shallow.
-- `core-dca`: broad ETF/cash deployment; evaluate allocation purpose, reserve cash and tranche stop
-  conditions, not single-name variant view.
+- `core-dca`: broad ETF/cash deployment; evaluate allocation purpose, the cash the plan leaves
+  behind (`effectiveCashFloor`, against the Mandate's `cashFloor`) and tranche stop conditions, not
+  single-name variant view.
 - `existing-position`: thesis/weight/exit review, not a new-entry scanner result.
 
 ⚠️ **This branch is the control arm, not the strategy.** Oversold and pullback are the most
@@ -377,6 +378,17 @@ caps where there is no capacity advantage to hide in. Load `skills/evidence-gate
 that means for sizing; the short version is that `controlArmLane` caps it at 1% a name and 6% in
 total, requires the exit discipline registered before entry, and **its results are never an argument
 for expanding it**.
+
+⚠️ **That is one of two lanes, and which one a candidate is in is computed.** The control arm waives
+the variant view *in exchange for* being small; the main lane requires one and may be sized to the
+Mandate's `maxPositionWeight`. `variantViewCheck` decides between them from checked inputs — a
+complete thesis carrying `variantView`, at least one dated and sourced `consensusRefs` row, and
+`challengeVerdict: 'cleared'` — and **anything unchecked is the control arm** (`variant_view_unverified`).
+⛔ There is no argument, flag or lane request that turns "not checked" into "checked": asking for
+`lane: 'main'` without one comes back `main_lane_requires_variant_view` and the candidate is sized
+under the experimental ceiling. ⛔ And a thesis whose evidence is this book's own mechanical cohort is
+`control_arm_evidence_cited` / `blocked` — the control arm's result is the baseline an edge claim
+clears, never the argument for one.
 
 #### Fundamentals and events — `upsideRadar`
 
@@ -450,9 +462,20 @@ is returned as `concentration_factor_label_unexamined` for this run to answer, n
 ⛔ **A cap the Mandate does not declare is `unevaluated`, and that is not a pass** — say so in
 `uncertainty` rather than sizing as though the limit were absent.
 
+⛔ **The cash axis is the Mandate's too, and it is checked against the plan rather than the book.**
+Call `effectiveCashFloor` with `mandateCashFloor` — the Mandate's `cashFloor`, which this package
+holds no copy of — and `projectedCashWeight`, the cash weight **after** everything this run
+proposes. A plan below the floor is `cash_floor_breach` / `blocked`, an undeclared floor is
+`cash_floor_unevaluated` (not "no floor"), and a projection nobody computed is
+`cash_floor_projection_missing` rather than a pass. ⚠️ **A floor is not a target.** `cashFloor` 0.10
+says the book may go down to 10% cash; reading that as "fill to 10%" is a defect of its own, and the
+returned `headroomWeight` is what may be deployed rather than what should be.
+
 ⛔ **And a cap the Mandate *does* declare, which this methodology then reduces, is disclosed with
 the same weight.** Call `effectivePositionCap` with `mandatePositionCap`, `maturityStatus`, the
-`lane` the candidate would enter, the NAV/floor inputs `experimentalCeiling` takes, and — once the
+`lane` the candidate would enter, the candidate's `thesis` and `challengeVerdict` (what
+`variantViewCheck` reads — without them there is no established variant view and the maturity
+ceiling binds exactly as before), the NAV/floor inputs `experimentalCeiling` takes, and — once the
 proposal exists — this run's `uncertainty`. It returns the declared cap beside the one that
 actually binds, which of the three limits produced it, and what lifts it. A reduction comes back as
 `position_cap_reduced_by_maturity`, and a proposal sized under it that does not carry that code

@@ -233,16 +233,36 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   트랙레코드의 실패 행이다. 그래서 닿은 레벨로 깨어난 실행은 **`WAIT`을 제출한다**: 무엇에
   깨어났고, 무엇을 찾았고, 무엇이 아직 닫힌 봉을 요구하고, 무엇을 다시 걸었는지 말하는 WAIT.
   침묵은 기계적으로 가능하지만 크래시로 채점된다.
-- **실제로 구속하는 상한은 투자자가 선언한 상한이 아니고, 승격은 수년짜리 대기다.** 렌즈가 승격되기
-  전까지 모든 개별종목은 실험 상한에, 대조군에서는 1%에 묶인다 — 선언된 `maxPositionWeight` 0.20이
-  0.01로 작동한다. `effectivePositionCap`이 그 비교를 계산하고 적용되는 모든 실행이 그것을
-  공시한다(`position_cap_reduced_by_maturity`). `concentration_cap_missing`과의 비대칭은 이것으로
-  닫힌다. 닫지 *못하는* 것은 대기 시간이다. `promotionGate`는 표본 30건, 클러스터 10개, 그리고
-  **레짐 3개**를 요구하고, 앞의 둘만 후보 생성률에 반응한다 — 레짐은 달력이 지나야 바뀐다. 결과
-  둘을 숨기지 않고 적는다: 그 기간 동안 장부는 사실상 ETF 배분기에 제한된 실험 하나를 옆에 둔
-  형태이고(`README.ko.md`가 설치 전에 그렇게 말한다), 1%와 완전 승격 사이에 중간 등급을 둘 것인가는
-  이 리비전이 의도적으로 답하지 않는 열린 방법론 질문이다.
-  ([#151](https://github.com/untilled/aumos-catalogue/issues/151))
+- **레인은 둘이고, 성숙도 게이트는 그중 하나의 것이다.** 원본 방법론은 기계적 대조군 —
+  variant view를 요구하지 않는 대신 종목당 1%·레인 총 6% — 과, variant view를 요구하는 대신
+  투자자 자신의 `maxPositionWeight`까지 실을 수 있는 정식 편입 레인을 함께 돌렸다. 이식본은 §4의
+  렌즈 성숙도 상한을 **두 레인 모두**에 걸었고, 그래서 variant view를 갖춘 후보도 기계 후보와
+  똑같이 `experimentalCeiling`(USD 14,866.44 장부에서 0.01345312)에 묶여 선언된
+  `maxPositionWeight` 0.20이 0.01로 작동했다. 두 레인을 가르는 것은 `variantViewCheck`이고, 그것은
+  주장이 아니라 검사 가능한 입력으로 답한다 — `variantView`를 담은 완전한 thesis, 출처와 날짜가
+  붙은 컨센서스 인용 최소 1건, 통과한 챌린지. 확인되지 않은 것은 전부 대조군으로 떨어지고
+  (`variant_view_unverified`), 대조군의 1%/6%는 원본 승인값 그대로 불변이다. ⛔ 여기서
+  `promotionGate`를 낮춘 것은 없고 `controlArmLane.expansionProhibited`는 그대로다 — 대조군의 성과는
+  결코 사이징의 근거가 아니며, 기계 코호트를 근거로 든 thesis는 레인 입구에서
+  `control_arm_evidence_cited` / `blocked`이다. 상한이 *실제로* 구속하는 자리에서는
+  `effectivePositionCap`이 여전히 그 비교를 계산하고 적용되는 모든 실행이 공시한다
+  (`position_cap_reduced_by_maturity`). `concentration_cap_missing`과의 비대칭은 이것으로 닫힌다.
+  닫지 *못하는* 것은 대기 시간이다. `promotionGate`는 표본 30건, 클러스터 10개, **레짐 3개**를
+  요구하고 앞의 둘만 후보 생성률에 반응한다 — 레짐은 달력이 지나야 바뀐다. 두 질문은 답하지 않고
+  열린 채로 기록한다: 개별종목 레인들이 합쳐서 어디까지 갈 수 있는가, 그리고 1%와 완전 승격 사이에
+  중간 등급을 둘 것인가.
+  ([#151](https://github.com/untilled/aumos-catalogue/issues/151),
+  [#153](https://github.com/untilled/aumos-catalogue/issues/153))
+- **현금 하한은 투자자의 것이고, 이 패키지는 더 이상 그 사본을 갖지 않는다.**
+  Mandate가 `cashFloor` 0.10을 선언한 동안 `coreDca.reserveFloorWeight`는 0.15를 들고 있었고
+  패키지는 자기 숫자만 읽었다 — 한 축이 두 번 선언됐고, 포지션 상한과 달리 공시조차 없었다. 그
+  설정은 사라졌고 `effectiveCashFloor`가 Mandate를 읽는다. 미선언은 "제한 없음"이 아니라
+  `cash_floor_unevaluated`이고, 검사는 계획이 집행된 **뒤에** 남는 현금에 대해 돌며(그 산술이 없으면
+  `cash_floor_projection_missing`, 어기면 `cash_floor_breach`), 이 방법론이 선언값보다 높은 하한을
+  들게 되는 경우는 `field: 'cashFloor'` 행으로 `effectiveConstraints`에 공시된다 —
+  `effectivePositionCap`이 `maxPositionWeight`에 대해 하는 것과 같은 공시다. ⚠️ 하한은 목표가
+  아니다. 10%는 장부가 거기까지 *가도 된다*는 말이지 거기까지 채우라는 말이 아니다.
+  ([#153](https://github.com/untilled/aumos-catalogue/issues/153))
 - **벤더 최소 실행금액이 대조군을 통째로 닫을 수 있다.** `experimentalPositionFloor`는 그 시장에서
   낼 가치가 있는 가장 작은 주문이고, 작은 장부에서는 레인 자체의 1% 칸을 넘어설 수 있다 — USD
   14,866.44 장부에서 USD 148.66 대 USD 200 — 그 뒤로는 어떤 미국 종목도 주가와 무관하게 그 레인에

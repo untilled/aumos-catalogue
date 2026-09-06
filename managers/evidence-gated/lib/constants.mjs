@@ -85,6 +85,27 @@ export const METHODOLOGY = Object.freeze({
     hardStopPct: -0.08,
   }),
   /**
+   * Cash floors this methodology adds on top of the Mandate's `cashFloor`.
+   *
+   * ⚠️ **Empty since #153, and that is the whole point.** `coreDca.reserveFloorWeight`
+   * stood at 0.15 while the investor had declared `cashFloor` 0.10 in «펀드 설정 >
+   * 투자 원칙», and this package read only its own copy — the same defect #151 is
+   * about, one axis said twice in two numbers, except that this one was not even
+   * disclosed. The Kernel enforces the Mandate's (`kernel.ts:1043`, a proposal
+   * whose cash target sits under the floor is refused), so the private copy could
+   * only ever be the quieter of the two and was silently the one that bound.
+   * #133 moved `concentration.position` → `maxPositionWeight` and
+   * `concentration.portfolioHeat` → `maxDrawdown` for the same reason; the cash
+   * axis was the one left behind.
+   *
+   * The list stays because `effectiveCashFloor` has to be able to *say* that a
+   * methodology floor sits above the declared one — `effectiveConstraints` with
+   * `field: 'cashFloor'` — the moment one is ever added again. An empty list is a
+   * complete answer, not an absent one: the row is emitted from an inequality
+   * that is computed every run rather than from a rule nobody re-reads.
+   */
+  methodologyCashFloors: Object.freeze([]),
+  /**
    * Existing exposure above a cap is carried and new exposure is not. Read by
    * `concentration`, `portfolioHeat` and `harnessAudit` from one place, so the
    * three cannot come to disagree about what the tolerance is.

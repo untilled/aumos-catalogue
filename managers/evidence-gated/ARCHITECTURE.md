@@ -267,19 +267,41 @@ fixture asserts the difference so it cannot be undone silently.
   touched level **submits a `WAIT`**: one that says it was woken, what it found, what still
   needs a closed bar, and what it re-armed. Staying silent is available in mechanism and is
   scored as a crash.
-- **The cap that binds is not the cap the investor declared, and promotion is a multi-year
-  wait.** While a lens is unpromoted every single name is held to the experimental ceiling
-  and, in the control arm, to 1% — so a declared `maxPositionWeight` of 0.20 operates at
-  0.01. `effectivePositionCap` computes that comparison and every applying run discloses it
+- **There are two lanes, and the maturity gate belongs to one of them.** The source
+  methodology ran a mechanical control arm — no variant view required, 1% a name and 6%
+  across the lane — *and* a main lane that required a variant view and could size a name to
+  the investor's own `maxPositionWeight`. The port applied §4's lens-maturity ceiling to
+  both, so a candidate with a variant view was held to `experimentalCeiling` — 0.01345312 on
+  a USD 14,866.44 book — exactly like a mechanical one, and a declared `maxPositionWeight` of
+  0.20 operated at 0.01. `variantViewCheck` is what tells the lanes apart, and it answers
+  from checked inputs rather than a claim: a complete thesis carrying `variantView`, at least
+  one dated and sourced consensus citation, and a cleared challenge. Anything unchecked falls
+  to the control arm — `variant_view_unverified` — and the control arm's 1% / 6% are the
+  source's own approved numbers and are unchanged. ⛔ Nothing here lowers `promotionGate`, and
+  `controlArmLane.expansionProhibited` still stands: a control-arm result is never an argument
+  for size, and a thesis that cites the mechanical cohort as its evidence is
+  `control_arm_evidence_cited` / `blocked` at the lane door. Where the ceiling *does* bind,
+  `effectivePositionCap` still computes the comparison and every applying run discloses it
   (`position_cap_reduced_by_maturity`), which closes the asymmetry against
-  `concentration_cap_missing`; what it does not do is shorten the wait.
-  `promotionGate` wants 30 samples, 10 clusters and **3 regimes**, and only the first two
-  respond to a higher candidate rate — a regime turns on the calendar. Two consequences are
-  stated rather than hidden: for that period the book is in practice an ETF allocator with a
-  bounded experiment beside it (`README.md` says so before installation), and whether an
-  intermediate rung should exist between 1% and full promotion is an open methodology
-  question this revision deliberately does not answer.
-  ([#151](https://github.com/untilled/aumos-catalogue/issues/151))
+  `concentration_cap_missing`; what it does not do is shorten the wait. `promotionGate` wants
+  30 samples, 10 clusters and **3 regimes**, and only the first two respond to a higher
+  candidate rate — a regime turns on the calendar. Two questions are recorded as open rather
+  than answered here: what total the single-name lanes may reach together, and whether an
+  intermediate rung should exist between 1% and full promotion.
+  ([#151](https://github.com/untilled/aumos-catalogue/issues/151),
+  [#153](https://github.com/untilled/aumos-catalogue/issues/153))
+- **The cash floor is the investor's, and this package no longer keeps a copy of it.**
+  `coreDca.reserveFloorWeight` held 0.15 while the Mandate declared `cashFloor` 0.10, and the
+  package read only its own number — one axis said twice, and unlike the position cap it was
+  not even disclosed. The setting is gone and `effectiveCashFloor` reads the Mandate.
+  An undeclared floor is `cash_floor_unevaluated` rather than "no floor", the check runs
+  against the cash the plan leaves **after** it executes (`cash_floor_projection_missing`
+  when that arithmetic is absent, `cash_floor_breach` when it fails), and a floor this
+  methodology ever raises above the declared one is published as an
+  `effectiveConstraints` row with `field: 'cashFloor'` — the same disclosure
+  `effectivePositionCap` makes for `maxPositionWeight`. ⚠️ A floor is not a target: 10%
+  says the book *may* go there, never that it should.
+  ([#153](https://github.com/untilled/aumos-catalogue/issues/153))
 - **A venue floor can close the control arm outright.** `experimentalPositionFloor` is the
   smallest order worth placing in a venue, and on a small book it can exceed the lane's
   own 1% cell — USD 200 against USD 148.66 on a USD 14,866.44 book — after which no US name

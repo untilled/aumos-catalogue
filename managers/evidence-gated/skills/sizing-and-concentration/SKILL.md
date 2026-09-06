@@ -58,7 +58,20 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    than zero risk. Over the cap, a run that adds new non-core risk
    is blocked while a book already over on its holdings alone warns — the same grandfathering
    reading the weight caps use, from the same place.
-4. Apply evidence maturity. `insufficient` and `observing` lenses are capped at the experimental
+4. Apply evidence maturity **to the lane it belongs to**. ⚠️ The §4 ceiling is the *control arm's*:
+   the source methodology waived the variant view there in exchange for 1% a name, and required one
+   in the main lane, where a name could be sized to the investor's own cap. Call `variantViewCheck`
+   — or pass the candidate's `thesis` and `challengeVerdict` straight to `effectivePositionCap`,
+   which calls it — and it is satisfied only by checked inputs: a complete thesis carrying
+   `variantView`, a dated and sourced `consensusRefs` row, and a cleared challenge. Satisfied, the
+   ceiling does not apply and the Mandate's `maxPositionWeight` plus every concentration cap are
+   what bind. Unsatisfied, nothing changes from what this section already said, and the run is told
+   which requirement is missing (`variant_view_unverified`); asking for `lane: 'main'` without one
+   is `main_lane_requires_variant_view` and never a way past it. ⛔ The control arm's 1% / 6% are the
+   source's approved numbers and are not touched, `promotionGate` is not lowered, and a thesis
+   resting on the mechanical cohort is `control_arm_evidence_cited` / `blocked`. ⚠️ What total the
+   single-name lanes may reach *together* is an open question this revision does not answer.
+   Where the ceiling does apply: `insufficient` and `observing` lenses are capped at the experimental
    ceiling; `reviewable` is still not promoted and cannot expand solely because its sample threshold
    was reached. ⚠️ **That ceiling is not the package's experimental ratio alone.** A ratio says nothing
    about whether the order it permits can be placed: 1% of a 10,095,751 KRW book is 100,958 KRW,
@@ -99,6 +112,18 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    control arm's 1% cell, which closes the lane to every name at every price. The diagnostic carries
    the NAV that resolves it. Read the three floor codes outermost-first — `experimental_floor_unreachable`,
    then `experimental_floor_exceeds_cap`, then #149's `experimental_ladder_unreachable`.
+4b. **Check the cash the plan leaves, against the floor the investor declared.** Call
+   `effectiveCashFloor` with `mandateCashFloor` — the Mandate's `cashFloor`; this package holds no
+   copy of it since #153, when `coreDca.reserveFloorWeight` was removed for being a second,
+   undisclosed answer to one axis — and `projectedCashWeight`, the cash weight **after** everything
+   this run proposes. A plan under the floor is `cash_floor_breach` / `blocked`; an undeclared floor
+   is `cash_floor_unevaluated`, which is the same *"nobody said"* the missing caps get and not a
+   pass; a projection nobody computed is `cash_floor_projection_missing`, because a floor is
+   breached after a plan executes rather than before it. If this methodology ever holds a floor
+   above the declared one, the row is published with `field: 'cashFloor'` exactly as the position
+   cap's is, and a proposal that does not carry it is `cash_floor_raise_undisclosed` / `blocked`.
+   ⚠️ **A floor is not a target.** `cashFloor` 0.10 is permission to go there, never an instruction
+   to fill to it; `headroomWeight` is what *may* be deployed.
 5. Compare with cash and benchmark alternatives. A target is the desired portfolio weight, not an
    order quantity, and it is never negative.
 

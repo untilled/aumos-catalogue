@@ -1,6 +1,6 @@
 import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW } from './diagnostics.mjs'
 import { METHODOLOGY } from './constants.mjs'
-import { normalizeTriggerKind } from './methodology.mjs'
+import { normalizeTriggerKind, variantViewCheck } from './methodology.mjs'
 import { trancheIntent } from './schedule.mjs'
 
 /**
@@ -225,18 +225,59 @@ export function effectivePositionCap(input = {}) {
   const lane = input?.lane === 'control-arm' ? 'control-arm' : input?.lane === 'main' ? 'main' : null
   const ceiling = experimentalCeiling(input)
   /**
+   * ── Which lane the maturity ceiling belongs to (issue #153) ───────────────
+   *
+   * §4's ceiling was applied to every candidate, and the source methodology
+   * applied it to one lane. `variantViewCheck` is what tells the two apart, and
+   * it answers from checked inputs rather than from a claim — a thesis this
+   * package already validates, a dated consensus citation, and a cleared
+   * challenge. ⛔ **The default is the control arm.** An unverified candidate
+   * is held exactly where it was before this change, and an explicit
+   * `lane: 'control-arm'` keeps the ceiling on even where a variant view is
+   * verified, because a request for the bounded lane is never overridden into a
+   * larger one.
+   */
+  const variant = variantViewCheck({
+    thesis: input?.thesis,
+    challengeVerdict: input?.challengeVerdict,
+    evidenceSamples: input?.evidenceSamples,
+    asOf: input?.asOf,
+  })
+  /**
+   * The check's own diagnostics belong to a run that made a claim about a
+   * variant view — it offered a `thesis`, or it asked for the main lane. A
+   * mechanical candidate that offered neither is *already* in the lane the
+   * absence puts it in, and reporting `variant_view_unverified` on every
+   * control-arm sizing call would be reporting the ordinary case. ⛔ It changes
+   * no answer: `verified` is false either way and the ceiling binds either way.
+   */
+  if (input?.thesis !== undefined || input?.lane === 'main') diagnostics.push(...variant.diagnostics)
+  const mainLaneOpen = variant.data.verified && lane !== 'control-arm'
+  const resolvedLane = lane === 'control-arm' ? 'control-arm' : mainLaneOpen ? 'main' : lane === 'main' ? 'control-arm' : lane
+  if (lane === 'main' && !variant.data.verified) {
+    diagnostics.push(diagnostic(
+      'main_lane_requires_variant_view',
+      'unevaluated',
+      'The main lane is what a checked variant view opens; this run asked for it without one, so the candidate is sized under the experimental ceiling until the missing requirements are met',
+      'lane',
+      { missing: variant.data.missing, satisfied: variant.data.satisfied, requirements: variant.data.requirements },
+    ))
+  }
+  /**
    * The ceiling's own diagnostics belong to the run only where the ceiling
    * binds. On a promoted lens it is not the limit and reporting its floor
-   * would be reporting a rule that did not apply.
+   * would be reporting a rule that did not apply — and on the main lane it is
+   * not the limit either.
    */
-  if (unpromoted) diagnostics.push(...ceiling.diagnostics)
+  const ceilingApplies = unpromoted && !mainLaneOpen
+  if (ceilingApplies) diagnostics.push(...ceiling.diagnostics)
   if (declared === null) {
     diagnostics.push(diagnostic('concentration_inputs_missing', 'unevaluated', "The Mandate's maxPositionWeight is the position cap and this run was given none", 'mandatePositionCap'))
   }
 
   const limits = []
   if (declared !== null) limits.push({ source: 'mandate', weight: declared })
-  if (unpromoted && finite(ceiling.data.experimentalCeiling)) limits.push({ source: 'lens-maturity', weight: ceiling.data.experimentalCeiling })
+  if (ceilingApplies && finite(ceiling.data.experimentalCeiling)) limits.push({ source: 'lens-maturity', weight: ceiling.data.experimentalCeiling })
   if (lane === 'control-arm') limits.push({ source: 'control-arm-lane', weight: METHODOLOGY.controlArm.singleMaxWeight })
   const bound = limits.length ? limits.reduce((low, row) => (row.weight < low.weight ? row : low)) : null
   const effective = bound ? round(bound.weight) : null
@@ -248,8 +289,8 @@ export function effectivePositionCap(input = {}) {
    * is what a person can act on and "the lane caps at 1%" is a consequence of
    * it. `limits` carries both so neither reading is lost.
    */
-  const reason = unpromoted ? `lens_${maturity}` : lane === 'control-arm' ? 'control_arm_lane' : null
-  const unlocksAt = unpromoted ? 'promotionGate' : null
+  const reason = ceilingApplies ? `lens_${maturity}` : lane === 'control-arm' ? 'control_arm_lane' : null
+  const unlocksAt = ceilingApplies ? 'promotionGate' : null
   const progress = input?.promotion ?? null
   const promotion = {
     required: METHODOLOGY.promotionGate,
@@ -311,7 +352,7 @@ export function effectivePositionCap(input = {}) {
    * row saying `declared === effective` is one the host would not draw and the
    * schema does not want.
    */
-  const unlocks = unpromoted
+  const unlocks = ceilingApplies
     ? `promotionGate: ${['samples', 'regimes', 'clusters'].map((key) => {
       const seen = promotion.observed[key]
       return `${key} ${seen === null ? '' : `${seen}/`}${METHODOLOGY.promotionGate[key]}`
@@ -371,7 +412,7 @@ export function effectivePositionCap(input = {}) {
       resolvesAtNav: round(floorAmount / laneCap, 2),
       exceeds: floorWeight > laneCap + 1e-12,
     }
-    if (unpromoted && floorVersusCap.exceeds) {
+    if (ceilingApplies && floorVersusCap.exceeds) {
       diagnostics.push(diagnostic(
         'experimental_floor_exceeds_cap',
         'unevaluated',
@@ -394,6 +435,11 @@ export function effectivePositionCap(input = {}) {
       promotion,
       limits: limits.map((row) => ({ source: row.source, weight: round(row.weight) })),
       lane,
+      /** The lane after `variantViewCheck`; `lane` stays what the run asked for. (#153) */
+      resolvedLane,
+      mainLaneOpen,
+      ceilingApplies,
+      variantView: variant.data,
       maturityStatus: maturity,
       mustReport: reduced,
       /** Copied into `DecisionProposal.effectiveConstraints` verbatim; empty is a complete answer. */
@@ -404,6 +450,132 @@ export function effectivePositionCap(input = {}) {
       ceiling: ceiling.data,
       floorVersusCap,
       units: { declaredCap: 'portfolio-weight', effectiveCap: 'portfolio-weight', reducedToFraction: 'ratio' },
+    },
+    diagnostics,
+  }
+}
+
+/**
+ * ── The cash floor the investor declared, and the one that binds (issue #153) ─
+ *
+ * The investor declared **`cashFloor` 0.10** in «펀드 설정 > 투자 원칙». This
+ * package never read it. It read `coreDca.reserveFloorWeight`, its own 0.15,
+ * and `candidate-research` asked a run to show *"the arithmetic showing
+ * `coreDca.reserveFloorWeight` still stands after the tranche"* — arithmetic no
+ * operation here performed, against a number the investor never chose. Two
+ * defects in one place: a private copy of an axis the Mandate owns, and a rule
+ * that lived in prose.
+ *
+ * Both are answered the same way `effectivePositionCap` answers them.
+ *
+ * | | before | now |
+ * |---|---|---|
+ * | where the floor comes from | `config.coreDca.reserveFloorWeight` | the Mandate's `cashFloor` |
+ * | when it is undeclared | the config default, 0.15, silently | `cash_floor_unevaluated` |
+ * | who checks the plan against it | a sentence in a skill | this operation |
+ * | when methodology binds tighter | nothing said | `effectiveConstraints` row, `field: 'cashFloor'` |
+ *
+ * ⛔ **An undeclared floor is not "no floor".** This package's own rule for a
+ * missing cap — *"없는 캡은 제한 없음이 아니라 `concentration_cap_missing`이다"* —
+ * is the rule here too: no floor is declared, so nothing was judged, and the run
+ * is told that rather than handed a pass.
+ *
+ * ⛔ **The floor is a floor, not a target.** `cashFloor` 0.10 says the book may
+ * go down to 10% cash; it never says it should. Nothing here proposes deploying
+ * to the floor, and a run that reads permission as instruction has read it
+ * backwards.
+ *
+ * ⚠️ **The projection is what is judged, not the current weight.** A plan
+ * breaches a floor *after* it executes, which is why `projectedCashWeight` is
+ * required and its absence is `unevaluated`: cash standing at 0.57 before a
+ * tranche says nothing about where the tranche leaves it.
+ */
+export function effectiveCashFloor(input = {}) {
+  const diagnostics = []
+  const declared = finite(input?.mandateCashFloor) ? Math.max(0, input.mandateCashFloor) : null
+  const additional = (Array.isArray(input?.methodologyCashFloors) ? input.methodologyCashFloors : METHODOLOGY.methodologyCashFloors)
+    .filter((row) => finite(row?.weight))
+    .map((row) => ({ source: row.source ?? 'methodology', weight: Math.max(0, row.weight) }))
+  if (declared === null) {
+    diagnostics.push(diagnostic('cash_floor_unevaluated', 'unevaluated', "The cash floor is the Mandate's cashFloor and this run was given none; an undeclared floor is not an absent one, and the Kernel refuses a proposal whose cash target sits under whatever the investor did declare", 'mandateCashFloor'))
+  }
+  const floors = [
+    ...(declared === null ? [] : [{ source: 'mandate', weight: declared }]),
+    ...additional,
+  ]
+  const bound = floors.length ? floors.reduce((high, row) => (row.weight > high.weight ? row : high)) : null
+  const effective = bound ? round(bound.weight) : null
+
+  const raised = declared !== null && effective !== null && effective > declared + 1e-12
+  const reason = raised ? `methodology_floor_${bound.source}` : null
+  if (raised) {
+    diagnostics.push(diagnostic(
+      'cash_floor_raised_by_methodology',
+      'unevaluated',
+      'This book is operating under a cash floor higher than the one the Mandate declares, because this methodology holds it there; say so with the declared number, the effective number and what raised it, rather than reserving the difference in silence',
+      'mandateCashFloor',
+      { declared: round(declared), effective, binding: bound.source, floors: floors.map((row) => ({ source: row.source, weight: round(row.weight) })) },
+    ))
+  }
+  /**
+   * The same row `effectivePositionCap` emits, on the other host field. ⛔ `field`
+   * is the host's vocabulary — `cashFloor` here — and empty is a complete answer:
+   * an axis this package does not narrow gets no row, because a row saying
+   * `declared === effective` is one the host would not draw.
+   */
+  const effectiveConstraints = raised
+    ? [{ field: 'cashFloor', declared: round(declared), effective, reason }]
+    : []
+  const constraintDisclosed = Array.isArray(input?.effectiveConstraints)
+    ? input.effectiveConstraints.some((entry) => entry?.field === 'cashFloor' && finite(entry?.effective) && Math.abs(entry.effective - effective) <= 1e-9)
+    : null
+  if (raised && constraintDisclosed === false) {
+    diagnostics.push(diagnostic(
+      'cash_floor_raise_undisclosed',
+      'blocked',
+      'This proposal reserves more cash than the investor asked to reserve and does not say so; carry this operation’s `effectiveConstraints` row verbatim in the proposal',
+      'effectiveConstraints',
+      { declared: round(declared), effective, expected: effectiveConstraints },
+    ))
+  }
+
+  const projected = finite(input?.projectedCashWeight) ? input.projectedCashWeight : null
+  let breached = null
+  if (effective === null || projected === null) {
+    if (effective !== null) {
+      diagnostics.push(diagnostic('cash_floor_projection_missing', 'unevaluated', 'A floor is checked against the cash the plan leaves behind, not the cash it starts with; give projectedCashWeight — the cash weight after everything this run proposes', 'projectedCashWeight', { effective }))
+    }
+  } else {
+    breached = projected + 1e-12 < effective
+    if (breached) {
+      diagnostics.push(diagnostic(
+        'cash_floor_breach',
+        'blocked',
+        'This plan leaves less cash than the floor that binds; the Kernel refuses a proposal whose cash target sits under the Mandate’s cashFloor, and a plan whose arithmetic breaches the floor is not a plan',
+        'projectedCashWeight',
+        { projectedCashWeight: round(projected), effective, declared: declared === null ? null : round(declared), shortfall: round(effective - projected) },
+      ))
+    }
+  }
+
+  return {
+    data: {
+      declaredFloor: declared,
+      effectiveFloor: effective,
+      binding: bound?.source ?? null,
+      raised,
+      reason,
+      floors: floors.map((row) => ({ source: row.source, weight: round(row.weight) })),
+      cashWeight: finite(input?.cashWeight) ? round(input.cashWeight) : null,
+      projectedCashWeight: projected === null ? null : round(projected),
+      headroomWeight: effective === null || projected === null ? null : round(projected - effective),
+      breached,
+      /** A floor, never a target: the headroom is what may be deployed, not what should be. */
+      floorIsNotATarget: true,
+      /** Copied into `DecisionProposal.effectiveConstraints` verbatim; empty is a complete answer. */
+      effectiveConstraints,
+      constraintDisclosed,
+      units: { declaredFloor: 'portfolio-weight', effectiveFloor: 'portfolio-weight', projectedCashWeight: 'portfolio-weight', headroomWeight: 'portfolio-weight' },
     },
     diagnostics,
   }
@@ -456,11 +628,10 @@ export function targetWeight(input) {
    * comparison. A missing `mandatePositionCap` is reported there, under the
    * code it has always had.
    */
-  const unpromoted = UNPROMOTED_MATURITIES.includes(maturity)
   const capReport = effectivePositionCap(input)
   const ceiling = { data: capReport.data.ceiling }
   diagnostics.push(...capReport.diagnostics)
-  if (unpromoted) caps.push(finite(ceiling.data.experimentalCeiling) ? ceiling.data.experimentalCeiling : 0)
+  if (capReport.data.ceilingApplies) caps.push(finite(ceiling.data.experimentalCeiling) ? ceiling.data.experimentalCeiling : 0)
   const cap = caps.length ? Math.max(0, Math.min(...caps)) : 0
   return {
     data: {
@@ -468,6 +639,9 @@ export function targetWeight(input) {
       bindingCap: round(cap),
       targetWeight: diagnostics.some((item) => item.severity === 'blocked') ? null : round(Math.min(raw, cap)),
       maturityStatus: maturity,
+      lane: capReport.data.resolvedLane,
+      variantViewVerified: capReport.data.variantView.verified,
+      experimentalCeilingApplies: capReport.data.ceilingApplies,
       experimentalCeiling: ceiling.data.experimentalCeiling,
       experimentalCeilingBinding: ceiling.data.binding,
       declaredPositionCap: capReport.data.declaredCap,
