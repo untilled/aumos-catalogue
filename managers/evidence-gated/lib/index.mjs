@@ -3,7 +3,7 @@ import { validateInput, INPUT_KEYS, INPUT_CONTRACTS, NESTED_CONTRACTS, GUARDED_O
 import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
-import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
+import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
 import { calibrationSummary, closedOutcomeSamples, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
@@ -65,6 +65,13 @@ const operations = {
   singleNameBudget,
   legacySizeSuggestion,
   concentration,
+  /**
+   * ⚠️ Registered beside `concentration` because it answers the question that
+   * operation's clean pass leaves open (#162): what share of this book is
+   * bearing risk at all, and — when none of it is — whether that is a run that
+   * found nothing worth owning or one whose gates never got their inputs.
+   */
+  mandateExecution,
   entryQualityGate,
   newSinglePacing: (input, asOf) => newSinglePacing({ ...input, asOf }),
   entryTranchePlan: (input, asOf) => entryTranchePlan({ ...input, asOf }),

@@ -1,6 +1,7 @@
 # Host dependencies after issues #145–153
 
-Version 0.4.27 wires the fundamental discovery branch to its input. 0.4.26 before it stopped
+Version 0.4.29 reports what share of the book is bearing risk at all, and reads the Mandate's
+`objective` for the first time. 0.4.27 wired the fundamental discovery branch to its input; 0.4.26 before it stopped
 reading `decisions[].armed` as a receipt for a promise it cannot carry; 0.4.24 separated the main
 lane from the maturity gate, read the Mandate's `cashFloor`, derived the single-name total from the
 Mandate and enforced the source's exit discipline.

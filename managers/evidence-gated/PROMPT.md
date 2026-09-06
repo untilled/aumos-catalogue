@@ -560,6 +560,25 @@ parking sleeve in place of the ETF lane. A missing Mandate number is `single_nam
 and never an unlimited lane. ⚠️ A budget is what the Mandate permits, never what the book should
 hold. Hand `controlArmRemainingWeight` to `controlArmLane` as `experimentTotalRemainingWeight`.
 
+⛔ **And say what share of this book is bearing risk at all.** Call `mandateExecution` with the
+invocation's `mandate.objective` **verbatim** as `mandateObjective`, the same `positions` and
+`proposed` the two operations above received, this run's `cashWeight`, and `reportedDiagnostics` —
+the diagnostic codes the rest of this run already returned. It reports `parkedLiquidityWeight`,
+`coreWeight`, `singleNameWeight` and `riskBearingWeight` beside the objective the investor declared.
+⚠️ **`parkedLiquidity` excludes a row from the sector, theme, factor and heat axes; it never
+excludes it from existing.** A book at 57.25% cash, 38.54% parked and 0.00% in any single name
+passes `concentration`, `effectiveCashFloor`, `caps.portfolioHeat` and `singleNameBudget` — four
+clean gates, all clean for the one reason none of them states — and `heldSingleNameWeight: 0` reads
+as *the lane has room* rather than as *nothing this Mandate is for is being done*. With no single
+name held the operation returns `mandate_objective_unexecuted`, and the **cause** is what matters:
+`no-candidate-cleared-the-gates` is `info` — holding cash because nothing cleared its gates is this
+methodology working, and it is never an argument for buying — while `input-path-incomplete` and
+`unreported` are `unevaluated`, which is not a pass. Put the cause and the parked share in
+`uncertainty`. ⛔ **The objective is quoted, never parsed**: it is prose, and inferring from its
+wording what the book should hold would be an allocation decision taken from a label. ⛔ And it is
+not a sell signal — disposing of parked liquidity is an investment judgement on `allocate` that the
+investor approves.
+
 ⛔ **The cash axis is the Mandate's too, and it is checked against the plan rather than the book.**
 Call `effectiveCashFloor` with `mandateCashFloor` — the Mandate's `cashFloor`, which this package
 holds no copy of — and `projectedCashWeight`, the cash weight **after** everything this run

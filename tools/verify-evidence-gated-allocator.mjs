@@ -1745,6 +1745,89 @@ assert.equal(
 )
 
 /**
+ * ── The exclusion stopped meaning «spends no budget» (issue #162) ──────────
+ *
+ * The 2026-09-06 book, at the measured numbers: 57.25% cash, 27.05% in the KRW
+ * parking ETF, 11.49% in SGOV — 38.54% parked, 95.79% cash-like — 4.21% in an
+ * index ETF and **0.00% in any single name**. Four gates came back clean and
+ * every one of them was clean for the same unstated reason, so this pins the
+ * numbers that say it: the split on `concentration` and `singleNameBudget`, and
+ * the cause on `mandateExecution`.
+ *
+ * ⛔ The last three cases are the boundary. `no-candidate-cleared-the-gates` is
+ * `info` and not a defect, because a book that holds cash when nothing clears
+ * its gates is this methodology working; the objective is quoted and never
+ * parsed; and nothing in any of it blocks, because neither a purchase nor a
+ * disposal is a thing a report may decide.
+ */
+covers('sizing/parked-liquidity-is-reported')
+const septemberBook = [
+  { symbol: '153130', weight: 0.27052, parkedLiquidity: true, factors: ['krw-currency', 'ultra-short-duration'], sector: 'fixed-income', themes: ['parking'] },
+  { symbol: 'SGOV', weight: 0.1149, parkedLiquidity: true, factors: ['usd-currency', 'ultra-short-duration'], sector: 'fixed-income', themes: ['parking'] },
+  { symbol: '069500', weight: 0.04206, core: true, factors: ['krw-currency', 'kr-equity-beta'], sector: 'index' },
+]
+const objective = 'Grow capital by understanding a few companies deeply and buying what the market has mispriced.'
+const septemberConcentration = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: septemberBook, caps: krwCaps } })
+assert.equal(septemberConcentration.data.parkedLiquidityWeight, 0.38542, 'the parked share is a number in the response and not only a list of exempted symbols')
+assert.equal(septemberConcentration.data.riskBearingWeight, 0.04206, 'and what is left bearing risk stands beside it')
+assert.equal(septemberConcentration.data.singleNameWeight, 0, 'no single name is held at all')
+assert.equal(septemberConcentration.data.heat.holdingsOnly, 0, 'measured heat is zero — clean, and clean because there is nothing in the market to measure')
+assert.deepEqual(septemberConcentration.data.parkedLiquidityExcluded, ['153130', 'SGOV'], "⛔ and #141's exclusion is unchanged: the rows still leave the sector, theme and factor axes")
+assert.equal(septemberConcentration.data.exposures.factor['krw-currency'], 0.04206, 'they still spend none of the factor budget')
+
+const septemberBudget = execute({ operation: 'singleNameBudget', asOf: methodology.asOf, input: { mandateCashFloor: 0.1, mandatePositionCap: 0.2, positions: septemberBook } })
+assert.equal(septemberBudget.data.heldSingleNameWeight, 0)
+assert.equal(septemberBudget.data.remainingWeight, 0.9, 'the number that reads as «the lane is empty, there is room»')
+assert.equal(septemberBudget.data.parkedLiquidityWeight, 0.38542, 'and the number that says what the book is actually holding instead, on the same response')
+assert.equal(septemberBudget.data.riskBearingWeight, 0.04206)
+assert.equal(septemberBudget.data.heldSingleNameCount, 0)
+
+covers('sizing/mandate-objective-unexecuted')
+const wiringUnfinished = execute({
+  operation: 'mandateExecution',
+  asOf: methodology.asOf,
+  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, reportedDiagnostics: ['corp_code_mapping_pending', 'variant_view_unverified'] },
+})
+assert.equal(wiringUnfinished.data.parkedLiquidityWeight, 0.38542)
+assert.equal(wiringUnfinished.data.cashLikeWeight, 0.95792, 'cash plus parking, which is the sentence no operation was saying')
+assert.equal(wiringUnfinished.data.riskBearingWeight, 0.04206)
+assert.equal(wiringUnfinished.data.objective, objective, "⛔ the investor's own sentence, carried verbatim")
+assert.equal(wiringUnfinished.data.objectiveIsNotParsed, true, 'and read for nothing else — an intent inferred from free prose is an allocation decision taken from a label')
+assert.equal(wiringUnfinished.data.cause, 'input-path-incomplete', 'the cause is a set intersection over diagnostics this run already produced, not a second opinion about them')
+assert.deepEqual(wiringUnfinished.data.inputPathCodes, ['corp_code_mapping_pending'])
+assert.equal(wiringUnfinished.status, 'unevaluated', 'an empty lane because the inputs never arrived is an unanswered question, and «nobody said» is not a pass')
+assert.ok(wiringUnfinished.diagnostics.some((row) => row.code === 'mandate_objective_unexecuted' && row.severity === 'unevaluated'))
+assert.equal(wiringUnfinished.diagnostics.some((row) => row.severity === 'blocked'), false, '⛔ and it refuses nothing: it is a report')
+
+const nothingCleared = execute({
+  operation: 'mandateExecution',
+  asOf: methodology.asOf,
+  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, reportedDiagnostics: ['research_gate_active_return_short'] },
+})
+assert.equal(nothingCleared.data.cause, 'no-candidate-cleared-the-gates')
+assert.equal(
+  nothingCleared.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity,
+  'info',
+  '⛔ holding cash because nothing cleared the gates is this methodology working, and this operation is never an argument for filling the lane',
+)
+assert.equal(nothingCleared.data.parkedLiquidityIsUncapped, true, '⑶ of the issue, decided: reported here and capped nowhere — a ceiling on cash-equivalent weight is a floor under deployment by another name')
+
+const noReason = execute({ operation: 'mandateExecution', asOf: methodology.asOf, input: { positions: septemberBook, cashWeight: 0.5725 } })
+assert.equal(noReason.data.cause, 'unreported', 'a run that reported no diagnostics has not established that it looked')
+assert.equal(noReason.data.objectiveDeclared, false)
+assert.ok(noReason.diagnostics.some((row) => row.code === 'mandate_objective_unread' && row.severity === 'unevaluated'), 'and the Mandate sentence no computation used to read is asked for by name')
+
+const buying = execute({
+  operation: 'mandateExecution',
+  asOf: methodology.asOf,
+  input: { mandateObjective: objective, positions: septemberBook, proposed: [{ symbol: '035420', weight: 0.02, stopLossPct: 0.12 }], cashWeight: 0.5725, reportedDiagnostics: ['corp_code_mapping_pending'] },
+})
+assert.equal(buying.data.cause, 'executing', 'one single name in the plan and there is nothing left to explain')
+assert.equal(buying.data.singleNameWeight, 0.02)
+assert.equal(buying.data.heldSingleNameWeight, 0, 'held and proposed stay distinguishable, the same contract concentration and singleNameBudget keep')
+assert.equal(buying.diagnostics.some((row) => row.code === 'mandate_objective_unexecuted'), false)
+
+/**
  * ── A factor label at twice its cap is a question about the label (#141) ───
  *
  * The package ships no factor taxonomy on purpose — what counts as one shared
@@ -2285,7 +2368,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 101)
+assert.equal(supportedOperations.length, 102)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
