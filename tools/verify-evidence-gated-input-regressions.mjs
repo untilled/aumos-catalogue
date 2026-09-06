@@ -95,7 +95,7 @@ assert.equal(corrupt.data.nextState, null)
 assert.equal(run('reconcileArmedReviews', { previous: remembered, journalArmed: sequence, sequence: [] }).data.nextState.armed.length, 1)
 
 // #149: DKS's capped USD 200 cannot fund three whole-share rungs.
-const ceiling = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', experimentalPositionFloor: { USD: 200, KRW: 300000 }, positionCurrency: 'USD', maturity: 'insufficient' })
+const ceiling = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', experimentalPositionFloor: { USD: 200, KRW: 300000 }, positionCurrency: 'USD' })
 const weight = ceiling.data.experimentalCeiling
 const plan = { symbol: 'DKS', lens: 'mean-reversion', maturity: 'insufficient', price: 139.15, plannedTotalWeight: weight, execution: { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'USD', lotSize: 1 }, tranches: [{ weight: weight / 3, condition: { kind: 'immediate' } }, { weight: weight / 3, condition: { kind: 'price-below', threshold: 130 } }, { weight: weight / 3, condition: { kind: 'price-below', threshold: 120 } }] }
 assert.ok(has(run('entryTranchePlan', plan), 'experimental_ladder_unreachable'))
@@ -469,3 +469,260 @@ assert.equal(run('calibration', { samples: closed.data.samples }).data.sampleCou
 assert.equal(run('promotionGate', { rows: closed.data.samples }).data.byRuleVersion?.length ?? 0, 0)
 
 console.log('evidence-gated issues #145–153 regression tests passed')
+
+/**
+ * ── #158: the shape is published, and a guess is refused (2026-09-06) ──────
+ *
+ * Every malformed call below is one a real flow actually sent. Fixing them as
+ * cases is the point: the dominant pattern in this package's memory is *"a
+ * wrong input is not refused and comes back looking like a pass"*, and the only
+ * defence against it that does not decay is a published contract with a test
+ * that the wrong shape is refused rather than answered.
+ */
+const contracts = run('inputContracts').data
+const supported = execute({ operation: null, asOf }).diagnostics[0].details.supported
+assert.deepEqual(
+  Object.keys(contracts.contracts).sort(),
+  [...supported].sort(),
+  'every registered operation publishes its input shape — the eleven were the ones #147 reached, not a principle',
+)
+assert.equal(contracts.operationCount, supported.length)
+for (const [operation, contract] of Object.entries(contracts.contracts)) {
+  assert.ok(['strict', 'named', 'open'].includes(contract.mode), `${operation} declares what an unknown key costs`)
+  assert.deepEqual(Object.keys(contract.keys), contracts.keys[operation], 'the published key list is the contract it came from')
+}
+for (const operation of ['nextReviewSequence', 'coverage', 'specialistBudget', 'experimentalCeiling', 'exitDiscipline', 'laneCoverage', 'harnessAudit']) {
+  assert.ok(contracts.guarded.includes(operation), `${operation} is a gate and refuses a key it does not read`)
+}
+// The nested shapes a key list cannot show are published too — both of the two that cost a run.
+assert.deepEqual(Object.keys(contracts.nested.nextReviewSequence['config.schedule']), ['krCloseBufferMinutes', 'usCloseBufferMinutes'])
+assert.deepEqual(Object.keys(contracts.nested.harnessAudit['researchActivity[]']), ['source', 'granted', 'attempts', 'succeeded'])
+
+/**
+ * The five shapes the 2026-09-06 orchestrator sent to `nextReviewSequence`.
+ * Each was answered `next_market_session_missing` at a `path` of `sessions` —
+ * a key the operation does not have — so the diagnostic sent the caller looking
+ * for a shape that could not exist, five times.
+ */
+const guessedSequences = [
+  { sessions: [{ market: 'kr', date: '2026-09-08', close: '15:30' }] },
+  { market: 'kr', closeAt: '2026-09-08T06:30:00Z' },
+  { krSession: { date: '2026-09-08' }, usSession: { date: '2026-09-08' } },
+  { calendar: { XKRX: [{ session_date: '2026-09-08', close_time: '15:30' }] } },
+  { sessions: { kr: { date: '2026-09-08' }, us: { date: '2026-09-08' } } },
+]
+for (const input of guessedSequences) {
+  const answer = run('nextReviewSequence', input)
+  assert.equal(answer.status, 'blocked', 'a guessed shape is refused rather than answered from defaults')
+  assert.ok(has(answer, 'input_shape_invalid'))
+  assert.equal(answer.data, null)
+  assert.equal(has(answer, 'next_market_session_missing'), false, 'and never with a diagnostic pointing at a key the operation has not got')
+}
+// The true shape, and a diagnostic that names the key it is actually about.
+const krOnly = run('nextReviewSequence', { krSessions: [{ isOpen: true, date: '2026-09-08', closeLocal: '15:30', timeZone: 'Asia/Seoul' }] })
+assert.equal(krOnly.data.sequence[0].flow, 'kr-sleeve')
+assert.deepEqual(
+  krOnly.diagnostics.filter((row) => row.code === 'next_market_session_missing').map((row) => row.path),
+  ['usSessions'],
+  'the empty side is named by the key that would fill it',
+)
+// ⛔ #91 from the caller's side: the buffers live under config.schedule.
+const misplacedBuffers = run('nextReviewSequence', {
+  krSessions: [{ isOpen: true, date: '2026-09-08', closeLocal: '15:30', timeZone: 'Asia/Seoul' }],
+  config: { krCloseBufferMinutes: 30, usCloseBufferMinutes: 45 },
+})
+assert.equal(misplacedBuffers.status, 'blocked', 'the package must not answer with its own 30/45 while the investor believes theirs ran')
+assert.deepEqual(misplacedBuffers.diagnostics.find((row) => row.code === 'input_shape_invalid').details.misplaced, ['krCloseBufferMinutes', 'usCloseBufferMinutes'])
+// Nested correctly, the investor's numbers run and the answer says whose they were.
+const configured = run('nextReviewSequence', {
+  krSessions: [{ isOpen: true, date: '2026-09-08', closeLocal: '15:30', timeZone: 'Asia/Seoul' }],
+  usSessions: [{ isOpen: true, date: '2026-09-08', closeLocal: '16:00', timeZone: 'America/New_York' }],
+  config: { schedule: { krCloseBufferMinutes: 20, usCloseBufferMinutes: 50 } },
+})
+assert.deepEqual(configured.data.buffers, { kr: 20, us: 50 })
+assert.deepEqual(configured.data.bufferSource, { kr: 'config.schedule.krCloseBufferMinutes', us: 'config.schedule.usCloseBufferMinutes' })
+assert.equal(has(configured, 'schedule_buffer_defaulted'), false)
+// Declared nowhere, the package default still runs — and stops being silent about it.
+const defaulted = run('nextReviewSequence', { krSessions: [{ isOpen: true, date: '2026-09-08', closeLocal: '15:30', timeZone: 'Asia/Seoul' }] })
+const defaultNote = defaulted.diagnostics.find((row) => row.code === 'schedule_buffer_defaulted')
+assert.equal(defaultNote.severity, 'info', 'a default that ran is a report, never a stop')
+assert.deepEqual(defaultNote.details.applied, { kr: 30, us: 45 })
+
+/**
+ * `coverage`: an array of objects used to leak a raw `TypeError` as the
+ * diagnostic, and two markets in two elements used to raise a `universe_drift`
+ * that was never drift. The second is the likely origin of the standing
+ * "US universe_drift unresolved" item Brief v6 has been carrying.
+ */
+const objectRows = run('coverage', { scannerUniverses: [{ scanner: 'kr-momentum', symbols: ['005930', '000660'] }] })
+assert.equal(objectRows.status, 'blocked')
+assert.ok(has(objectRows, 'input_shape_invalid'))
+assert.equal(has(objectRows, 'operation_failed'), false, 'a shape mismatch is refused by name, never by whatever the arithmetic threw')
+assert.match(objectRows.diagnostics[0].message, /one array of symbols per scanner over the same market/)
+const twoMarkets = run('coverage', { scannerUniverses: [['005930', '000660'], ['DKS', 'AAPL']], holdings: ['005930'] })
+assert.ok(has(twoMarkets, 'universe_markets_mixed'), 'two markets are two calls, and this is not drift')
+assert.equal(has(twoMarkets, 'universe_drift'), false)
+assert.deepEqual(twoMarkets.diagnostics.find((row) => row.code === 'universe_markets_mixed').details.overlap, [0])
+// Real drift — same market, one scanner short a name — still fires under its own code.
+const realDrift = run('coverage', { scannerUniverses: [['005930', '000660'], ['005930']], holdings: ['005930'] })
+assert.ok(has(realDrift, 'universe_drift'))
+assert.equal(has(realDrift, 'universe_markets_mixed'), false)
+// And `asOf` reaches the operation now, so a disposition whose revisit date has passed is uncovered.
+assert.deepEqual(
+  run('coverage', { scannerUniverses: [['005930']], dispositions: [{ symbol: '005930', revisitAt: '2026-08-01' }] }).data.uncovered,
+  ['005930'],
+  'a revisit date in the past is a disposition that has expired, and the operation never saw asOf to notice',
+)
+
+/**
+ * `specialistBudget`: three spellings of the budget key, all answered
+ * `sleeve_budget_missing` at a path of `input`, and `withinBriefBudget` left
+ * `null` — so the sleeve's compliance with its own budget went unchecked.
+ */
+for (const key of ['sleeveBudget', 'briefBudgetWeight', 'budgetWeight']) {
+  const answer = run('specialistBudget', { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.18, [key]: 0.3, requestedTargetWeight: 0.02 })
+  assert.equal(answer.status, 'blocked', `${key} is refused rather than defaulted away`)
+  assert.match(answer.diagnostics[0].message, /sleeveBudgetWeight/)
+}
+const budgetShort = run('specialistBudget', { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.18, requestedTargetWeight: 0.02 })
+assert.ok(has(budgetShort, 'sleeve_budget_missing'))
+const budgetDiagnostic = budgetShort.diagnostics.find((row) => row.code === 'sleeve_budget_missing')
+assert.deepEqual(budgetDiagnostic.details.missing, ['sleeveBudgetWeight'])
+assert.equal(budgetDiagnostic.path, 'sleeveBudgetWeight', 'the path names the key, not the whole input')
+assert.equal(run('specialistBudget', { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.18, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02 }).data.withinBriefBudget, true)
+
+/**
+ * `experimentalCeiling`'s KRW leg, which returned `floorAmount: null`,
+ * `binding: 'ratio'`, status `ok` and no diagnostic at all. The floor is
+ * declared **per venue currency** and the leg had passed a bare amount; the
+ * arithmetic it wanted was KRW 300,000 → 0.0149, a floor binding.
+ */
+const bareFloor = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'KRW', experimentalPositionFloor: 300000, usdKrw: 1352.5 })
+assert.equal(bareFloor.status, 'blocked', 'a bare amount names no venue, and answering it with the ratio is the silent pass this issue is about')
+assert.deepEqual(
+  bareFloor.diagnostics.filter((row) => row.code === 'input_shape_invalid').map((row) => row.path).sort(),
+  ['input.experimentalPositionFloor', 'input.usdKrw'],
+  'both halves of the KRW leg are named: the floor is a per-currency map and the rate is fx.USDKRW',
+)
+// Declared per venue, with the rate where the contract says it is, the leg binds on the floor.
+const krwLeg = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'KRW', experimentalPositionFloor: { USD: 200, KRW: 300000 }, fx: { USDKRW: 1352.5 } })
+assert.equal(krwLeg.data.binding, 'floor')
+assert.equal(krwLeg.data.floorAmount, 300000)
+assert.equal(krwLeg.data.floorWeight, 0.01492028, '300,000 / 1352.5 / 14,866.44')
+// The USD leg is unchanged, and it is the one that always worked.
+const usdLeg = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'USD', experimentalPositionFloor: { USD: 200, KRW: 300000 } })
+assert.equal(usdLeg.data.binding, 'floor')
+assert.equal(usdLeg.data.floorWeight, 0.01345312)
+// No floor declared at all is the ratio alone, said out loud rather than implied.
+const ratioOnly = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'USD' })
+assert.equal(ratioOnly.data.binding, 'ratio')
+assert.ok(has(ratioOnly, 'experimental_floor_unevaluated'))
+
+/**
+ * ── #158 ⑷: the block the documents promised, fired where entries are ──────
+ *
+ * `skills/deterministic-metrics` and `PROMPT.md` §1b both say an entry with no
+ * registered stop and review date is refused, and omitting `registration`
+ * returned `given: false` and nothing else. #155's "omission is unadjudicated"
+ * is right for the call this makes every run — the sweep over holdings, whose
+ * registration this manager cannot read back at all (#97) — so the two calls
+ * are separated by saying which one is being made, and the unstated case is
+ * reported instead of passing.
+ */
+const holdingReview = run('exitDiscipline', { symbol: 'DKS', lane: 'control-arm', entryDate: '2026-08-25', entryPrice: 100, price: 99, entryProposed: false })
+assert.equal(has(holdingReview, 'exit_rules_unregistered'), false, 'a holding review is not refused for a registration nothing can hand back')
+assert.equal(has(holdingReview, 'exit_registration_unjudged'), false)
+assert.equal(holdingReview.data.registration.judged, null)
+const newEntry = run('exitDiscipline', { symbol: 'DKS', lane: 'control-arm', entryDate: '2026-08-25', entryPrice: 100, price: 99, entryProposed: true })
+assert.equal(newEntry.status, 'blocked', 'an entry registers its stop and review date or it is not an entry')
+assert.ok(has(newEntry, 'exit_rules_unregistered'))
+assert.equal(newEntry.data.registration.judged, false)
+const unstatedEntry = run('exitDiscipline', { symbol: 'DKS', lane: 'control-arm', entryDate: '2026-08-25', entryPrice: 100, price: 99 })
+assert.ok(has(unstatedEntry, 'exit_registration_unjudged'), 'the rule not being applied is itself in the answer')
+assert.equal(unstatedEntry.diagnostics.find((row) => row.code === 'exit_registration_unjudged').severity, 'unevaluated')
+assert.equal(unstatedEntry.data.registration.judged, null)
+// A complete registration is judged whether or not the caller said which call this is.
+assert.equal(run('exitDiscipline', { symbol: 'DKS', lane: 'control-arm', entryDate: '2026-08-25', entryPrice: 100, price: 99, entryProposed: true, registration: { stopPct: 0.08, reviewBy: '2026-10-20' } }).data.registration.judged, true)
+
+/**
+ * ── #157: `succeeded` reads as a count and was a boolean ───────────────────
+ *
+ * The controlled `kr-sleeve` run: integers gave three `lane_query_failed` and
+ * a `warningCount` of 6, booleans gave none and 3, and every other byte was
+ * identical — three routes that all answered, reported as three that had not.
+ */
+const threeRoutes = (mode) => [
+  { source: 'web', granted: true, attempts: 10, succeeded: mode === 'count' ? 3 : true },
+  { source: 'open-dart', granted: true, attempts: 4, succeeded: mode === 'count' ? 4 : true },
+  { source: 'toss-market', granted: true, attempts: 2, succeeded: mode === 'count' ? 2 : true },
+]
+const counted = run('harnessAudit', { researchActivity: threeRoutes('count') })
+const flagged = run('harnessAudit', { researchActivity: threeRoutes('flag') })
+assert.equal(counted.diagnostics.filter((row) => row.code === 'lane_query_failed').length, 0, 'a route that answered three of ten queries did not fail')
+assert.equal(counted.data.warningCount, flagged.data.warningCount, 'the integer and the boolean describe the same run and must report the same one')
+// ⚠️ And the count is kept, because "3 of 10" is worth reporting.
+const partialLane = counted.diagnostics.find((row) => row.code === 'lane_query_partial')
+assert.equal(partialLane.severity, 'info', 'a partial lane is a note and never a warning')
+assert.deepEqual([partialLane.details.attempts, partialLane.details.successCount], [10, 3])
+assert.equal(counted.data.noteCount, 1)
+// ⛔ The pair §2b asks to be kept apart: no attempt, against attempted and empty.
+const notQueried = run('harnessAudit', { researchActivity: [{ source: 'web', granted: true, attempts: 0, succeeded: 0 }] })
+assert.ok(has(notQueried, 'lane_not_queried'))
+assert.equal(has(notQueried, 'lane_query_failed'), false, 'zero attempts is not a failed query')
+const emptyAnswer = run('harnessAudit', { researchActivity: [{ source: 'web', granted: true, attempts: 3, succeeded: 0 }] })
+assert.ok(has(emptyAnswer, 'lane_query_failed'), 'zero successes over three attempts is a failed lane, and the integer zero says so')
+assert.equal(has(emptyAnswer, 'lane_not_queried'), false)
+assert.equal(
+  run('harnessAudit', { researchActivity: [{ source: 'web', granted: true, attempts: 3, succeeded: false }] }).diagnostics.filter((row) => row.code === 'lane_query_failed').length,
+  1,
+  'the boolean false is the same fact and reads the same way',
+)
+// A count above the attempts that produced it is refused rather than clamped into a reading.
+const incoherent = run('harnessAudit', { researchActivity: [{ source: 'web', granted: true, attempts: 2, succeeded: 5 }] })
+assert.equal(incoherent.status, 'blocked')
+assert.ok(has(incoherent, 'input_shape_invalid'))
+// `laneCoverage` reads the same field and had the same defect.
+const laneSources = { toss: { status: 'fresh' }, web: { status: 'available' } }
+const laneCounted = run('laneCoverage', { lane: 'kr', intent: 'holding-news', sources: laneSources, activity: { web: { attempts: 10, succeeded: 3 } } })
+assert.deepEqual(laneCounted.data.failed, [], 'three usable responses out of ten is not a failed lane here either')
+assert.deepEqual(laneCounted.data.partial, ['web'])
+assert.equal(laneCounted.data.action, 'CONTINUE')
+assert.deepEqual(run('laneCoverage', { lane: 'kr', intent: 'holding-news', sources: laneSources, activity: { web: { attempts: 10, succeeded: 0 } } }).data.failed, ['web'])
+
+/**
+ * ── The class, rather than the instances (#158 ⑵) ──────────────────────────
+ *
+ * A raw exception reaching the caller as `operation_failed` is a shape mismatch
+ * nobody wrote a sentence for. These are the ones that were leaking.
+ */
+for (const [operation, wrongShape] of [
+  ['coverage', { scannerUniverses: [{ scanner: 'kr' }] }],
+  ['sleeveNav', { cash: { KRW: 1000 } }],
+  ['opportunityUniverse', { rows: {} }],
+  ['promotionGate', { rows: {} }],
+  ['lensEnvelope', { lens: 'mean-reversion', triggers: {} }],
+  ['validateAdjustment', { series: {} }],
+  ['harnessAudit', { positions: {} }],
+  ['concentration', { positions: {} }],
+]) {
+  const answer = run(operation, wrongShape)
+  assert.equal(answer.status, 'blocked', `${operation} refuses the shape`)
+  assert.ok(has(answer, 'input_shape_invalid'), `${operation} refuses it by name`)
+  assert.equal(has(answer, 'operation_failed'), false, `${operation} does not hand a raw exception back as the explanation`)
+}
+// `validateAdjustment` was reading the whole input object as the series; it now reads its key.
+const mixedBases = run('validateAdjustment', { series: [{ adjustment: 'split' }, { adjustment: 'none' }] })
+assert.deepEqual([...mixedBases.data.bases].sort(), ['none', 'split'])
+assert.ok(has(mixedBases, 'adjustment_basis_conflict'))
+
+// A key the operation does not read is reported, not absorbed.
+const unread = run('themeRadarDue', { lastRunAt: '2026-09-01T00:00:00Z', expectedDue: true })
+assert.ok(has(unread, 'input_key_unread'))
+assert.equal(unread.diagnostics.find((row) => row.code === 'input_key_unread').path, 'input.expectedDue')
+assert.equal(unread.status, 'unevaluated')
+assert.equal(unread.data.due, true, 'the answer it did compute still stands; the caller is told which part of the call was not read')
+// ⛔ And the invocation's asOf is not silently overruled by a second copy inside the input.
+assert.ok(has(execute({ operation: 'themeRadarDue', asOf, input: { lastRunAt: '2026-09-01T00:00:00Z', asOf: '2020-01-01T00:00:00Z' } }), 'input_shape_invalid'))
+assert.equal(execute({ operation: 'themeRadarDue', asOf, input: { lastRunAt: '2026-09-01T00:00:00Z', asOf } }).status, 'ok', 'a copy that agrees costs nothing')
+
+console.log('evidence-gated issues #157-158 input-contract regression tests passed')

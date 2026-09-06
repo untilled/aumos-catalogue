@@ -79,21 +79,40 @@ function globalReviewRule(time, timeZone) {
   return { cron: `${minute} ${hour} * * ${TRADING_WEEKDAYS}`, timeZone }
 }
 
-export function nextMarketReview({ sessions = [], asOf, bufferMinutes = 30 }) {
+/**
+ * ⚠️ **`path` is a parameter because the diagnostic named a key that does not
+ * exist** (issue #158). `nextReviewSequence` calls this twice, over `krSessions`
+ * and `usSessions`, and both answers came back pointing at `sessions` — so a
+ * caller reading the diagnostic looked for a key the operation does not have,
+ * and the 2026-09-06 orchestrator spent five round trips inventing shapes that
+ * would put one there. A diagnostic that names a path the input cannot contain
+ * is worse than one that names none: it is a wrong answer to the only question
+ * the caller has.
+ */
+export function nextMarketReview({ sessions = [], asOf, bufferMinutes = 30, path = 'sessions' }) {
   const diagnostics = []
   const candidates = []
+  const openSessions = sessions.filter((session) => session?.isOpen)
   for (const [index, session] of sessions.entries()) {
     if (!session?.isOpen) continue
     const close = zonedDateTimeToUtc(session.date, session.closeLocal, session.timeZone)
     if (!close) {
-      diagnostics.push(diagnostic('market_session_invalid', 'unevaluated', 'Session date, closeLocal and IANA timezone are required', `sessions[${index}]`))
+      diagnostics.push(diagnostic('market_session_invalid', 'unevaluated', 'Session date, closeLocal and IANA timezone are required', `${path}[${index}]`))
       continue
     }
     const review = addMinutes(close, bufferMinutes)
     if (Date.parse(review) > Date.parse(asOf)) candidates.push({ ...session, closeUtc: close, reviewAt: review })
   }
   candidates.sort((a, b) => Date.parse(a.reviewAt) - Date.parse(b.reviewAt))
-  if (!candidates.length) diagnostics.push(diagnostic('next_market_session_missing', 'unevaluated', 'No future open market session is available from the source calendar', 'sessions'))
+  if (!candidates.length) {
+    diagnostics.push(diagnostic(
+      'next_market_session_missing',
+      'unevaluated',
+      'No future open market session is available from the source calendar; a session is { isOpen: true, date, closeLocal: "15:30", timeZone: "Asia/Seoul" }',
+      path,
+      { sessionsGiven: sessions.length, openSessionsGiven: openSessions.length, bufferMinutes },
+    ))
+  }
   return { data: { next: candidates[0] ?? null }, diagnostics }
 }
 
@@ -260,10 +279,36 @@ export function nextReviewSequence({ krSessions = [], usSessions = [], globalRev
    * passed value is this call's.
    */
   const schedule = config?.schedule ?? {}
+  /**
+   * ⚠️ **And the fallback says so** (issue #158). `buffers` and
+   * `config.schedule` are both optional and the package's own 30/45 stands in
+   * for whichever is absent — which is correct, and was **silent**. A caller
+   * who put the buffers at the top of `config` rather than under
+   * `config.schedule` got the defaults and no sign of it, and the book that
+   * measured this had an investor value of exactly 30/45, so not one number in
+   * the answer differed. The misplacement is refused in `input-contracts.mjs`;
+   * a buffer nobody declared at all is reported here, because a run reading
+   * `PROMPT.md`'s "plus configured buffer" is entitled to know which number it
+   * actually got.
+   */
   const krBuffer = buffers.kr ?? schedule.krCloseBufferMinutes ?? 30
   const usBuffer = buffers.us ?? schedule.usCloseBufferMinutes ?? 45
-  const kr = nextMarketReview({ sessions: krSessions, asOf, bufferMinutes: krBuffer })
-  const us = nextMarketReview({ sessions: usSessions, asOf, bufferMinutes: usBuffer })
+  const bufferSource = {
+    kr: buffers.kr !== undefined ? 'buffers.kr' : schedule.krCloseBufferMinutes !== undefined ? 'config.schedule.krCloseBufferMinutes' : 'package-default',
+    us: buffers.us !== undefined ? 'buffers.us' : schedule.usCloseBufferMinutes !== undefined ? 'config.schedule.usCloseBufferMinutes' : 'package-default',
+  }
+  const defaulted = Object.entries(bufferSource).filter(([, source]) => source === 'package-default').map(([market]) => market)
+  if (defaulted.length) {
+    diagnostics.push(diagnostic(
+      'schedule_buffer_defaulted',
+      'info',
+      "The close buffer is the investor's and none was passed, so the package's own default ran; it is read from config.schedule.krCloseBufferMinutes / usCloseBufferMinutes, or from buffers.kr / buffers.us for this call alone",
+      'config.schedule',
+      { defaulted, applied: { kr: krBuffer, us: usBuffer }, source: bufferSource },
+    ))
+  }
+  const kr = nextMarketReview({ sessions: krSessions, asOf, bufferMinutes: krBuffer, path: 'krSessions' })
+  const us = nextMarketReview({ sessions: usSessions, asOf, bufferMinutes: usBuffer, path: 'usSessions' })
   diagnostics.push(...kr.diagnostics, ...us.diagnostics)
   const globalAt = globalReview.date && globalReview.time && globalReview.timeZone
     ? zonedDateTimeToUtc(globalReview.date, globalReview.time, globalReview.timeZone)
@@ -290,7 +335,7 @@ export function nextReviewSequence({ krSessions = [], usSessions = [], globalRev
   ].filter(Boolean)
     .map((row) => ({ ...row, intent: marketReviewIntent(row.flow, row.at) }))
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-  return { data: { sequence }, diagnostics }
+  return { data: { sequence, buffers: { kr: krBuffer, us: usBuffer }, bufferSource }, diagnostics }
 }
 
 /** The marker that opens a market review's `intent`. */

@@ -56,10 +56,43 @@ export function coverageState({ scannerUniverses = [], extensions = [], holdings
       { holdingsCount: new Set(holdings).size, extensionsCount: new Set(extensions).size },
     ))
   }
+  /**
+   * ── What `universe_drift` is about, and the run that misread it (#158) ────
+   *
+   * `scannerUniverses` is *several scanners over the **same** market*, and the
+   * drift it catches is two scanners disagreeing about what that market
+   * contains. Nothing said so, and a run passed **KR as one element and US as
+   * the other**. Two markets share no symbol, so every symbol differed, so the
+   * answer was a `blocked` `universe_drift` — on two lists that were never the
+   * same denominator and could not drift from each other. It carried into a
+   * Brief as a standing "US universe_drift unresolved" item across runs.
+   *
+   * Disjoint lists are therefore named as what they are rather than reported as
+   * drift: the resolution is one `coverage` call per market, not a reconciliation
+   * of two universes that were never one.
+   */
   if (universeSets.length > 1) {
     const [first, ...rest] = universeSets
     const drift = rest.some((set) => [...new Set([...first, ...set])].some((symbol) => first.has(symbol) !== set.has(symbol)))
-    if (drift) diagnostics.push(diagnostic('universe_drift', 'blocked', 'Scanner universes differ; union is used but drift must be resolved', 'scannerUniverses'))
+    const overlap = rest.map((set) => [...set].filter((symbol) => first.has(symbol)).length)
+    const disjoint = drift && universeSets.every((set) => set.size > 0) && overlap.every((count) => count === 0)
+    if (disjoint) {
+      diagnostics.push(diagnostic(
+        'universe_markets_mixed',
+        'blocked',
+        'These scanner universes share no symbol, so they are not two readings of one market: coverage takes several scanners over the SAME market, and two markets are two calls. Read as one denominator they raise a universe_drift that is not drift, and a coverage verdict computed over the union answers a question nobody asked',
+        'scannerUniverses',
+        { sizes: universeSets.map((set) => set.size), overlap },
+      ))
+    } else if (drift) {
+      diagnostics.push(diagnostic(
+        'universe_drift',
+        'blocked',
+        'Scanner universes differ; union is used but drift must be resolved',
+        'scannerUniverses',
+        { sizes: universeSets.map((set) => set.size), overlap },
+      ))
+    }
   }
   const held = new Set(holdings)
   const bySymbol = new Map(dispositions.map((row) => [row.symbol, row]))

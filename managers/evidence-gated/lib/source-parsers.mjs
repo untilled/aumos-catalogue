@@ -1,4 +1,5 @@
 import { diagnostic, finite } from './diagnostics.mjs'
+import { laneOutcome } from './input-contracts.mjs'
 
 export function filterPointInTime(rows, { asOf, timestampField = 'availableAt', freshnessHours }) {
   const diagnostics = []
@@ -232,11 +233,22 @@ export function laneCoverage({ lane, sources = {}, intent = 'review', activity =
   if (category === 'fundamental' && lane === 'us' && webFallback) required.splice(required.indexOf('alpaca'), 1, 'web')
   const unavailable = required.filter((source) => !['fresh', 'available'].includes(sources[source]?.status))
   if (unavailable.length) diagnostics.push(diagnostic('lane_source_blocked', category === 'price' && intent === 'review' ? 'unevaluated' : 'blocked', 'Required source is missing or stale for this lane and intent', 'sources', { lane, intent, unavailable }))
-  const unqueried = activity === null ? [] : required.filter((source) => available(source) && !(activity[source]?.attempts > 0))
+  /**
+   * ⚠️ `succeeded` is either the flag or the count of usable responses (#157);
+   * `attempts` is what separates *not queried* from *queried and empty*, which
+   * is the pair `PROMPT.md` §2b asks to be reported separately.
+   */
+  const outcomeOf = (source) => laneOutcome(activity?.[source])
+  const unqueried = activity === null ? [] : required.filter((source) => available(source) && !(outcomeOf(source).attempts > 0))
   if (unqueried.length) diagnostics.push(diagnostic('lane_not_queried', 'unevaluated', 'The lane was granted but was not queried; this is not source absence', 'activity', { unqueried }))
-  const failed = activity === null ? [] : required.filter((source) => activity[source]?.attempts > 0 && activity[source]?.succeeded !== true)
+  const failed = activity === null ? [] : required.filter((source) => outcomeOf(source).attempts > 0 && outcomeOf(source).succeeded !== true)
   if (failed.length) diagnostics.push(diagnostic('lane_query_failed', 'unevaluated', 'The lane was queried but no usable response was obtained', 'activity', { failed }))
-  return { data: { lane, intent, required, unavailable, unqueried, failed, degradesTo: required.includes('web') && webFallback ? 'web' : null, judgement: unavailable.length ? 'unable' : unqueried.length || failed.length ? 'unevaluated' : 'reviewable', action: unavailable.length || unqueried.length || failed.length ? 'WAIT' : 'CONTINUE' }, diagnostics }
+  const partial = activity === null ? [] : required.filter((source) => {
+    const outcome = outcomeOf(source)
+    return outcome.succeeded === true && outcome.successCount !== null && outcome.attempts !== null && outcome.successCount < outcome.attempts
+  })
+  if (partial.length) diagnostics.push(diagnostic('lane_query_partial', 'info', 'The lane answered some of the queries it was sent; it is not a failed lane and the shortfall is worth reporting', 'activity', { partial: partial.map((source) => ({ source, ...outcomeOf(source) })) }))
+  return { data: { lane, intent, required, unavailable, unqueried, failed, partial, degradesTo: required.includes('web') && webFallback ? 'web' : null, judgement: unavailable.length ? 'unable' : unqueried.length || failed.length ? 'unevaluated' : 'reviewable', action: unavailable.length || unqueried.length || failed.length ? 'WAIT' : 'CONTINUE' }, diagnostics }
 }
 
 export function validateAdjustment(series, corporateActions = []) {
