@@ -13,6 +13,7 @@ import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backt
 import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap, exitCheck } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { fundamentalsPlan, mapCorporationCodes, dartVendorStatus, radarCandidates, radarFeedDiagnosis } from './fundamentals-feed.mjs'
+import { thesisValuation, thesisGapSources } from './valuation.mjs'
 import { harnessAudit, lessonAudit } from './audit.mjs'
 import { lensEnvelope, clusterBlock, timeStopPolicy, exitDiscipline, ruleVersions, policyLint } from './envelopes.mjs'
 import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport, controlArmLane } from './learning.mjs'
@@ -142,6 +143,19 @@ const operations = {
   dartVendorStatus: (input) => dartVendorStatus(input),
   radarCandidates: (input, asOf) => radarCandidates({ ...input, asOf }),
   radarFeedDiagnosis: (input, asOf) => radarFeedDiagnosis({ ...input, asOf }),
+
+  /**
+   * ── The other end of the same wire (issue #160) ──────────────────────────
+   *
+   * The five above feed **discovery**. These two feed **sizing**: the fair
+   * value and the expected upside `validateThesis` asks for come off the same
+   * statements, and until they do, `variantViewCheck` reports three of four
+   * requirements met and `effectivePositionCap` turns a declared 0.2 into
+   * 0.01. `thesisGapSources` is what keeps *no source exists* and *the source
+   * was never called* from being written down as the same sentence.
+   */
+  thesisValuation: (input, asOf) => thesisValuation({ ...input, asOf }),
+  thesisGapSources: (input, asOf) => thesisGapSources({ ...input, asOf }),
 
   zonedDateTimeToUtc: (input) => ({ data: { instant: zonedDateTimeToUtc(input?.date, input?.time, input?.timeZone) }, diagnostics: [] }),
   nextMarketReview: (input, asOf) => nextMarketReview({ ...input, asOf }),

@@ -25,6 +25,17 @@ export const INPUT_VOCABULARY = {
   marketToResearchMarket: { XKRX: 'kr', XNAS: 'us', XNYS: 'us' },
   cacheStates: ['fresh', 'stale', 'never-fetched', 'refresh-failed'],
   cacheDocuments: { 'open-dart': ['filings', 'financials'], 'sec-edgar': ['companyfacts'] },
+  /**
+   * ⚠️ The two vocabularies #160 turns on. `scenarioCases` is the table this
+   * methodology derives a fair value from — there is no multiple and no
+   * discount rate published here because the methodology names none — and
+   * `instrumentClasses` is the distinction that decides whether an open
+   * valuation gap is unfetched or unfillable.
+   */
+  scenarioCases: ['bear', 'base', 'bull'],
+  filingFacts: ['revenue', 'operatingIncome', 'operatingIncomeYoy', 'marginDeltaYoy'],
+  instrumentClasses: ['single-name-filer', 'non-filer-instrument', 'unknown'],
+  memoryRuleKeys: ['failures/repeated-patterns', 'run/theme-radar-last'],
   paperSetups: Object.keys(PAPER_SETUP_COHORTS),
 }
 
@@ -103,6 +114,17 @@ export const NESTED_CONTRACTS = {
   },
   refutedMemoryRules: {
     patterns: 'The whole value read from `failures/repeated-patterns` — an array of rows, or the stored object holding them under `patterns`/`rows`/`entries`/`failures`. Read under a key that is not there, a carried rule reads as absent and stays uncorrected.',
+    memory: 'An object keyed by stable memory key — { "run/theme-radar-last": <whatever was read> } — for the refuted rules filed somewhere other than `failures/repeated-patterns`. ⚠️ A false durable claim is not only ever a failure pattern (#160); the value may be prose and fields rather than a row list, and is matched either way.',
+  },
+  thesisValuation: {
+    'scenarios.<bear|base|bull>': { probability: NUMBER, target: NUMBER, return: NUMBER, drivers: ARRAY },
+    'scenarios.<case>.drivers[]': 'Either a filing-fact name — revenue, operatingIncome, operatingIncomeYoy, marginDeltaYoy — or { metric, evidenceId }. ⛔ Any other name is reported unmatched rather than read as something else; this package has no valuation method of its own to fall back on.',
+    'filings[]': 'The `filings` array `radarCandidates` builds for this symbol, unchanged: { periodEnd, availableAt, revenue, operatingIncome, operatingIncomeYoy, marginDeltaYoy, currency, sourceType }.',
+  },
+  thesisGapSources: {
+    gaps: 'The `gaps` array `validateThesis` returned, verbatim.',
+    mapping: 'The `mapCorporationCodes` answer — { registrySize, mapped[], unmapped[] } — which is what decides whether this symbol has a filer at all. ⛔ Without it the instrument stays unclassified rather than assumed.',
+    feed: 'The `radarCandidates` answer, for `fedCount`: whether the statements were actually read.',
   },
   laneCoverage: {
     'activity.<source>': { attempts: NUMBER, succeeded: 'boolean-or-count' },
@@ -297,6 +319,10 @@ export const INPUT_CONTRACTS = {
   radarCandidates: { mode: 'strict', keys: { market: STRING, symbols: ARRAY, financials: OBJECT, facts: OBJECT, documents: OBJECT, prices: OBJECT, events: OBJECT, catalysts: OBJECT, valuations: OBJECT } },
   radarFeedDiagnosis: { mode: 'strict', keys: { market: STRING, symbols: ARRAY, plan: OBJECT, mapping: OBJECT, responses: ARRAY, candidates: OBJECT, lanes: OBJECT } },
 
+  // ── The valuation end of the same wiring (#160) ────────────────────────
+  thesisValuation: { mode: 'strict', keys: { asset: STRING, market: STRING, price: NUMBER, currency: STRING, scenarios: OBJECT, filings: ARRAY } },
+  thesisGapSources: { mode: 'strict', keys: { asset: STRING, market: STRING, gaps: ARRAY, mapping: OBJECT, instrumentType: STRING, feed: OBJECT, filings: ARRAY } },
+
   // ── Schedule and wake ──────────────────────────────────────────────────
   zonedDateTimeToUtc: { mode: 'named', keys: { date: STRING, time: STRING, timeZone: STRING } },
   nextMarketReview: { mode: 'strict', keys: { sessions: ARRAY, bufferMinutes: NUMBER } },
@@ -314,7 +340,7 @@ export const INPUT_CONTRACTS = {
   // ── State the run carries ──────────────────────────────────────────────
   researchState: { mode: 'strict', keys: { previous: OBJECT, observations: ARRAY } },
   researchUniverse: { mode: 'strict', keys: { market: STRING, extensions: ARRAY } },
-  refutedMemoryRules: { mode: 'strict', keys: { patterns: ANY } },
+  refutedMemoryRules: { mode: 'strict', keys: { patterns: ANY, memory: OBJECT } },
   inputContracts: { mode: 'named', keys: {} },
 }
 

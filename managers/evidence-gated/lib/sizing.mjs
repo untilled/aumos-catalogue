@@ -273,9 +273,9 @@ export function effectivePositionCap(input = {}) {
     diagnostics.push(diagnostic(
       'main_lane_requires_variant_view',
       'unevaluated',
-      'The main lane is what a checked variant view opens; this run asked for it without one, so the candidate is sized under the experimental ceiling until the missing requirements are met',
+      `The main lane is what a checked variant view opens; this run asked for it without one, so the candidate is sized under the experimental ceiling until the missing requirements are met. ${variant.data.satisfiedCount} of ${variant.data.requirementCount} are already met — read requirementReport for which one binds and what is outstanding on it, rather than the verdict alone (#160)`,
       'lane',
-      { missing: variant.data.missing, satisfied: variant.data.satisfied, requirements: variant.data.requirements },
+      { missing: variant.data.missing, satisfied: variant.data.satisfied, requirements: variant.data.requirements, requirementReport: variant.data.requirementReport },
     ))
   }
   /**
@@ -332,6 +332,21 @@ export function effectivePositionCap(input = {}) {
         unlocksAt,
         promotion,
         limits: limits.map((row) => ({ source: row.source, weight: round(row.weight) })),
+        /**
+         * ⚠️ `promotionGate` is what lifts the *ceiling*; the main lane is what
+         * takes the ceiling off the candidate entirely, and it is a different
+         * door with a different key. Naming only the first left the reader of a
+         * twentyfold reduction with no way to see that three of the four main
+         * lane requirements were already met (#160).
+         */
+        mainLane: {
+          open: mainLaneOpen,
+          satisfied: variant.data.satisfied,
+          missing: variant.data.missing,
+          satisfiedCount: variant.data.satisfiedCount,
+          requirementCount: variant.data.requirementCount,
+          requirementReport: variant.data.requirementReport,
+        },
       },
     ))
   }
