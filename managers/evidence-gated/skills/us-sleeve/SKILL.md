@@ -46,11 +46,49 @@ web plus installed OpenDART/SEC. Include distributions for liquidity ETFs when a
 Alpaca absence activates web fallback; it does not close news. Report attempted and unused routes
 through `laneCoverage` activity and return its diagnostic codes in uncertainty.
 
-Fetch and normalize point-in-time filings for the curated research names before calling
-`upsideRadar` on them. Also run the price-pattern `scan` branch; neither branch substitutes for
-the other. Return all radar lanes' included/excluded counts and `radar_lane_starved` diagnostics.
-Use `researchState` to carry the bounded roster and Evidence references; source payloads must be
-refetched until host source storage is available. The roster is not a claim of full-market coverage.
+### Feed the fundamental branch, then run it — this is a numbered step (#146)
+
+⛔ **It was a sentence in a paragraph and all three flows skipped it.** The 2026-09-06 run declared
+its universe, swept it, called `upsideRadar` — and got `starved` on all three lanes, 0 included of
+13, because nothing had ever fetched a filing to feed it. The branch was not dead; it had never
+been fed. Do these in order and report each one:
+
+1. **`researchUniverse({market: "us"})`** — ⚠️ the argument is **`"us"`**, the sleeve, and **never
+   the MIC `XNAS`/`XNYS`**. `inputContracts.vocabulary.researchMarkets` publishes the pair.
+2. **`source_request` `sec-edgar` `/files/company_tickers.json`** — the CIK registry. ⚠️ **This
+   side has the lower barrier and has still never been fed.** `/api/xbrl/companyfacts/{symbol}` is
+   keyed by the **ticker**, so the vendor route needs no mapping at all; the host cache route wants
+   SEC's own `vendorId`, which is the CIK, and this file is where it comes from. The previous run's
+   US candidate was recorded as *why-cheap unresolved (sec-edgar was open and unused)* — open and
+   unused is the entire finding.
+3. **`mapCorporationCodes({market: "us", tickerRows})`** — ticker → CIK. Report the unmapped names;
+   a name with no CIK can still be reached on the vendor route and not through the cache.
+4. **`fundamentalsPlan`** — it returns the ordered calls with the host cache state already read.
+   Call `source_cache_read` for each (`provider`, `market`, `symbol`, `freshFor`, `asOf`), and
+   `source_cache_refresh` (which also needs `document: "companyfacts"` and the CIK as `vendorId`)
+   only where the state says to. ⚠️ **`never-fetched`
+   is blind, `refresh-failed` is behind, and `fresh` with no document is the vendor having nothing.**
+   Three different findings; do not collapse them.
+5. **Read each response's own dates.** `normalizeSecFacts` takes `filed` as the availability
+   instant — never the fiscal period end — and drops anything later than `asOf`.
+6. **`radarCandidates`** — vendor rows or cached documents in, radar candidates out. Every roster
+   name comes back, including the unfed ones, with the reason it is unfed.
+7. **`radarFeedDiagnosis`** — which stage lost the input: registry, mapping, request, response,
+   normalization, or none of them.
+8. **`upsideRadar({candidates, feed})`** — pass the diagnosis as `feed`. Without it a starved lane
+   can say it is unfed and not *why*, and that is `radar_starvation_cause_unreported`.
+
+Also run the price-pattern `scan` branch; neither branch substitutes for the other. Return all
+radar lanes' included/excluded counts, the `radar_lane_starved` diagnostics **with their
+`feedStage`/`feedCause`**, and the feed verdict — `fed-and-evaluated`, `fed-and-genuinely-empty`
+or `never-fed`. ⛔ **Reporting the second as the third, or the third as the second, is the worst
+outcome available here**: one says the market was reviewed and declined, the other says nothing
+was ever looked at, and they read identically in a candidate list.
+
+Use `researchState` to carry the bounded roster and Evidence references. ⛔ Private memory is not
+a source cache — `skills/memory-contract/SKILL.md` forbids it in as many words — and it no longer
+has to be: the store is the host's, reached through the two cache tools above. The roster is not a
+claim of full-market coverage.
 
 ## Your tools
 

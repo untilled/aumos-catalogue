@@ -55,7 +55,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `sectorStrength` | L1: lane ranking, rank moves, regime, `researchQueue`, bot baselines |
 | `regimeTag` | a Brief regime call, canonicalized, attributed, and compared with the sector reading |
 | `entryQualityGate` | `falling_knife` blocks; eq-v2 and `no_new_low` dual lenses |
-| `upsideRadar` | the three fundamental/event lanes, with every exclusion explained and starvation reported |
+| `upsideRadar` | the three fundamental/event lanes, with every exclusion explained and starvation reported, and — given `feed` — the stage that starved it |
 | `variantViewCheck` | whether a candidate's variant view is established — a complete thesis, a dated consensus citation and a cleared challenge — and therefore which lane may size it |
 
 ### Sizing, concentration and budgets
@@ -153,6 +153,20 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `normalizeDartFinancials` | OpenDART statements |
 | `parseDartCorpCodes` | the OpenDART corp-code registry |
 
+### The fundamental feeding path
+
+The one line `upsideRadar` was missing (#146). The order is the fix: nothing can
+be addressed to a filer until the registry supplies the id the roster does not
+carry, and the 2026-09-06 run never asked for it.
+
+| operation | what it decides |
+|---|---|
+| `fundamentalsPlan` | the ordered source calls that feed the branch, each with its host cache state — and whether that state means *read it*, *refresh it* or *the refresh failed* |
+| `mapCorporationCodes` | roster symbol → the vendor's own filer id (OpenDART `corp_code`, SEC CIK); reports unmapped names one by one |
+| `dartVendorStatus` | which OpenDART status arrived on an HTTP 200 — ⛔ `013` (matched nothing) and `020` (quota; **we were not allowed to look**) are never the same finding |
+| `radarCandidates` | vendor rows or cached normalized documents → `upsideRadar` candidates, with every unfed name still returned and counted |
+| `radarFeedDiagnosis` | which stage lost the input — registry, mapping, request, response, normalization — so a starved lane names its cause instead of repeating *unfed* |
+
 ### Schedule and wake
 
 | operation | what it decides |
@@ -230,7 +244,9 @@ shape of every operation is in that call, and it is the one to read when composi
 | `signalPaper` | `ruleVersion` on every row, and `benchmarkBars` | A row with no rule version is refused: rows judged under different versions are reported together and never pooled. Without a benchmark a row scores no excess and drops out of the aggregate rather than counting as zero. |
 | `paperAdmission` | `challengeVerdict`, and for a call `thesis.evidenceStatus` plus `priceHistoryLatestDate` | The verdict decides the setup, so a conditional verdict cannot be logged as a call. A promote on price history stale by more than two weekdays is refused. |
 | `verdictReport` | `paper.d60` from `signalPaper.byCohort['llm-research']`, the `cohort` it came from, and optionally `shadow`, `baseline`, `closedOutcomeCount` | Thresholds may be passed **stricter only** — a looser one is refused, not honoured. Any cohort other than `llm-research` is refused outright: a control arm is measured, never promoted. |
-| `upsideRadar` | `price.ma50`, `price.ma200`, `price.offHigh200` and `events` with `announcedAt`/`sue`/`preAnnouncementClose` | The three lanes read them. Without them a lane excludes every candidate and reports `starved`, which is a sourcing finding rather than an absence of opportunity. |
+| `upsideRadar` | `price.ma50`, `price.ma200`, `price.offHigh200` and `events` with `announcedAt`/`sue`/`preAnnouncementClose`, plus `feed` — what `radarFeedDiagnosis` returned | The three lanes read the first group. Without them a lane excludes every candidate and reports `starved`, which is a sourcing finding rather than an absence of opportunity. Without `feed` that finding can say the lane is unfed and **not what stage lost the input**, which is `radar_starvation_cause_unreported`. |
+| `fundamentalsPlan` | `market` as `'kr'` / `'us'` — ⛔ never a MIC — plus `symbols` from `researchUniverse`, `corporationCodes` from `mapCorporationCodes`, and `cache` keyed by the plan's own `cacheKey` | The market argument is the sleeve, not the venue; `inputContracts.vocabulary.researchMarkets` publishes it beside the MIC list because publishing only the MIC list is what made the wrong one the obvious guess. Without `cache` every call is reported `source_cache_unreported`: a missing cache and a failed refresh cannot be told apart from an absent entry. Without `businessYear` and `reportCode` the OpenDART financials document is refused by name rather than answered broadly. |
+| `radarFeedDiagnosis` | `plan`, `mapping`, `responses`, `candidates` and `lanes` | ⚠️ `mapping: null` means the join was never attempted and is a **different** finding from a join that matched nothing — that pair is the whole of this issue. Without `lanes` the verdict is `unevaluated` rather than a claim that the branch was fed. |
 | `controlArmLane` | `exitRegistered: true` on every row, and `experimentTotalRemainingWeight` | The exit discipline is this lane's product, so an unregistered entry is refused. The lane spends inside the experimental total, not beside it. |
 | `discoveryCapacity` | `radar` (what `themeRadarDue` returned) and `coverage` (what `coverage` returned), plus this run's `uncertainty` once the proposal exists | Each lane is judged from the operation that owns it, so nothing here is a second copy of either answer. ⚠️ An absent input is `unstated`, never `open`: the failure this exists for (#140) is a question never asked, and defaulting the unasked half to open would reproduce it. Without `uncertainty` the disclosure is unjudged rather than passed; with it, a dark run that does not carry `discovery_lane_dark` verbatim is `blocked` — the proposal, not the run. |
 | `harnessAudit` | `decisions` with `orderReady`/`exitRegistered`/`quantity`, `theses`, `managedSince` (the invocation's `mandate.effectiveFrom`), `universe` | Without the decisions every held position reads as unexplained. Without the theses every WATCH on an unheld name reads as orphaned. Both are true findings on a real book and noise on a partial input. ⚠️ Without `managedSince` a position **inherited** at cold start cannot be told from one bought since, and every unexplained holding is carried — the safe direction, and reported as `audit_managed_since_missing` rather than guessed. Whether new non-core exposure waits while an unexplained holding stands is decided by the same package rule `concentration` reads; it was a config key nothing read until #109 and stopped being a setting in #133. ⚠️ Without `universe` — `{ scannerUniverses, extensions }`, or `coverage`'s own answer — this run cannot say whether a discovery denominator was standing, and an unasked question is not a yes: it is a **`warn`** either way and never a blocker, because a book with no universe still has a sell side to manage. |

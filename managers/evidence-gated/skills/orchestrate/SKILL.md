@@ -109,6 +109,8 @@ Your tools are the Aumos gateway's, already attached to this session:
   mcp__aumos__memory_read      mcp__aumos__memory_write
   mcp__aumos__source_request       (a data vendor this machine holds a key for)
   mcp__aumos__connection_request   (a broker login the investor already connected)
+  mcp__aumos__source_cache_read    (stored filings for one filer, cut to this asOf)
+  mcp__aumos__source_cache_refresh (collect one document for one filer, by vendor id)
 and this package's own server:
   mcp__evidence-gated-metrics__calculate
 and, when this session was served them, the CLI's own web research:
@@ -175,10 +177,18 @@ So every dispatch prompt carries this, adjusted to the flow's markets:
 Declare this sleeve's universe for this run before any sweep — call researchUniverse for
 the curated seed, verify current listing eligibility, add persisted research extensions, and pass both to
 `coverage` (`scannerUniverses`, `extensions`) and to `harnessAudit` (`universe`).
+Feed the fundamental branch before running it, in this order (#146): the registry that gives the
+vendor's own filer id (open-dart /api/corpCode.xml for corp_code, sec-edgar
+/files/company_tickers.json for the CIK) → mapCorporationCodes → fundamentalsPlan →
+source_cache_read / source_cache_refresh → dartVendorStatus on every OpenDART response →
+radarCandidates → radarFeedDiagnosis → upsideRadar({candidates, feed}). The registry call is the
+one no run has ever made; without it nothing fetched can be addressed to a filer.
 Collect dated filings, catalysts and events, then run both the price-pattern sweep and upsideRadar.
 Scan holdings' news/disclosures through granted web and installed filing sources every cycle.
-Return researchActivity ({source, granted, attempts, succeeded}) and each radar lane's exclusions
-and starvation. Persist the roster/Evidence references with researchState. If the roster cannot
+Return researchActivity ({source, granted, attempts, succeeded}), each radar lane's exclusions and
+starvation with its feedStage/feedCause, and the feed verdict — fed-and-evaluated,
+fed-and-genuinely-empty or never-fed. The last two produce an identical empty list and mean
+opposite things; do not report one as the other. Persist the roster/Evidence references with researchState. If the roster cannot
 be read or eligibility cannot be checked, report that scope gap in uncertainty; never substitute holdings.
 ```
 

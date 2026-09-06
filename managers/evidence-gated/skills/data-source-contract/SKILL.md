@@ -57,6 +57,30 @@ is what makes the wrong turn look right.
 | `open-dart` | `/api/corpCode.xml`, `/api/company.json`, `/api/list.json`, `/api/fnlttSinglAcntAll.json`, `/api/fnlttSinglAcnt.json` | the **receipt** is the moment: `rcept_no` begins with the receipt date and `rcept_dt` repeats it; a business year is not a disclosure date |
 | CLI web | fallback news, corporate actions, distributions, consensus; IR, policy, macro, industry/theme context | active fallback when Alpaca is absent; non-canonical, retain URL/access time and disclose replay gap |
 
+### The stored copy, and the four answers it gives (aumos#671, #683 · Aumos 0.3.30)
+
+`source_cache_read` and `source_cache_refresh` hold filings per filer so the branch is not
+re-procured every run. Read before you refresh, and read the **`state`** — the field is `state`,
+not `status`:
+
+| `state` | what it is | ⚠️ what it is **not** |
+|---|---|---|
+| `never-fetched` | nobody has ever asked for this filer | not an empty answer — this run is blind |
+| `refresh-failed` | the attempt did not reach the vendor; `failure` says why, `cached` is what is still on hand | not an empty cache — what is there is behind |
+| `stale` | the last success is outside the `freshFor` this call stated | not unusable; refresh, then read |
+| `fresh` | the last success is inside it | ⛔ `fresh` with an empty `documents` is **the vendor having nothing** — that is an answer |
+
+`source_cache_read` takes `{provider, market, symbol, freshFor, asOf}` and `freshFor` has **no
+default**, deliberately: a default would be the host setting this methodology's deadline.
+`source_cache_refresh` additionally takes `document` — only `open-dart`/`filings`,
+`open-dart`/`financials` (which requires `parameters.year` and `parameters.reportCode` by name) and
+`sec-edgar`/`companyfacts` are routed — and `vendorId`, the vendor's own id for the filer, which
+Aumos does not resolve for you. ⛔ **There is no cache document for the corp-code registry**, which
+is why the registry above stays a `source_request` and stays first.
+
+The host cuts every cached observation and attempt at the invocation's `asOf` before this process
+sees a row. Filter again anyway; a boundary enforced in one place is one refactor from being gone.
+
 ### Toss's two time formats, and the one enum this package guessed
 
 The 토스 login is two families of route, and they do not spell time the same way. Neither shape is
@@ -112,9 +136,15 @@ For every response:
 5. Pagination repeats the same boundary. A later page may not reintroduce future rows.
 
 Three OpenDART behaviours change what a response means. `corpCode.xml` answers with a ZIP archive,
-relayed as sent — read `corp_code` and `stock_code` off `list.json` rows instead of trying to parse
-it. Errors arrive with HTTP 200 and a `status` field, so `020` (quota exceeded) must be read as *we
-were not allowed to look* rather than as an empty result. And XBRL statements follow the periodic
+relayed as sent — `parseDartCorpCodes` reads the decompressed text, and where a run cannot
+decompress it, `corp_code` and `stock_code` come off `list.json` rows instead; `mapCorporationCodes`
+takes either. ⛔ **That registry is not optional and it is not a fallback**: every OpenDART route,
+and the host cache's `vendorId`, is keyed by `corp_code`, the curated roster is keyed by the
+six-digit listing symbol, and the call that joins them had never been made until #146.
+Errors arrive with HTTP 200 and a `status` field, so `020` (quota exceeded) must be read as *we
+were not allowed to look* rather than as an empty result — ⛔ and `013` (matched nothing) is a
+**different** answer, not a synonym. `dartVendorStatus` separates them and every OpenDART response
+goes through it. And XBRL statements follow the periodic
 report, so a quarter that has only been announced preliminarily has no statement — a real gap, never
 filled in with the preliminary figures.
 

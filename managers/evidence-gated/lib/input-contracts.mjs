@@ -9,7 +9,22 @@ export const PAPER_SETUP_COHORTS = {
 export const INPUT_VOCABULARY = {
   sentinelKinds: ['price_below', 'price_above', 'metric', 'time'],
   sentinelOperators: ['above', 'below'],
+  /**
+   * ⚠️ **Two market vocabularies, and publishing one of them was a trap** (#146).
+   * `markets` is the MIC list — the venues this manager contributes to, and the
+   * spelling the host's own tools take. It is **not** what `researchUniverse`,
+   * `fundamentalsPlan`, `radarCandidates` or `radarFeedDiagnosis` accept: those
+   * take the sleeve, `'kr'` or `'us'`. With only the MIC list published, a
+   * caller reading this object had exactly one market vocabulary to reach for
+   * and it was the wrong one — the same shape as the guessed-shape failure #158
+   * is named after, one field down. Both are published now, each said to be
+   * what it is.
+   */
   markets: ['XKRX', 'XNAS', 'XNYS'],
+  researchMarkets: ['kr', 'us'],
+  marketToResearchMarket: { XKRX: 'kr', XNAS: 'us', XNYS: 'us' },
+  cacheStates: ['fresh', 'stale', 'never-fetched', 'refresh-failed'],
+  cacheDocuments: { 'open-dart': ['filings', 'financials'], 'sec-edgar': ['companyfacts'] },
   paperSetups: Object.keys(PAPER_SETUP_COHORTS),
 }
 
@@ -111,6 +126,29 @@ export const NESTED_CONTRACTS = {
   crossCheckPrice: {
     config: { priceConflictTolerance: NUMBER },
   },
+  fundamentalsPlan: {
+    'symbols[]': 'A roster symbol string, or a researchUniverse row — { symbol, sector }. The whole array from researchUniverse.data.symbols is what this expects.',
+    'corporationCodes[]': { symbol: STRING, corporationCode: STRING, vendorId: STRING },
+    'cache.<cacheKey>': `The source_cache_read answer for that call: { state, documents | cached, observedAt }. The field is state, not status, and it is one of ${['fresh', 'stale', 'never-fetched', 'refresh-failed'].join(', ')}. An absent entry is reported as unreported rather than assumed empty.`,
+  },
+  mapCorporationCodes: {
+    registryRows: 'parseDartCorpCodes output — the array, or the { rows } wrapper. KR only.',
+    filingRows: 'normalizeDartFilings output; the list.json route carries corp_code and stock_code on the same row and is the fallback when the ZIP cannot be decompressed.',
+    tickerRows: 'The company_tickers.json body — the object keyed by index, or its values as an array. US only; it is what supplies the CIK the cache route wants.',
+  },
+  radarCandidates: {
+    'financials.<symbol>': 'normalizeDartFinancials output for that symbol. KR.',
+    'facts.<symbol>': 'normalizeSecFacts output for that symbol. US.',
+    'documents.<symbol>': 'The CachedDocument array from source_cache_read — { publishedAt, version, normalized: { period, currency, metrics } }. When present it is preferred over the raw vendor rows, because it is what the host already dated.',
+    'prices.<symbol>': { status: STRING, close: NUMBER, ma50: NUMBER, ma200: NUMBER, offHigh200: NUMBER, rs20VsBenchmarkPct: NUMBER },
+  },
+  radarFeedDiagnosis: {
+    plan: 'The whole fundamentalsPlan data object; its requests carry the cache states this reads.',
+    mapping: 'The whole mapCorporationCodes data object. ⚠️ null means the join was never attempted, which is a different finding from a join that returned nothing.',
+    'responses[]': { step: STRING, symbol: STRING, feedFailure: STRING, classification: STRING, usable: BOOLEAN },
+    candidates: 'The whole radarCandidates data object.',
+    lanes: 'upsideRadar.data.lanes, so the reading can say fed-and-empty rather than starved.',
+  },
 }
 
 /** `key: type` for every registered operation, with the mode that governs the rest. */
@@ -126,7 +164,7 @@ export const INPUT_CONTRACTS = {
   sectorStrength: { mode: 'named', keys: { benchmarkBars: ARRAY, sectors: ARRAY, previousRanks: OBJECT, lane: STRING, weights: ARRAY } },
   regimeTag: { mode: 'named', keys: { asserted: STRING, mechanical: ANY, briefRevisionId: STRING, assertedAt: STRING, recorded: ANY } },
   entryQualityGate: { mode: 'strict', keys: { bars: ARRAY, lenses: ARRAY, noNewLow: OBJECT } },
-  upsideRadar: { mode: 'named', keys: { candidates: ARRAY } },
+  upsideRadar: { mode: 'named', keys: { candidates: ARRAY, feed: OBJECT } },
   variantViewCheck: { mode: 'named', keys: { thesis: OBJECT, challengeVerdict: STRING, evidenceSamples: ARRAY } },
 
   // ── Sizing, concentration and budgets ──────────────────────────────────
@@ -246,6 +284,13 @@ export const INPUT_CONTRACTS = {
   normalizeSecSubmissions: { mode: 'open', keys: {} },
   laneCoverage: { mode: 'strict', keys: { lane: STRING, sources: OBJECT, intent: STRING, activity: OBJECT } },
   validateAdjustment: { mode: 'named', keys: { series: ARRAY, corporateActions: ARRAY } },
+
+  // ── The fundamental feeding path (#146) ────────────────────────────────
+  fundamentalsPlan: { mode: 'strict', keys: { market: STRING, symbols: ARRAY, corporationCodes: ARRAY, cache: OBJECT, businessYear: ANY, reportCode: ANY, freshForSeconds: NUMBER } },
+  mapCorporationCodes: { mode: 'strict', keys: { market: STRING, symbols: ARRAY, registryRows: ANY, filingRows: ANY, tickerRows: ANY } },
+  dartVendorStatus: { mode: 'named', keys: { payload: OBJECT, path: STRING } },
+  radarCandidates: { mode: 'strict', keys: { market: STRING, symbols: ARRAY, financials: OBJECT, facts: OBJECT, documents: OBJECT, prices: OBJECT, events: OBJECT, catalysts: OBJECT, valuations: OBJECT } },
+  radarFeedDiagnosis: { mode: 'strict', keys: { market: STRING, symbols: ARRAY, plan: OBJECT, mapping: OBJECT, responses: ARRAY, candidates: OBJECT, lanes: OBJECT } },
 
   // ── Schedule and wake ──────────────────────────────────────────────────
   zonedDateTimeToUtc: { mode: 'named', keys: { date: STRING, time: STRING, timeZone: STRING } },

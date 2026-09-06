@@ -726,3 +726,210 @@ assert.ok(has(execute({ operation: 'themeRadarDue', asOf, input: { lastRunAt: '2
 assert.equal(execute({ operation: 'themeRadarDue', asOf, input: { lastRunAt: '2026-09-01T00:00:00Z', asOf } }).status, 'ok', 'a copy that agrees costs nothing')
 
 console.log('evidence-gated issues #157-158 input-contract regression tests passed')
+
+/**
+ * ── #146: the fundamental branch has a feeding path, and it names its failures ──
+ *
+ * ⚠️ **Every vendor number below is a fixture, and none of it has been observed
+ * against a live vendor.** No OpenDART or SEC key exists in the environment
+ * this was written in. The shapes come from the vendors' own documentation and
+ * from the 2026-09-06 run's recorded responses; ⛔ a vendor continuing to
+ * answer the way its documentation says is not something these tests establish,
+ * and #146 stays open until a run with keys reports a fed lane.
+ *
+ * The measured facts these pin, from `inst_6efcc6a0486a42478702a1c247e6d921`:
+ * `researchUniverse` 74 KR / 83 US at `snapshotDate 2026-07-24`; `corp_code
+ * 00126380` → `stock_code 005930`; three lanes 0 included / 13 excluded on
+ * `no-valid-point-in-time-filing` and `no-event-in-the-last-30-days`.
+ */
+const feedAsOf = '2026-09-06T07:00:00Z'
+const feedRun = (operation, input = {}) => execute({ operation, asOf: feedAsOf, input })
+const feedHas = (answer, code) => answer.diagnostics.some((row) => row.code === code)
+
+// The roster is here, and its argument is the sleeve rather than the MIC.
+const krRoster = feedRun('researchUniverse', { market: 'kr' })
+const usRoster = feedRun('researchUniverse', { market: 'us' })
+assert.equal(krRoster.data.symbols.length, 74)
+assert.equal(usRoster.data.symbols.length, 83)
+assert.equal(krRoster.data.snapshotDate, '2026-07-24')
+assert.equal(feedRun('researchUniverse', { market: 'XKRX' }).status, 'blocked', 'the MIC is refused rather than answered')
+const vocabulary = feedRun('inputContracts').data.vocabulary
+assert.deepEqual(vocabulary.researchMarkets, ['kr', 'us'], 'the sleeve vocabulary is published beside the MIC list, which is what made the wrong one the obvious guess')
+assert.deepEqual(vocabulary.markets, ['XKRX', 'XNAS', 'XNYS'])
+assert.equal(vocabulary.marketToResearchMarket.XKRX, 'kr')
+
+// The join that was missing: 005930 → 00126380, off the registry the run never requested.
+const registry = feedRun('parseDartCorpCodes', { xml: '<result><list><corp_code>00126380</corp_code><corp_name>합성전자</corp_name><stock_code>005930</stock_code><modify_date>20260801</modify_date></list></result>' })
+assert.equal(registry.data.rows[0].stockCode, '005930')
+const mapped = feedRun('mapCorporationCodes', { market: 'kr', symbols: ['005930', '036460'], registryRows: registry.data.rows })
+assert.equal(mapped.data.mapped[0].corporationCode, '00126380')
+assert.equal(mapped.data.mapped[0].vendorId, '00126380', 'the host cache is keyed by the same id')
+assert.deepEqual(mapped.data.unmapped, ['036460'])
+assert.ok(feedHas(mapped, 'corp_code_unmapped_symbols'), 'a name the registry did not carry is reported, not dropped')
+// ⛔ No registry at all is a different finding from a registry that matched nothing.
+assert.ok(feedHas(feedRun('mapCorporationCodes', { market: 'kr', symbols: ['005930'] }), 'corp_code_registry_absent'))
+assert.ok(feedHas(feedRun('mapCorporationCodes', { market: 'kr', symbols: ['005930'], registryRows: [{ stockCode: '000660', corporationCode: '00164779' }] }), 'corp_code_mapping_empty'))
+// The `list.json` fallback carries the same pair when the ZIP cannot be decompressed.
+assert.equal(feedRun('mapCorporationCodes', { market: 'kr', symbols: ['005930'], filingRows: [{ stockCode: '005930', corporationCode: '00126380' }] }).data.mapped.length, 1)
+// US maps ticker → CIK, padded, off company_tickers.json's index-keyed object.
+const usMapped = feedRun('mapCorporationCodes', { market: 'us', symbols: ['AAPL', 'DKS'], tickerRows: { 0: { cik_str: 320193, ticker: 'AAPL', title: 'Apple Inc.' } } })
+assert.equal(usMapped.data.mapped[0].cik, '0000320193')
+assert.deepEqual(usMapped.data.unmapped, ['DKS'])
+
+/**
+ * The plan reads the host cache's `state` — the field is `state`, not `status`
+ * — and the four values are four findings rather than one empty payload.
+ */
+const planned = { symbol: '005930', corporationCode: '00126380' }
+const cacheFor = (financials, filings) => ({ 'open-dart:financials:005930': financials, 'open-dart:filings:005930': filings })
+const planInput = { market: 'kr', symbols: ['005930'], corporationCodes: [planned], businessYear: 2026, reportCode: 11012 }
+const feedPlan = feedRun('fundamentalsPlan', { ...planInput, cache: cacheFor({ state: 'fresh', documents: [{}] }, { state: 'never-fetched' }) })
+assert.equal(feedPlan.data.requests[0].step, 'corp-code-registry', 'the registry is planned first, because nothing below it can be addressed without it')
+assert.equal(feedPlan.data.requests[0].tool, 'source_request', 'there is no cache document for the registry, so it stays a vendor request')
+assert.equal(feedPlan.data.requests.find((row) => row.step === 'financials').action, 'read-cache')
+assert.equal(feedPlan.data.requests.find((row) => row.step === 'financials').vendorId, '00126380')
+assert.equal(feedPlan.data.requests.find((row) => row.step === 'filings').action, 'refresh-then-read')
+assert.ok(feedHas(feedPlan, 'source_cache_never_fetched'), 'never-fetched is blind rather than empty and says so')
+assert.equal(feedPlan.data.freshForSeconds, 604800)
+assert.equal(feedRun('fundamentalsPlan', { ...planInput, freshForSeconds: 0 }).status, 'blocked', 'freshFor has no default here either')
+assert.ok(feedHas(feedRun('fundamentalsPlan', planInput), 'source_cache_unreported'), 'an unreported cache state cannot be read as an empty one')
+const failedRefresh = feedRun('fundamentalsPlan', { ...planInput, cache: cacheFor({ state: 'refresh-failed', cached: [{}] }, { state: 'refresh-failed', cached: [] }) })
+assert.ok(feedHas(failedRefresh, 'source_cache_refresh_failed'))
+assert.equal(failedRefresh.status, 'blocked')
+// A fresh cache holding nothing is the vendor's answer, and is neither of the two above.
+assert.ok(feedHas(feedRun('fundamentalsPlan', { ...planInput, cache: cacheFor({ state: 'fresh', documents: [] }, { state: 'fresh', documents: [] }) }), 'source_cache_fresh_and_empty'))
+// The US plan needs no mapping to reach the vendor, and asks for the CIK file only for the cache.
+const usFeedPlan = feedRun('fundamentalsPlan', { market: 'us', symbols: ['DKS'] })
+assert.equal(usFeedPlan.data.requests[0].step, 'ticker-registry')
+assert.equal(usFeedPlan.data.requests.find((row) => row.step === 'facts').path, '/api/xbrl/companyfacts/DKS')
+
+/**
+ * ⛔ OpenDART reports its own refusals on an HTTP 200, and `013` and `020` are
+ * not the same finding. Mixing them makes the starvation diagnosis worthless:
+ * a quota outage would read as a fact about a company.
+ */
+assert.equal(feedRun('dartVendorStatus', { payload: { status: '013', message: '조회된 데이터가 없습니다.' } }).data.feedFailure, 'vendor-holds-no-row')
+assert.equal(feedRun('dartVendorStatus', { payload: { status: '020', message: '요청 제한을 초과하였습니다.' } }).data.feedFailure, 'quota-exhausted')
+assert.notEqual(
+  feedRun('dartVendorStatus', { payload: { status: '013' } }).data.feedFailure,
+  feedRun('dartVendorStatus', { payload: { status: '020' } }).data.feedFailure,
+  'we looked and found nothing is never the same answer as we were not allowed to look',
+)
+assert.ok(feedHas(feedRun('dartVendorStatus', { payload: { status: '020' } }), 'dart_quota_exhausted'))
+assert.ok(feedHas(feedRun('dartVendorStatus', { payload: { status: '013' } }), 'dart_query_matched_nothing'))
+assert.equal(feedRun('dartVendorStatus', { payload: { status: '020' } }).data.retryable, true)
+assert.equal(feedRun('dartVendorStatus', { payload: { status: '013' } }).data.retryable, false)
+assert.equal(feedRun('dartVendorStatus', { payload: { status: '000' } }).data.usable, true)
+assert.ok(feedHas(feedRun('dartVendorStatus', { payload: {} }), 'dart_status_missing'))
+assert.ok(feedHas(feedRun('dartVendorStatus', { payload: { status: '777' } }), 'dart_status_unknown'), 'an unmeasured status is recorded rather than guessed at')
+
+/**
+ * The prior comparable travels inside the same OpenDART filing (`frmtrm_amount`)
+ * and was being dropped, which is one reason `inflection` reported
+ * `no-valid-point-in-time-filing` on rows it had been handed.
+ */
+const statements = feedRun('normalizeDartFinancials', {
+  status: '000',
+  list: [
+    { rcept_no: '20260814000001', corp_code: '00126380', bsns_year: '2026', reprt_code: '11012', fs_div: 'CFS', sj_div: 'IS', account_id: 'ifrs-full_Revenue', account_nm: '매출액', thstrm_amount: '1,000', frmtrm_amount: '900' },
+    { rcept_no: '20260814000001', corp_code: '00126380', bsns_year: '2026', reprt_code: '11012', fs_div: 'CFS', sj_div: 'IS', account_id: 'dart_OperatingIncomeLoss', account_nm: '영업이익', thstrm_amount: '120', frmtrm_amount: '-30' },
+  ],
+})
+assert.equal(statements.data.rows[1].priorAmount, -30, 'the previous term is carried rather than thrown away')
+const built = feedRun('radarCandidates', { market: 'kr', symbols: ['005930', '036460'], financials: { '005930': statements.data.rows }, prices: { '005930': { status: 'confirmed', close: 100, ma50: 110, ma200: 90, offHigh200: -0.18 } } })
+assert.equal(built.data.candidates.length, 2, 'a name with no response still comes back — dropping it is how never fetched becomes did not qualify')
+assert.deepEqual(built.data.unfed.map((row) => row.symbol), ['036460'])
+assert.equal(built.data.unfed[0].reason, 'no-response-supplied-for-this-symbol')
+const filing = built.data.candidates[0].filings[0]
+assert.equal(filing.periodEnd, '2026-06-30')
+assert.equal(filing.operatingIncomeYoy, 500, 'a sign flip from -30 to 120 is a +500% reading against the absolute prior')
+assert.equal(built.data.fedCount, 1)
+assert.equal(built.data.comparableCount, 1)
+// The host cache hands back its own normalized shape, and that path is read too.
+const fromCache = feedRun('radarCandidates', {
+  market: 'us',
+  symbols: ['DKS'],
+  documents: {
+    DKS: [
+      { publishedAt: '2025-09-01T00:00:00Z', version: 1, normalized: { period: { start: '2025-05-01', end: '2025-08-02', fiscalPeriod: 'Q2' }, currency: 'USD', metrics: { operatingIncome: 100, revenue: 1000 } } },
+      { publishedAt: '2026-09-01T00:00:00Z', version: 1, normalized: { period: { start: '2026-05-01', end: '2026-08-01', fiscalPeriod: 'Q2' }, currency: 'USD', metrics: { operatingIncome: 150, revenue: 1200 } } },
+    ],
+  },
+})
+assert.equal(fromCache.data.candidates[0].filings.at(-1).operatingIncomeYoy, 50)
+assert.equal(fromCache.data.candidates[0].filings.at(-1).sourceType, 'host-source-cache')
+
+/**
+ * ── Ask 4: a starved lane must say what starved it ─────────────────────────
+ *
+ * The 2026-09-06 numbers, reproduced: thirteen candidates, three lanes, 0/13
+ * each, and the two dominant reasons the run recorded.
+ */
+const thirteen = Array.from({ length: 13 }, (_, index) => ({ asset: `K${index}`, market: 'kr' }))
+const bare = execute({ operation: 'upsideRadar', asOf: feedAsOf, input: { candidates: thirteen } })
+for (const lane of ['inflection', 'quality-pullback', 'post-event-continuation']) {
+  assert.equal(bare.data.lanes[lane].included, 0, `${lane} included 0`)
+  assert.equal(bare.data.lanes[lane].excluded, 13, `${lane} excluded 13`)
+  assert.equal(bare.data.lanes[lane].starved, true)
+}
+assert.equal(bare.data.lanes.inflection.reasons['no-valid-point-in-time-filing'], 13)
+assert.equal(bare.data.lanes['quality-pullback'].reasons['no-valid-point-in-time-filing'], 13)
+assert.equal(bare.data.lanes['post-event-continuation'].reasons['no-event-in-the-last-30-days'], 13)
+assert.equal(bare.data.lanes.inflection.ruleVersion, 'uri-v1')
+// ⛔ Unfed with no reading is itself reported: this run cannot say what starved it.
+assert.ok(feedHas(bare, 'radar_starvation_cause_unreported'))
+
+// The reading, on the run that actually happened: the registry was never requested.
+const neverFed = feedRun('radarFeedDiagnosis', { market: 'kr', symbols: thirteen.map((row) => row.asset), plan: { requests: [] }, lanes: bare.data.lanes })
+assert.equal(neverFed.data.stage, 'registry')
+assert.equal(neverFed.data.cause, 'registry-never-requested')
+assert.equal(neverFed.data.verdict, 'never-fed')
+assert.ok(feedHas(neverFed, 'radar_feed_broken'))
+const named = execute({ operation: 'upsideRadar', asOf: feedAsOf, input: { candidates: thirteen, feed: neverFed.data } })
+assert.equal(named.data.lanes.inflection.feedCause, 'registry-never-requested')
+assert.equal(named.data.lanes.inflection.feedStage, 'registry')
+assert.ok(named.diagnostics.find((row) => row.code === 'radar_lane_starved').message.includes('registry-never-requested'), 'the sentence names the cause instead of repeating "unfed"')
+assert.equal(feedHas(named, 'radar_starvation_cause_unreported'), false)
+
+// Each stage is a separate cause, and the first one that failed is the answer.
+const joined = { registrySize: 3800, mapped: [{ symbol: '005930' }], unmapped: [] }
+const stageOf = (input) => feedRun('radarFeedDiagnosis', { market: 'kr', symbols: ['005930'], lanes: bare.data.lanes, ...input }).data
+assert.equal(stageOf({ plan: feedPlan.data, mapping: { registrySize: 0, mapped: [], unmapped: ['005930'] } }).cause, 'registry-received-but-empty')
+assert.equal(stageOf({ plan: feedPlan.data, mapping: { registrySize: 3800, mapped: [], unmapped: ['005930'] } }).stage, 'mapping')
+assert.equal(stageOf({ plan: { requests: [{ step: 'corp-code-registry' }] }, mapping: joined }).cause, 'no-fundamental-request-was-planned')
+const quota = stageOf({ plan: feedPlan.data, mapping: joined, responses: [{ step: 'financials', ...feedRun('dartVendorStatus', { payload: { status: '020' } }).data }] })
+assert.equal(quota.cause, 'vendor-quota-exhausted-we-were-not-allowed-to-look')
+const noRow = stageOf({ plan: feedPlan.data, mapping: joined, responses: [{ step: 'financials', ...feedRun('dartVendorStatus', { payload: { status: '013' } }).data }], candidates: { fedCount: 0, comparableCount: 0 } })
+assert.equal(noRow.cause, 'vendor-holds-no-row-for-these-filers')
+assert.notEqual(quota.cause, noRow.cause, 'the two OpenDART 200s stay two causes all the way to the diagnosis')
+assert.equal(stageOf({ plan: failedRefresh.data, mapping: joined }).cause, 'source-cache-refresh-failed')
+assert.equal(stageOf({ plan: feedPlan.data, mapping: joined }).cause, 'source-cache-never-fetched-and-no-refresh-was-made')
+assert.notEqual(
+  stageOf({ plan: failedRefresh.data, mapping: joined }).cause,
+  stageOf({ plan: feedPlan.data, mapping: joined }).cause,
+  'a failed refresh and a cache nobody has filled are two causes, which is the distinction the host tool exists to make',
+)
+
+/**
+ * ⛔ And the worst outcome available here is mixing *fed and empty* with
+ * *never fed*: both produce an empty candidate list and they mean opposite
+ * things. The verdict says which, on the same object.
+ */
+const freshPlan = feedRun('fundamentalsPlan', { ...planInput, cache: cacheFor({ state: 'fresh', documents: [{}] }, { state: 'fresh', documents: [{}] }) })
+const fedButEmpty = feedRun('radarFeedDiagnosis', { market: 'kr', symbols: ['005930'], plan: freshPlan.data, mapping: joined, candidates: { fedCount: 1, comparableCount: 1 }, lanes: bare.data.lanes })
+assert.equal(fedButEmpty.data.fed, true)
+assert.equal(fedButEmpty.data.verdict, 'fed-and-genuinely-empty')
+assert.ok(feedHas(fedButEmpty, 'radar_lane_empty_not_starved'))
+assert.equal(feedHas(fedButEmpty, 'radar_feed_broken'), false)
+assert.notEqual(fedButEmpty.data.verdict, neverFed.data.verdict)
+
+// Every new operation publishes its contract, and refuses a key it does not read.
+const published = feedRun('inputContracts').data
+for (const operation of ['fundamentalsPlan', 'mapCorporationCodes', 'dartVendorStatus', 'radarCandidates', 'radarFeedDiagnosis']) {
+  assert.ok(published.contracts[operation], `${operation} publishes its shape`)
+  assert.ok(published.keys[operation].length, `${operation} publishes its keys`)
+}
+assert.equal(feedRun('fundamentalsPlan', { market: 'kr', symbols: ['005930'], corpCodes: [] }).status, 'blocked', 'a guessed key name is refused rather than absorbed')
+assert.equal(feedRun('radarCandidates', { market: 'XKRX', symbols: [] }).status, 'blocked')
+
+console.log('evidence-gated issue #146 fundamental-feed regression tests passed')
