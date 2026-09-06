@@ -284,6 +284,14 @@ memory contract, the skills, and the parity check against the original Python ha
 tracks the build checklist and `CONFORMANCE.md` separates checks that run in this
 repository from release gates that need an installed runtime.
 
+**The fundamental discovery branch is fed from host source storage, and this is new.**
+`source-cache:read` / `source-cache:write` (Aumos 0.3.30) hold OpenDART and SEC filings per filer,
+trimmed at each invocation's `asOf`, so this package no longer re-procures the same statements every
+run — and, more importantly, can tell a cache nobody has ever filled from a refresh that failed.
+Both were one empty payload before, and the branch that reads them reported *starved* either way.
+`engines.aumos` therefore requires `>=0.3.30`; an older build refuses the whole manifest rather than
+ignoring an unknown capability. ⛔ Private memory is not and never becomes the cache.
+
 **Two declared capabilities currently serve nothing.** `thesis:read` and `evidence:read`
 are in the manifest vocabulary, and the current Aumos build maps each to an empty tool
 list, so a run gets no such tool. The prompt reads them *when available* and the manifest

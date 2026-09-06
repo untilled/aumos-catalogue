@@ -174,6 +174,11 @@ missing field with model knowledge. Preserve source Evidence ids and web URLs se
 
 Do this every run. `skills/data-source-contract/SKILL.md` owns the listing and filing routes.
 
+⚠️ **The argument is the sleeve — `'kr'` or `'us'` — and never a MIC.**
+`inputContracts.vocabulary.markets` publishes `XKRX`/`XNAS`/`XNYS`, which is the venue list this
+manager contributes to and not what any operation on this page accepts; `researchMarkets` is
+published beside it for exactly that reason (#146).
+
 Use `researchUniverse({market: "kr" | "us", extensions})` for the bundled curated seed
 (KR 74 / US 83, pinned to the package provenance commit). This is a research scope, not today's
 whole market. Check current listing eligibility from the provider, record delistings/exclusions,
@@ -183,17 +188,31 @@ the operation refuses a seed dated after asOf; current listings cannot establish
 1. Read `coverage/research-index`; pass its extension rows to `researchUniverse`.
 2. Check the returned roster's current eligibility and fetch price history and installed filing
    sources for the eligible names. OpenDART receipts and SEC publication times must be <= asOf.
-3. Run both `scan` and `upsideRadar`; collect normalized filings, catalysts and recent events
-   before the radar. No price signal is required to enter the fundamental branch.
+3. **Feed the fundamental branch before running it, in this order** (#146): the registry that
+   supplies the vendor's own filer id — `open-dart` `/api/corpCode.xml` for `corp_code`,
+   `sec-edgar` `/files/company_tickers.json` for the CIK — then `mapCorporationCodes` to join it
+   onto the roster, then `fundamentalsPlan` for the ordered calls with their host cache states,
+   then `source_cache_read` / `source_cache_refresh`, then `dartVendorStatus` on every OpenDART
+   response, then `radarCandidates`, then `radarFeedDiagnosis`. ⛔ **The registry step is the one
+   that was never taken**, and without it nothing fetched can be addressed to a filer.
+   Run `upsideRadar({candidates, feed})` and `scan`; no price signal is required to enter the
+   fundamental branch.
 4. Pass the declared roster to `coverage` as `scannerUniverses` and extensions as `extensions`.
    Record individual exclusions and unresolved names, and the aggregate in `coverage/universe-state`.
 5. Call `researchState` with the previous index and observations containing
    `{symbol, market, observedAt, evidenceIds, sector, extension}`; persist its non-null nextState.
    This keeps research membership and provenance between runs, not raw vendor payloads.
 
-If source storage is unavailable, refetch filings per run and report cache availability separately.
-A failed or unperformed filing collection must surface `radar_lane_starved`, not an empty
-opportunity set. The host still needs queryable per-symbol source storage for durable fundamentals.
+Source storage is the host's and now exists (aumos#671, #683): `source_cache_read` reports
+`never-fetched` / `refresh-failed` / `stale` / `fresh`, and those are four findings rather than one
+empty payload. Read the cache, refresh only what the state says to, and report the state you got.
+Where the store is unavailable, refetch per run and say so — ⛔ never in private memory, which
+`skills/memory-contract/SKILL.md` forbids from being a source cache.
+
+A failed or unperformed filing collection must surface `radar_lane_starved` **with the stage that
+lost it**, not an empty opportunity set. ⛔ And `fed-and-genuinely-empty` is reported as itself:
+the market was looked at and declined nobody, which is a different sentence from *nothing was ever
+looked at* and produces the same empty list.
 
 `entryQualityGate` needs historical OHLC `bars` (at least 60; 200+ for the long indicators),
 not a `scanHistory` field or prior scan runs. A first run can fetch those bars and evaluate quality.

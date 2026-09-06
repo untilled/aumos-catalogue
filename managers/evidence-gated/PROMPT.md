@@ -451,13 +451,55 @@ everything.
 - `post-event-continuation`: a positive surprise inside 30 days whose price has held its
   pre-announcement level.
 
-Feed it: `earningsCheckpoint` fills the rolling window these lanes read, and a starved lane is a
-sourcing problem to report, not an absence of opportunity.
+⛔ **And feeding it is a step, not an adjective.** The 2026-09-06 run declared its universe, swept
+it, called `upsideRadar` — and all three lanes came back `starved`, 0 included of 13, on
+`no-valid-point-in-time-filing` and `no-event-in-the-last-30-days`. Nothing was wrong with the
+lanes. **Nothing had ever fetched a filing.** The roster was here, `open-dart` answered, the
+parsers existed — and the one call that joins them, the registry that turns a six-digit listing
+symbol into the `corp_code` every OpenDART route is keyed by, had never been made (#146).
+
+So the branch has a written path and the flow skills carry it as a numbered step:
+
+`researchUniverse` → **the registry** (`corpCode.xml`, or `company_tickers.json` for the CIK) →
+`mapCorporationCodes` → `fundamentalsPlan` → `source_cache_read` / `source_cache_refresh` →
+`dartVendorStatus` → `radarCandidates` → `radarFeedDiagnosis` → `upsideRadar({candidates, feed})`.
+
+⚠️ **`researchUniverse` and everything on that path take `'kr'` / `'us'`, not a MIC.**
+`inputContracts.vocabulary` published only the MIC list, so the one market vocabulary a caller
+could read was the wrong one; `researchMarkets` is published beside it now.
+
+⚠️ **The store is the host's and is no longer hypothetical.** `source_cache_read` /
+`source_cache_refresh` (aumos#671, #683) answer with a `state`, and the four values are four
+different findings: `never-fetched` is *nobody has ever asked* — blind, not empty; `refresh-failed`
+is *we asked and the vendor did not answer*, with what is cached still on hand and behind; `stale`
+and `fresh` are the last success outside or inside the freshness this run stated. ⛔ A `fresh`
+answer holding no document is **the vendor having nothing**, which is an answer. Private memory is
+still not a source cache and `skills/memory-contract/SKILL.md` still forbids it.
+
+⛔ **OpenDART reports its own refusals on an HTTP 200, and `013` and `020` are not the same
+finding.** `013` matched nothing; `020` is quota — *we were not allowed to look*. Run every
+OpenDART response through `dartVendorStatus`; collapsing the two makes the paragraph below
+meaningless, because a quota outage then reads as a fact about a company.
+
+**A starved lane must say what starved it.** `radarFeedDiagnosis` names the stage — registry,
+mapping, request, response, normalization — and `upsideRadar` puts it on the diagnostic when it is
+passed as `feed`; without it, `radar_starvation_cause_unreported`. ⛔ And the report distinguishes
+**`fed-and-genuinely-empty`** from **`never-fed`**. Those two produce an identical empty candidate
+list and mean opposite things, and mixing them is the worst outcome this branch can produce.
+
+`earningsCheckpoint` fills the rolling event window these lanes read.
 
 Entry quality is a gate, not a description. Call `entryQualityGate` before any single-name BUY or
 risk-increasing RESIZE: a `falling_knife` blocks, and a `mean-reversion` candidate with no
-`trend-pullback` beside it needs a confirmed pass state rather than an unconfirmed one. Absent scan
-history warns and never blocks — over-constraint is not caution.
+`trend-pullback` beside it needs a confirmed pass state rather than an unconfirmed one.
+
+⚠️ **It reads historical OHLC bars, not previous scan runs, and the older wording here said
+otherwise.** `bars` — 60 at minimum, 200+ for the long indicators — is the whole input; a
+`scanHistory` key is refused outright (#147). So a first run that fetches enough dated bars
+evaluates this gate on that run, and `entry_quality_unverified` on a newly swept book is a
+**missing-bars** finding, not a missing scan-history database. #146 recorded the opposite reading
+and withdrew it; no durable scan ledger is required for this gate. Insufficient bars warn and never
+block — over-constraint is not caution.
 
 Load `skills/evidence-gates/SKILL.md` and `skills/candidate-research/SKILL.md` for any new or resized
 risk. Load `skills/thesis-challenge/SKILL.md` before any new single-name BUY or thesis promotion.

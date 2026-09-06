@@ -241,7 +241,9 @@
               "brief:read",
               "brief:write",
               "source:passthrough",
-              "connection:passthrough"
+              "connection:passthrough",
+              "source-cache:read",
+              "source-cache:write"
             ]
           },
           "reason": {

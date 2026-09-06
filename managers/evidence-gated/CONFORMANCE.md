@@ -199,6 +199,14 @@ reports no session at all (aumos #453).
   **not** yet done is a fixture recorded from the live vendor: the KR parsers are exercised against
   synthetic payloads, and a real `crtfc_key` is needed to confirm the receipt fields, the ZIP
   behaviour of `corpCode.xml` and the `status`-on-200 error path against the vendor itself.
+- **The fundamental feeding path has never run against a vendor (#146).** `fundamentalsPlan` →
+  `mapCorporationCodes` → `source_cache_read` / `source_cache_refresh` → `dartVendorStatus` →
+  `radarCandidates` → `radarFeedDiagnosis` → `upsideRadar` is fixture-fixed end to end, using the
+  2026-09-06 run's own numbers (74/83 roster, `corp_code 00126380` → `stock_code 005930`, three
+  lanes 0/13). ⛔ What no check here can establish is that a lane comes back **fed**: that needs a
+  live `crtfc_key`, a SEC user-agent and the host at `>=0.3.30`, and it is the gate that closes
+  #146. Until then the honest report is the one the package now produces — the stage that lost the
+  input, by name.
 - The three packages of this collection have not yet been installed together against the same Toss-connected shadow
   portfolio for consecutive KR close → US close → Global review cycles.
 - ✅ *Partly resolved by the cycle above.* Real `memory_write` reached the store from all

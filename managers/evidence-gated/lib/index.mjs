@@ -12,6 +12,7 @@ import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActu
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
 import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap, exitCheck } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
+import { fundamentalsPlan, mapCorporationCodes, dartVendorStatus, radarCandidates, radarFeedDiagnosis } from './fundamentals-feed.mjs'
 import { harnessAudit, lessonAudit } from './audit.mjs'
 import { lensEnvelope, clusterBlock, timeStopPolicy, exitDiscipline, ruleVersions, policyLint } from './envelopes.mjs'
 import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport, controlArmLane } from './learning.mjs'
@@ -127,6 +128,21 @@ const operations = {
   normalizeSecSubmissions: (input, asOf) => normalizeSecSubmissions(input, asOf),
   laneCoverage,
   validateAdjustment: (input) => validateAdjustment(input?.series, input?.corporateActions),
+
+  /**
+   * ── The feeding path (issue #146) ────────────────────────────────────────
+   *
+   * In order, and the order is the fix: the registry that supplies the vendor's
+   * own filer id, the join onto the curated roster, the vendor status read off
+   * an HTTP 200, the candidates the radar eats, and the reading that says which
+   * of those stages lost the input when a lane comes back starved.
+   */
+  fundamentalsPlan: (input, asOf) => fundamentalsPlan({ ...input, asOf }),
+  mapCorporationCodes: (input, asOf) => mapCorporationCodes({ ...input, asOf }),
+  dartVendorStatus: (input) => dartVendorStatus(input),
+  radarCandidates: (input, asOf) => radarCandidates({ ...input, asOf }),
+  radarFeedDiagnosis: (input, asOf) => radarFeedDiagnosis({ ...input, asOf }),
+
   zonedDateTimeToUtc: (input) => ({ data: { instant: zonedDateTimeToUtc(input?.date, input?.time, input?.timeZone) }, diagnostics: [] }),
   nextMarketReview: (input, asOf) => nextMarketReview({ ...input, asOf }),
   earningsCheckpoint: (input, asOf) => earningsCheckpoint(input?.observation, input?.marketSession, { ...input?.config, asOf }),

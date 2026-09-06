@@ -1,26 +1,49 @@
 # Host dependencies after issues #145–153
 
-Version 0.4.24 separates the main lane from the maturity gate, reads the Mandate's `cashFloor`,
-derives the single-name total from the Mandate and enforces the source's exit discipline.
-Three runtime facilities remain outside this catalogue package.
+Version 0.4.27 wires the fundamental discovery branch to its input. 0.4.26 before it stopped
+reading `decisions[].armed` as a receipt for a promise it cannot carry; 0.4.24 separated the main
+lane from the maturity gate, read the Mandate's `cashFloor`, derived the single-name total from the
+Mandate and enforced the source's exit discipline.
 
-## Fundamental storage (#146)
+## Fundamental storage (#146) — ✅ the host built it, and this package now uses it
 
-The package contains KR 74 / US 83 symbol rosters from its existing provenance commit. It does
-not copy the upstream investor's 173 cached files. `coverage/research-index` carries bounded
-membership and Evidence references only; it cannot serve filing payloads. Every sleeve therefore
-refetches OpenDART/SEC observations before `upsideRadar` and reports starvation when it cannot.
+**The dependency recorded here is discharged.** `source_cache_read` and `source_cache_refresh`
+(aumos#671, #683, released in 0.3.30) are exactly the storage this section asked for: keyed by
+provider, market, symbol and version, trimmed at invocation `asOf` in the host before the gateway
+process sees a row, retaining prior versions, and — the request this package cared most about —
+**distinguishing a missing cache from a failed refresh**. The manifest declares `source-cache:read`
+and `source-cache:write` and `engines.aumos` moves to `>=0.3.30`.
 
-The host needs source storage keyed by provider, market, symbol, accession/receipt and version,
-with publication/receipt time, capture time, Evidence id and the original response. Queries must
-exclude observations published after invocation asOf, retain prior versions, enforce instance/fund
-access, and distinguish a missing cache from a failed refresh. Normalized current and comparable
-filings must retain provenance and period/currency semantics. A stale cache must not silently
-become fresh evidence. This is a required follow-up, so #146 is not fully closed by this package.
+⚠️ **And the diagnosis this file recorded was half wrong.** The 2026-09-06 run measured it: the
+curated roster *is* ported (`researchUniverse` answers 74 KR / 83 US at `snapshotDate 2026-07-24`)
+and the OpenDART route *is* alive (`company.json?corp_code=00126380` → `stock_code 005930`). The
+only missing piece was the **join** — nothing mapped a six-digit listing symbol to the `corp_code`
+every OpenDART route, and the cache's own `vendorId`, is keyed by. `/api/corpCode.xml` was already
+on the allowlist and `parseDartCorpCodes` already read it; no run had asked for it. The US side had
+an even lower barrier — `companyfacts` is keyed by the ticker — and had never been fed either.
+
+So this revision adds the path rather than another request: `fundamentalsPlan` →
+`mapCorporationCodes` → the two cache tools → `dartVendorStatus` → `radarCandidates` →
+`radarFeedDiagnosis` → `upsideRadar({candidates, feed})`, with the flow skills carrying it as a
+numbered step because a sentence in §3 was skipped by all three flows.
+
+⛔ **What is still owed is not storage but proof.** No live OpenDART or SEC key exists in the
+environment this was written in, so every step is fixture-fixed and none of it has been observed
+against a vendor. `#146` stays open until a run with keys reports a lane that is fed rather than
+starved. Two smaller items remain host-side:
+
+- `source_cache_refresh` routes only `open-dart`/`filings`, `open-dart`/`financials` and
+  `sec-edgar`/`companyfacts`. There is **no cache document for the corp-code registry**, so the
+  registry stays a `source_request` and its ZIP arrives relayed as sent — a run that cannot
+  decompress it falls back to reading `corp_code`/`stock_code` off `list.json` rows.
+- `CachedDocument.normalized.metrics` is a free-form map. This package reads operating income and
+  revenue under the names it has measured and reports `cache_metrics_unrecognized` rather than
+  guessing when neither appears.
 
 The old `entry_quality_unverified` wording also misled the run: `entryQualityGate` consumes
 historical OHLC bars, not previous scan runs. Fetching sufficient dated bars permits evaluation
-on the first run; a durable scan-history database is not required for that gate.
+on the first run; a durable scan-history database is not required for that gate. §3 of `PROMPT.md`
+carried the same misreading and no longer does.
 
 ## Authoritative WATCH reads (#97, #148, #156 — open as `untilled/aumos#690`)
 

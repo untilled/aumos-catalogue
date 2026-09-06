@@ -143,7 +143,18 @@ export function normalizeDartFinancials(payload, asOf) {
     }
     const amount = dartAmount(row.thstrm_amount)
     if (amount === null) diagnostics.push(diagnostic('dart_financial_amount_missing', 'unevaluated', 'Missing amount stays null', `list[${index}].thstrm_amount`, { accountId: row.account_id ?? null }))
+    /**
+     * ⚠️ The prior comparable travels **inside the same filing** and was being
+     * dropped (#146). `fnlttSinglAcntAll` puts the previous term beside the
+     * current one — `frmtrm_amount` — and without it a year-on-year reading
+     * needs a second call to a second business year that nothing was making.
+     * That is one of the reasons `inflection` saw `no-valid-point-in-time-filing`
+     * on rows it had actually been handed.
+     */
+    const priorAmount = dartAmount(row.frmtrm_amount)
     rows.push({
+      priorAmount,
+      priorPeriodName: row.frmtrm_nm ?? null,
       receiptNumber: receipt,
       availableAt,
       corporationCode: row.corp_code ?? null,

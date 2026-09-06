@@ -3,7 +3,7 @@
   "id": "evidence-gated",
   "publisher": "aumos",
   "name": "Evidence-Gated Allocator",
-  "version": "0.4.26",
+  "version": "0.4.27",
   "description": "One evidence-gated methodology run as three market flows: a Korean sleeve, a US sleeve, and the allocator that sets their budgets and proposes the cross-market rebalance. The flows are subagents of one manager; only the orchestrator submits.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
@@ -36,7 +36,7 @@
     "notice": "./NOTICE.md"
   },
   "engines": {
-    "aumos": ">=0.3.18"
+    "aumos": ">=0.3.30"
   },
   "ampVersion": 1,
   "contributes": {
@@ -102,6 +102,14 @@
       "reason": "SEC filings and OpenDART receipts and statements are checked as independent vendor evidence; configured OpenBB/FMP history may supplement bars."
     },
     {
+      "kind": "source-cache:read",
+      "reason": "The fundamental discovery branch reads stored OpenDART and SEC filings instead of re-procuring every run, and the answer's state separates a cache nobody has ever filled from a refresh that failed — the distinction the starvation diagnosis is built on."
+    },
+    {
+      "kind": "source-cache:write",
+      "reason": "A stale or never-fetched filing is refreshed for the named filer only, so the branch is fed on the run that needs it rather than reporting starvation it could have resolved."
+    },
+    {
       "kind": "connection:passthrough",
       "connectors": [
         "toss",
@@ -116,6 +124,8 @@
       "connection_request"
     ],
     "optionalSkills": [
+      "source_cache_read",
+      "source_cache_refresh",
       "portfolio_read",
       "thesis_read",
       "evidence_read",
