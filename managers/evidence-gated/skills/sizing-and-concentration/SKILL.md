@@ -58,6 +58,20 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    than zero risk. Over the cap, a run that adds new non-core risk
    is blocked while a book already over on its holdings alone warns — the same grandfathering
    reading the weight caps use, from the same place.
+
+3c. **Say what the exclusion did not remove.** ⚠️ **Excluded means the row spends no budget; it
+   never means the row is not there.** `concentration` and `singleNameBudget` now return
+   `parkedLiquidityWeight`, `coreWeight`, `singleNameWeight` and `riskBearingWeight` beside their
+   verdicts, and `mandateExecution` sets that split next to the Mandate's declared `objective`,
+   carried verbatim and never parsed. A book at 57.25% cash and 38.54% parked with no single name
+   held passes every axis in this section, and `heldSingleNameWeight: 0` is read as headroom rather
+   than as an unexecuted mandate. When the lane is empty the operation says which it is —
+   `no-candidate-cleared-the-gates` (`info`: nothing cleared the gates, and buying anyway is what
+   this whole skill refuses), `input-path-incomplete` or `unreported` (`unevaluated`, which is not
+   a pass) — and the cause goes in `uncertainty`. ⛔ It is a report and not a cap: parked liquidity
+   has no ceiling here, because a ceiling on cash-equivalent weight is a floor under deployment by
+   another name. ⛔ And it is not a sell signal.
+
 4. Apply evidence maturity **to the lane it belongs to**. ⚠️ The §4 ceiling is the *control arm's*:
    the source methodology waived the variant view there in exchange for 1% a name, and required one
    in the main lane, where a name could be sized to the investor's own cap. Call `variantViewCheck`

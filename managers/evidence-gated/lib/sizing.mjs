@@ -652,6 +652,56 @@ export function effectiveCashFloor(input = {}) {
  * `controlArmRemainingWeight` is what `controlArmLane` takes as
  * `experimentTotalRemainingWeight`, so the two answers cannot disagree.
  */
+/**
+ * ── What the exclusion stopped saying out loud (issue #162) ────────────────
+ *
+ * `parkedLiquidity: true` takes a row off the sector, theme and factor axes and
+ * off heat, and #141 is right about every part of that: a cash equivalent is on
+ * no shared loss path, and counting one there did not measure a risk, it spent
+ * a budget. ⛔ **That exclusion is not touched here and must not be.**
+ *
+ * What went wrong is what the exclusion came to *mean* in the output.
+ * **Excluded means «spends no budget». It does not mean «is not there».** In
+ * the 2026-09-06 book the difference was the whole reading: 57.25% cash, 27.05%
+ * in the KRW parking ETF, 11.49% in SGOV, 4.21% in an index ETF and **0.00% in
+ * any single name**. Four gates came back clean — `concentration` with one
+ * grandfathered position breach and nothing else, `effectiveCashFloor` with
+ * 0.47 of headroom, `caps.portfolioHeat` measuring **0** against 0.06, and
+ * `singleNameBudget` reporting `heldSingleNameWeight: 0` against 0.90 of room —
+ * and every one of them was clean for the same reason, which no operation said:
+ * ⚠️ **the book is barely carrying any risk at all.**
+ *
+ * `heldSingleNameWeight: 0` is the whole defect in one number. It is formally
+ * true, and a reader takes it for *"the lane is empty, there is room"* rather
+ * than *"nothing this Mandate is for is being done"*. So the split stands beside
+ * it from here on, in every operation that reports one of its parts: what is
+ * parked, what is core, what is single-name, and what of the book is bearing
+ * risk at all.
+ *
+ * ⛔ **This is arithmetic on rows the caller already passes, and it is a report
+ * and not a cap.** Nothing in it refuses anything, nothing in it asks for a
+ * purchase, and nothing in it proposes selling the parking — a disposal is an
+ * investment judgement on the `allocate` flow and the investor approves it.
+ */
+export function bookWeightSplit(rows = []) {
+  const held = (Array.isArray(rows) ? rows : []).filter((row) => finite(row?.weight) && row.weight >= 0)
+  const parkedRow = (row) => row?.parkedLiquidity === true
+  const coreRow = (row) => !parkedRow(row) && row?.core === true
+  const singleRow = (row) => !parkedRow(row) && row?.core !== true
+  const sum = (predicate) => held.filter(predicate).reduce((total, row) => total + row.weight, 0)
+  const core = sum(coreRow)
+  const single = sum(singleRow)
+  return {
+    parkedLiquidityWeight: round(sum(parkedRow)),
+    coreWeight: round(core),
+    singleNameWeight: round(single),
+    /** ⚠️ Core and single name together — what is actually exposed to a market. */
+    riskBearingWeight: round(core + single),
+    singleNameCount: held.filter((row) => singleRow(row) && row.weight > 0).length,
+    parkedLiquiditySymbols: [...new Set(held.filter(parkedRow).map((row) => row?.symbol ?? null))],
+  }
+}
+
 export function singleNameBudget(input = {}) {
   const diagnostics = []
   const cashFloorReport = effectiveCashFloor({ mandateCashFloor: input?.mandateCashFloor })
@@ -679,6 +729,7 @@ export function singleNameBudget(input = {}) {
   const total = (rows) => rows.filter(singleName).reduce((sum, row) => sum + row.weight, 0)
   const held = total(positions)
   const withProposed = total(positions.filter((row) => !restated.has(row?.symbol))) + total(proposed)
+  const heldSplit = bookWeightSplit(positions)
 
   const deployable = floor === null ? null : round(1 - floor)
   const remaining = deployable === null ? null : round(deployable - withProposed)
@@ -724,6 +775,19 @@ export function singleNameBudget(input = {}) {
       heldSingleNameWeight: round(held),
       proposedSingleNameWeight: round(withProposed),
       remainingWeight: remaining,
+      /**
+       * ⚠️ **The three numbers that stop `heldSingleNameWeight` from being read
+       * alone** (#162). A zero here is either an empty lane with room in it or a
+       * book that is almost entirely cash and parking, and those are opposite
+       * situations reported by the same digit. `parkedLiquidity` is excluded
+       * from the shared-loss-path axes — it spends no budget — and it was never
+       * excluded from *existing*; this says so on the same response.
+       */
+      parkedLiquidityWeight: heldSplit.parkedLiquidityWeight,
+      coreWeight: heldSplit.coreWeight,
+      riskBearingWeight: heldSplit.riskBearingWeight,
+      heldSingleNameCount: heldSplit.singleNameCount,
+      parkedLiquiditySymbols: heldSplit.parkedLiquiditySymbols,
       overPerNameCap: overPerName,
       cashFloor: floor,
       /** ⚠️ Named so nobody re-reads its absence as an omission. */
@@ -1126,6 +1190,7 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
   if (carried.length || (expanded.length && !grandfather.blocksNewNonCoreWhenBreached)) {
     diagnostics.push(diagnostic('concentration_grandfathered', 'unevaluated', 'The book carries exposure above a cap; forcing an immediate sale is a trade the cap never asked for, and a trim or exit of it is never blocked', 'positions', { breaches: [...carried, ...(grandfather.blocksNewNonCoreWhenBreached ? [] : expanded)] }))
   }
+  const bookSplit = bookWeightSplit([...standing, ...proposed])
   const heat = portfolioHeat({ positions, proposed, cap: caps.portfolioHeat, grandfather, diagnostics })
   return {
     data: {
@@ -1140,8 +1205,256 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
        * axes, and that they are still on the position axis. (#141)
        */
       parkedLiquidityExcluded: [...new Set([...standing, ...proposed].filter((row) => row?.parkedLiquidity === true).map((row) => row?.symbol ?? null))],
+      /**
+       * ⚠️ **Which is the naming, and this is the number** (#162). Listing the
+       * excluded symbols said *that* something left the axes; it never said how
+       * much of the book left with them. 38.54% of the 2026-09-06 book was
+       * parked and every axis it touched read clean, so the four passing gates
+       * and the sentence *"this book is almost entirely cash"* were the same
+       * finding with only the first half published. ⛔ Reported, never capped —
+       * see `mandateExecution` for why a cap here was declined.
+       */
+      parkedLiquidityWeight: bookSplit.parkedLiquidityWeight,
+      coreWeight: bookSplit.coreWeight,
+      singleNameWeight: bookSplit.singleNameWeight,
+      riskBearingWeight: bookSplit.riskBearingWeight,
+      singleNameCount: bookSplit.singleNameCount,
       heat,
       exposures: Object.fromEntries(Object.entries(totals).map(([kind, map]) => [kind, Object.fromEntries([...map].map(([key, weight]) => [key, round(weight)]))])),
+    },
+    diagnostics,
+  }
+}
+
+/**
+ * ── The codes that mean «the inputs never arrived» ─────────────────────────
+ *
+ * Published rather than hidden, because it is the whole basis on which
+ * `mandateExecution` separates *an empty single-name lane the run chose* from
+ * *an empty one nobody was able to fill*. Every entry is a code this package
+ * already emits from the input path — the roster, the corp-code join, the
+ * vendor status, the source cache, the discovery denominator — so the
+ * classification is a set intersection over diagnostics that already ran, and
+ * not a second opinion about them.
+ *
+ * ⛔ Codes from the sizing and lens gates are deliberately absent. A thesis
+ * that did not clear its challenge is a *judgement* the methodology made, and a
+ * run that filed it under "the wiring is unfinished" would be excusing its own
+ * verdict. What belongs here is only ever a stage that lost an input.
+ *
+ * ⚠️ **`valuation_gap_is_unfetched_not_unfillable` is the strongest member of
+ * this list and it arrived from `thesisGapSources` (#160/#166).** It is the one
+ * code that says, of a *named* instrument, that a source which fills the gap
+ * **exists** and **was never called** — the distinction the undifferentiated
+ * `gaps` list had been hiding. Its two siblings are deliberately **not** here,
+ * and the reason each is left out is the point:
+ *
+ * - `valuation_gap_has_no_source_for_this_instrument` is a fact about the
+ *   *instrument* — an index ETF publishes no statements — so the gap stays open
+ *   however well the wiring works. Filing that under "unfinished wiring" would
+ *   promise a fix that no amount of fetching can deliver.
+ * - `instrument_class_unknown` says the run could not establish whether a filer
+ *   exists at all. ⛔ **Unknown is not "incomplete".** Reading it as one is the
+ *   generalization #166 exists to stop, arriving from this side; it goes on
+ *   `CAUSE_UNRESOLVED_CODES` instead, where it does the one honest thing —
+ *   forbids the *other* conclusion too.
+ */
+export const INPUT_PATH_INCOMPLETE_CODES = Object.freeze([
+  'corp_code_mapping_pending',
+  'corp_code_registry_absent',
+  'dart_status_missing',
+  'dart_status_unknown',
+  'discovery_lane_dark',
+  'feed_universe_empty',
+  'radar_feed_broken',
+  'radar_feed_produced_nothing',
+  'source_cache_never_fetched',
+  'source_cache_refresh_failed',
+  'source_cache_state_unknown',
+  'source_cache_unreported',
+  'valuation_gap_is_unfetched_not_unfillable',
+])
+
+/**
+ * ── Codes that refuse both conclusions ─────────────────────────────────────
+ *
+ * `no-candidate-cleared-the-gates` is `info` because it asserts something
+ * positive: the gates ran, on their inputs, and nothing was worth owning. A run
+ * carrying one of these has **not** established that. `instrument_class_unknown`
+ * is the case #166 built the vocabulary for — nothing said whether the symbol
+ * has a filer, so neither *unfetched* nor *unfillable* may be claimed about it —
+ * and a `mandateExecution` that answered `info` over the top of it would be
+ * making exactly the assumption that operation refuses to make.
+ *
+ * ⛔ So these do not prove the wiring is unfinished either. They demote the
+ * answer to `unreported`, which is this package's way of saying nobody has
+ * established it — the rule `cash_floor_unevaluated` follows.
+ */
+export const CAUSE_UNRESOLVED_CODES = Object.freeze([
+  'instrument_class_disputed',
+  'instrument_class_unknown',
+])
+
+export const MANDATE_EXECUTION_CAUSES = Object.freeze([
+  'executing',
+  'input-path-incomplete',
+  'no-candidate-cleared-the-gates',
+  'unreported',
+])
+
+/**
+ * ── The Mandate's own sentence, and whether anything acts on it (issue #162) ─
+ *
+ * `mandate.objective` arrives on every invocation, is prose, and until this
+ * operation **no computation in this package read it**. A book whose declared
+ * purpose is *"to understand a few companies deeply and buy what the market has
+ * mispriced"* held zero companies through eight consecutive runs and no
+ * diagnostic anywhere said so, because each gate was answering its own
+ * question and each of them passed.
+ *
+ * ⛔ **The sentence is not parsed, and nothing here infers an intent from it.**
+ * `objective` is free text and every investor writes a different one; a run
+ * that read the words and decided what the book *should* hold would be the
+ * failure `aumos#687` is named for — the name beating the document — arriving
+ * from the manager's side. What is judged is checkable and nothing else:
+ *
+ *   1. **Is an objective on the record for this run?** A string, or not.
+ *   2. **Does the book bear any single-name risk?** Arithmetic over the same
+ *      rows `concentration` and `singleNameBudget` already receive.
+ *   3. **If not, why?** Read off the diagnostics this run's other operations
+ *      *already produced* — the intersections with `INPUT_PATH_INCOMPLETE_CODES`
+ *      and `CAUSE_UNRESOLVED_CODES` above — rather than decided here.
+ *
+ * The objective itself is carried back **verbatim** so the investor reads their
+ * own words beside the number, and that is the entire use this package makes
+ * of it.
+ *
+ * ⚠️ **Nothing here is an instruction to buy.** *When nothing clears the gates,
+ * nothing is bought* is the structural advantage of this methodology and it is
+ * not being traded away for a filled lane: `no-candidate-cleared-the-gates` is
+ * `info`, which is this package's severity for a thing that is working and
+ * still worth saying. What is `unevaluated` is the other two — an empty lane
+ * because the inputs never arrived, and an empty lane nobody gave a reason for.
+ * Those are unanswered questions, and *"nobody said"* is not a pass, the same
+ * rule `cash_floor_unevaluated` and `concentration_cap_missing` follow.
+ *
+ * ⛔ **And nothing here is an instruction to sell.** Disposing of 153130 or
+ * SGOV is an investment judgement on the `allocate` flow that the investor
+ * approves; this operation opens the place that judgement can be *stated*, and
+ * it never makes it.
+ *
+ * ── ⑶ Why `parkedLiquidity` is not capped ──────────────────────────────────
+ *
+ * The issue raised a cap on the parked share as a counter-proposal and **it is
+ * declined here on purpose**, so that the next revision finds the reasoning
+ * rather than the gap. A ceiling on cash-equivalent weight is a floor under
+ * deployment by another name: it makes the book buy *something* on a schedule,
+ * which is precisely the behaviour every evidence gate in this package exists
+ * to refuse. The 2026-09-06 defect was never that 38.54% was parked — a book
+ * holding cash because nothing cleared its gates is the methodology working.
+ * The defect was that no output said it. So the answer is a number in every
+ * response and no new limit anywhere.
+ */
+export function mandateExecution({ mandateObjective = null, positions = [], proposed = [], cashWeight = null, reportedDiagnostics = [] } = {}) {
+  const diagnostics = []
+  const declared = typeof mandateObjective === 'string' && mandateObjective.trim().length > 0
+  if (!declared) {
+    diagnostics.push(diagnostic(
+      'mandate_objective_unread',
+      'unevaluated',
+      "The Mandate's objective is the one sentence saying what this money is for, it arrives on every invocation, and this run did not carry it; without it the book can still be measured but cannot be set beside what the investor declared, which is the comparison nothing in this package was making",
+      'mandateObjective',
+    ))
+  }
+
+  const restated = new Set((Array.isArray(proposed) ? proposed : []).map((row) => row?.symbol).filter((symbol) => symbol !== undefined && symbol !== null))
+  const standing = (Array.isArray(positions) ? positions : []).filter((row) => !restated.has(row?.symbol))
+  const heldSplit = bookWeightSplit(positions)
+  const split = bookWeightSplit([...standing, ...(Array.isArray(proposed) ? proposed : [])])
+  const cash = finite(cashWeight) ? round(Math.max(0, cashWeight)) : null
+  const cashEquivalent = cash === null ? null : round(cash + split.parkedLiquidityWeight)
+
+  /** Strings or `{ code }` rows — a run passes back what `execute` handed it. */
+  const codes = [...new Set((Array.isArray(reportedDiagnostics) ? reportedDiagnostics : [])
+    .map((row) => (typeof row === 'string' ? row : row?.code))
+    .filter((code) => typeof code === 'string' && code.length > 0))]
+  const inputPathCodes = codes.filter((code) => INPUT_PATH_INCOMPLETE_CODES.includes(code)).sort()
+  const unresolvedCodes = codes.filter((code) => CAUSE_UNRESOLVED_CODES.includes(code)).sort()
+
+  const laneEmpty = split.singleNameWeight <= 0
+  /**
+   * ⛔ The order is the argument. A positive input-path finding outranks an
+   * unresolved one — a source that exists and was never called is established
+   * whatever else is unknown — but an unresolved one outranks the `info`
+   * answer, because `no-candidate-cleared-the-gates` claims the gates *ran* and
+   * a run that cannot say whether the instrument even has a filer has not
+   * earned that claim. (#162 reading #166's vocabulary.)
+   */
+  const cause = !laneEmpty
+    ? 'executing'
+    : inputPathCodes.length
+      ? 'input-path-incomplete'
+      : unresolvedCodes.length || !codes.length
+        ? 'unreported'
+        : 'no-candidate-cleared-the-gates'
+
+  if (laneEmpty) {
+    diagnostics.push(diagnostic(
+      'mandate_objective_unexecuted',
+      cause === 'no-candidate-cleared-the-gates' ? 'info' : 'unevaluated',
+      'This book carries no single-name weight at all, so every weight, heat and concentration gate is clean for one reason none of them states — there is almost nothing in the market to measure; report the share that is cash and parked beside that fact and say which of the two this is, a run that found nothing worth owning or a run whose gates never received their inputs. ⛔ It is neither a reason to buy nor a reason to sell: a purchase still needs its evidence, and disposing of parked liquidity is the investor’s judgement to approve',
+      'positions',
+      {
+        objective: declared ? mandateObjective : null,
+        cause,
+        inputPathCodes,
+        unresolvedCodes,
+        cashWeight: cash,
+        parkedLiquidityWeight: split.parkedLiquidityWeight,
+        cashLikeWeight: cashEquivalent,
+        riskBearingWeight: split.riskBearingWeight,
+        singleNameWeight: split.singleNameWeight,
+      },
+    ))
+  }
+
+  return {
+    data: {
+      objectiveDeclared: declared,
+      /** ⛔ Verbatim. Read to be quoted beside the numbers, and to nothing else. */
+      objective: declared ? mandateObjective : null,
+      objectiveIsNotParsed: true,
+      cashWeight: cash,
+      cashLikeWeight: cashEquivalent,
+      parkedLiquidityWeight: split.parkedLiquidityWeight,
+      parkedLiquiditySymbols: split.parkedLiquiditySymbols,
+      coreWeight: split.coreWeight,
+      singleNameWeight: split.singleNameWeight,
+      singleNameCount: split.singleNameCount,
+      riskBearingWeight: split.riskBearingWeight,
+      heldSingleNameWeight: heldSplit.singleNameWeight,
+      singleNameLaneEmpty: laneEmpty,
+      cause,
+      causes: MANDATE_EXECUTION_CAUSES,
+      inputPathCodes,
+      inputPathCodeVocabulary: INPUT_PATH_INCOMPLETE_CODES,
+      /** ⛔ Why this run may not claim the gates ran and found nothing. */
+      unresolvedCodes,
+      unresolvedCodeVocabulary: CAUSE_UNRESOLVED_CODES,
+      reportedDiagnosticCount: codes.length,
+      /** ⑶ of #162, decided and recorded: reported here, capped nowhere. */
+      parkedLiquidityIsUncapped: true,
+      parkedLiquidityCapDeclined: 'a ceiling on cash-equivalent weight is a floor under deployment by another name; the defect was that the parking was unreported, never that it was large',
+      notABuyInstruction: true,
+      notASellSignal: true,
+      units: {
+        cashWeight: 'portfolio-weight',
+        cashLikeWeight: 'portfolio-weight',
+        parkedLiquidityWeight: 'portfolio-weight',
+        coreWeight: 'portfolio-weight',
+        singleNameWeight: 'portfolio-weight',
+        riskBearingWeight: 'portfolio-weight',
+      },
     },
     diagnostics,
   }

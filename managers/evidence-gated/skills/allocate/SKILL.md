@@ -41,6 +41,23 @@ Sleeve budgets are a **book-wide conclusion**: they belong in Brief through `bri
 in private memory and not only in this run's rationale. The next run of either sleeve reads
 them there, and a budget that was never written is a budget that does not exist.
 
+**What share of this book is bearing risk is a book-wide conclusion too, and Brief is where the
+investor reads it.** Call `mandateExecution` — the invocation's `mandate.objective` verbatim, the
+book's `positions`, this run's `cashWeight`, and the diagnostic codes the rest of the run returned
+as `reportedDiagnostics` — and carry `parkedLiquidityWeight`, `riskBearingWeight` and
+`singleNameWeight` into the Brief conclusion with the objective beside them. ⚠️ A book that is
+95.79% cash and parking passes every gate in `PROMPT.md` §4, and passes them **because** it is:
+this is the only line that tells the investor so. When no single name is held, write the cause the
+operation returned — nothing cleared the gates, the input path is unfinished, or nobody said —
+rather than the weights alone.
+
+⛔ **Neither half of that is a trade.** It is not an argument for buying: when nothing clears the
+gates, holding cash is what this methodology is for. And it is not an argument for selling the
+parking — 153130 and SGOV are disposed of, if ever, by a judgement you propose and the investor
+approves, never because a report noticed their weight. Parked liquidity carries no cap here for the
+same reason: a ceiling on cash-equivalent weight is a floor under deployment wearing a different
+name.
+
 Re-arm the Global review at the next sourced 08:00 Asia/Seoul after both available closes.
 
 A cross-market move is one `REBALANCE` naming every position it touches. `targetWeight` is
