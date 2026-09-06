@@ -76,23 +76,118 @@ assert.equal(run('signalPaper', { state: carried }).data.nextState.openWindows.l
 const rpc = handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'calculate', arguments: { operation: 'thesisSentinel', asOf, input: { invalidation: [] } } } })
 assert.equal(rpc.result.structuredContent.status, 'blocked')
 
-// #148: calculated arms are pending; only actual host receipts deduplicate.
+/**
+ * ── #156: `decisions[].armed` is past tense, and #148 read it as a receipt ──
+ *
+ * The control observation is `dec_c914fc5caf644d74a72113a87c2562b3`: one
+ * judgement armed four plans and only the one that had already **TRIGGERED**
+ * appeared in its `armed[]`. The three ARMED ones were absent — by design, not
+ * by failure — so a run that read the empty-for-them array as "the arm failed"
+ * re-armed them, and did it twice: kr-sleeve 3 / us-sleeve 3 / allocate 2.
+ */
+const journalOfDecC914 = [
+  // `pln_c446d3c1…` weight-drift, plans.status TRIGGERED — the only one carried.
+  { planId: 'pln_c446d3c1', fate: 'fired', trigger: 'weight-drift' },
+]
+const standingPlansOfDecC914 = [
+  { planId: 'pln_8e142b0f', flow: 'us-sleeve', at: '2026-09-08T20:45:00.000Z', status: 'ARMED' },
+  { planId: 'pln_10c901bd', flow: 'kr-sleeve', at: '2026-09-07T07:00:00.000Z', status: 'ARMED' },
+  { planId: 'pln_13e6da3e', flow: 'allocate', at: '2026-11-06T21:00:00.000Z', status: 'ARMED' },
+]
+assert.equal(journalOfDecC914.length, 1, 'one of four plans reached the journal, and it is the one that ended')
+assert.equal(standingPlansOfDecC914.filter((row) => row.status === 'ARMED').length, 3, 'the three still standing are unreadable from any field AMP publishes')
+
 const sequence = [{ flow: 'kr-sleeve', at: '2026-09-07T07:00:00Z' }]
 const remembered = { schemaVersion: 2, updatedAsOf: asOf, armed: [{ flow: 'kr-sleeve', atEpochMs: Date.parse(sequence[0].at) }] }
-const phantom = run('reconcileArmedReviews', { previous: remembered, journalArmed: [], sequence })
-assert.ok(has(phantom, 'armed_journal_mismatch'))
-assert.deepEqual(phantom.data.toArm, sequence)
-assert.deepEqual(phantom.data.nextState.armed, [])
-const confirmed = run('reconcileArmedReviews', { previous: remembered, journalArmed: sequence, sequence })
-assert.deepEqual(confirmed.data.toArm, [])
-assert.equal(confirmed.data.nextState.armed.length, 1)
-const missingJournal = run('reconcileArmedReviews', { previous: remembered, sequence })
-assert.ok(has(missingJournal, 'armed_journal_unverified'))
-assert.deepEqual(missingJournal.data.toArm, sequence)
-const corrupt = run('reconcileArmedReviews', { previous: { ...remembered, armed: [{ flow: 'kr-sleeve', atEpochMs: 1757228400000, atLabel: '2026-09-07 07h00m00s UTC' }] }, journalArmed: sequence, sequence })
+// The empty journal is refused as a parameter, not read as "no confirmed arms".
+const withJournal = run('reconcileArmedReviews', { previous: remembered, journalArmed: [], sequence })
+assert.ok(has(withJournal, 'armed_journal_not_a_receipt'))
+assert.equal(withJournal.status, 'blocked')
+assert.equal(withJournal.data.nextState, null)
+assert.equal(has(withJournal, 'armed_journal_mismatch'), false, 'the journal cannot win a question it does not answer')
+assert.equal(has(withJournal, 'armed_journal_unverified'), false)
+// A receipt-shaped journal is refused too: the shape was never the problem.
+assert.ok(has(run('reconcileArmedReviews', { previous: remembered, journalArmed: sequence, sequence }), 'armed_journal_not_a_receipt'))
+// Without it, the promise is re-armed rather than suppressed, and named.
+const rearmed = run('reconcileArmedReviews', { previous: remembered, sequence })
+assert.equal(has(rearmed, 'armed_journal_unverified'), false, 'nothing is unverified; there was never a verifier')
+assert.deepEqual(rearmed.data.toArm, sequence)
+assert.deepEqual(rearmed.data.duplicateFlows, ['kr-sleeve'])
+assert.ok(has(rearmed, 'review_already_armed'))
+assert.ok(has(rearmed, 'armed_state_unreadable'))
+assert.equal(rearmed.data.standingArms, null)
+assert.equal(rearmed.data.standingArmsAreUnreadable, true)
+assert.equal(rearmed.status, 'ok', 'an unreadable standing count is a true statement about the contract, not a failed calculation')
+// The promise survives the run that could not confirm it — #148 emptied it here.
+assert.equal(rearmed.data.nextState.armed.length, 1)
+assert.equal(run('reconcileArmedReviews', { previous: remembered, sequence: [] }).data.nextState.armed.length, 1, 'a run with nothing to arm still carries what it promised')
+// The three duplicated intents: each re-arm is returned, and each is disclosed.
+const duplicatedIntents = standingPlansOfDecC914.map((row) => ({ flow: row.flow, at: row.at }))
+const thirdPass = run('reconcileArmedReviews', {
+  previous: { schemaVersion: 2, updatedAsOf: asOf, armed: duplicatedIntents.map((row) => ({ flow: row.flow, atEpochMs: Date.parse(row.at) })) },
+  sequence: duplicatedIntents,
+})
+assert.deepEqual(thirdPass.data.toArm, duplicatedIntents, 'every review is armed every judgement; the host folds the identical instant per instance (aumos#593)')
+assert.deepEqual(thirdPass.data.duplicateFlows, ['us-sleeve', 'kr-sleeve', 'allocate'], 'and all three repeats are named rather than silently produced')
+assert.deepEqual(thirdPass.data.superseded, [], 'none of them moved, so none of them is the duplicate the host does not fold')
+// The duplicate folding does not cover: same flow, different instant.
+const moved = run('reconcileArmedReviews', { previous: remembered, sequence: [{ flow: 'kr-sleeve', at: '2026-09-07T07:30:00Z' }] })
+assert.ok(has(moved, 'review_superseded'))
+assert.equal(moved.diagnostics.find((row) => row.code === 'review_superseded').severity, 'unevaluated')
+const corrupt = run('reconcileArmedReviews', { previous: { ...remembered, armed: [{ flow: 'kr-sleeve', atEpochMs: 1757228400000, atLabel: '2026-09-07 07h00m00s UTC' }] }, sequence })
 assert.ok(has(corrupt, 'armed_instant_mismatch'))
 assert.equal(corrupt.data.nextState, null)
-assert.equal(run('reconcileArmedReviews', { previous: remembered, journalArmed: sequence, sequence: [] }).data.nextState.armed.length, 1)
+
+// #156: the durable rule that caused the duplicates is retracted by the package, not by a run.
+const confirmedWrongRule = {
+  schemaVersion: 1,
+  updatedAsOf: asOf,
+  patterns: [
+    { id: 'armed-reviews-memory-claims-arms-the-decision-never-made', state: 'CONFIRMED', severity: 'blocks-every-future-wake', rule: 'Cross-check `run/armed-reviews` against `history.recentDecisions[].armed`. When they disagree, the journal wins.' },
+    { id: 'source-route-flaky', state: 'OBSERVED', rule: 'The Toss calendar route timed out twice.' },
+  ],
+}
+const retraction = run('refutedMemoryRules', { patterns: confirmedWrongRule })
+assert.ok(has(retraction, 'memory_rule_refuted'))
+assert.equal(retraction.data.retractions.length, 1, 'only the refuted rule is named; an unrelated observed pattern is left alone')
+assert.equal(retraction.data.retractions[0].writeAs.state, 'RETRACTED')
+assert.equal(retraction.data.retractions[0].writeAs.retracts, 'armed-reviews-memory-claims-arms-the-decision-never-made')
+assert.ok(/past tense/.test(retraction.data.retractions[0].correction), 'the retraction says why the observation was real and the inference wrong, so it cannot be re-derived')
+// The wording matches even when another instance named the rule something else.
+const renamed = run('refutedMemoryRules', { patterns: [{ id: 'my-own-name-for-it', rule: 'When they disagree, the journal wins.' }] })
+assert.equal(renamed.data.retractions.length, 1)
+assert.equal(renamed.data.retractions[0].matchedId, 'my-own-name-for-it')
+assert.deepEqual(run('refutedMemoryRules', { patterns: [] }).data.retractions, [])
+assert.ok(has(run('refutedMemoryRules'), 'memory_rules_unread'), 'a run that never read the key cannot correct it, and is told so')
+assert.equal(run('refutedMemoryRules', { patterns: 'confirmed' }).status, 'blocked')
+assert.ok(has(run('refutedMemoryRules', { patterns: 42 }), 'memory_rules_shape_invalid'))
+
+/**
+ * ── #156 ⑵: a holding explained by a decision outside the window ───────────
+ *
+ * `history.recentDecisions` is a window (aumos#688). `positions[].origin` reads
+ * the earliest naming decision over the whole journal, and
+ * `history.totalDecisions` says whether the window was cut — both optional, and
+ * absent means the host did not say, never that no decision explains it.
+ */
+const windowed = { decisions: [{ asset: 'DKS', targetWeight: 0.01 }], managedSince: '2026-01-01T00:00:00Z' }
+const withOrigin = run('harnessAudit', { ...windowed, totalDecisions: 7, positions: [{ symbol: 'DKS' }, { symbol: '069500', origin: { decisionId: 'dec_f0549343', asOf: '2026-07-02T00:00:00Z' } }] })
+assert.deepEqual(withOrigin.data.unexplained, [], 'the journal names the decision even though the window did not carry it')
+assert.deepEqual(withOrigin.data.blocksExpansionOf, [], 'so nothing is frozen against a decision that simply aged out')
+assert.ok(has(withOrigin, 'audit_position_origin_outside_window'))
+assert.equal(withOrigin.data.decisionWindowWhole, false)
+const truncated = run('harnessAudit', { ...windowed, totalDecisions: 7, positions: [{ symbol: '069500' }] })
+assert.deepEqual(truncated.data.unexplained, ['069500'], 'without an origin the holding is still carried the conservative way')
+assert.ok(has(truncated, 'audit_decision_window_truncated'))
+assert.equal(truncated.data.issues.find((row) => row.code === 'audit_position_untracked').explanationReadable, false, 'but the run no longer claims to have read that no decision explains it')
+const unstated = run('harnessAudit', { ...windowed, positions: [{ symbol: '069500' }] })
+assert.ok(has(unstated, 'audit_decision_window_unstated'), 'an absent totalDecisions is the host not saying, never a whole journal')
+assert.equal(unstated.data.decisionWindowWhole, null)
+assert.equal(unstated.data.issues.find((row) => row.code === 'audit_position_untracked').explanationReadable, false)
+const whole = run('harnessAudit', { ...windowed, totalDecisions: 1, positions: [{ symbol: '069500' }] })
+assert.equal(has(whole, 'audit_decision_window_unstated'), false)
+assert.equal(has(whole, 'audit_decision_window_truncated'), false)
+assert.equal(whole.data.issues.find((row) => row.code === 'audit_position_untracked').explanationReadable, true, 'the whole journal was supplied, so the finding is a fact this run read')
 
 // #149: DKS's capped USD 200 cannot fund three whole-share rungs.
 const ceiling = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', experimentalPositionFloor: { USD: 200, KRW: 300000 }, positionCurrency: 'USD' })
@@ -497,6 +592,17 @@ for (const operation of ['nextReviewSequence', 'coverage', 'specialistBudget', '
 // The nested shapes a key list cannot show are published too — both of the two that cost a run.
 assert.deepEqual(Object.keys(contracts.nested.nextReviewSequence['config.schedule']), ['krCloseBufferMinutes', 'usCloseBufferMinutes'])
 assert.deepEqual(Object.keys(contracts.nested.harnessAudit['researchActivity[]']), ['source', 'granted', 'attempts', 'succeeded'])
+/**
+ * #156 changed two signatures, so the published contract had to move with them
+ * — a contract that still advertised `journalArmed: ARRAY` would keep sending
+ * runs at the reading this version refuses.
+ */
+assert.deepEqual(Object.keys(contracts.nested.harnessAudit['positions[].origin']), ['decisionId', 'asOf'])
+assert.equal(contracts.contracts.harnessAudit.keys.totalDecisions, 'number')
+assert.ok(/never a statement that the window is whole/.test(contracts.nested.harnessAudit.totalDecisions), 'and the published contract says what an absent face means, which is the half a type cannot carry')
+assert.equal(contracts.contracts.reconcileArmedReviews.keys.journalArmed, 'any', 'the refused parameter stays published so it can be named rather than silently dropped')
+assert.ok(contracts.guarded.includes('refutedMemoryRules'))
+assert.deepEqual(contracts.keys.refutedMemoryRules, ['patterns'])
 
 /**
  * The five shapes the 2026-09-06 orchestrator sent to `nextReviewSequence`.

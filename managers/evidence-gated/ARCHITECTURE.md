@@ -213,9 +213,17 @@ fixture asserts the difference so it cannot be undone silently.
   tell whether it is arming a review it already armed. Since #87 that costs more than it did: every
   wake dispatches one flow, so two `kr-sleeve` reviews half an hour apart each run the Korean
   sleeve and each seal a judgement. `run/armed-reviews` and `reconcileArmedReviews` are the bridge
-  — the manager writes down what it armed — and a bridge is what they are: private memory is scoped
-  to this instance, so a new instance starts blind and the record can drift from what Aumos holds.
+  — the manager writes down what it promised — and a bridge is what they are: private memory is
+  scoped to this instance, so a new instance starts blind and the record can drift from what Aumos
+  holds.
   ([#97](https://github.com/untilled/aumos-catalogue/issues/97))
+  ⛔ **And the bridge does not carry a dedupe.** `decisions[].armed` is past tense — what became of
+  promises that have *ended* — so reading it as a receipt made two runs judge a clean arm a failed
+  one and re-arm three market reviews twice over. Nothing anywhere answers what is currently armed
+  (`untilled/aumos#690`), so this package arms at every judgement and the host folds identical
+  instants per instance (`untilled/aumos#593`). What the record still answers, and folding does not,
+  is the same flow promised at a **different** instant — which is #87's harm exactly.
+  ([#156](https://github.com/untilled/aumos-catalogue/issues/156))
   A staged single-name entry rides the same bridge for the same reason: `entryTranchePlan` returns
   the `intent` each unfilled rung is armed with, and `resolveTrancheWake` reads that marker back out
   of the fired plan's event summary, because there is nothing else to read.

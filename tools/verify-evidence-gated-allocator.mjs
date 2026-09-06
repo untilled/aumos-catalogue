@@ -905,16 +905,25 @@ const rearmAsOf = '2026-08-28T18:00:00.000Z'
 const firstArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: null, sequence: rearmSequence } })
 assert.deepEqual(firstArm.data.toArm.map((row) => row.flow), ['kr-sleeve', 'us-sleeve'], 'with nothing recorded, every review in the sequence is armed')
 
-const secondArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: firstArm.data.nextState, journalArmed: rearmSequence, sequence: rearmSequence } })
-assert.deepEqual(secondArm.data.toArm, [], 'a review already armed for that flow and instant is not armed again — since #87 a duplicate wake dispatches the sleeve a second time and seals a second judgement on the same day')
-assert.deepEqual(secondArm.data.duplicateFlows, ['kr-sleeve', 'us-sleeve'], 'and it names which ones')
+/**
+ * ⛔ #156 turned this assertion over. A same-instant repeat is **still armed**:
+ * nothing can be read back to prove the first one stands, and the host folds an
+ * identical instant per instance (aumos#593). What is asserted is that the
+ * repeat is *named*, not that it is suppressed.
+ */
+const secondArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: firstArm.data.nextState, sequence: rearmSequence } })
+assert.deepEqual(secondArm.data.toArm, rearmSequence, 'a review this instance already promised at this instant is armed again — a standing promise cannot be read back and an empty decisions[].armed is not evidence it failed')
+assert.deepEqual(secondArm.data.duplicateFlows, ['kr-sleeve', 'us-sleeve'], 'and it names which ones, so the repeat reaches uncertainty instead of being silent')
+assert.equal(secondArm.data.standingArms, null, 'the count of standing reviews is not a number this manager has')
+assert.equal(secondArm.data.standingArmsAreUnreadable, true, 'and it says so, so a Brief cannot write zero for it')
 
-const movedArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: secondArm.data.nextState, journalArmed: rearmSequence, sequence: [{ flow: 'kr-sleeve', at: '2026-08-31T07:30:00.000Z' }] } })
-assert.ok(movedArm.diagnostics.some((row) => row.code === 'review_superseded'), 'a review that moved leaves the old one out there — with no read path it cannot be withdrawn, and pretending it replaced itself is the assumption this key exists to refuse')
+const movedArm = execute({ operation: 'reconcileArmedReviews', asOf: rearmAsOf, input: { previous: secondArm.data.nextState, sequence: [{ flow: 'kr-sleeve', at: '2026-08-31T07:30:00.000Z' }] } })
+assert.ok(movedArm.diagnostics.some((row) => row.code === 'review_superseded' && row.severity === 'unevaluated'), 'a review that moved leaves the old one out there — the host folds only identical instants, so this is the one duplicate that really does wake the sleeve twice, and pretending it replaced itself is the assumption this key exists to refuse')
 assert.deepEqual(movedArm.data.toArm.map((row) => row.at), ['2026-08-31T07:30:00.000Z'], 'the new instant is still armed')
 
 const expiredArm = execute({ operation: 'reconcileArmedReviews', asOf: '2026-09-01T00:00:00.000Z', input: { previous: firstArm.data.nextState, sequence: rearmSequence } })
-assert.deepEqual(expiredArm.data.toArm.map((row) => row.flow), ['kr-sleeve', 'us-sleeve'], 'a recorded review whose instant has passed no longer blocks a re-arm — it has already fired')
+assert.deepEqual(expiredArm.data.toArm.map((row) => row.flow), ['kr-sleeve', 'us-sleeve'], 'a promise whose instant has passed leaves the record; it does not linger as a supersede')
+assert.deepEqual(expiredArm.data.superseded, [], 'and it supersedes nothing, because it is no longer a promise')
 
 const memoryKeysSkill = await readFile(new URL('../skills/memory-contract/SKILL.md', fixtureRoot), 'utf8')
 assert.ok(memoryKeysSkill.includes('`run/armed-reviews`'), 'the key is published rather than invented by a run')
@@ -2276,7 +2285,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 100)
+assert.equal(supportedOperations.length, 101)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -3500,14 +3509,27 @@ const misplaced = execute({ operation: 'reconcileArmedReviews', asOf: standingAs
 assert.equal(misplaced.status, 'blocked', 'the standing arms passed at the top level are refused rather than read as an empty carry — the run that did this re-armed three standing reviews and woke each sleeve twice')
 assert.ok(misplaced.diagnostics.some((row) => row.code === 'armed_state_misplaced'), 'and the refusal names the shape, so the next reader is not left to infer it from a `toArm` that looks ordinary')
 
-const reconciled = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, journalArmed: standingSequence, sequence: standingSequence } })
-assert.deepEqual(reconciled.data.toArm, [], 'passed as `previous`, an identical sequence arms nothing — this is the case the issue reproduced and the shape is the whole difference')
-assert.deepEqual(reconciled.data.duplicateFlows, ['kr-sleeve', 'us-sleeve', 'allocate'], 'and each standing flow is named')
+/**
+ * ⛔ **#156 reversed what an identical sequence does.** It used to arm nothing;
+ * the suppression rested on `decisions[].armed`, which answers what became of
+ * promises that have *ended*, so it never said a promise was still standing.
+ * Now every review is armed every judgement and the host folds the identical
+ * instant per instance (aumos#593) — what is asserted is that the repeat is
+ * **named**, and that a run with nothing to arm still carries the record.
+ */
+const reconciled = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, sequence: standingSequence } })
+assert.deepEqual(reconciled.data.toArm, standingSequence, 'passed as `previous`, an identical sequence is armed again — nothing this manager can read says the earlier promise is still standing')
+assert.deepEqual(reconciled.data.duplicateFlows, ['kr-sleeve', 'us-sleeve', 'allocate'], 'and each repeat is named, so it reaches uncertainty rather than being produced in silence')
+assert.equal(reconciled.data.standingArmsAreUnreadable, true, 'and the count of standing reviews is refused, so no Brief can publish it as zero')
 
-const quietRun = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, journalArmed: standingSequence, sequence: [] } })
-assert.equal(quietRun.data.nextState.armed.length, 3, 'a run with nothing to arm still writes back the three reviews that are standing — a review does not stop standing because this run had no reason to mention it')
+const staleJournalReading = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, journalArmed: [], sequence: standingSequence } })
+assert.equal(staleJournalReading.status, 'blocked', 'and the reading that caused the duplicates is refused rather than ignored — an empty decisions[].armed was read as three failed arms')
+assert.ok(staleJournalReading.diagnostics.some((row) => row.code === 'armed_journal_not_a_receipt'))
+
+const quietRun = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: armedState, sequence: [] } })
+assert.equal(quietRun.data.nextState.armed.length, 3, 'a run with nothing to arm still writes back the three reviews it promised — a promise does not leave the record because this run had no reason to mention it')
 assert.equal(
-  execute({ operation: 'reconcileArmedReviews', asOf: '2026-09-09T00:00:00.000Z', input: { previous: armedState, journalArmed: standingSequence, sequence: [] } }).data.nextState.armed.length,
+  execute({ operation: 'reconcileArmedReviews', asOf: '2026-09-09T00:00:00.000Z', input: { previous: armedState, sequence: [] } }).data.nextState.armed.length,
   0,
   'and it leaves the state when its instant passes, which is the only way out — that is what keeps the key from growing',
 )
@@ -3527,8 +3549,9 @@ assert.ok(
   reconciled.data.nextState.armed.every((row) => typeof row.atEpochMs === 'number' && row.at === undefined),
   'the state written back carries epoch milliseconds and no RFC 3339 string — a string here is a value the host refuses to hand back, and the key is unreadable in proportion to how well it is filled',
 )
-const legacyArmed = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: { schemaVersion: 1, armed: standingSequence.map((row) => ({ flow: row.flow, at: row.at })) }, journalArmed: standingSequence, sequence: standingSequence } })
-assert.deepEqual(legacyArmed.data.toArm, [], 'a key written by the version before this one is still read — a migration that begins by discarding the record is the loss this function exists to prevent')
+const legacyArmed = execute({ operation: 'reconcileArmedReviews', asOf: standingAsOf, input: { previous: { schemaVersion: 1, armed: standingSequence.map((row) => ({ flow: row.flow, at: row.at })) }, sequence: standingSequence } })
+assert.deepEqual(legacyArmed.data.duplicateFlows, ['kr-sleeve', 'us-sleeve', 'allocate'], 'a key written by the version before this one is still read — a migration that begins by discarding the record is the loss this function exists to prevent')
+assert.equal(legacyArmed.data.nextState.armed.length, 3, 'and it is rewritten in the current encoding rather than dropped')
 assert.ok(
   reconciled.data.toArm.every((row) => row.at === undefined || typeof row.at === 'string'),
   '`toArm` keeps RFC 3339: it leaves in a DecisionProposal, where AMP takes strings and this guard does not run',

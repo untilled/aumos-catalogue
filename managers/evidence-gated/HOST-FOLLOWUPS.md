@@ -1,8 +1,9 @@
 # Host dependencies after issues #145–153
 
-Version 0.4.27 wires the fundamental discovery branch to its input, separates the main lane from
-the maturity gate, reads the Mandate's `cashFloor`, derives the single-name total from the Mandate
-and enforces the source's exit discipline.
+Version 0.4.27 wires the fundamental discovery branch to its input. 0.4.26 before it stopped
+reading `decisions[].armed` as a receipt for a promise it cannot carry; 0.4.24 separated the main
+lane from the maturity gate, read the Mandate's `cashFloor`, derived the single-name total from the
+Mandate and enforced the source's exit discipline.
 
 ## Fundamental storage (#146) — ✅ the host built it, and this package now uses it
 
@@ -44,22 +45,64 @@ historical OHLC bars, not previous scan runs. Fetching sufficient dated bars per
 on the first run; a durable scan-history database is not required for that gate. §3 of `PROMPT.md`
 carried the same misreading and no longer does.
 
-## Authoritative WATCH reads (#97, #148)
+## Authoritative WATCH reads (#97, #148, #156 — open as `untilled/aumos#690`)
 
-`reconcileArmedReviews` now accepts `journalArmed`, normalized from actual host
-`decisions[].armed`, separately from the proposed `sequence`. Its `nextState` contains only
-confirmed future arms; `pending` never becomes a memory receipt. Missing journal data is
-explicitly unverified and cannot suppress arming. Contradictory epoch/label pairs are blocked.
-Do not persist any null `nextState`, or a proposal the host did not accept.
+⚠️ **This section asked for the face, and then the package went ahead and built one out of a
+field that does not carry it.** #148 had `reconcileArmedReviews` take `journalArmed`, normalized
+from `decisions[].armed`, and treat it as proof of arming. `decisions[].armed` is **past tense** —
+`fate` is `fired | replaced | lapsed`, with no value for a promise still standing — so a review
+that armed cleanly and one that was never armed produce the same empty array. One judgement in the
+measured book armed four plans and only the already-TRIGGERED one appeared in its `armed[]`.
 
-A decision journal proves submission, but cannot prove an arm remains active after early firing,
-cancellation or replacement. The host still needs an asOf-aware read of active plans/watches,
-including id, owner/flow, trigger instant, status, originating decision and fire/cancel history.
-Until that exists, unverified journal access can lead to duplicate scheduling; the package chooses
-to disclose that risk rather than suppress every future wake based on unconfirmed memory.
+The cost is recorded in `#156` and `untilled/aumos#687`: three market-review intents standing
+3 / 3 / 2 deep, *“the journal wins”* set in `failures/repeated-patterns` as `CONFIRMED` /
+`blocks-every-future-wake`, and a Brief that told the investor **zero** market reviews were standing
+while six were ARMED.
 
-The #136 claim that correctly supplied `previous.armed` never deduped was refuted in #148.
-Do not carry “ignore toArm and arm manually” forward as a confirmed rule.
+0.4.26 removes the reading entirely. `journalArmed` is refused with `armed_journal_not_a_receipt`
+rather than ignored; nothing suppresses a re-arm; `nextState` is a first-person record of what this
+instance proposed and whose instant has not passed; `standingArms` is `null` beside
+`standingArmsAreUnreadable: true` so the count can never be published as zero. The one duplicate the
+host does not fold — the same flow promised at a **different** instant — is `review_superseded`.
+
+✅ **The contract half is settled.** `untilled/aumos#691` keeps the field name and meaning
+(a rename would fail silently on the consumer side, and a fourth `fate` value would restore the
+“permission to stop” #622 refused), and states the invariant in the field's published
+`description` and in `AMP_MANAGER_INSTRUCTIONS`: nothing tells a manager what it currently has
+armed; re-arm at every judgement; the host folds identical instants per instance (#593).
+
+⬜ **The face this section asked for is now open as `untilled/aumos#690`.** A decision journal
+proves submission but cannot prove an arm remains active after early firing, cancellation or
+replacement. The host still needs an asOf-aware read of active plans/watches — id, owner/flow,
+trigger instant, status, originating decision, fire/cancel history. ⚠️ The hard half is the
+**shape**, not the data: a list of live promises reads as permission to stop re-arming, which is
+exactly what #622 refused, so #690 weighs a narrow per-intent question and an audit-only face
+against publishing the list. Until it lands the package discloses the gap and re-arms every run.
+
+The #136 claim that correctly supplied `previous.armed` never deduped was refuted in #148; #148's
+own conclusion that the journal is authoritative about arming was refuted in #156. Do not carry
+either forward as a confirmed rule — `refutedMemoryRules` retracts the second from durable memory.
+
+## Where a holding came from (`untilled/aumos#688`, landed in `#691`)
+
+`harnessAudit` used to read `history.recentDecisions` as though it were the journal. It is a
+**window**, so the decision that explains an older holding drifts out of it as the book keeps
+judging — and the block it produces is unfixable by construction, because what would lift it is the
+decision that just aged out. Measured: `dec_f0549343…` opened the thesis for `069500` and armed its
+tranche gate, sat at sequence 2 of 7 behind a five-row window, and the holding was reported as
+explained by nothing.
+
+0.4.26 reads the two faces `#691` added instead. `history.totalDecisions` → `totalDecisions` says
+whether the window was cut; `positions[].origin` (`{ decisionId, asOf }`) is the earliest judgement
+naming the asset, read over the **whole** journal.
+
+⚠️ **Both are optional and this package treats absence as the host not saying.** No origin and no
+total is `audit_decision_window_unstated`; a total above the rows supplied is
+`audit_decision_window_truncated`. In both cases the holding is still carried conservatively and
+still withheld from expansion, and `explanationReadable: false` records that "no decision explains
+it" is what this run failed to read rather than what it read. ⛔ `origin.asOf` is when a judgement
+was sealed and never an acquisition date; the inherited-or-acquired question stays on `acquiredAt`
+against `managedSince`.
 
 ## Experimental ladder (#149)
 

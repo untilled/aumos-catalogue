@@ -98,6 +98,11 @@ export const NESTED_CONTRACTS = {
   harnessAudit: {
     'researchActivity[]': { source: STRING, granted: BOOLEAN, attempts: NUMBER, succeeded: 'boolean-or-count' },
     universe: { scannerUniverses: ARRAY_OF_ARRAYS, extensions: ARRAY, screenedUniverseCount: NUMBER },
+    'positions[].origin': { decisionId: STRING, asOf: STRING },
+    totalDecisions: 'history.totalDecisions — how many judgements this book has sealed at or before asOf. Greater than the number of decisions passed means the older part of the journal was not supplied. ⛔ Absent means the host did not say; it is never zero and never a statement that the window is whole, and a holding whose explanation may sit outside an unmeasured window is not an unexplained holding.',
+  },
+  refutedMemoryRules: {
+    patterns: 'The whole value read from `failures/repeated-patterns` — an array of rows, or the stored object holding them under `patterns`/`rows`/`entries`/`failures`. Read under a key that is not there, a carried rule reads as absent and stays uncorrected.',
   },
   laneCoverage: {
     'activity.<source>': { attempts: NUMBER, succeeded: 'boolean-or-count' },
@@ -264,7 +269,7 @@ export const INPUT_CONTRACTS = {
   policyLint: { mode: 'named', keys: { current: OBJECT, proposed: OBJECT, provenance: OBJECT } },
 
   // ── Pre-flight ─────────────────────────────────────────────────────────
-  harnessAudit: { mode: 'strict', keys: { positions: ARRAY, watches: ARRAY, theses: ARRAY, decisions: ARRAY, universe: OBJECT, researchActivity: ARRAY, gateStaleDays: NUMBER, managedSince: STRING, config: OBJECT } },
+  harnessAudit: { mode: 'strict', keys: { positions: ARRAY, watches: ARRAY, theses: ARRAY, decisions: ARRAY, universe: OBJECT, researchActivity: ARRAY, gateStaleDays: NUMBER, managedSince: STRING, totalDecisions: NUMBER, config: OBJECT } },
   lessonAudit: { mode: 'named', keys: { proposals: ARRAY, staleDays: NUMBER } },
 
   // ── Methodology ────────────────────────────────────────────────────────
@@ -304,11 +309,12 @@ export const INPUT_CONTRACTS = {
   nextReviewSequence: { mode: 'strict', keys: { krSessions: ARRAY, usSessions: ARRAY, globalReview: OBJECT, buffers: OBJECT, config: OBJECT } },
   resolveWakeFlow: { mode: 'named', keys: { summary: STRING, intent: STRING, watchId: STRING } },
   resolveTrancheWake: { mode: 'named', keys: { summary: STRING, intent: STRING, watchId: STRING } },
-  reconcileArmedReviews: { mode: 'strict', keys: { previous: OBJECT, sequence: ARRAY, armed: ANY, journalArmed: ARRAY } },
+  reconcileArmedReviews: { mode: 'strict', keys: { previous: OBJECT, sequence: ARRAY, armed: ANY, journalArmed: ANY } },
 
   // ── State the run carries ──────────────────────────────────────────────
   researchState: { mode: 'strict', keys: { previous: OBJECT, observations: ARRAY } },
   researchUniverse: { mode: 'strict', keys: { market: STRING, extensions: ARRAY } },
+  refutedMemoryRules: { mode: 'strict', keys: { patterns: ANY } },
   inputContracts: { mode: 'named', keys: {} },
 }
 
