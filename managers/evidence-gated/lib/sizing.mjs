@@ -273,9 +273,9 @@ export function effectivePositionCap(input = {}) {
     diagnostics.push(diagnostic(
       'main_lane_requires_variant_view',
       'unevaluated',
-      'The main lane is what a checked variant view opens; this run asked for it without one, so the candidate is sized under the experimental ceiling until the missing requirements are met',
+      `The main lane is what a checked variant view opens; this run asked for it without one, so the candidate is sized under the experimental ceiling until the missing requirements are met. ${variant.data.satisfiedCount} of ${variant.data.requirementCount} are already met — read requirementReport for which one binds and what is outstanding on it, rather than the verdict alone (#160)`,
       'lane',
-      { missing: variant.data.missing, satisfied: variant.data.satisfied, requirements: variant.data.requirements },
+      { missing: variant.data.missing, satisfied: variant.data.satisfied, requirements: variant.data.requirements, requirementReport: variant.data.requirementReport },
     ))
   }
   /**
@@ -332,6 +332,21 @@ export function effectivePositionCap(input = {}) {
         unlocksAt,
         promotion,
         limits: limits.map((row) => ({ source: row.source, weight: round(row.weight) })),
+        /**
+         * ⚠️ `promotionGate` is what lifts the *ceiling*; the main lane is what
+         * takes the ceiling off the candidate entirely, and it is a different
+         * door with a different key. Naming only the first left the reader of a
+         * twentyfold reduction with no way to see that three of the four main
+         * lane requirements were already met (#160).
+         */
+        mainLane: {
+          open: mainLaneOpen,
+          satisfied: variant.data.satisfied,
+          missing: variant.data.missing,
+          satisfiedCount: variant.data.satisfiedCount,
+          requirementCount: variant.data.requirementCount,
+          requirementReport: variant.data.requirementReport,
+        },
       },
     ))
   }
@@ -1226,6 +1241,23 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
  * that did not clear its challenge is a *judgement* the methodology made, and a
  * run that filed it under "the wiring is unfinished" would be excusing its own
  * verdict. What belongs here is only ever a stage that lost an input.
+ *
+ * ⚠️ **`valuation_gap_is_unfetched_not_unfillable` is the strongest member of
+ * this list and it arrived from `thesisGapSources` (#160/#166).** It is the one
+ * code that says, of a *named* instrument, that a source which fills the gap
+ * **exists** and **was never called** — the distinction the undifferentiated
+ * `gaps` list had been hiding. Its two siblings are deliberately **not** here,
+ * and the reason each is left out is the point:
+ *
+ * - `valuation_gap_has_no_source_for_this_instrument` is a fact about the
+ *   *instrument* — an index ETF publishes no statements — so the gap stays open
+ *   however well the wiring works. Filing that under "unfinished wiring" would
+ *   promise a fix that no amount of fetching can deliver.
+ * - `instrument_class_unknown` says the run could not establish whether a filer
+ *   exists at all. ⛔ **Unknown is not "incomplete".** Reading it as one is the
+ *   generalization #166 exists to stop, arriving from this side; it goes on
+ *   `CAUSE_UNRESOLVED_CODES` instead, where it does the one honest thing —
+ *   forbids the *other* conclusion too.
  */
 export const INPUT_PATH_INCOMPLETE_CODES = Object.freeze([
   'corp_code_mapping_pending',
@@ -1240,6 +1272,27 @@ export const INPUT_PATH_INCOMPLETE_CODES = Object.freeze([
   'source_cache_refresh_failed',
   'source_cache_state_unknown',
   'source_cache_unreported',
+  'valuation_gap_is_unfetched_not_unfillable',
+])
+
+/**
+ * ── Codes that refuse both conclusions ─────────────────────────────────────
+ *
+ * `no-candidate-cleared-the-gates` is `info` because it asserts something
+ * positive: the gates ran, on their inputs, and nothing was worth owning. A run
+ * carrying one of these has **not** established that. `instrument_class_unknown`
+ * is the case #166 built the vocabulary for — nothing said whether the symbol
+ * has a filer, so neither *unfetched* nor *unfillable* may be claimed about it —
+ * and a `mandateExecution` that answered `info` over the top of it would be
+ * making exactly the assumption that operation refuses to make.
+ *
+ * ⛔ So these do not prove the wiring is unfinished either. They demote the
+ * answer to `unreported`, which is this package's way of saying nobody has
+ * established it — the rule `cash_floor_unevaluated` follows.
+ */
+export const CAUSE_UNRESOLVED_CODES = Object.freeze([
+  'instrument_class_disputed',
+  'instrument_class_unknown',
 ])
 
 export const MANDATE_EXECUTION_CAUSES = Object.freeze([
@@ -1269,8 +1322,8 @@ export const MANDATE_EXECUTION_CAUSES = Object.freeze([
  *   2. **Does the book bear any single-name risk?** Arithmetic over the same
  *      rows `concentration` and `singleNameBudget` already receive.
  *   3. **If not, why?** Read off the diagnostics this run's other operations
- *      *already produced* — the intersection with `INPUT_PATH_INCOMPLETE_CODES`
- *      above — rather than decided here.
+ *      *already produced* — the intersections with `INPUT_PATH_INCOMPLETE_CODES`
+ *      and `CAUSE_UNRESOLVED_CODES` above — rather than decided here.
  *
  * The objective itself is carried back **verbatim** so the investor reads their
  * own words beside the number, and that is the entire use this package makes
@@ -1326,15 +1379,24 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
     .map((row) => (typeof row === 'string' ? row : row?.code))
     .filter((code) => typeof code === 'string' && code.length > 0))]
   const inputPathCodes = codes.filter((code) => INPUT_PATH_INCOMPLETE_CODES.includes(code)).sort()
+  const unresolvedCodes = codes.filter((code) => CAUSE_UNRESOLVED_CODES.includes(code)).sort()
 
   const laneEmpty = split.singleNameWeight <= 0
+  /**
+   * ⛔ The order is the argument. A positive input-path finding outranks an
+   * unresolved one — a source that exists and was never called is established
+   * whatever else is unknown — but an unresolved one outranks the `info`
+   * answer, because `no-candidate-cleared-the-gates` claims the gates *ran* and
+   * a run that cannot say whether the instrument even has a filer has not
+   * earned that claim. (#162 reading #166's vocabulary.)
+   */
   const cause = !laneEmpty
     ? 'executing'
     : inputPathCodes.length
       ? 'input-path-incomplete'
-      : codes.length
-        ? 'no-candidate-cleared-the-gates'
-        : 'unreported'
+      : unresolvedCodes.length || !codes.length
+        ? 'unreported'
+        : 'no-candidate-cleared-the-gates'
 
   if (laneEmpty) {
     diagnostics.push(diagnostic(
@@ -1346,6 +1408,7 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
         objective: declared ? mandateObjective : null,
         cause,
         inputPathCodes,
+        unresolvedCodes,
         cashWeight: cash,
         parkedLiquidityWeight: split.parkedLiquidityWeight,
         cashLikeWeight: cashEquivalent,
@@ -1375,6 +1438,9 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
       causes: MANDATE_EXECUTION_CAUSES,
       inputPathCodes,
       inputPathCodeVocabulary: INPUT_PATH_INCOMPLETE_CODES,
+      /** ⛔ Why this run may not claim the gates ran and found nothing. */
+      unresolvedCodes,
+      unresolvedCodeVocabulary: CAUSE_UNRESOLVED_CODES,
       reportedDiagnosticCount: codes.length,
       /** ⑶ of #162, decided and recorded: reported here, capped nowhere. */
       parkedLiquidityIsUncapped: true,

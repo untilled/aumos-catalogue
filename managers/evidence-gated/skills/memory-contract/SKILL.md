@@ -170,6 +170,15 @@ re-derived by the next run that sees the same empty `armed[]`. ⛔ The registry 
 a run may not add to it — "this durable rule is wrong", decided inside the run that dislikes the
 rule, is the mechanism this section exists to stop.
 
+⚠️ **A false durable claim is not only ever a failure pattern** (#160). The second retracted rule is
+in `run/theme-radar-last` — *"gaps `expectedUpsidePct` and `fairValueRange` that no granted source
+can fill"*, written 2026-09-04. True of an ETF, false of a listed company, and self-sealing either
+way: a run that reads it does not attempt the fetch, observes the same empty gaps, and writes it
+again. So the key belongs to the rule, and the values of the other keys are passed under `memory`:
+`refutedMemoryRules({ patterns, memory: { 'run/theme-radar-last': … } })`. `keysUnread` names any
+key the registry has a rule under that this run did not pass; the value there is prose and fields
+rather than a row list, and is matched as one value.
+
 ## Read
 
 Read with invocation `asOf`. The runtime must return only revisions visible to this exact instance

@@ -1817,6 +1817,41 @@ assert.equal(noReason.data.cause, 'unreported', 'a run that reported no diagnost
 assert.equal(noReason.data.objectiveDeclared, false)
 assert.ok(noReason.diagnostics.some((row) => row.code === 'mandate_objective_unread' && row.severity === 'unevaluated'), 'and the Mandate sentence no computation used to read is asked for by name')
 
+/**
+ * ── Reading #166's vocabulary, including the part that refuses to guess ────
+ *
+ * `thesisGapSources` computes the distinction the flat `gaps` list was hiding,
+ * and `mandateExecution` is the operation that most needs it. ⛔ The three
+ * cases below are one rule read three ways: a source that **exists and was
+ * never called** establishes the wiring is unfinished; a source that **does not
+ * exist for this instrument** does not, because no amount of fetching closes
+ * it; and an **unknown** instrument class establishes neither — it removes the
+ * `info` answer without earning the other one. Unknown is not incomplete.
+ */
+covers('sizing/mandate-execution-reads-gap-sources')
+const withCause = (reportedDiagnostics) => execute({
+  operation: 'mandateExecution',
+  asOf: methodology.asOf,
+  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, reportedDiagnostics },
+})
+const unfetchedValuation = withCause(['valuation_gap_is_unfetched_not_unfillable'])
+assert.equal(unfetchedValuation.data.cause, 'input-path-incomplete', 'a source that exists for this instrument and was never called is the sharpest evidence there is that the lane is empty for want of wiring')
+assert.deepEqual(unfetchedValuation.data.inputPathCodes, ['valuation_gap_is_unfetched_not_unfillable'])
+
+const unfillableValuation = withCause(['valuation_gap_has_no_source_for_this_instrument', 'research_gate_active_return_short'])
+assert.equal(unfillableValuation.data.cause, 'no-candidate-cleared-the-gates', '⛔ an instrument that publishes no statements is a fact about the instrument; filing it as unfinished wiring would promise a fix no fetch can deliver')
+assert.deepEqual(unfillableValuation.data.inputPathCodes, [])
+
+const unknownClass = withCause(['instrument_class_unknown', 'research_gate_active_return_short'])
+assert.equal(unknownClass.data.cause, 'unreported', '⛔ unknown is not incomplete — and it is not «the gates ran and found nothing» either')
+assert.deepEqual(unknownClass.data.unresolvedCodes, ['instrument_class_unknown'])
+assert.deepEqual(unknownClass.data.inputPathCodes, [], 'it never counts as evidence that the wiring is at fault')
+assert.equal(
+  unknownClass.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity,
+  'unevaluated',
+  'so the `info` answer is withdrawn rather than asserted over the top of a question #166 refuses to answer',
+)
+
 const buying = execute({
   operation: 'mandateExecution',
   asOf: methodology.asOf,
@@ -2368,7 +2403,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 102)
+assert.equal(supportedOperations.length, 104)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),

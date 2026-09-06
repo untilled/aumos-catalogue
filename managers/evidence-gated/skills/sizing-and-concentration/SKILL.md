@@ -81,7 +81,11 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    ceiling does not apply and the Mandate's `maxPositionWeight` plus every concentration cap are
    what bind. Unsatisfied, nothing changes from what this section already said, and the run is told
    which requirement is missing (`variant_view_unverified`); asking for `lane: 'main'` without one
-   is `main_lane_requires_variant_view` and never a way past it. ⛔ The control arm's 1% / 6% are the
+   is `main_lane_requires_variant_view` and never a way past it. ⚠️ Read `requirementReport` rather
+   than `missing` alone (#160): `missing: ["thesisComplete"]` is what three-of-four looks like, and
+   the two thesis fields usually holding it — `expectedUpsidePct`, `fairValueRange` — are derived by
+   `thesisValuation` from the scenario table, so on a filer the shortfall is an unmade fetch and
+   `thesisGapSources` says so. ⛔ The control arm's 1% / 6% are the
    source's approved numbers and are not touched, `promotionGate` is not lowered, and a thesis
    resting on the mechanical cohort is `control_arm_evidence_cited` / `blocked`. ⚠️ What total the
    single-name lanes may reach *together* is an open question this revision does not answer.

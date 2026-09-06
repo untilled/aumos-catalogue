@@ -77,6 +77,13 @@ been fed. Do these in order and report each one:
    normalization, or none of them.
 8. **`upsideRadar({candidates, feed})`** — pass the diagnosis as `feed`. Without it a starved lane
    can say it is unfed and not *why*, and that is `radar_starvation_cause_unreported`.
+9. **`thesisGapSources` and `thesisValuation` on any name that reaches a thesis** (#160). The same
+   statements feed sizing. `thesisGapSources({gaps, mapping, feed})` says whether an open
+   `expectedUpsidePct` / `fairValueRange` gap is **unfetched** (a filer, so go and fetch) or
+   **unfillable** (no filer — an index vehicle, and `candidate-research` §Core DCA already forbids
+   inventing a single-name view about one); `thesisValuation({price, scenarios, filings})` derives
+   both fields from the bear/base/bull targets. ⛔ Without them a complete variant view still reads
+   `missing: ["thesisComplete"]` and a declared 20% cap operates at 1%.
 
 Also run the price-pattern `scan` branch; neither branch substitutes for the other. Return all
 radar lanes' included/excluded counts, the `radar_lane_starved` diagnostics **with their

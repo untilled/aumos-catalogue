@@ -207,6 +207,15 @@ reports no session at all (aumos #453).
   live `crtfc_key`, a SEC user-agent and the host at `>=0.3.30`, and it is the gate that closes
   #146. Until then the honest report is the one the package now produces — the stage that lost the
   input, by name.
+- **The main lane has never been opened by a real thesis (#160).** `thesisValuation` derives
+  `fairValueRange` and `expectedUpsidePct` from the bear/base/bull targets and checks each case's
+  drivers against the filings, and the regression proves that with those two fields present
+  `variantViewCheck` returns `verified: true` and `lane: 'main'` — but it proves it on **fixture
+  filings**, because the same missing `crtfc_key` blocks this path too. ⛔ What no check here can
+  establish is that an actual filer's statements support a target a real challenge clears. The gate
+  that closes #160 is a run with keys reporting `mainLaneOpen: true` on a name it fetched.
+  Meanwhile the measured state stays reported rather than papered over: three of four requirements
+  met, `missing: ["thesisComplete"]`, declared `0.2` operating at `0.01`.
 - The three packages of this collection have not yet been installed together against the same Toss-connected shadow
   portfolio for consecutive KR close → US close → Global review cycles.
 - ✅ *Partly resolved by the cycle above.* Real `memory_write` reached the store from all
