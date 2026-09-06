@@ -124,14 +124,50 @@ assert.deepEqual(reduction.details.limits.map((row) => row.source), ['mandate', 
 // The ceiling alone is not the whole reduction; the lane cap is the part that binds.
 assert.ok(reduction.details.limits.some((row) => row.source === 'lens-maturity' && row.weight === 0.01345312))
 
-// The disclosure round-trips exactly as `discovery_lane_dark` does.
+const promotedAgainstMandate = run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.2, maturityStatus: 'promoted', uncertainty: [] })
+
+/**
+ * The row the fund-settings screen draws (untilled/aumos#681, issue #679).
+ * `effectiveConstraintSchema` is a strictObject, so the field names are the
+ * host's and a methodology name would be refused there.
+ */
+const constraints = declaredVersusEffective.data.effectiveConstraints
+assert.deepEqual(constraints, [{
+  field: 'maxPositionWeight',
+  declared: 0.2,
+  effective: 0.01,
+  reason: 'lens_insufficient',
+  unlocks: 'promotionGate: samples 0/30 \u00b7 regimes 0/3 \u00b7 clusters 0/10',
+}])
+assert.deepEqual(Object.keys(constraints[0]).sort(), ['declared', 'effective', 'field', 'reason', 'unlocks'], 'no key the host schema does not carry')
+// `declared` is echoed from this run's mandate rather than pinned to one book.
+assert.equal(capOf({ mandatePositionCap: 0.1 }).data.effectiveConstraints[0].declared, 0.1)
+// No inequality, no row — and an unpromoted lens whose ceiling clears the Mandate emits nothing.
+assert.deepEqual(run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.005, maturityStatus: 'insufficient', lane: 'control-arm' }).data.effectiveConstraints, [])
+assert.deepEqual(promotedAgainstMandate.data.effectiveConstraints, [])
+// Only the axis this methodology actually narrows is named.
+assert.deepEqual([...new Set(constraints.map((row) => row.field))], ['maxPositionWeight'])
+
+// The disclosure round-trips exactly as `discovery_lane_dark` does, in both halves.
 assert.equal(capOf().data.disclosed, null, 'a call made before the proposal exists leaves the disclosure unjudged')
 assert.equal(has(capOf(), 'position_cap_reduction_undisclosed'), false)
 assert.ok(has(capOf({ uncertainty: ['the sweep found one candidate'] }), 'position_cap_reduction_undisclosed'))
 assert.equal(has(capOf({ uncertainty: ['position_cap_reduced_by_maturity: 0.20 declared, 0.01 operative'] }), 'position_cap_reduction_undisclosed'), false)
+// Prose without the machine-readable row is still an undisclosed reduction.
+const proseOnly = capOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: [] })
+assert.ok(has(proseOnly, 'position_cap_reduction_undisclosed'))
+assert.deepEqual(proseOnly.diagnostics.find((row) => row.code === 'position_cap_reduction_undisclosed').details.missing, ['effectiveConstraints'])
+// And the row without the prose is the same silence from the other side.
+assert.deepEqual(capOf({ uncertainty: [], effectiveConstraints: constraints }).diagnostics.find((row) => row.code === 'position_cap_reduction_undisclosed').details.missing, ['uncertainty'])
+// Both halves carried, and the run is clear.
+const bothHalves = capOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: constraints })
+assert.equal(has(bothHalves, 'position_cap_reduction_undisclosed'), false)
+assert.equal(bothHalves.data.disclosed, true)
+// A row naming another number is not this reduction.
+assert.ok(has(capOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: [{ ...constraints[0], effective: 0.2 }] }), 'position_cap_reduction_undisclosed'))
 
 // A promoted lens is held to the Mandate alone, so there is nothing to disclose.
-const promoted = run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.2, maturityStatus: 'promoted', uncertainty: [] })
+const promoted = promotedAgainstMandate
 assert.equal(promoted.data.effectiveCap, 0.2)
 assert.equal(promoted.data.reduced, false)
 assert.equal(has(promoted, 'position_cap_reduced_by_maturity'), false)
@@ -162,5 +198,6 @@ assert.equal(sized.data.positionCapReduced, true)
 assert.equal(sized.data.positionCapUnlocksAt, 'promotionGate')
 assert.ok(has(sized, 'position_cap_reduced_by_maturity'))
 assert.equal(sized.data.targetWeight, 0.01345312)
+assert.deepEqual(sized.data.effectiveConstraints, [{ field: 'maxPositionWeight', declared: 0.2, effective: 0.01345312, reason: 'lens_insufficient', unlocks: 'promotionGate: samples 30 \u00b7 regimes 3 \u00b7 clusters 10' }])
 
 console.log('evidence-gated issues #145\u2013151 regression tests passed')

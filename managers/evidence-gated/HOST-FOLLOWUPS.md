@@ -54,21 +54,34 @@ share price. `experimental_floor_exceeds_cap` reports it, with the resolving NAV
 
 ## The effective cap on the input screen (#151, proposal 4)
 
-`effectivePositionCap` now computes the reduction and every run that applies one discloses it, so
-the fact reaches the investor **after** a run. It does not reach them where the number is entered.
-An investor typing `maxPositionWeight = 0.20` into fund settings is declaring a limit that this
-manager will operate twentyfold below for as long as its lenses are unpromoted, and the screen
-says nothing.
+`effectivePositionCap` computes the reduction and every run that applies one discloses it, so the
+fact reaches the investor after a run. Reaching them **where the number is entered** is the host's
+half, and it is no longer hypothetical: `untilled/aumos#681` (issue #679) draws the effective limit
+beside the fund-settings control, and it reads exactly one place —
+`DecisionProposal.effectiveConstraints`.
 
-The host would need, beside the position-limit field, the effective limit each installed manager
-would apply at the current evidence state and book size — which is a value only the manager can
-compute, so it needs a read path Aumos does not have: a way to ask an installed manager for its
-operative constraints outside a decision run. That is Aumos's design call, not this package's;
-what this package can do is make the answer computable, which `effectivePositionCap` is. This
-follow-up is owned by `untilled/aumos`, and #151 is therefore not fully closed by this package.
+This package fills it. `effectivePositionCap` returns the array ready to copy into the proposal,
+and `PROMPT.md` §4 says to copy it verbatim:
 
-⛔ It is a **disclosure** dependency and not a gating one. Nothing here waits on the host: the
-diagnostic fires today, and the proposal that does not carry it is refused today.
+```jsonc
+{ "field": "maxPositionWeight",     // the host's vocabulary; a methodology name is refused
+  "declared": 0.2,                  // echoed from this invocation's mandate, never a constant
+  "effective": 0.01,
+  "reason": "lens_insufficient",    // this package's own code, rendered opaque
+  "unlocks": "promotionGate: samples 0/30 · regimes 0/3 · clusters 0/10" }
+```
+
+⚠️ **The two repositories have to land together.** The diagnostic alone leaves the screen empty,
+and the screen alone has nothing to draw. Only `maxPositionWeight` is ever emitted here: `cashFloor`
+is untouched by this methodology and the heat cap is read straight off `maxDrawdown` without being
+narrowed, and the host's rule is that an axis with no row is drawn as nothing rather than as
+unconstrained. ⛔ An entry is emitted **only** where `effective` differs from `declared` — that
+inequality is the whole test, and a reduction that is computed and not emitted is the defect #151
+is about, which is why the emission is judged (`position_cap_reduction_undisclosed`) rather than
+left to diligence.
+
+⛔ The dependency is a **disclosure** one and not a gating one. Nothing here waits on the host: the
+diagnostic fires today, and the proposal that does not carry both halves is refused today.
 
 ## The promotion ladder's middle rungs (#151, proposal 3)
 

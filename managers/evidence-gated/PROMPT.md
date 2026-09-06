@@ -462,6 +462,19 @@ is being sized at 0.01 cannot tell that run from one where 0.20 was simply not n
 disclosure is never an argument for raising anything; the gates are right and `policyLint` refuses
 a loosened threshold.
 
+⛔ **The disclosure has two halves and the proposal carries both.** `uncertainty` is prose the
+investor reads *after* the run; `DecisionProposal.effectiveConstraints` is the machine-readable
+value the fund-settings screen draws beside the control they typed the limit into. Copy this
+operation's `effectiveConstraints` array into the proposal **verbatim** — `field` is the host's
+vocabulary (`maxPositionWeight`, `cashFloor`, `maxDrawdown`) and a methodology name is refused by
+that schema, `declared` echoes the Mandate value this invocation handed you, `reason` is this
+package's own code (`lens_insufficient`), and `unlocks` names the gate with its progress. Pass the
+array back as `effectiveConstraints` alongside `uncertainty` and a proposal that carries the code
+in prose while leaving the field empty is `blocked` on that half alone. An empty array is a
+complete answer when nothing was reduced; ⚠️ **it is never a way to say "nothing bound"** — the
+host draws nothing at all for an absent row, so a reduction that is not emitted is exactly the
+silence this closes.
+
 ⚠️ **`experimental_floor_exceeds_cap` means the venue's minimum executable amount is larger than
 the control arm allows one name to be** — no name enters that lane at any share price, and the
 diagnostic carries the NAV that resolves it. It is the middle of three nested readings of the same

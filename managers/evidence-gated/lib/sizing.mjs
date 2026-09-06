@@ -279,16 +279,75 @@ export function effectivePositionCap(input = {}) {
       },
     ))
   }
-  const disclosed = Array.isArray(input?.uncertainty)
+  /**
+   * ── The half the investor sees before the run, not after it ───────────────
+   *
+   * `uncertainty` is prose in the invocation's `language` and is read *after* a
+   * proposal exists. The screen where the investor typed `maxPositionWeight`
+   * needs a machine-readable value, and `untilled/aumos#681` (issue #679)
+   * publishes exactly one: `DecisionProposal.effectiveConstraints`, an array of
+   * `effectiveConstraintSchema` — a `strictObject`, so this shape is the host's
+   * and not ours to extend.
+   *
+   * ⛔ **`field` is the host's vocabulary and only ever `maxPositionWeight`,
+   * `cashFloor` or `maxDrawdown`.** A methodology name — `controlArmLane`,
+   * `caps.position`, the experimental ceiling — is *refused* by that schema,
+   * and rightly: the string names the control the investor filled in, beside
+   * which the sentence is drawn. What actually bound is `reason`, which is
+   * where this package's own vocabulary belongs.
+   *
+   * ⛔ **`declared` is echoed from what this run was handed**, never a constant.
+   * A hardcoded 0.20 marks the row stale against every other Mandate.
+   *
+   * ⛔ **No entry when `effective === declared`.** The inequality is the whole
+   * test, and absence is not a claim that nothing bound — the host draws
+   * nothing at all — which is why *reduced and not emitted* is the exact defect
+   * #151 is about, and why it is judged below rather than left to care.
+   *
+   * ⚠️ Only `maxPositionWeight` is ever emitted here, and that is a statement
+   * about this methodology rather than a gap: `cashFloor` is untouched, and the
+   * portfolio-heat cap is read straight off `maxDrawdown` without this package
+   * tightening it. An axis this package does not narrow gets no row, because a
+   * row saying `declared === effective` is one the host would not draw and the
+   * schema does not want.
+   */
+  const unlocks = unpromoted
+    ? `promotionGate: ${['samples', 'regimes', 'clusters'].map((key) => {
+      const seen = promotion.observed[key]
+      return `${key} ${seen === null ? '' : `${seen}/`}${METHODOLOGY.promotionGate[key]}`
+    }).join(' · ')}`
+    : null
+  const effectiveConstraints = reduced
+    ? [{ field: 'maxPositionWeight', declared: round(declared), effective, reason, ...(unlocks ? { unlocks } : {}) }]
+    : []
+
+  /**
+   * The disclosure is judged on both halves, and each half is unjudged rather
+   * than passed when it was not handed over. A proposal that carries the
+   * diagnostic code in prose and leaves `effectiveConstraints` empty has told
+   * the run's reader and not the investor's screen, which is the same silence
+   * one layer up.
+   */
+  const uncertaintyDisclosed = Array.isArray(input?.uncertainty)
     ? input.uncertainty.some((entry) => typeof entry === 'string' && entry.includes('position_cap_reduced_by_maturity'))
     : null
+  const constraintDisclosed = Array.isArray(input?.effectiveConstraints)
+    ? input.effectiveConstraints.some((entry) => entry?.field === 'maxPositionWeight' && finite(entry?.effective) && Math.abs(entry.effective - effective) <= 1e-9)
+    : null
+  const disclosed = uncertaintyDisclosed === null && constraintDisclosed === null
+    ? null
+    : uncertaintyDisclosed !== false && constraintDisclosed !== false
   if (reduced && disclosed === false) {
+    const missing = [
+      ...(uncertaintyDisclosed === false ? ['uncertainty'] : []),
+      ...(constraintDisclosed === false ? ['effectiveConstraints'] : []),
+    ]
     diagnostics.push(diagnostic(
       'position_cap_reduction_undisclosed',
       'blocked',
-      'This proposal is sized under a cap smaller than the one the investor declared and does not say so; carry the code `position_cap_reduced_by_maturity` verbatim in one `uncertainty` entry',
-      'uncertainty',
-      { declared: round(declared), effective, entries: input.uncertainty.length },
+      'This proposal is sized under a cap smaller than the one the investor declared and does not say so; carry the code `position_cap_reduced_by_maturity` verbatim in one `uncertainty` entry and this operation’s `effectiveConstraints` row verbatim in the proposal',
+      missing[0] ?? 'uncertainty',
+      { declared: round(declared), effective, missing, expected: effectiveConstraints },
     ))
   }
 
@@ -337,7 +396,11 @@ export function effectivePositionCap(input = {}) {
       lane,
       maturityStatus: maturity,
       mustReport: reduced,
+      /** Copied into `DecisionProposal.effectiveConstraints` verbatim; empty is a complete answer. */
+      effectiveConstraints,
       disclosed,
+      uncertaintyDisclosed,
+      constraintDisclosed,
       ceiling: ceiling.data,
       floorVersusCap,
       units: { declaredCap: 'portfolio-weight', effectiveCap: 'portfolio-weight', reducedToFraction: 'ratio' },
@@ -411,6 +474,7 @@ export function targetWeight(input) {
       effectivePositionCap: capReport.data.effectiveCap,
       positionCapReduced: capReport.data.reduced,
       positionCapUnlocksAt: capReport.data.unlocksAt,
+      effectiveConstraints: capReport.data.effectiveConstraints,
       units: { rawWeight: 'portfolio-weight', bindingCap: 'portfolio-weight', targetWeight: 'portfolio-weight', experimentalCeiling: 'portfolio-weight', declaredPositionCap: 'portfolio-weight', effectivePositionCap: 'portfolio-weight' },
     },
     diagnostics,
