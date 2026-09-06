@@ -138,9 +138,9 @@ function approximatePValue(pointEstimate, confidenceInterval) {
 export function promotionGate({ rows = [], horizon = 'd20', seed = 0, resamples = 2000, thresholds = {} }) {
   const diagnostics = []
   const minimum = {
-    samples: thresholds.samples ?? 30,
-    regimes: thresholds.regimes ?? 3,
-    clusters: thresholds.clusters ?? 10,
+    samples: thresholds.samples ?? METHODOLOGY.promotionGate.samples,
+    regimes: thresholds.regimes ?? METHODOLOGY.promotionGate.regimes,
+    clusters: thresholds.clusters ?? METHODOLOGY.promotionGate.clusters,
   }
   const costs = { kr: 0.3, us: 0.5, ...(thresholds.roundTripCostPct ?? {}) }
   const matured = rows.filter((row) => row?.cohort === 'promote' && finite(row?.forward?.[horizon]?.returnPct) && typeof row?.signalDate === 'string')

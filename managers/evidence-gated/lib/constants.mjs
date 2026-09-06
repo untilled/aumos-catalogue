@@ -30,6 +30,23 @@
 export const METHODOLOGY = Object.freeze({
   /** Complete samples before a lens leaves `observing`. */
   minimumLensSamples: 10,
+  /**
+   * What `promotionGate` requires before a lens may be promoted.
+   *
+   * ⚠️ **These were three literals inside `promotionGate` and are read from
+   * here since #151.** The reason is not tidiness: `effectivePositionCap` has
+   * to name the gate a reduced cap unlocks at, and a second copy of the
+   * thresholds is a second answer to *"how far away is promotion?"* — the
+   * failure this file's opening paragraph is about.
+   *
+   * ⛔ **`regimes` is the one that cannot be hurried.** Samples and clusters
+   * respond to a higher candidate rate; a market regime turns on the calendar,
+   * so three of them is years rather than months. That is a fact about this
+   * gate the investor is owed before installing, and `README.md` says it — it
+   * is not an argument for lowering the number, which `policyLint` would
+   * refuse and is right to.
+   */
+  promotionGate: Object.freeze({ samples: 30, regimes: 3, clusters: 10 }),
   /** Independent date clusters before the same. Samples from one week are one event. */
   minimumIndependentDateClusters: 4,
   /** Closed outcomes after which new-single pacing relaxes from unevaluated to advisory. */
@@ -48,6 +65,25 @@ export const METHODOLOGY = Object.freeze({
    * exceed it.
    */
   experimentalPositionCeilingMax: 0.03,
+  /**
+   * The control arm's limits — 1% a name, 6% across the lane, six concurrent,
+   * and the exit discipline it registers before entry.
+   *
+   * ⚠️ **These lived in `learning.mjs` and are read from here since #151**, for
+   * the same reason `promotionGate`'s thresholds moved: `singleMaxWeight` is
+   * the number that actually binds a new single name on an unpromoted book, so
+   * `effectivePositionCap` in `sizing.mjs` has to be able to say so, and a
+   * lane cap copied into the operation that needed it second is how the two
+   * come to disagree. The argument for each value is in `controlArmLane`,
+   * which is still the only thing that enforces them.
+   */
+  controlArm: Object.freeze({
+    singleMaxWeight: 0.01,
+    laneTotalMaxWeight: 0.06,
+    maxConcurrentPositions: 6,
+    timeStopTradingDays: 40,
+    hardStopPct: -0.08,
+  }),
   /**
    * Existing exposure above a cap is carried and new exposure is not. Read by
    * `concentration`, `portfolioHeat` and `harnessAudit` from one place, so the

@@ -2276,7 +2276,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 89)
+assert.equal(supportedOperations.length, 90)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),

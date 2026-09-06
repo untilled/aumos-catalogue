@@ -1,7 +1,7 @@
-# Host dependencies after issues #145–149
+# Host dependencies after issues #145–151
 
-Version 0.4.21 restores the curated research assets and makes collection, input and scheduling
-failures observable. Two runtime facilities remain outside this catalogue package.
+Version 0.4.22 discloses the operative position cap and the venue floor that closes the control
+arm. Three runtime facilities remain outside this catalogue package.
 
 ## Fundamental storage (#146)
 
@@ -46,3 +46,48 @@ the observed price. USD 200 at DKS USD 139.15 cannot fund three whole-share rung
 The ceiling and staging policy are unchanged. Broker lot size must be supplied; fractional lots
 are used only when the broker actually supports them. Missing execution inputs produce
 `experimental_ladder_unevaluated`, never an assertion that every entry gate passed.
+
+⚠️ The issue's own "only names under USD 66 can enter" reading is **withdrawn** by #151 and was
+too generous. The binding fact is that `experimentalPositionFloor.USD` (200) is above the control
+arm's single-name cell (1% of USD 14,866.44 = USD 148.66), so no US name enters that lane at any
+share price. `experimental_floor_exceeds_cap` reports it, with the resolving NAV (USD 20,000).
+
+## The effective cap on the input screen (#151, proposal 4)
+
+`effectivePositionCap` computes the reduction and every run that applies one discloses it, so the
+fact reaches the investor after a run. Reaching them **where the number is entered** is the host's
+half, and it is no longer hypothetical: `untilled/aumos#681` (issue #679) draws the effective limit
+beside the fund-settings control, and it reads exactly one place —
+`DecisionProposal.effectiveConstraints`.
+
+This package fills it. `effectivePositionCap` returns the array ready to copy into the proposal,
+and `PROMPT.md` §4 says to copy it verbatim:
+
+```jsonc
+{ "field": "maxPositionWeight",     // the host's vocabulary; a methodology name is refused
+  "declared": 0.2,                  // echoed from this invocation's mandate, never a constant
+  "effective": 0.01,
+  "reason": "lens_insufficient",    // this package's own code, rendered opaque
+  "unlocks": "promotionGate: samples 0/30 · regimes 0/3 · clusters 0/10" }
+```
+
+⚠️ **The two repositories have to land together.** The diagnostic alone leaves the screen empty,
+and the screen alone has nothing to draw. Only `maxPositionWeight` is ever emitted here: `cashFloor`
+is untouched by this methodology and the heat cap is read straight off `maxDrawdown` without being
+narrowed, and the host's rule is that an axis with no row is drawn as nothing rather than as
+unconstrained. ⛔ An entry is emitted **only** where `effective` differs from `declared` — that
+inequality is the whole test, and a reduction that is computed and not emitted is the defect #151
+is about, which is why the emission is judged (`position_cap_reduction_undisclosed`) rather than
+left to diligence.
+
+⛔ The dependency is a **disclosure** one and not a gating one. Nothing here waits on the host: the
+diagnostic fires today, and the proposal that does not carry both halves is refused today.
+
+## The promotion ladder's middle rungs (#151, proposal 3)
+
+Left open deliberately. Whether an intermediate grade should exist between the experimental
+ceiling and a full promotion — reaching, say, 3% on 10 samples and 5 clusters without the third
+regime — is a methodology judgement about how much size unproven evidence may carry, and it is
+exactly the kind of number the source harness marked *"값 수정·완화는 사용자만 한다"*. This
+revision changes no threshold and adds no rung. It states the wait in `README.md` so the investor
+can decide before installing, and leaves the ladder question on the issue.
