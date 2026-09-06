@@ -547,6 +547,19 @@ the fourth were `catalysts`, `invalidationTriggers`, `expectedUpsidePct` and `fa
 `effectivePositionCap` then turned a declared `0.2` into an effective `0.01`, a `reductionMultiple`
 of **20**. ⇒ The main lane was not shut; it had never been opened.
 
+⚠️ **One of those four gaps could not be closed honestly, and now it can.** `invalidationTriggers`
+refused `kind: 'event'` outright — the diagnostic said *producer-less event is forbidden* and then
+refused every event, produced or not. So a falsifier like *"자사주 매입 중단"* or *"요금 인상 로드맵
+후퇴"*, which is what an invalidation condition is supposed to be, had to be dropped or dressed as a
+`metric` with a level nobody measures. An `event` invalidation is now accepted **with a
+`producer: { publisher, document }` — who announces the fact and in which document — and a
+`checkBy`**; missing either is `invalidation_producer_missing` / `invalidation_event_undated`, both
+`blocked`. Write no URL: the document has not been published yet, which is the point of registering
+the falsifier in advance. ⛔ Nothing on the WATCH side moved — a wake engine still cannot fire on an
+event, so `event` is not a WATCH kind and known earnings stay `at-time` checkpoints. `thesisSentinel`
+still reports an event as unevaluated, because a person reads the document; what is automatic is the
+deadline — an event past its own `checkBy` unread is `thesis_review` in `exitCheck`.
+
 ⛔ **And this package invents no valuation method to open it.** The methodology already says where a
 fair value comes from and says it twice: `candidate-research` §Candidate record 5 asks for
 bear/base/bull with a **target**, a return and factual drivers, and `researchGate` already computes

@@ -315,6 +315,20 @@ refused is opening the lane **quietly**. And `observationLedger` closes the loop
 value read on the web, used in judgement and supported by none of the submitted ids is
 `claim_evidence_missing` / `blocked`, which is the 2026-09-06 BOK-rate failure made into a finding.
 
+**And the requirement behind that lane could not be met honestly until now: a real falsifier had
+nowhere to go.** The main lane's first requirement is a *complete* thesis, and a thesis is complete
+only with `invalidationTriggers` — what would make you drop the name, decided before you are
+attached to it. `validateThesis` refused `kind: 'event'` outright, with a diagnostic that read
+*"producer-less event is forbidden"* and then refused every event, produced or not. The clause it
+turns on was never implemented. So *"자사주 매입 중단"* and *"PF 손실 대규모 인식"* — the two conditions
+under which a bank thesis is actually wrong — had to be dropped, or dressed as a `metric` with a
+level nobody measures, which is worse because it reads as machine-checked. An `event` invalidation is
+now accepted **with a `producer: { publisher, document }` and a `checkBy`**: who announces the fact,
+in which document, read by when. ⛔ This narrows the gate rather than widening it — the same trigger
+without a producer is still `blocked` (`invalidation_producer_missing`), a producer without a
+deadline is `blocked` too (`invalidation_event_undated`, because *"not announced yet"* is a true
+answer forever), and no WATCH kind, cap, promotion gate or control-arm number moved.
+
 **Two declared capabilities currently serve nothing.** `thesis:read` and `evidence:read`
 are in the manifest vocabulary, and the current Aumos build maps each to an empty tool
 list, so a run gets no such tool. The prompt reads them *when available* and the manifest
