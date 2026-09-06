@@ -240,6 +240,21 @@ carried and new exposure is not* is this methodology's rule, held once in `lib/c
 `harnessAudit` and `concentration` read the same copy — so they cannot come to disagree, and no run
 has to remember to hand it over.
 
+⚠️ **Read the holding's origin before calling it unexplained.** `history.recentDecisions` is a
+**window**, not the journal, so the decision that explains an older holding drifts out of it as the
+book keeps judging — and from the sixth decision on, an inherited position would freeze permanently
+against the very decision that just fell off the end. Pass `history.totalDecisions` as
+`totalDecisions`, and pass each holding's `positions[].origin` through untouched: origin is the
+earliest judgement in this book that names the asset, read over the **whole** journal, so it is the
+face that answers this and the window is not. ⛔ **Both are optional and absence is the host not
+saying, never «none».** No origin plus no total is `audit_decision_window_unstated`; a total larger
+than the rows you passed is `audit_decision_window_truncated`. In either case
+`audit_position_untracked` still carries the holding the conservative way and still withholds
+expansion, and it stops saying that no decision explains it — that is
+`explanationReadable: false`, and reporting it as unexplained is the defect this reads around.
+⛔ `origin.asOf` is when a judgement was sealed, never when the asset was bought; the
+inherited-or-acquired question stays on `acquiredAt` against `managedSince`.
+
 ⚠️ **A held position no decision explains is normal, and a run that treats it as a failure will
 never do anything.** This manager does not own the book: Aumos keeps the broker link, every order
 is approved by a person, and the investor trades outside this manager whenever they like. So on
@@ -572,28 +587,46 @@ closes. **Pass the invocation's config to `nextReviewSequence`** — `schedule.k
 and `usCloseBufferMinutes` are the investor's, and a run that omits them silently substitutes the
 package's own defaults for a number the install screen said was theirs. Never add 24 hours or reuse a fixed UTC close across DST, holidays or early closes.
 
+⛔ **Nothing tells you what you currently have armed, and you may not infer it.** `decisions[].armed`
+is **past tense** — *what became of what you armed* — and `fate` is `fired | replaced | lapsed` with
+no value for a promise still standing. A review that armed cleanly and one that was never armed
+produce **the same empty array**, so an empty `armed[]` is not evidence of a failed arm. One
+judgement in this book armed four plans and only the one that had already TRIGGERED appeared in its
+`armed[]`; the three still standing were absent, exactly as designed. There is no other face either:
+the runtime publishes no watch or plan capability, and an authoritative standing-promise read is
+open as `untilled/aumos#690` and does not exist yet. **So the answer is: re-arm at every judgement.**
+The host folds the same instant per instance (`untilled/aumos#593`), so re-arming what is already
+standing costs plan rows and never a second wake.
+
+⚠️ **Therefore nothing in this package suppresses a re-arm, and it is worth being plain about
+that.** Two consecutive runs read `armed: []` as *"the arm failed"*, re-armed the same three market
+reviews, and left three intents standing 3 / 3 / 2 deep. What made that possible was not the
+duplicate: it was believing the journal had answered.
+
 **Reconcile before you arm.** Read `run/armed-reviews` and pass **the whole value you read as
-`previous`**, the sequence as `sequence`, to `reconcileArmedReviews`; arm only what it returns in
-`toArm`. Also pass `journalArmed`, the actual `decisions[].armed` receipts from the host journal,
-normalized to `{flow, at}` or `{flow, atEpochMs}` using the review intent and trigger instant.
-An empty journal array means no confirmed arms; an unavailable journal is omitted and produces
-`armed_journal_unverified` when memory claimed arms. Memory alone must not suppress a review.
-The #136 dedupe claim was corrected by #148: the algorithm worked with correctly shaped input;
-the observed failures involved malformed calls, corrupted instants and unsubmitted proposals.
-⛔ The parameter name is the instruction: passing the standing arms at the top level as
-`armed` reads as `previous: null`, and a call that sees no standing arm re-arms every review —
-three flows woken twice on the same day, which is the state §4 exists to prevent. That shape is
-refused with `armed_state_misplaced` rather than answered. ⚠️ **You cannot read your own
-WATCHes** — the runtime publishes no watch capability — so this key is the only thing standing
-between a re-arm and a second review that wakes the same sleeve twice on the same day. Write
-`nextState` back only from confirmed journal receipts. `pending`/`toArm` is a proposal, never
-proof of arming. After successful submission, persist a reconciliation using its actual receipts;
-if receipts cannot be read in this run, leave pending rows out of memory and reconcile next run.
-A blocked calculation has no writable `nextState`. It is what is **standing**, not what this run armed: a run with nothing to arm
-still writes back the reviews that are still open, and a state smaller than the arms it was built
-from is refused with `armed_state_lost`. A `review_superseded` diagnostic means an older review is
-still out there and cannot be withdrawn; say so in `uncertainty` rather than assuming it replaced
-itself.
+`previous`**, the sequence as `sequence`, to `reconcileArmedReviews`; arm everything it returns in
+`toArm`, which is the whole sequence. ⛔ **Do not pass `journalArmed`** — that parameter built a
+receipt out of a field that answers a different question, and it is refused with
+`armed_journal_not_a_receipt` rather than ignored. ⛔ The parameter name is the instruction: passing
+the arms at the top level as `armed` reads as `previous: null`, and the record is then lost rather
+than carried; that shape is refused with `armed_state_misplaced`.
+
+What the key is for, now that it does not suppress anything, is the one duplicate the host does
+**not** fold: a second review for the same flow at a **different** instant, which is two wakes and
+two judgements sealed on the same book on the same day. That is `review_superseded`, it is
+`unevaluated`, and it means an older review is still out there and cannot be withdrawn — say so in
+`uncertainty` rather than assuming it replaced itself. `review_already_armed` names a same-instant
+repeat: arm it anyway and report it. Write `nextState` back verbatim when it is non-null. It is a
+**first-person** record — what this instance proposed, whose instant has not passed — never a claim
+about what is standing; a run with nothing to arm still writes back its unexpired promises, and a
+state smaller than the promises it was built from is refused with `armed_state_lost`. A blocked
+calculation has no writable `nextState`.
+
+⛔ **Never report a count of standing reviews, and never report it as zero.** `reconcileArmedReviews`
+returns `standingArms: null` with `standingArmsAreUnreadable: true` and says the same thing in
+`armed_state_unreadable`. A Brief that told the investor *"standing market reviews: 0"* while six
+were ARMED is what this sentence exists to prevent: where the number is unknown, the Brief and
+`uncertainty` say **unreadable**, and may say how many this instance proposed.
 
 ⚠️ **The instants in that key are epoch milliseconds, not RFC 3339.** `run/armed-reviews` holds
 future instants by design and `memory_read` refuses a result carrying any *string* timestamp after
@@ -673,6 +706,17 @@ passed stricter, never looser: a criterion adjusted after seeing the result is r
 When `verdictReport` returns proposals, **state them in this run**. They are what a met threshold
 looks like, they still require the investor's approval, and a manager that only ever argues itself
 smaller is not being careful.
+
+**Retract what this package has refuted.** Pass the whole value you read from
+`failures/repeated-patterns` to `refutedMemoryRules` as `patterns`, and write every `writeAs` row it
+returns as a new revision of that key **in this run**. ⛔ A wrong rule there is the one defect a new
+package version cannot fix by itself: the key is read on every wake, a row in it is what a run
+trusts on sight, and it decides how this code gets called. One such rule is carried today —
+*"when `run/armed-reviews` and the host journal disagree, the journal wins"*, filed `CONFIRMED` /
+`blocks-every-future-wake`, and it is the **cause** of the duplicate arming it was filed about.
+⚠️ Retract, never delete: the key is append-only, and a rule that merely vanished is re-derived by
+the next run that sees the same empty `armed[]`. `memory_rules_unread` means the key was not passed
+and nothing could be corrected.
 
 Load `skills/outcome-calibration/SKILL.md` when closed decisions or forward outcomes are available,
 and `skills/memory-contract/SKILL.md` before any memory write. Write a new revision only when a

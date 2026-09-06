@@ -15,6 +15,7 @@ import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCo
 import { harnessAudit, lessonAudit } from './audit.mjs'
 import { lensEnvelope, clusterBlock, timeStopPolicy, exitDiscipline, ruleVersions, policyLint } from './envelopes.mjs'
 import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport, controlArmLane } from './learning.mjs'
+import { refutedMemoryRules } from './memory-rules.mjs'
 import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence, resolveWakeFlow, resolveTrancheWake, reconcileArmedReviews } from './schedule.mjs'
 
 const operations = {
@@ -138,6 +139,7 @@ const operations = {
   resolveWakeFlow,
   resolveTrancheWake,
   reconcileArmedReviews: (input, asOf) => reconcileArmedReviews({ ...input, asOf }),
+  refutedMemoryRules: (input, asOf) => refutedMemoryRules({ ...input, asOf }),
 }
 
 export function execute(request) {

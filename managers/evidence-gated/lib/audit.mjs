@@ -162,7 +162,46 @@ function screenedCount(universe) {
   return new Set([...extensions, ...scanners.flatMap((rows) => (Array.isArray(rows) ? rows : []))]).size
 }
 
-export function harnessAudit({ positions = [], watches = [], theses = [], decisions = [], universe = null, researchActivity = null, gateStaleDays = GATE_STALE_DAYS, managedSince = null, config = {}, asOf } = {}) {
+/**
+ * ── Which decisions were even offered, and where a holding came from ───────
+ *
+ * ⛔ **`decisions` is a window and this operation used to read it as the
+ * journal.** (aumos#688, aumos#691) `history.recentDecisions` carries the
+ * latest N; the decision that explains an older holding drifts out of it as the
+ * book keeps judging, so from the sixth decision on an inherited position
+ * freezes permanently — and the thing that would unfreeze it is the decision
+ * that just fell off the end. The measured case: `dec_f0549343…` opened a
+ * thesis for `069500` and armed its tranche gate, sat at sequence 2 of 7 with a
+ * five-row window, and `audit_position_untracked` reported the book held
+ * something no decision explained.
+ *
+ * Two optional faces answer it, and **absence means different things**:
+ *
+ * - `totalDecisions` — `history.totalDecisions`, how many judgements this book
+ *   has sealed at or before `asOf`. Greater than the number supplied means
+ *   there is a part of the journal this run did not see, and it is the older
+ *   part. ⚠️ **Absent means the host did not say**, never zero and never "the
+ *   window is whole" — a run that assumed the latter keeps the exact defect
+ *   this reads around.
+ * - `positions[].origin` — `{ decisionId, asOf }` for the earliest decision in
+ *   this book that names the asset, read over the **whole** journal rather than
+ *   the window, so it is unaffected by window size. Absent means no judgement
+ *   in this book names the asset, which is the definition of an inherited
+ *   holding — *when the host publishes the face at all*.
+ *
+ * ⛔ **`origin.asOf` is not an acquisition date.** It is when a judgement was
+ * sealed; Aumos holds no tax lots and no fill time is on this line. The
+ * inherited/acquired-since question stays where it was, on `acquiredAt` against
+ * `managedSince`, and origin only answers *explained or not*.
+ */
+const originOf = (position) => {
+  const id = position?.origin?.decisionId
+  if (typeof id !== 'string' || id === '') return null
+  const at = position?.origin?.asOf
+  return { decisionId: id, asOf: typeof at === 'string' && Number.isFinite(Date.parse(at)) ? at : null }
+}
+
+export function harnessAudit({ positions = [], watches = [], theses = [], decisions = [], universe = null, researchActivity = null, gateStaleDays = GATE_STALE_DAYS, managedSince = null, totalDecisions = null, config = {}, asOf } = {}) {
   const diagnostics = []
   const issues = []
   const add = (severity, code, subject, message, detail = {}) => {
@@ -235,9 +274,28 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
   const managedFrom = typeof managedSince === 'string' && Number.isFinite(Date.parse(managedSince)) ? managedSince : null
   const grandfathered = []
   const unexplained = []
+  const explainedOutsideWindow = []
+  /**
+   * `true` the journal was supplied whole, `false` it was cut, `null` the host
+   * did not say — and the third is not the second. `<=` rather than `===`
+   * because a caller may pass more rows than the total it read.
+   */
+  const windowIsWhole = finite(totalDecisions) ? totalDecisions <= decisions.length : null
   for (const position of positions) {
     const symbol = subjectOf(position)
     const decision = symbol === null ? undefined : accountedFor.get(symbol)
+    const origin = originOf(position)
+    if (!decision && origin) {
+      /**
+       * ⛔ Explained, and the window is what was short. Read over the whole
+       * journal, so this is never "the window did not reach it" — it is the
+       * earliest judgement that named the asset, whether or not that judgement
+       * is one of the rows this run was handed.
+       */
+      explainedOutsideWindow.push({ symbol, ...origin })
+      add('info', 'audit_position_origin_outside_window', symbol, 'No decision in the window explains this holding and the journal names one anyway; the earliest judgement about this asset is older than the rows this run was given, so this is the edge of the window and not a missing explanation', { origin, suppliedDecisions: decisions.length, totalDecisions: finite(totalDecisions) ? totalDecisions : null })
+      continue
+    }
     if (!decision) {
       /**
        * ⚠️ Two different questions, and they were one line until the review of
@@ -253,14 +311,25 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
       const carried = grandfather.enabled && inherited
       unexplained.push(symbol)
       if (carried) grandfathered.push(symbol)
+      /**
+       * ⚠️ **The finding stays; the certainty behind it is what changed.**
+       * Without `origin` and without a whole journal, "no decision explains
+       * this" is not something this run read — it is what it failed to read.
+       * The action is identical either way and it is the conservative one, so
+       * the row keeps its severity; the sentence stops asserting a fact the
+       * input never carried, and `explanationReadable` says which it is.
+       */
+      const readable = windowIsWhole === true
       add(
         'warn',
         'audit_position_untracked',
         symbol,
-        inherited
-          ? 'The book holds something no decision explains and nothing says it was bought under this manager; carry it, reduce it or exit it, and do not expand it'
-          : 'The book holds something no decision explains and it was acquired under this manager; the investor also trades this book directly, so this is a missing explanation rather than a size disagreement',
-        { inherited, grandfathered: carried, managedSince: managedFrom, acquiredAt: position?.acquiredAt ?? null },
+        readable
+          ? inherited
+            ? 'The book holds something no decision in its whole journal explains and nothing says it was bought under this manager; carry it, reduce it or exit it, and do not expand it'
+            : 'The book holds something no decision in its whole journal explains and it was acquired under this manager; the investor also trades this book directly, so this is a missing explanation rather than a size disagreement'
+          : 'No decision this run was given explains this holding, and nothing says the decisions it was given are the whole journal — so this is an unread explanation as easily as a missing one. Carry it, reduce it or exit it, do not expand it, and do not report it as unexplained',
+        { inherited, grandfathered: carried, managedSince: managedFrom, acquiredAt: position?.acquiredAt ?? null, explanationReadable: readable, originStated: false },
       )
       continue
     }
@@ -270,6 +339,12 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
   }
   if (unexplained.length && !managedFrom) {
     diagnostics.push(diagnostic('audit_managed_since_missing', 'unevaluated', 'Without the mandate effective date, a position inherited at cold start cannot be told from one bought since; both are carried and neither is expanded', 'managedSince', { unexplained }))
+  }
+  if (unexplained.length && windowIsWhole === false) {
+    diagnostics.push(diagnostic('audit_decision_window_truncated', 'unevaluated', 'The book has sealed more judgements than this run was given, and the ones it was not given are the older ones — exactly where the explanation of an older holding lives. Ask for `positions[].origin`, which is read over the whole journal, before calling a holding unexplained', 'decisions', { suppliedDecisions: decisions.length, totalDecisions, unexplained }))
+  }
+  if (unexplained.length && windowIsWhole === null) {
+    diagnostics.push(diagnostic('audit_decision_window_unstated', 'unevaluated', 'Nothing says whether the decisions supplied are this book’s whole journal: `history.totalDecisions` was not passed and none of these holdings carried `positions[].origin`. An absent face is the host not saying, never a statement that no decision explains the holding — carry them and do not report them as unexplained', 'totalDecisions', { suppliedDecisions: decisions.length, unexplained }))
   }
 
   /**
@@ -336,6 +411,10 @@ export function harnessAudit({ positions = [], watches = [], theses = [], decisi
       clearToPlan: blockers.length === 0,
       grandfathered,
       unexplained,
+      explainedOutsideWindow,
+      decisionWindowWhole: windowIsWhole,
+      suppliedDecisions: decisions.length,
+      totalDecisions: finite(totalDecisions) ? totalDecisions : null,
       managedSince: managedFrom,
       universeDeclared: screened === null ? null : screened > 0,
       screenedUniverseCount: screened,

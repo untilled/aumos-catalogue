@@ -403,7 +403,45 @@ export function resolveWakeFlow({ summary, intent, watchId } = {}) {
 }
 
 /**
- * What this instance last armed, so a re-arm does not duplicate it.
+ * ── What this key is, after #156 took its old job away ─────────────────────
+ *
+ * ⛔ **`decisions[].armed` is past tense and this package read it as a
+ * receipt.** `snapshots.ts:250` had said so since #622 — *"There is no word for
+ * one that is still standing … an empty array is never a statement about what
+ * is armed"* — and `armedPlanFateSchema` carries `fired | replaced | lapsed`
+ * and nothing for a promise that has not ended. The name is present tense, and
+ * the name won: this file's own comment said *"Only host journal receipts
+ * attest to arming"*, §4 said *"an empty journal array means no confirmed
+ * arms"*, and one control observation settles which reading was right —
+ * `dec_c914fc5caf644d74a72113a87c2562b3` armed four plans and only the one that
+ * had already **TRIGGERED** appeared in its `armed[]`. The three still standing
+ * were absent, exactly as designed.
+ *
+ * The cost was paid twice over. Three market-review intents stood armed 3 / 3 /
+ * 2 deep because two consecutive runs read `armed: []` as *"the arm failed"*;
+ * *"when they disagree, the journal wins"* set in this manager's
+ * `failures/repeated-patterns` as `CONFIRMED` / `blocks-every-future-wake`,
+ * which is the rule that **caused** the duplicates; and Brief v6 §8 told the
+ * investor that **zero** market reviews were standing while six were ARMED.
+ * (#156, aumos#687, aumos#691)
+ *
+ * ⚠️ **Nothing anywhere answers "what do I currently have armed".** That is the
+ * gap, not an oversight of ours to work around: aumos#622 refused to publish a
+ * standing list because a list of live promises reads as permission to stop
+ * re-arming, aumos#690 is open for a shape that does not read that way, and
+ * until it exists the host's answer is the one this operation now implements —
+ * **re-arm at every judgement and let the host fold.** `wake/engine.ts` folds
+ * the same instant per instance (aumos#593), so a duplicate at the *same*
+ * instant costs plan rows and never a second wake.
+ *
+ * ⛔ **So this operation suppresses nothing, and that is the honest answer to
+ * "then what stops a duplicate".** Nothing here does. The host's fold does, and
+ * only for an identical instant. What this key still answers is the question
+ * folding does not touch and the journal cannot reach: **did this instance
+ * already promise this flow a review at a *different* instant** — #87's real
+ * harm, two `kr-sleeve` reviews half an hour apart, two wakes, two judgements
+ * sealed on the same book on the same day. That is `review_superseded`, it is
+ * first-person by construction, and no read path is needed to answer it.
  *
  * ⚠️ **A manager can arm a WATCH and cannot read one back.** The grant map
  * publishes `portfolio_read`, `brief_read/write`, `memory_read/write` and
@@ -417,7 +455,9 @@ export function resolveWakeFlow({ summary, intent, watchId } = {}) {
  * nothing in either saying which one read the close. That is the state #87
  * existed to remove.
  *
- * So the manager writes down what the journal confirms it armed. Rows are replaced every run rather
+ * So the manager writes down what it proposed itself. ⛔ **First person, and
+ * that is the whole of what it claims** — never "these are standing", which is
+ * a sentence this package has no way to write truthfully. Rows are replaced every run rather
  * than appended to, in the same shape `run/watch-alerts` uses for the same
  * reason (#88): a key that grows is the ledger `memory-contract` forbids.
  *
@@ -467,7 +507,7 @@ const armedKey = (row) => {
   return instant === null ? null : `${row?.flow}|${instant}`
 }
 
-export function reconcileArmedReviews({ previous = null, sequence = [], journalArmed = null, armed: misplacedArmed, asOf } = {}) {
+export function reconcileArmedReviews({ previous = null, sequence = [], journalArmed, armed: misplacedArmed, asOf } = {}) {
   const diagnostics = []
   /**
    * ⛔ **The record arrives under `previous`, and a run that passed it at the
@@ -484,55 +524,82 @@ export function reconcileArmedReviews({ previous = null, sequence = [], journalA
   if (misplacedArmed !== undefined) {
     diagnostics.push(diagnostic('armed_state_misplaced', 'blocked', 'The standing arms arrive as `previous` — the whole value read from `run/armed-reviews` — not as a top-level `armed`. Read at the top level they are invisible, and every standing review is re-armed', 'armed', { received: Array.isArray(misplacedArmed) ? misplacedArmed.length : null }))
   }
+  /**
+   * ⛔ **`journalArmed` is refused rather than ignored.** (#156) It was built
+   * from `decisions[].armed`, which answers *what became of what you armed* and
+   * has no value for a promise still standing — so a run that passed it and got
+   * an ordinary answer had "verified" an arm against a field that never spoke
+   * about arming. Ignoring the key silently would leave that belief in place;
+   * `armed_state_misplaced` one paragraph up is refused for the same reason.
+   * The key stays in the published contract precisely so it can be named here.
+   */
+  if (journalArmed !== undefined) {
+    diagnostics.push(diagnostic('armed_journal_not_a_receipt', 'blocked', '`decisions[].armed` is past tense — what became of what was armed, never what is armed now — and an empty array is not evidence of a failed arm: a review that armed cleanly and one that was never armed produce the same empty array. Nothing in AMP answers what this instance currently has armed, so this operation takes no journal; drop the parameter and re-arm the sequence', 'journalArmed', { received: Array.isArray(journalArmed) ? journalArmed.length : null }))
+  }
   const remembered = Array.isArray(previous?.armed) ? previous.armed : []
-  for (const [index, row] of [...remembered, ...sequence, ...(journalArmed ?? [])].entries()) {
+  for (const [index, row] of [...remembered, ...sequence].entries()) {
     const instant = armedInstant(row)
     const label = typeof row?.atLabel === 'string' ? row.atLabel.replace(/(\d{2})h(\d{2})m(\d{2})s UTC$/, '$1:$2:$3Z').replace(' ', 'T') : null
     if (!DISPATCHABLE_FLOWS.includes(row?.flow) || !Number.isSafeInteger(instant) || !Number.isFinite(new Date(instant).getTime()) || (row?.atLabel !== undefined && Date.parse(label) !== instant) || (row?.at && Date.parse(row.at) !== instant)) {
       diagnostics.push(diagnostic('armed_instant_mismatch', 'blocked', 'Review epoch and human-readable instant must agree; never repair an epoch by hand', `reviews[${index}]`))
     }
   }
-  // Only host journal receipts attest to arming. A planned sequence is not a receipt.
-  const recorded = Array.isArray(journalArmed) ? journalArmed : []
-  if (journalArmed === null && remembered.length) diagnostics.push(diagnostic('armed_journal_unverified', 'unevaluated', 'Memory alone cannot suppress a review; read actual decisions[].armed from the host journal', 'journalArmed'))
-  const phantom = remembered.filter((row) => !recorded.some((receipt) => armedKey(receipt) === armedKey(row)))
-  if (Array.isArray(journalArmed) && phantom.length) diagnostics.push(diagnostic('armed_journal_mismatch', 'unevaluated', 'Memory claims arms absent from the host journal; journal wins and these rows do not suppress toArm', 'previous.armed', { phantom }))
-  const stillOpen = recorded.filter((row) => {
+  /**
+   * ⛔ **This is a first-person record and it is read as one.** (#156) Rows
+   * this instance proposed whose instant has not passed — never "what is
+   * standing", which nothing can say. A row can be wrong in exactly one
+   * direction: the promise behind it may already have fired, lapsed or been
+   * replaced without this instance being able to see it. That is why no row
+   * here suppresses anything.
+   */
+  const previouslyProposed = remembered.filter((row) => {
     const instant = armedInstant(row)
     return instant !== null && instant > Date.parse(asOf)
   })
-  const duplicates = []
-  const toArm = []
-  for (const row of sequence) {
-    const match = stillOpen.find((open) => open.flow === row.flow && armedInstant(open) === armedInstant(row))
-    if (match) {
-      duplicates.push(row.flow)
-      continue
-    }
-    toArm.push(row)
-  }
+  diagnostics.push(diagnostic('armed_state_unreadable', 'info', 'Nothing in AMP answers what this instance currently has armed: `decisions[].armed` is past tense and there is no standing-promise read (aumos#690). What follows is what this instance proposed, never what stands — report it as unreadable and never as a count of standing reviews, least of all as zero', 'previous.armed', { proposedAndUnexpired: previouslyProposed.length }))
+  /**
+   * ⛔ **Nothing is suppressed, and `toArm` is the whole sequence.** (#156)
+   * The suppression this returned before was built on a journal that does not
+   * answer the question, and the two runs that trusted it armed the same
+   * reviews a second and third time. The host's rule is *arm at every
+   * judgement*; `wake/engine.ts` folds an identical instant per instance
+   * (aumos#593), so the duplicate costs plan rows and never a second wake.
+   * `duplicateFlows` still names them, because a run that silently re-arms
+   * three reviews it already promised has nothing to put in `uncertainty`.
+   */
+  const duplicates = sequence.filter((row) => previouslyProposed.some((open) => open.flow === row.flow && armedInstant(open) === armedInstant(row))).map((row) => row.flow)
+  const toArm = [...sequence]
   if (duplicates.length) {
-    diagnostics.push(diagnostic('review_already_armed', 'info', 'A review at this instant is already armed for this flow; arming it again would wake the sleeve twice', 'sequence', { flows: duplicates }))
-  }
-  const superseded = stillOpen.filter((open) => sequence.some((row) => row.flow === open.flow && armedInstant(row) !== armedInstant(open)))
-  if (superseded.length) {
-    diagnostics.push(diagnostic('review_superseded', 'info', 'A previously armed review is being replaced by one at a different instant; the old one cannot be withdrawn without a read path', 'previous', { superseded }))
+    diagnostics.push(diagnostic('review_already_armed', 'info', 'This instance already proposed a review for this flow at this instant. Arm it again anyway — a standing promise cannot be read back, and the host folds the same instant per instance — and say in `uncertainty` that the count of standing reviews is unreadable', 'sequence', { flows: duplicates }))
   }
   /**
-   * ⚠️ **`armed` is what is standing, not what this run happened to arm.**
-   * (#136) It was `sequence.map(...)` — a copy of this run's sequence — so a
-   * run with nothing to arm wrote an empty `armed` over three live reviews and
-   * the next run re-armed all three. A review does not stop standing because
-   * this run had no reason to mention it; it stops standing when it fires.
+   * ⚠️ **The one duplicate the host does not fold.** A second review at a
+   * *different* instant is a second wake and a second judgement sealed on the
+   * same book on the same day — #87's actual harm — and it is the one question
+   * this first-person record can answer without a read path.
+   */
+  const superseded = previouslyProposed.filter((open) => sequence.some((row) => row.flow === open.flow && armedInstant(row) !== armedInstant(open)))
+  if (superseded.length) {
+    diagnostics.push(diagnostic('review_superseded', 'unevaluated', 'This instance already proposed a review for this flow at a different instant, and the host folds only identical instants — so both may fire and the sleeve may be judged twice on one day. It cannot be withdrawn without a read path; say so in `uncertainty` rather than assuming it replaced itself', 'previous', { superseded }))
+  }
+  /**
+   * ⚠️ **`armed` is what this instance has promised, not what this run
+   * happened to arm.** (#136) It was `sequence.map(...)` — a copy of this run's
+   * sequence — so a run with nothing to arm wrote an empty `armed` over three
+   * live reviews and the next run re-armed all three. A promise does not leave
+   * this record because this run had no reason to mention it; it leaves when
+   * its instant passes.
    *
-   * Since #148 the host journal is authoritative: only confirmed, still-open
-   * receipts survive. Proposed rows stay pending until submission is confirmed.
-   * A phantom memory row is removed even if its instant has not passed.
+   * ⛔ **And it is no longer gated on a journal receipt.** (#156) #148 made
+   * only journal-confirmed rows survive, which meant every standing review was
+   * dropped from memory on the next run — `decisions[].armed` carries a
+   * promise only once it has *ended*. The gate emptied the record it was meant
+   * to verify.
    */
   const nextArmed = []
-  for (const row of stillOpen) {
+  for (const row of [...previouslyProposed, ...toArm]) {
     const instant = armedInstant(row)
-    if (instant === null) continue
+    if (instant === null || !(instant > Date.parse(asOf))) continue
     if (nextArmed.some((kept) => kept.flow === row.flow && kept.atEpochMs === instant)) continue
     nextArmed.push({ flow: row.flow, atEpochMs: instant })
   }
@@ -540,9 +607,9 @@ export function reconcileArmedReviews({ previous = null, sequence = [], journalA
   const loss = stateLoss({
     code: 'armed_state_lost',
     path: 'nextState.armed',
-    before: stillOpen.map(armedKey),
+    before: previouslyProposed.map(armedKey),
     after: nextArmed.map(armedKey),
-    message: 'A standing review is missing from the state this run would write back; a record smaller than the arms it was built from is a review nobody can dedupe against and a sleeve woken twice',
+    message: 'A promise this instance made is missing from the state this run would write back; a record smaller than the promises it was built from is a supersede nobody can notice and a sleeve judged twice in a day',
   })
   if (loss) diagnostics.push(loss)
   return {
@@ -550,9 +617,10 @@ export function reconcileArmedReviews({ previous = null, sequence = [], journalA
       toArm,
       duplicateFlows: duplicates,
       superseded,
-      stillOpen,
+      previouslyProposed,
       pending: toArm,
-      persistenceRequiresJournal: true,
+      standingArms: null,
+      standingArmsAreUnreadable: true,
       nextState: diagnostics.some((row) => row.severity === 'blocked') ? null : {
         schemaVersion: 2,
         updatedAsOf: asOf ?? null,
