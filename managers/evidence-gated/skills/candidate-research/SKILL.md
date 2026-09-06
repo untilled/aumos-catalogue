@@ -99,7 +99,7 @@ Five conditions, all of them numbers rather than intentions:
 |---|---|
 | cash threshold | the first tranche executes only when cash and short bonds are at least `coreDca.minimumCashWeightForFirstTranche` of the book. Deploying from a thin cash position turns the reserve into the tranche |
 | tranche plan | T1/T2/T3 each with its size and its date-or-price condition. "We will add on weakness" is not a tranche |
-| reserve floor | the arithmetic showing `coreDca.reserveFloorWeight` still stands **after** the tranche, not before it |
+| reserve floor | `effectiveCashFloor` with the Mandate's `cashFloor` as `mandateCashFloor` and the post-tranche cash weight as `projectedCashWeight` — the arithmetic showing the floor still stands **after** the tranche, not before it, computed rather than described. ⚠️ Since #153 the floor is the investor's declaration and this package holds no copy of it; an undeclared one is `cash_floor_unevaluated`, which is not "no floor", and the floor is a floor rather than a target |
 | stop conditions | four, named: a market break, a better opportunity, the cash floor breached, a hedge gate firing |
 | classification | recorded as cash deployment. **It does not count as a ready single-name BUY** — pooling the two makes the single-name sample look larger than it is |
 

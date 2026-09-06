@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated/lib/index.mjs'
 import { handleMcpRequest } from '../managers/evidence-gated/lib/mcp-server.mjs'
+import { METHODOLOGY } from '../managers/evidence-gated/lib/constants.mjs'
+
+const configSchema = JSON.parse(await readFile(new URL('../managers/evidence-gated/config.schema.json', import.meta.url), 'utf8'))
 
 const asOf = '2026-09-05T11:44:38.351Z'
 const run = (operation, input = {}) => execute({ operation, asOf, input })
@@ -200,4 +204,124 @@ assert.ok(has(sized, 'position_cap_reduced_by_maturity'))
 assert.equal(sized.data.targetWeight, 0.01345312)
 assert.deepEqual(sized.data.effectiveConstraints, [{ field: 'maxPositionWeight', declared: 0.2, effective: 0.01345312, reason: 'lens_insufficient', unlocks: 'promotionGate: samples 30 \u00b7 regimes 3 \u00b7 clusters 10' }])
 
-console.log('evidence-gated issues #145\u2013151 regression tests passed')
+/**
+ * #153: the main lane, the control arm, and the floor the investor declared.
+ *
+ * The same book as #151 — NAV USD 14,866.44, 57% of it cash, a USD 200 venue
+ * floor, a Mandate declaring `maxPositionWeight` 0.20 and `cashFloor` 0.10 —
+ * and the source methodology's own approved control-arm numbers, 1% a name and
+ * 6% a lane, which nothing below moves.
+ */
+const consensusRef = { metric: 'consensusTargetPrice', value: 250000, sourceUrl: 'https://example.invalid/consensus', publishedAt: '2026-08-20T00:00:00Z', capturedAt: '2026-08-21T00:00:00Z' }
+const mainLaneThesis = {
+  thesisId: 'th-035420', asset: '035420', createdAt: '2026-08-21T00:00:00Z', coreClaim: 'search monetization inflection', horizonEnd: '2027-03-31T00:00:00Z',
+  evidenceStatus: 'complete', variantView: 'the market prices the ad cycle and not the cloud contribution',
+  consensusRefs: [consensusRef],
+  catalysts: [{ event: 'Q3 result', windowStart: '2026-10-20T00:00:00Z', windowEnd: '2026-11-10T00:00:00Z' }],
+  invalidationTriggers: [{ kind: 'price-below', level: 150000, checkBy: '2026-12-31T00:00:00Z' }],
+  expectedUpsidePct: 32, fairValueRange: { low: 230000, high: 280000 },
+}
+const laneOf = (extra = {}) => run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.2, maturityStatus: 'insufficient', ...extra })
+
+// A checked variant view is sized by the Mandate, not by the maturity ceiling.
+const mainLane = laneOf({ lane: 'main', thesis: mainLaneThesis, challengeVerdict: 'cleared' })
+assert.equal(mainLane.data.variantView.verified, true)
+assert.deepEqual(mainLane.data.variantView.missing, [])
+assert.equal(mainLane.data.resolvedLane, 'main')
+assert.equal(mainLane.data.ceilingApplies, false)
+assert.equal(mainLane.data.effectiveCap, 0.2)
+assert.equal(mainLane.data.reduced, false)
+assert.equal(mainLane.data.reason, null)
+assert.deepEqual(mainLane.data.effectiveConstraints, [], 'a cap that was not reduced draws no row')
+assert.equal(has(mainLane, 'position_cap_reduced_by_maturity'), false)
+assert.equal(has(mainLane, 'experimental_floor_exceeds_cap'), false, 'the control arm cell is not this candidate cell')
+// The Mandate still governs the lane it opened.
+assert.equal(laneOf({ lane: 'main', thesis: mainLaneThesis, challengeVerdict: 'cleared', mandatePositionCap: 0.05 }).data.effectiveCap, 0.05)
+
+// Every requirement is load-bearing, and each failure falls to the control arm rather than through.
+for (const [label, extra] of [
+  ['no variant view statement', { thesis: { ...mainLaneThesis, variantView: '' } }],
+  ['no dated consensus citation', { thesis: { ...mainLaneThesis, consensusRefs: [] } }],
+  ['a citation published after it was captured', { thesis: { ...mainLaneThesis, consensusRefs: [{ ...consensusRef, publishedAt: '2026-08-22T00:00:00Z' }] } }],
+  ['a citation published after asOf', { thesis: { ...mainLaneThesis, consensusRefs: [{ ...consensusRef, publishedAt: '2027-01-01T00:00:00Z', capturedAt: '2027-01-02T00:00:00Z' }] } }],
+  ['an incomplete thesis', { thesis: { ...mainLaneThesis, evidenceStatus: 'incomplete' } }],
+  ['a conditional challenge verdict', { challengeVerdict: 'conditional_watch' }],
+  ['no thesis at all', { thesis: undefined }],
+]) {
+  const fallen = laneOf({ lane: 'main', thesis: mainLaneThesis, challengeVerdict: 'cleared', ...extra })
+  assert.equal(fallen.data.variantView.verified, false, `${label} is not a variant view`)
+  assert.equal(fallen.data.resolvedLane, 'control-arm', `${label} falls to the control arm`)
+  assert.equal(fallen.data.effectiveCap, 0.01345312, `${label} is held to the experimental ceiling`)
+  assert.ok(has(fallen, 'variant_view_unverified'))
+  assert.ok(has(fallen, 'main_lane_requires_variant_view'), 'asking for the lane is not a way into it')
+}
+
+// The control arm's approved numbers are untouched, and an explicit request for it is honoured.
+assert.equal(METHODOLOGY.controlArm.singleMaxWeight, 0.01)
+assert.equal(METHODOLOGY.controlArm.laneTotalMaxWeight, 0.06)
+const armWithView = laneOf({ lane: 'control-arm', thesis: mainLaneThesis, challengeVerdict: 'cleared' })
+assert.equal(armWithView.data.effectiveCap, 0.01, 'a request for the bounded lane is never overridden into a larger one')
+assert.equal(armWithView.data.resolvedLane, 'control-arm')
+assert.deepEqual(run('controlArmLane', { proposed: [{ symbol: 'M1', weight: 0.02, exitRegistered: true }] }).data.limits.singleMaxWeight, 0.01)
+
+// The promotion gate is not lowered by any of this.
+assert.deepEqual(METHODOLOGY.promotionGate, { samples: 30, regimes: 3, clusters: 10 })
+
+// The control arm's own record may not buy size in the main lane.
+const citingTheArm = laneOf({ lane: 'main', thesis: mainLaneThesis, challengeVerdict: 'cleared', evidenceSamples: [{ setup: 'mean_reversion', cohort: 'mechanical-baseline' }] })
+assert.ok(has(citingTheArm, 'control_arm_evidence_cited'))
+assert.equal(citingTheArm.diagnostics.find((row) => row.code === 'control_arm_evidence_cited').severity, 'blocked')
+assert.equal(citingTheArm.data.variantView.verified, false)
+assert.equal(citingTheArm.data.effectiveCap, 0.01345312)
+// The research cohort's own record is not the control arm's.
+assert.equal(laneOf({ lane: 'main', thesis: mainLaneThesis, challengeVerdict: 'cleared', evidenceSamples: [{ setup: 'thesis_call' }] }).data.variantView.verified, true)
+
+// Nothing about an unverified candidate changed: #151's numbers still stand exactly.
+assert.equal(capOf({ promotion: { samples: 0, regimes: 0, clusters: 0 } }).data.effectiveCap, 0.01)
+assert.equal(run('targetWeight', { ...issueBook, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'insufficient', researchGate: 'passed', challengeVerdict: 'cleared' }).data.targetWeight, 0.01345312)
+// and a verified one is sized by the Mandate all the way through `targetWeight`.
+const sizedOnMainLane = run('targetWeight', { ...issueBook, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'insufficient', researchGate: 'passed', challengeVerdict: 'cleared', lane: 'main', thesis: mainLaneThesis })
+assert.equal(sizedOnMainLane.data.variantViewVerified, true)
+assert.equal(sizedOnMainLane.data.experimentalCeilingApplies, false)
+assert.equal(sizedOnMainLane.data.targetWeight, 0.2)
+assert.deepEqual(sizedOnMainLane.data.effectiveConstraints, [])
+// Sector headroom still binds it — the lane is not an exemption from concentration.
+assert.equal(run('targetWeight', { ...issueBook, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, sectorHeadroom: 0.04, maturityStatus: 'insufficient', researchGate: 'passed', challengeVerdict: 'cleared', lane: 'main', thesis: mainLaneThesis }).data.targetWeight, 0.04)
+
+/**
+ * The cash floor: the investor declared 0.10 in fund settings and the package
+ * used to hold its own 0.15 under `coreDca.reserveFloorWeight`.
+ */
+assert.equal(Object.hasOwn(configSchema.properties.coreDca.properties, 'reserveFloorWeight'), false, 'the package holds no second copy of the cash axis')
+const floor = (input) => run('effectiveCashFloor', input)
+const declaredFloor = floor({ mandateCashFloor: 0.1, cashWeight: 0.57, projectedCashWeight: 0.42 })
+assert.equal(declaredFloor.data.declaredFloor, 0.1)
+assert.equal(declaredFloor.data.effectiveFloor, 0.1)
+assert.equal(declaredFloor.data.binding, 'mandate')
+assert.equal(declaredFloor.data.headroomWeight, 0.32)
+assert.equal(declaredFloor.data.breached, false)
+assert.deepEqual(declaredFloor.data.effectiveConstraints, [])
+// A plan that lands under the floor is refused; the Kernel refuses the same proposal.
+const breaching = floor({ mandateCashFloor: 0.1, cashWeight: 0.57, projectedCashWeight: 0.08 })
+assert.ok(has(breaching, 'cash_floor_breach'))
+assert.equal(breaching.diagnostics.find((row) => row.code === 'cash_floor_breach').severity, 'blocked')
+assert.equal(breaching.diagnostics.find((row) => row.code === 'cash_floor_breach').details.shortfall, 0.02)
+// An undeclared floor is "nobody said", exactly as a missing concentration cap is.
+const undeclaredFloor = floor({ cashWeight: 0.57, projectedCashWeight: 0.05 })
+assert.ok(has(undeclaredFloor, 'cash_floor_unevaluated'))
+assert.equal(undeclaredFloor.diagnostics.find((row) => row.code === 'cash_floor_unevaluated').severity, 'unevaluated')
+assert.equal(undeclaredFloor.data.effectiveFloor, null)
+assert.equal(undeclaredFloor.data.breached, null, 'an undeclared floor is unjudged, never passed')
+// The floor is checked after the plan, not before it: the current weight cannot answer it.
+assert.ok(has(floor({ mandateCashFloor: 0.1, cashWeight: 0.57 }), 'cash_floor_projection_missing'))
+// A methodology floor above the declared one is disclosed on the host's own field.
+const raised = floor({ mandateCashFloor: 0.1, projectedCashWeight: 0.2, methodologyCashFloors: [{ source: 'core-dca-reserve', weight: 0.15 }] })
+assert.equal(raised.data.effectiveFloor, 0.15)
+assert.deepEqual(raised.data.effectiveConstraints, [{ field: 'cashFloor', declared: 0.1, effective: 0.15, reason: 'methodology_floor_core-dca-reserve' }])
+assert.ok(has(raised, 'cash_floor_raised_by_methodology'))
+assert.ok(has(floor({ mandateCashFloor: 0.1, projectedCashWeight: 0.2, methodologyCashFloors: [{ source: 'core-dca-reserve', weight: 0.15 }], effectiveConstraints: [] }), 'cash_floor_raise_undisclosed'))
+assert.equal(has(floor({ mandateCashFloor: 0.1, projectedCashWeight: 0.2, methodologyCashFloors: [{ source: 'core-dca-reserve', weight: 0.15 }], effectiveConstraints: raised.data.effectiveConstraints }), 'cash_floor_raise_undisclosed'), false)
+// And this methodology declares no such floor today, so the row is empty rather than silent.
+assert.deepEqual(METHODOLOGY.methodologyCashFloors, [])
+
+console.log('evidence-gated issues #145–153 regression tests passed')

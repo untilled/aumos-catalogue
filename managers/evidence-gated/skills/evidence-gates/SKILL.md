@@ -104,6 +104,20 @@ stop (−8%) registered **before** the entry rather than promised after it. A va
 required here — the size is why. A candidate that does have one belongs in the main lane, where it
 can be sized properly.
 
+⚠️ **"Belongs in the main lane" is now computed rather than described.** `variantViewCheck` is the
+operation, and it answers from inputs that can be checked rather than from the claim itself: a
+thesis `validateThesis` calls complete, a non-empty `variantView`, at least one `consensusRefs` row
+with a metric, a value, a source URL and `publishedAt` ≤ `capturedAt` ≤ `asOf`, and
+`challengeVerdict: 'cleared'`. All four, or the candidate is a control-arm entry
+(`variant_view_unverified`). `effectivePositionCap` reads it, and only when it is satisfied does the
+§4 maturity ceiling stop applying — the Mandate's `maxPositionWeight` and every concentration cap
+still bind, and an explicit `lane: 'control-arm'` still holds the name to 1%.
+
+⛔ **The leak this closes on the other side.** A thesis may not reach the main lane on the control
+arm's own record: `evidenceSamples` rows from any cohort other than `llm-research` come back
+`control_arm_evidence_cited` / `blocked`. That is `expansionProhibited` at the lane door — the same
+rule `verdictReport` enforces one layer up, where a mechanical cohort gets no verdict at all.
+
 ⛔ **A good result from this lane is never an argument for enlarging it.** `verdictReport` refuses to
 render a verdict on the mechanical cohort at all. Read a strong baseline as "our bar is high", not as
 "do more of this": expanding a control arm destroys the control, and after that no edge claim can be
@@ -146,7 +160,7 @@ to lift the lane cap — the control arm's 1% is what makes its variant-view wai
 lane enlarged to fit a floor is no longer a control.
 
 The same call is what tells the investor that a declared `maxPositionWeight` of 0.20 is operating
-at 0.01 while the lens is unpromoted: `position_cap_reduced_by_maturity`, with the declared number,
+at 0.01 while the lens is unpromoted **and no variant view is established**: `position_cap_reduced_by_maturity`, with the declared number,
 the effective number, and `promotionGate` as what lifts it. ⛔ **Disclosing the gate is not
 loosening it.** Nothing in this package's promotion thresholds moves because a cap was found to be
 binding; the whole point of a control arm is that it binds.

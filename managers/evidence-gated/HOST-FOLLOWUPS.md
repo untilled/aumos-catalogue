@@ -1,7 +1,7 @@
-# Host dependencies after issues #145–151
+# Host dependencies after issues #145–153
 
-Version 0.4.22 discloses the operative position cap and the venue floor that closes the control
-arm. Three runtime facilities remain outside this catalogue package.
+Version 0.4.23 separates the main lane from the maturity gate and reads the Mandate's `cashFloor`.
+Three runtime facilities remain outside this catalogue package.
 
 ## Fundamental storage (#146)
 
@@ -72,9 +72,13 @@ and `PROMPT.md` §4 says to copy it verbatim:
 ```
 
 ⚠️ **The two repositories have to land together.** The diagnostic alone leaves the screen empty,
-and the screen alone has nothing to draw. Only `maxPositionWeight` is ever emitted here: `cashFloor`
-is untouched by this methodology and the heat cap is read straight off `maxDrawdown` without being
-narrowed, and the host's rule is that an axis with no row is drawn as nothing rather than as
+and the screen alone has nothing to draw. ⚠️ **`cashFloor` is a second field this package can now
+emit on (#153).** `effectiveCashFloor` reads the Mandate's floor — the package's own
+`coreDca.reserveFloorWeight` is gone — and returns an `effectiveConstraints` row with
+`field: 'cashFloor'` on the same inequality, for the case where this methodology ever holds a floor
+above the declared one. It emits nothing today because it holds no such floor, which is the correct
+empty answer rather than a silence. The heat cap is still read straight off `maxDrawdown` without
+being narrowed, and the host's rule is that an axis with no row is drawn as nothing rather than as
 unconstrained. ⛔ An entry is emitted **only** where `effective` differs from `declared` — that
 inequality is the whole test, and a reduction that is computed and not emitted is the defect #151
 is about, which is why the emission is judged (`position_cap_reduction_undisclosed`) rather than
@@ -82,6 +86,20 @@ left to diligence.
 
 ⛔ The dependency is a **disclosure** one and not a gating one. Nothing here waits on the host: the
 diagnostic fires today, and the proposal that does not carry both halves is refused today.
+
+## The lane split, and the two numbers it does not set (#153, requests 1–2)
+
+The maturity ceiling was applied to both lanes and belongs to one; `variantViewCheck` is what tells
+them apart, from checked inputs rather than a claim. Nothing here is a host dependency — the
+operation runs today — but two numbers are deliberately **not** set by this revision and are
+recorded so nobody reads their absence as a decision:
+
+- **What total the single-name lanes may reach together.** The source approved 28% (2026-07-08) and
+  a 15% minimum cash; the investor has since declared `cashFloor` 0.10 and asked for the ETF lane
+  to leave this account, which is a different arithmetic on a book whose cash is 57%. Issue #153 §3
+  puts three options to the investor and none of them is the package's to choose. The package's
+  existing totals are unchanged in the meantime.
+- **Whether the promotion ladder gets its middle rungs**, below.
 
 ## The promotion ladder's middle rungs (#151, proposal 3)
 

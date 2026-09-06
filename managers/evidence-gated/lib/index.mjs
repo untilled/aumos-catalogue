@@ -3,14 +3,14 @@ import { validateInput, INPUT_KEYS, INPUT_VOCABULARY } from './input-contracts.m
 import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
-import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
+import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, effectiveCashFloor, legacySizeSuggestion, concentration, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
 import { calibrationSummary, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
 import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
-import { validateThesis, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap, exitCheck } from './methodology.mjs'
+import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap, exitCheck } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { harnessAudit, lessonAudit } from './audit.mjs'
 import { lensEnvelope, clusterBlock, timeStopPolicy, ruleVersions, policyLint } from './envelopes.mjs'
@@ -38,9 +38,10 @@ const operations = {
   sectorStrength: (input, asOf) => sectorStrength({ ...input, asOf }),
   regimeTag: (input, asOf) => regimeTag({ ...input, asOf }),
   sleeveNav,
-  targetWeight,
+  targetWeight: (input, asOf) => targetWeight({ ...input, asOf }),
   experimentalCeiling,
-  effectivePositionCap,
+  effectivePositionCap: (input, asOf) => effectivePositionCap({ ...input, asOf }),
+  effectiveCashFloor,
   legacySizeSuggestion,
   concentration,
   entryQualityGate,
@@ -89,6 +90,7 @@ const operations = {
   lessonAudit: (input, asOf) => lessonAudit({ ...input, asOf }),
   verdictReport: (input, asOf) => verdictReport({ ...input, asOf }),
   validateThesis,
+  variantViewCheck: (input, asOf) => variantViewCheck({ ...input, asOf }),
   thesisSentinel,
   exitCheck: (input, asOf) => exitCheck({ ...input, asOf }),
   upsideRadar: (input, asOf) => upsideRadar({ ...input, asOf }),

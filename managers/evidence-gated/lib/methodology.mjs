@@ -1,4 +1,5 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
+import { PAPER_SETUP_COHORTS } from './input-contracts.mjs'
 
 /**
  * ── One trigger vocabulary, two shapes that mean different things (§25) ────
@@ -172,6 +173,121 @@ export function validateThesis(input) {
   if (input?.evidenceStatus === 'complete' && gaps.length) diagnostics.push(diagnostic('thesis_false_complete', 'blocked', 'A complete thesis cannot have evidence gaps', 'evidenceStatus', { gaps }))
   else if (gaps.length) diagnostics.push(diagnostic('thesis_incomplete', 'unevaluated', 'Thesis gaps remain explicit', 'input', { gaps }))
   return { data: { valid: !diagnostics.some((row) => row.severity === 'blocked'), complete: input?.evidenceStatus === 'complete' && gaps.length === 0, gaps }, diagnostics }
+}
+
+/**
+ * ── What a variant view is *checked* by, and which lane it opens (issue #153) ─
+ *
+ * The source methodology ran two lanes. The mechanical one — `mechanical_experiment_lane`,
+ * approved 2026-07-29 — states its own trade in one sentence: *"variant view를
+ * 요구하지 않는 대신 사이징을 1%로 묶는다."* The other half of that trade is the
+ * lane it is contrasted with: the **main lane requires a variant view and could
+ * size a name to the investor's own single-name cap** (20%, warn 18%). The three
+ * names the investor actually made money on were in that lane.
+ *
+ * The port kept the 1% lane and lost the other one: §4's lens-maturity ceiling
+ * was applied to *both*, so a candidate with a variant view was held to
+ * `experimentalCeiling` — 1.345% on this book — exactly like a mechanical one.
+ * ⛔ **Restoring the second lane is not a relaxation of a gate; it is moving a
+ * gate off the lane it was never written for.** Nothing here lowers
+ * `promotionGate`, nothing here touches the control arm's 1% / 6%, and
+ * `controlArmLane.expansionProhibited` still stands: a control-arm *result* is
+ * never an argument for size anywhere.
+ *
+ * ── The part that has to be computed ──────────────────────────────────────
+ *
+ * If "this candidate has a variant view" were a claim a run could simply
+ * assert, the main lane would be a text box that raises a cap twentyfold — the
+ * exact shape of #141, where a string a run invented became an allocation
+ * limit. So the answer is assembled from inputs that can be checked, and every
+ * one of them already exists in this package:
+ *
+ * | requirement | checked by | why this one |
+ * |---|---|---|
+ * | `thesisComplete` | `validateThesis().complete` | the thesis names `variantView` and carries expected upside, fair value, catalysts and invalidation triggers; a gap list is not a variant view |
+ * | `variantView` | a non-empty statement on the thesis | the claim itself, still necessary and never sufficient |
+ * | `consensusRefs` | one dated, sourced, point-in-time row | *"we see this differently"* has no meaning without what the consensus is; a citation published after it was captured, or after `asOf`, is not one |
+ * | `challengeCleared` | `challengeVerdict === 'cleared'` | the adversarial read is what separates a variant view from a preference; a conditional verdict is a watch |
+ *
+ * ⛔ **Anything unchecked falls to the control arm.** `verified` is true only
+ * when every requirement is satisfied; a missing input is `missing`, never
+ * waived, and there is no argument, flag or lane request that turns *"not
+ * checked"* into *"checked"*.
+ *
+ * ⛔ **`evidenceSamples` is the leak guard.** A candidate may not reach the
+ * main lane on the control arm's own record: the mechanical cohort is the
+ * baseline others clear, and a thesis that cites it as its evidence has spent
+ * the control it depends on. `verdictReport` refuses the same substitution one
+ * layer up; this refuses it at the lane door. Rows are read in
+ * `paperAdmission`'s vocabulary (`{ setup, cohort }`).
+ */
+export const RESEARCH_COHORT = 'llm-research'
+
+export const VARIANT_VIEW_REQUIREMENTS = Object.freeze(['thesisComplete', 'variantView', 'consensusRefs', 'challengeCleared'])
+
+export function variantViewCheck({ thesis = null, challengeVerdict = null, evidenceSamples = [], asOf = null } = {}) {
+  const diagnostics = []
+  const satisfied = []
+  const missing = []
+  const record = (requirement, met) => (met ? satisfied : missing).push(requirement)
+
+  const thesisReport = thesis && typeof thesis === 'object' ? validateThesis(thesis) : null
+  record('thesisComplete', thesisReport?.data?.complete === true)
+  record('variantView', typeof thesis?.variantView === 'string' && thesis.variantView.trim().length > 0)
+
+  const asOfInstant = Date.parse(asOf)
+  const consensusRefs = Array.isArray(thesis?.consensusRefs) ? thesis.consensusRefs : []
+  const accepted = consensusRefs.filter((row) => {
+    if (!row?.metric || !finite(row?.value) || !row?.sourceUrl) return false
+    const published = Date.parse(row.publishedAt)
+    const captured = Date.parse(row.capturedAt)
+    if (!Number.isFinite(published) || !Number.isFinite(captured) || published > captured) return false
+    return !Number.isFinite(asOfInstant) || published <= asOfInstant
+  })
+  record('consensusRefs', accepted.length > 0)
+  record('challengeCleared', challengeVerdict === 'cleared')
+
+  const citedCohorts = [...new Set((Array.isArray(evidenceSamples) ? evidenceSamples : [])
+    .map((row) => row?.cohort ?? PAPER_SETUP_COHORTS[row?.setup] ?? null)
+    .filter((cohort) => typeof cohort === 'string'))]
+  const controlArmCited = citedCohorts.filter((cohort) => cohort !== RESEARCH_COHORT)
+  if (controlArmCited.length) {
+    diagnostics.push(diagnostic(
+      'control_arm_evidence_cited',
+      'blocked',
+      'This variant view rests on the mechanical cohort, which is the control arm: its result is the baseline an edge claim has to clear and never the argument for one. Cite the research cohort or external evidence, or size this candidate in the control arm',
+      'evidenceSamples',
+      { cohorts: controlArmCited, researchCohort: RESEARCH_COHORT },
+    ))
+  }
+
+  const verified = missing.length === 0 && controlArmCited.length === 0
+  if (!verified) {
+    diagnostics.push(diagnostic(
+      'variant_view_unverified',
+      'unevaluated',
+      'No variant view is established for this candidate, so it is a mechanical entry and is sized as one: the main lane is what a checked variant view opens, and an unchecked one is not a smaller version of a checked one',
+      'thesis',
+      { missing, satisfied, gaps: thesisReport?.data?.gaps ?? null, consensusRefsAccepted: accepted.length },
+    ))
+  }
+  return {
+    data: {
+      verified,
+      requirements: VARIANT_VIEW_REQUIREMENTS,
+      satisfied,
+      missing,
+      gaps: thesisReport?.data?.gaps ?? null,
+      consensusRefsAccepted: accepted.length,
+      consensusRefsGiven: consensusRefs.length,
+      challengeVerdict: challengeVerdict ?? null,
+      citedCohorts,
+      controlArmEvidenceCited: controlArmCited.length > 0,
+      /** The lane a checked variant view opens; anything else is the control arm. */
+      lane: verified ? 'main' : 'control-arm',
+    },
+    diagnostics,
+  }
 }
 
 export function thesisSentinel({ invalidations = [], evidence = [], priorVerdicts = [] }) {

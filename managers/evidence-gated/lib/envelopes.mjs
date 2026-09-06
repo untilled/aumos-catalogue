@@ -306,7 +306,6 @@ const POLICY_DIRECTIONS = {
   'concentration.sector': 'lower-is-stricter',
   'concentration.theme': 'lower-is-stricter',
   'concentration.factor': 'lower-is-stricter',
-  'coreDca.reserveFloorWeight': 'higher-is-stricter',
   'coreDca.minimumCashWeightForFirstTranche': 'higher-is-stricter',
   'coreDca.monthlyTrancheMaxWeight': 'lower-is-stricter',
   'coreDca.catchUpMonthlyMaxWeight': 'lower-is-stricter',

@@ -2276,7 +2276,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 90)
+assert.equal(supportedOperations.length, 92)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -3125,7 +3125,7 @@ assert.ok(
 )
 
 covers('policy/declared-thresholds', 'policy/benchmark-fixed')
-for (const [path, value] of [['benchmarkHurdleAnnualPct', 7.67], ['coreDca.minimumCashWeightForFirstTranche', 0.5], ['coreDca.reserveFloorWeight', 0.15], ['coreDca.catchUpMonthlyMaxWeight', 0.125]]) {
+for (const [path, value] of [['benchmarkHurdleAnnualPct', 7.67], ['coreDca.minimumCashWeightForFirstTranche', 0.5], ['coreDca.catchUpMonthlyMaxWeight', 0.125]]) {
   const node = path.split('.').reduce((acc, key) => acc.properties[key], { properties: configSchema.properties })
   assert.equal(node.default, value, `${path} is declared with its approved value rather than left to each run`)
 }
@@ -3136,7 +3136,7 @@ assert.deepEqual(
 )
 assert.equal(GRANDFATHER_DEFAULTS.blocksNewNonCoreWhenBreached, true, 'existing exposure is tolerated and new exposure is not — a package rule since #133, not a setting')
 const dcaSkill = await readFile(new URL('../skills/candidate-research/SKILL.md', fixtureRoot), 'utf8')
-for (const condition of ['minimumCashWeightForFirstTranche', 'reserveFloorWeight', 'catchUpMonthlyMaxWeight']) {
+for (const condition of ['minimumCashWeightForFirstTranche', 'catchUpMonthlyMaxWeight', 'effectiveCashFloor']) {
   assert.ok(dcaSkill.includes(condition), `the Core DCA gate names ${condition} rather than describing it`)
 }
 assert.ok(/does not count as a ready single-name BUY/i.test(dcaSkill), 'a cash deployment is not counted as a single-name sample')
