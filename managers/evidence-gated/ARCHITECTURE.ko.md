@@ -184,10 +184,17 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   `DecisionProposal`로 나가기만 하고 돌아오는 길이 없어서, 실행은 자기가 이미 건 검토를 다시
   거는 중인지 알 수 없다. #87 이후로 그 비용이 커졌다: 웨이크마다 플로우 하나를 디스패치하므로,
   30분 간격의 `kr-sleeve` 검토 둘이 각각 한국 슬리브를 돌리고 각각 판단을 봉인한다.
-  `run/armed-reviews`와 `reconcileArmedReviews`가 그 다리다 — 매니저가 무장한 것을 적어둔다 —
+  `run/armed-reviews`와 `reconcileArmedReviews`가 그 다리다 — 매니저가 약속한 것을 적어둔다 —
   그리고 다리일 뿐이다: 사설 메모리는 인스턴스 범위라 새 인스턴스는 눈이 먼 채 시작하고 기록은
   Aumos가 든 것과 갈라질 수 있다.
   ([#97](https://github.com/untilled/aumos-catalogue/issues/97))
+  ⛔ **그리고 그 다리가 중복을 막지는 않는다.** `decisions[].armed`는 과거형이다 — 이미 *끝난*
+  약속이 어떻게 됐는지를 나른다 — 그래서 그것을 수신증으로 읽은 두 실행이 깨끗이 무장된 것을
+  실패로 판정하고 시장 리뷰 셋을 두 번 더 무장했다. 지금 무엇이 무장돼 있는지는 어디에서도 읽을
+  수 없으므로(`untilled/aumos#690`) 이 패키지는 매 판단마다 무장하고, 같은 instant는 호스트가
+  인스턴스별로 접는다(`untilled/aumos#593`). 기록이 여전히 답하고 접기가 답하지 않는 것은 같은
+  플로우를 **다른** instant로 약속했는가이고, 그것이 정확히 #87의 해악이다.
+  ([#156](https://github.com/untilled/aumos-catalogue/issues/156))
   단일종목 분할 진입도 같은 이유로 같은 다리를 탄다: `entryTranchePlan`이 채워지지 않은 각 트랜치를
   무장할 `intent`를 돌려주고, `resolveTrancheWake`가 발화한 plan의 이벤트 summary에서 그 마커를
   다시 읽는다 — 읽을 것이 그것밖에 없기 때문이다.
