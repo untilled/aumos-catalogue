@@ -22,7 +22,7 @@ Six more decide whether it is **complete**. Each is a way of being wrong on the 
 | `variantView` | that the claim is the consensus, in which case the price already has it |
 | `consensusRefs` | what you are differing *from* — each ref dated, sourced, captured after it was published, and **filed with `observation_file` so the row names an `evidenceId`**: a consensus figure exists on the web and nowhere else, and an unfiled one is `consensus_ref_uncited` (#692) |
 | `catalysts` | when the claim gets tested, as a window rather than a hope |
-| `invalidationTriggers` | what would make you drop it, decided before you are attached to it, each with a `checkBy` |
+| `invalidationTriggers` | what would make you drop it, decided before you are attached to it, each with a `checkBy` — and an `event` one also with a `producer`, see §Trigger vocabulary |
 | `expectedUpsidePct` | the number you can be wrong about |
 | `fairValueRange` | the low and the high, so the upside has something under it |
 
@@ -55,7 +55,7 @@ normalized so no recorded thesis becomes unreadable, and using one says so.
 
 | | accepted kinds |
 |---|---|
-| thesis invalidation (`validateThesis`) | `price-below` · `price-above` · `metric` · `at-time` |
+| thesis invalidation (`validateThesis`) | `price-below` · `price-above` · `metric` · `at-time` · `event` |
 | WATCH (`validateWatch`) | `at-time` · `price-below` · `price-above` · `weight-drift` |
 
 `at-time` is shared. It used to be spelled `time` on the thesis side and `at-time` on the WATCH
@@ -67,9 +67,36 @@ The remaining difference is deliberate:
   engine from published data; a thesis metric may need a filing that a person reads.
 - **`weight-drift` is a WATCH and not a thesis invalidation.** Drifting past a weight says something
   about the portfolio, not about the claim.
+- **`event` is a thesis invalidation and not a WATCH**, and only with a producer. Nothing publishes
+  *"the buyback was halted"* at the instant it becomes true, so no wake engine fires on it — which is
+  why a producer-less `event: earnings` WATCH is still refused. A person, though, can read a named
+  document by a named date, and *"자사주 매입 중단"* is precisely the condition under which the claim
+  is wrong.
 
-An event kind exists in neither: a producer-less `event: earnings` is refused in both places, because
-nothing publishes the fact that it happened at the moment it happens.
+### `event` invalidations carry a producer and a deadline
+
+```json
+{ "id": "buyback_halt", "kind": "event", "checkBy": "2026-10-31",
+  "producer": { "publisher": "우리금융지주", "document": "자기주식 취득·처분 결정 공시 (DART)" },
+  "description": "자사주 매입 중단" }
+```
+
+- `producer.publisher` — who announces the fact. `producer.document` — the document it is announced
+  in. Two fields, not a sentence, so each can be *wrong in a way somebody can name*: a publisher who
+  publishes no such thing, a document that does not carry the item. Missing either is
+  `invalidation_producer_missing` / `blocked`.
+- ⚠️ **No URL.** A `consensusRefs` row cites a document that exists; an event invalidation names one
+  that has not been published yet, which is the point of registering the falsifier in advance.
+  Inventing a link is how a fabricated citation enters a thesis. The link arrives later, on the
+  consensus row that cites the document once it exists.
+- `checkBy` is **blocking** on this kind, not the usual `unevaluated`: *"not announced yet"* is a
+  true answer forever, so a producer with no deadline is watched and never read. That was measured —
+  one thesis ran four consecutive `threatened` verdicts because every trigger it had could only fire
+  when a negative was confirmed, and the investor broke the loop by hand with a trigger whose firing
+  condition was **the failure to confirm by a date**. Missing it is `invalidation_event_undated`.
+- Machine evaluation is unchanged: `thesisSentinel` reports `sentinel_rule_unevaluated` for an event,
+  because a person reads the document. What is automatic is `exitCheck` — a registered event that
+  passes its own `checkBy` unread raises `thesis_review`, which is the loop-breaker made ordinary.
 
 ## Lens-specific reading
 

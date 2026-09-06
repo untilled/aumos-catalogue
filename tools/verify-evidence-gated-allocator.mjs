@@ -528,6 +528,65 @@ const validMemory = execute({ operation: 'validateMemory', asOf: methodology.asO
 assert.equal(validMemory.data.accepted, true)
 const futureMemory = execute({ operation: 'validateMemory', asOf: methodology.asOf, input: { value: methodology.memory.future } })
 assert.equal(futureMemory.data.accepted, false, 'future memory is ignored')
+/**
+ * ── The falsifiers the gate used to have no way to hold (2026-09-07) ───────
+ *
+ * `invalidation_kind_invalid` read *"producer-less event is forbidden"* and
+ * then refused every event, produced or not. These five rows are transcribed
+ * from theses an investor wrote by hand and made money on — Woori's
+ * `buyback_halt` and `pf_loss`, KOGAS's `fee_roadmap_retreat` and
+ * `receivables_reincrease_or_dividend_cut`, NAVER's `earnings_thesis_break`.
+ * Every one of them was `blocked` by this package before this change, which is
+ * the measurement the fix exists for.
+ *
+ * ⛔ The rejection is not softened, it is aimed: the same rows **without** a
+ * producer, and with a producer but no deadline, are still refused below.
+ */
+covers('research/produced-event-invalidation')
+const producedEvents = [
+  { id: 'buyback_halt', kind: 'event', checkBy: '2026-10-31', producer: { publisher: '우리금융지주', document: '자기주식 취득·처분 결정 공시 (DART)' }, description: '자사주 매입 중단' },
+  { id: 'pf_loss', kind: 'event', checkBy: '2026-10-31', producer: { publisher: '우리금융지주', document: '분기보고서 — 부동산 PF 익스포저 및 충당금' }, description: 'PF 손실 대규모 인식' },
+  { id: 'fee_roadmap_retreat', kind: 'event', checkBy: '2026-07-31', producer: { publisher: '산업통상자원부', document: '천연가스 공급비 조정 고시 / 하반기 요금 방향 발표' }, description: '요금 인상 로드맵 후퇴/무산' },
+  { id: 'receivables_reincrease_or_dividend_cut', kind: 'event', checkBy: '2026-08-14', producer: { publisher: '한국가스공사', document: '반기보고서 — 민수용 미수금 원금 및 배당 정책' }, description: 'Q2 미수금 원금 재증가 또는 배당 삭감 시그널' },
+  { id: 'earnings_thesis_break', kind: 'event', checkBy: '2026-08-07', producer: { publisher: 'NAVER', document: '분기 실적발표 자료 및 컨퍼런스콜' }, description: 'AI 수익화/광고 성장 가정의 구조적 후퇴 확인' },
+]
+for (const trigger of producedEvents) {
+  const accepted = execute({ operation: 'validateThesis', asOf: methodology.asOf, input: { ...methodology.thesis, invalidationTriggers: [trigger] } })
+  assert.equal(accepted.status, 'ok', `${trigger.id} — a produced event is a registrable falsifier`)
+  assert.equal(accepted.data.complete, true, `${trigger.id} closes the invalidationTriggers gap rather than sitting outside the thesis`)
+  assert.ok(!accepted.diagnostics.some((row) => row.severity === 'blocked'), `${trigger.id} raises nothing blocking`)
+
+  const { producer, ...withoutProducer } = trigger
+  const refused = execute({ operation: 'validateThesis', asOf: methodology.asOf, input: { ...methodology.thesis, invalidationTriggers: [withoutProducer] } })
+  assert.equal(refused.status, 'blocked', `${trigger.id} without a producer is judged by nobody and stays refused`)
+  assert.ok(refused.diagnostics.some((row) => row.code === 'invalidation_producer_missing' && row.severity === 'blocked'))
+  assert.ok(refused.data.gaps.includes('invalidationTriggers'), 'and it does not quietly count as an invalidation')
+
+  const halfProducer = execute({ operation: 'validateThesis', asOf: methodology.asOf, input: { ...methodology.thesis, invalidationTriggers: [{ ...trigger, producer: { publisher: producer.publisher } }] } })
+  assert.ok(halfProducer.diagnostics.some((row) => row.code === 'invalidation_producer_missing'), 'a publisher with no document names nothing to read')
+
+  const undated = execute({ operation: 'validateThesis', asOf: methodology.asOf, input: { ...methodology.thesis, invalidationTriggers: [{ ...trigger, checkBy: null }] } })
+  assert.equal(undated.status, 'blocked', `${trigger.id} with no deadline is the four-threatened loop; “not announced yet” stays true forever`)
+  assert.ok(undated.diagnostics.some((row) => row.code === 'invalidation_event_undated' && row.severity === 'blocked'))
+}
+assert.ok(
+  execute({ operation: 'validateThesis', asOf: methodology.asOf, input: { ...methodology.thesis, invalidationTriggers: [{ ...producedEvents[0], producer: '우리금융지주 공시' }] } })
+    .diagnostics.some((row) => row.code === 'invalidation_producer_missing'),
+  'a producer is two named fields, not a sentence the run writes and the gate reads back to itself',
+)
+
+/**
+ * The loop-breaker the investor built by hand, now ordinary: an event whose own
+ * `checkBy` passed unread is a review candidate, and no new lane was needed.
+ */
+const eventDeadlinePassed = execute({
+  operation: 'exitCheck',
+  asOf: '2026-11-01T00:00:00Z',
+  input: { symbol: '316140', price: 31000, rules: {}, thesis: { invalidationTriggers: [producedEvents[0]] } },
+})
+assert.equal(eventDeadlinePassed.data.action, 'REVIEW')
+assert.ok(eventDeadlinePassed.data.findings.some((row) => row.kind === 'thesis_review' && row.triggerId === 'buyback_halt'))
+
 covers('owner-cutover/canonical-owner-map')
 const mapped = execute({ operation: 'migrationMap', asOf: methodology.asOf, input: { records: methodology.migration, cutoverAt: methodology.asOf } })
 assert.equal(mapped.status, 'ok')
@@ -3332,8 +3391,8 @@ for (const [name, section] of [['THESIS_TRIGGER_KINDS', vocabularySection], ['WA
 }
 assert.deepEqual(
   setLiteral(methodologySource, 'THESIS_TRIGGER_KINDS').filter((kind) => !setLiteral(methodologySource, 'WATCH_TRIGGER_KINDS').includes(kind)),
-  ['metric'],
-  'the one thesis-only kind is metric, and the skill says why',
+  ['metric', 'event'],
+  'the thesis-only kinds are metric and the produced event, and the skill says why neither is a WATCH',
 )
 assert.deepEqual(
   setLiteral(methodologySource, 'WATCH_TRIGGER_KINDS').filter((kind) => !setLiteral(methodologySource, 'THESIS_TRIGGER_KINDS').includes(kind)),

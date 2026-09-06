@@ -46,6 +46,9 @@ The verifier covers:
   web-absent lane blocking and refusal of copied source prose in private memory;
 - the manifest's declared required sources;
 - producer-less `event` WATCH rejection and AMP/1 action/target consistency;
+- produced `event` thesis invalidations — five triggers transcribed from hand-written theses accepted
+  with `producer: { publisher, document }` and `checkBy`, and the same five refused without a
+  producer, with half a producer, with a producer written as prose, and with no deadline;
 - absence of network, broker/order/database capabilities in the manager manifest.
 
 On 2026-08-25 all six proposal fixtures were also parsed directly by

@@ -287,6 +287,20 @@ Evidence id를 만들지 않는다 — 그리고 `evidenceIds`는 그 말고는 
 고리를 닫는다 — 웹에서 읽고 판단에 썼는데 제출된 어느 id도 받치지 않는 값은
 `claim_evidence_missing` / `blocked`이며, 그것이 2026-09-06 BOK 금리 실패를 진단으로 만든 것이다.
 
+**그리고 그 레인의 요구 하나는 지금까지 정직하게 채울 수 없었다 — 진짜 반증 조건이 들어갈 자리가
+없었다.** 메인 레인의 첫 요구는 *완결된* thesis이고, thesis가 완결되려면 `invalidationTriggers`가
+있어야 한다 — 그 종목에 정들기 전에 미리 정해 두는, 무엇이 확인되면 접을 것인가다. 그런데
+`validateThesis`는 `kind: 'event'`를 통째로 거부했다. 진단문은 *"producer-less event is
+forbidden"*이라고 적어 놓고, 발표 주체가 있든 없든 모든 event를 거부했다 — 문장이 걸고 있던 조건이
+구현된 적이 없었다. 그래서 *"자사주 매입 중단"*과 *"PF 손실 대규모 인식"* 같은, 은행 thesis가 실제로
+틀리는 조건들은 버려지거나 아무도 재지 않는 level을 붙인 `metric`으로 위장해야 했다 — 후자가 더 나쁘다,
+기계가 검증하는 것처럼 읽히기 때문이다. 이제 `event` 무효화는 **`producer: { publisher, document }`와
+`checkBy`를 함께 갖췄을 때** 수립된다: 누가, 어느 문서로 발표하며, 언제까지 읽는가. ⛔ 이것은 게이트를
+넓히는 것이 아니라 좁히는 것이다 — 같은 트리거라도 producer가 없으면 여전히 `blocked`
+(`invalidation_producer_missing`), producer가 있어도 기한이 없으면 `blocked`
+(`invalidation_event_undated` — *"아직 발표 안 됐다"*는 영원히 참인 답이기 때문이다), 그리고 WATCH
+어휘도 캡도 승격 게이트도 대조군 수치도 하나도 움직이지 않았다.
+
 **선언된 권한 둘은 현재 아무것도 서빙하지 않는다.** `thesis:read`와 `evidence:read`는 매니페스트
 어휘에 있고, 현재 Aumos 빌드는 각각을 빈 도구 목록으로 매핑하므로 실행에 그 도구가 생기지 않는다.
 프롬프트가 *가능할 때* 읽는다고 적고 매니페스트가 둘을 `optionalSkills`에 두는 이유가 정확히

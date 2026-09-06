@@ -22,6 +22,12 @@ import { attestationCounts, attestationOf, MANAGER_OBSERVATION_SOURCE, strongest
  *   need a filing read by a person.
  * - `weight-drift` is a WATCH and not a thesis invalidation, because drifting
  *   past a weight says something about the portfolio, not about the claim.
+ * - `event` is a thesis invalidation and not a WATCH, for the same reason
+ *   `metric` is: nothing publishes *"the buyback was halted"* at the instant it
+ *   becomes true, so no wake engine can fire on it — but a person can read the
+ *   named producer's document by the named date. `producer` and `checkBy` are
+ *   what make that reading a check rather than a mood; see
+ *   `EVENT_INVALIDATION_PRODUCER` below.
  *
  * Everything else is shared, `at-time` included — it used to be spelled `time`
  * on the thesis side, which made one condition look like two.
@@ -40,7 +46,7 @@ export const TRIGGER_ALIASES = {
    */
   time: 'at-time',
 }
-export const THESIS_TRIGGER_KINDS = new Set(['price-below', 'price-above', 'metric', 'at-time'])
+export const THESIS_TRIGGER_KINDS = new Set(['price-below', 'price-above', 'metric', 'at-time', 'event'])
 export const WATCH_TRIGGER_KINDS = new Set(['at-time', 'price-below', 'price-above', 'weight-drift'])
 
 export function normalizeTriggerKind(kind) {
@@ -137,6 +143,75 @@ export function normalizeWatch(watch) {
 const TRIGGER_KINDS = THESIS_TRIGGER_KINDS
 const MATURITY = new Set(['insufficient', 'observing', 'reviewable', 'promoted'])
 
+/**
+ * ── What was actually wrong with an `event` invalidation (2026-09-07) ──────
+ *
+ * The refusal read *"Invalidation must be price, metric or time; producer-less
+ * event is forbidden"* and then refused **every** event, producer or not. The
+ * clause the sentence turns on was never implemented: what cannot be judged is
+ * not the kind, it is an event with nobody who announces it. *"자사주 매입 중단"*
+ * and *"PF 손실 대규모 인식"* are not vague — they are the two conditions under
+ * which the Woori thesis was wrong, they are exactly what a falsification
+ * condition is supposed to be, and the gate had no way to hold them.
+ *
+ * ⛔ This is not a relaxation. Before, an investor with a real falsifier had
+ * two moves: drop it, or dress it as a `metric` with a level nobody measures.
+ * The second is worse than the event, because it reads as machine-checked. What
+ * is added here is a **second required field on a kind that used to be
+ * unregisterable**, and every existing kind is refused on exactly the terms it
+ * was before.
+ *
+ * ── The shape, and why it is two fields rather than a sentence ─────────────
+ *
+ * `producer` is `{ publisher, document }`: **who** announces the fact, and **in
+ * which document** it will be announced. This follows the vocabulary already
+ * here rather than inventing a third style — `consensusRefs` is a row of
+ * separately checkable fields (`metric`, `value`, `sourceUrl`, `publishedAt`,
+ * `capturedAt`) and a `catalysts` window is `{ event, windowStart, windowEnd }`.
+ * A free-text `producer` would have been a string the run writes and the gate
+ * reads back to itself — the shape of #141, where a sentence a run invented
+ * became an allocation limit. Two named fields can each be *wrong in a way
+ * somebody can name*: a publisher who publishes no such thing, a document that
+ * does not carry the item.
+ *
+ * ⚠️ **No URL is required, and that is not an oversight.** A `consensusRefs`
+ * row cites a document that already exists, which is why it carries
+ * `sourceUrl` and a `publishedAt` that cannot follow its `capturedAt`. An event
+ * invalidation names a document that has **not been published yet** — the whole
+ * point is to register the falsifier before the fact. Requiring a link would
+ * mean either no event trigger can be registered in advance, or the link is
+ * invented; the second is how a fabricated citation gets into a thesis. The URL
+ * appears later, on the consensus row that cites the document once it exists.
+ *
+ * ── Why `checkBy` is blocking here and unevaluated elsewhere ───────────────
+ *
+ * A producer with no deadline still cannot decide anything: *"not announced
+ * yet"* is a true answer forever, so the trigger reads as watched while never
+ * being read. That is not hypothetical. `036460_KOGAS` ran **four consecutive
+ * `threatened` verdicts** (2026-07-17 · 07-20 · 07-21 · 07-27), each concluding
+ * that no new fact had arrived, because its two live triggers could only fire
+ * *when a negative was confirmed* — and the investor broke the loop by hand,
+ * registering `unjudgeable_deadline`, a trigger whose firing condition is **the
+ * failure to confirm by a date**. That hand-made trigger is what the pair
+ * `producer` + `checkBy` makes ordinary: the producer says where the answer
+ * comes from, the deadline says when its absence is itself the answer. Missing
+ * either one is `blocked`, because half of this pair judges nothing.
+ *
+ * ⚠️ What still does not happen is machine evaluation. `thesisSentinel` cannot
+ * compare an event to a number and reports `sentinel_rule_unevaluated`, as it
+ * should — a person reads the producer's document. `exitCheck` already raises
+ * `thesis_review` for any trigger that passed its own `checkBy` unevaluated, so
+ * a registered event whose deadline arrives surfaces there without a new lane.
+ */
+export const EVENT_INVALIDATION_PRODUCER = Object.freeze(['publisher', 'document'])
+
+const nonEmpty = (value) => typeof value === 'string' && value.trim().length > 0
+
+export function eventProducerComplete(producer) {
+  return Boolean(producer) && typeof producer === 'object' && !Array.isArray(producer) &&
+    EVENT_INVALIDATION_PRODUCER.every((field) => nonEmpty(producer[field]))
+}
+
 export function validateThesis(input) {
   const diagnostics = []
   const required = ['thesisId', 'asset', 'createdAt', 'coreClaim', 'horizonEnd', 'evidenceStatus']
@@ -161,7 +236,25 @@ export function validateThesis(input) {
       diagnostics.push(diagnostic('trigger_kind_alias', 'info', 'The canonical spelling is kebab-case, as in every other vocabulary here; the underscore form is accepted and normalized', `invalidationTriggers[${index}].kind`, { given: row?.kind, canonical: kind }))
     }
     if (!TRIGGER_KINDS.has(kind)) {
-      diagnostics.push(diagnostic('invalidation_kind_invalid', 'blocked', 'Invalidation must be price, metric or time; producer-less event is forbidden', `invalidationTriggers[${index}].kind`, { supported: [...TRIGGER_KINDS] }))
+      diagnostics.push(diagnostic('invalidation_kind_invalid', 'blocked', 'Invalidation must be price, metric, time or a produced event', `invalidationTriggers[${index}].kind`, { supported: [...TRIGGER_KINDS] }))
+      continue
+    }
+    if (kind === 'event') {
+      /**
+       * Both halves or neither: a producer with no deadline is never read, and
+       * a deadline with no producer names no document to read. Refused here
+       * rather than falling through, so an event never reaches the generic
+       * `unevaluated` deadline line and never counts toward `invalidations`.
+       */
+      if (!eventProducerComplete(row?.producer)) {
+        diagnostics.push(diagnostic('invalidation_producer_missing', 'blocked', 'An event invalidation must name its producer as { publisher, document } — who announces the fact and in which document; a producer-less event is judged by nobody', `invalidationTriggers[${index}].producer`, { required: [...EVENT_INVALIDATION_PRODUCER] }))
+        continue
+      }
+      if (!Number.isFinite(Date.parse(row?.checkBy))) {
+        diagnostics.push(diagnostic('invalidation_event_undated', 'blocked', 'An event invalidation must name the date its producer is read by; without one “not announced yet” stays true forever and the trigger decides nothing', `invalidationTriggers[${index}].checkBy`))
+        continue
+      }
+      invalidations.push(row)
       continue
     }
     if (['price-below', 'price-above'].includes(kind) && !finite(row.level)) diagnostics.push(diagnostic('invalidation_price_missing', 'blocked', 'Price invalidation needs a numeric level', `invalidationTriggers[${index}].level`))
