@@ -9,6 +9,37 @@ reading `decisions[].armed` as a receipt for a promise it cannot carry; 0.4.24 s
 lane from the maturity gate, read the Mandate's `cashFloor`, derived the single-name total from the
 Mandate and enforced the source's exit discipline.
 
+## Prepared research (#209 §8-D) — ⚠️ the route exists, one input is not fed yet
+
+**0.4.53 declares two recipes and asks the host to run them.** `untilled/aumos#725` gave the host
+`research_prepare` / `research_job_get` / `research_job_cancel` / `research_result_get` and a way to
+run a named computation in its own process over stored inputs; `untilled/aumos#726` let a published
+package put its own name on one, in `manifest.recipes`. This package now declares `roster-scan` and
+`opportunity-metrics`, whose entrypoints call the same `execute()` the MCP tool calls, and the
+whole-universe sweep is routed through them. `engines.aumos` moves to `>=0.3.34` — **the next
+release**, because neither host PR was merged when this was written and `research:prepare` /
+`research:read` are in no released binary, so an installed Aumos refuses the manifest whole. Same
+failure mode as `observation:file` below, for the fifth time.
+
+### ⛔ Still owed by the host: no collector writes a price series
+
+`RecipeRequest.readings` is what this fund already collected about one symbol, out of
+`source_observations`. `COLLECTOR_ROUTES` holds **three** rows — `open-dart/filings`,
+`open-dart/financials`, `sec-edgar/companyfacts` — and **none of them is a price series**. So a
+roster prepared today comes back with filings and no bars, and both recipes answer
+`scanner_history_insufficient` / `opportunity_history_insufficient` with `count: 0`.
+
+⚠️ **That is the honest answer and not a workaround.** The recipes read bars from
+`reading.normalized.bars` and nothing else; ⛔ they refuse to take them from `parameters`, which is
+the one channel that would work today and is the 1.91M characters of tool argument this whole issue
+exists to delete, with an extra process in the middle. The shape a price collector has to write is
+the one already read, so the day a `toss/bars` or `alpaca/bars` row exists in `COLLECTOR_ROUTES`
+these recipes are fed with no change here.
+
+⚠️ **Until that row exists, the mechanical sweep is `unprepared` rather than empty** — and every
+document in this package now says so in those words, because an `unprepared` roster reported as a
+market that offered nothing is the exact error `untilled/aumos-catalogue#209` is named after.
+
 ## Web observations (#692) — ✅ the host built the route, and two things are still ours to watch
 
 **The dependency is discharged and the grade is the whole story.** `observation_file`

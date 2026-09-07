@@ -133,6 +133,18 @@ jobs:
       # list to go stale.
       - run: npm run check:delegation
 
+      # The other half of the same issue (#209 §8-D). `manifest.recipes` says
+      # this package's arithmetic has a name the host can call, and every claim
+      # that makes is about a **program** — one JSON object on stdin, one JSON
+      # line on stdout, no arguments, no environment, no clock. None of that is
+      # observable by importing the module: an entrypoint that read `process.argv`
+      # or reached for `Date.now()` imports exactly as cleanly as one that does
+      # not. So this spawns each entrypoint the way the host does, with the
+      # scrubbed environment the host gives it, and asserts the answer is what
+      # `mcp__evidence-gated-metrics__calculate` computes for the same bars —
+      # identical, because the entrypoints are shells over the same `execute()`.
+      - run: npm run check:recipes
+
       # ── Last, and that position is the point ──────────────────────────────
       #
       # The pair to `check:index`, and a different question: `check:index` asks

@@ -265,7 +265,87 @@ and without them a roster of 83 that produced one usable filing came back `fed`.
 reviewed» nor «nothing was ever looked at».
 
 `entryQualityGate` needs historical OHLC `bars` (at least 60; 200+ for the long indicators),
-not a `scanHistory` field or prior scan runs. A first run can fetch those bars and evaluate quality.
+not a `scanHistory` field or prior scan runs. ⚠️ **You do not fetch them for the sweep** — the
+`roster-scan` recipe below runs the gate beside `scan`, over the bars the host already holds, for
+every candidate that named a lens, and hands back `entryQuality` on the row. Relay bars only for a
+single name the roster never covered, and never for a roster.
+
+## The roster sweep is prepared, not relayed
+
+⛔ **Do not read a roster of daily bars out of a vendor and type them back in as `calculate`
+arguments.** That is what one measured run did — `scan` 40 times and `opportunityMetrics` 45 times,
+about **1.91 million characters** of tool argument, 29 subagents opened to carry it, and no
+judgement submitted at the end of it (`untilled/aumos-catalogue#209`). The arithmetic was never the
+expensive part; the model in the middle of it was.
+
+This package declares its own two computations in `aumos.json` under `recipes`, and the host runs
+them in its own process over the inputs it already stores:
+
+| recipe | what it is | what it is not |
+|---|---|---|
+| `roster-scan` | `scan` for one symbol, plus `entryQualityGate` when that symbol named a lens | not an aggregate — one process is one symbol |
+| `opportunity-metrics` | `opportunityMetrics` for one symbol | not the ranking; `opportunityUniverse` folds the rows afterwards |
+
+Both call `execute()` from `lib/index.mjs` — **the same function `mcp__evidence-gated-metrics__calculate`
+calls**, with the same `normalizeBars`, the same `LENS_ENVELOPES` thresholds and the same
+diagnostics. The numbers do not change because the caller did.
+
+### The three calls, in order
+
+1. `research_prepare({ recipeId, universe, parameters, asOf })`. The `universe` is the roster you
+   declared — `{ market, symbol }` rows, **names and nothing else**. `parameters` carries what the
+   sweep cannot derive and you can: `held` and `pending` as short symbol lists, and `sectors` as a
+   symbol→label map for `opportunity-metrics`. ⛔ **Bars never go in `parameters`.** They would be
+   the same 1.91M characters with one more process in the way.
+   The answer is immediate: either `cached: true` with a `resultRef`, or a `jobId`.
+2. `research_job_get({ jobId })` until it settles. `completed` and `partial` both carry a
+   `resultRef`; `failed` carries none, because nothing was evaluated.
+3. `research_result_get({ resultRef })` — **the summary is the default and it is bounded whatever
+   the roster's size.** Ask for detail by naming `symbols`, narrow it with `fields`, page it with
+   `limit`/`cursor`. There is no flag that means «give me everything», and you should not want one:
+   the rows you fold with `opportunityUniverse` are metric rows, and metric rows carry no bars.
+
+### The three counts are three reports and are never added together
+
+| count | what it says | what it does **not** say |
+|---|---|---|
+| `sourced` | this fund held readable documents for that many of your names | nothing about whether any of them carried a price |
+| `evaluated` | the recipe answered for that many | ⚠️ an answer of *these documents carried nothing* **is** an evaluation and is counted here |
+| `unprepared` | that many had **nothing readable at your `asOf`** | ⛔ **not** «no opportunity there» |
+| `failed` | something was there and could not be read | neither of the two above — the reason is named per symbol |
+
+⛔ **`unprepared` is blindness and is reported as blindness.** It means either that nobody ever
+collected those names or that everything collected was captured after the instant you are judging;
+the symbols come back **by name**, and the control that fixes it is `source_cache_refresh` on those
+names. Reporting an `unprepared` roster as a market that offered nothing is the same error as
+reporting `never-fed` as `fed-and-genuinely-empty`, one layer up, and it is the error this whole
+issue is named after.
+
+⚠️ **A row's `state` and a row's `output` are two different sentences.** `state: 'gap'` is the
+host's: nothing about that symbol was readable. An `output` carrying `empty: true` is the recipe's:
+it read the documents and they carried nothing. And a row whose `output.data` is `null` beside a
+`scanner_history_insufficient` / `opportunity_history_insufficient` diagnostic is the third: the
+documents were read and **none of them was a price series**, so the lens sweep was never run for
+that name. Carry the diagnostic — it is the only thing that tells those apart.
+
+### What you do with the names you could not review
+
+⛔ **Not a silence, and not a new memory key.** Persist the roster you *did* review with
+`researchState` to `coverage/research-index` (`skills/memory-contract/SKILL.md` owns that key),
+name the unreviewed names and **why** — `unprepared`, `failed` with its kind, or a delegation
+refusal code verbatim — in one `uncertainty` entry, and arm the revisit as a WATCH/plan the way
+this page already requires for a conditionally rejected candidate. A `WAIT` whose data was never
+prepared is a different answer from a `WAIT` where the gates ran and nothing qualified, and
+invariant 5 asks you to tell them apart.
+
+### When the tools are not served
+
+⚠️ `research_prepare` and its three siblings are **optional skills**, so a host that predates them
+serves none of them. That is an absence to report in `uncertainty`, exactly like any other — say
+which of the four was not named and that the mechanical sweep was therefore not prepared. ⛔ It is
+not licence to reopen the relay path: a roster's bars typed back as tool arguments is the failure
+mode, not the fallback. A single name that the sweep could not cover may still be evaluated through
+`calculate` with its own bars.
 
 ## Coverage
 

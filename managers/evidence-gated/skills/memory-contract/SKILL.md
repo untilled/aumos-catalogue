@@ -41,6 +41,17 @@ Refetch filing data from installed sources each run until the host provides quer
 storage; an Evidence id is a reference, not a promise that its payload can be read back.
 Capacity failure preserves the prior revision and requires explicit roster review.
 
+⚠️ **A name the mechanical sweep could not review goes here, and nowhere new.** When
+`research_result_get` reports a symbol `unprepared` or `failed`, or a delegation refusal cut the
+turn short, persist the roster you *did* review with `researchState`, name the rest **with the
+reason** — `unprepared`, `failed` with its `kind`, or the refusal code verbatim — in one
+`uncertainty` entry, and arm the revisit condition as a WATCH/plan the way
+`skills/candidate-research/SKILL.md` already requires for a conditionally rejected candidate.
+⛔ **Do not add a key for it and do not widen a row.** `researchState` builds each row from a fixed
+set of fields and drops anything else, so a reason written onto a row is a reason that is silently
+lost; the reason belongs where a reader sees it, and the revisit belongs where the scheduler can
+fire it. ⛔ And an `unprepared` name is never written down as a name that was reviewed and declined.
+
 `research/catalyst-window` is the second bounded exception, and it exists because the axis it
 carries had no producer at all (#169). `radarCandidates` takes `catalysts` and `events`,
 `upsideRadar` reads a window open inside 60 days and an event announced inside 30, and nothing in
