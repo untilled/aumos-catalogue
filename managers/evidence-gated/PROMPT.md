@@ -379,6 +379,14 @@ while price sits above its stop is exactly the case a price-only watch misses. T
 or dated deadline. Every verdict is a candidate for a proposal, never an order. ⛔ This layer never
 proposes adding to a position.
 
+**Say which evidence answers which invalidation.** `thesisSentinel` joins the two arrays by key and
+never by position: `invalidations[].evidenceId` → `evidence[].id`, or `evidence[].invalidationId` →
+`invalidations[].id`, or — for a `metric` rule — the same `metric` name on both. A rule that joins to
+nothing, or to two rows under one key, comes back `unevaluated`, which makes the verdict `watch`. ⛔
+It is never `met`: an invalidation nobody supplied evidence for cannot become the third `threatened`
+verdict that owes a resize. So an `unevaluated` line is a reading to supply, not a condition to
+report as clear — name the evidence and call it again rather than writing the rule off.
+
 **Forward research, when `themeRadarDue` says so.** Call it against `run/theme-radar-last`; when it
 is due, load `skills/theme-radar/SKILL.md` and run it before naming lenses, because it is where a
 candidate that no scanner would surface comes from. Call `sectorStrength` first — its

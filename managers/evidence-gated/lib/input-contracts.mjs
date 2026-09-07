@@ -10,6 +10,15 @@ export const INPUT_VOCABULARY = {
   sentinelKinds: ['price_below', 'price_above', 'metric', 'time'],
   sentinelOperators: ['above', 'below'],
   /**
+   * ⚠️ The keys `thesisSentinel` joins evidence to invalidations by, in the
+   * order it tries them (#181). Published because the contract said only
+   * `invalidations: "array"`, `evidence: "array"` — so the join was a shape a
+   * caller had to guess, and the code answered a wrong guess with a borrowed
+   * row rather than a refusal. A rule that joins by none of these is
+   * `unevaluated`; it is never `met`.
+   */
+  sentinelJoinKeys: ['evidenceId', 'invalidationId', 'metric'],
+  /**
    * ⚠️ **Two market vocabularies, and publishing one of them was a trap** (#146).
    * `markets` is the MIC list — the venues this manager contributes to, and the
    * spelling the host's own tools take. It is **not** what `researchUniverse`,
@@ -137,6 +146,11 @@ export const NESTED_CONTRACTS = {
     gaps: 'The `gaps` array `validateThesis` returned, verbatim.',
     mapping: 'The `mapCorporationCodes` answer — { registrySize, mapped[], unmapped[] } — which is what decides whether this symbol has a filer at all. ⛔ Without it the instrument stays unclassified rather than assumed.',
     feed: 'The `radarCandidates` answer, for `fedCount`: whether the statements were actually read.',
+  },
+  thesisSentinel: {
+    'invalidations[]': `{ id, kind, level | operator+level | at, evidenceId }. kind is one of ${['price_below', 'price_above', 'metric', 'time'].join(', ')}; a metric rule also carries metric and operator. ⚠️ id is kept verbatim and is what an evidence row addresses; without one the answer names the rule by position as rule-<index> and says so.`,
+    'evidence[]': 'The observation a rule is judged against: { id, value | availableAt, metric, invalidationId }. ⚠️ A row is joined to a rule by one of three keys and never by position — rule.evidenceId → this row\'s id, this row\'s invalidationId → rule.id, or, for a metric rule, this row\'s metric → rule.metric. A rule that joins to nothing, or to more than one row under the same key, answers unevaluated; it is never met, so an invalidation nobody supplied evidence for cannot become a threatened verdict.',
+    'priorVerdicts[]': { asOf: STRING, verdict: STRING },
   },
   laneCoverage: {
     'activity.<source>': { attempts: NUMBER, succeeded: 'boolean-or-count' },
