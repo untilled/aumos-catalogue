@@ -112,10 +112,13 @@ been fed. Do these in order and report each one:
 
 Also run the price-pattern `scan` branch; neither branch substitutes for the other. Return all
 radar lanes' included/excluded counts, the `radar_lane_starved` diagnostics **with their
-`feedStage`/`feedCause`**, and the feed verdict — `fed-and-evaluated`, `fed-and-genuinely-empty`
-or `never-fed`. ⛔ **Reporting the second as the third, or the third as the second, is the worst
-outcome available here**: one says the market was reviewed and declined, the other says nothing
-was ever looked at, and they read identically in a candidate list.
+`feedStage`/`feedCause`**, and the feed verdict — `fed-and-evaluated`, `fed-and-genuinely-empty`,
+`partially-fed` or `never-fed`. ⛔ **Reporting the second as the fourth, or the fourth as the
+second, is the worst outcome available here**: one says the market was reviewed and declined, the
+other says nothing was ever looked at, and they read identically in a candidate list. ⚠️ And
+`partially-fed` is reported **with its counts** — `feedCoverage: { fed, of, unfed }`, e.g. 1 of 83
+fed and 82 never fed — because a run that says «fed» on one name out of eighty-three has published
+eighty-two absences as judgements (#178).
 
 Use `researchState` to carry the bounded roster and Evidence references. ⛔ Private memory is not
 a source cache — `skills/memory-contract/SKILL.md` forbids it in as many words — and it no longer

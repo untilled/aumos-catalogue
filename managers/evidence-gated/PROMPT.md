@@ -566,10 +566,18 @@ OpenDART response through `dartVendorStatus`; collapsing the two makes the parag
 meaningless, because a quota outage then reads as a fact about a company.
 
 **A starved lane must say what starved it.** `radarFeedDiagnosis` names the stage — registry,
-mapping, request, response, normalization — and `upsideRadar` puts it on the diagnostic when it is
-passed as `feed`; without it, `radar_starvation_cause_unreported`. ⛔ And the report distinguishes
-**`fed-and-genuinely-empty`** from **`never-fed`**. Those two produce an identical empty candidate
-list and mean opposite things, and mixing them is the worst outcome this branch can produce.
+mapping, request, response, normalization, partially-fed — and `upsideRadar` puts it on the
+diagnostic when it is passed as `feed`; without it, `radar_starvation_cause_unreported`. ⛔ And the
+report distinguishes **`fed-and-genuinely-empty`** from **`never-fed`**. Those two produce an
+identical empty candidate list and mean opposite things, and mixing them is the worst outcome this
+branch can produce.
+
+⚠️ **Most runs are neither, and the third state is a count** (#178). A branch that fed 1 of 83
+candidates reported `fed` / `the-branch-was-fed` on the strength of `fedCount > 0`, so 82 names
+that never arrived were published as names the run had judged. `partially-fed` is its own stage
+and `partially-fed` its own verdict, and every lane header carries `feedCoverage: { fed, of,
+unfed }` — ⛔ report the counts, never «fed», and never the mirror error of calling one fed name
+`never-fed`.
 
 `earningsCheckpoint` fills the rolling event window these lanes read.
 

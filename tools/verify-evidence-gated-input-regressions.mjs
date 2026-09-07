@@ -1148,6 +1148,92 @@ assert.ok(feedHas(fedButEmpty, 'radar_lane_empty_not_starved'))
 assert.equal(feedHas(fedButEmpty, 'radar_feed_broken'), false)
 assert.notEqual(fedButEmpty.data.verdict, neverFed.data.verdict)
 
+/**
+ * ── #178: one fed name out of eighty-three is not «fed» ─────────────────────
+ *
+ * The measured run: roster 83, `fedCount: 1`, every lane starved, 82 exclusions
+ * of `no-valid-point-in-time-filing` — and the header said `fed` /
+ * `the-branch-was-fed`, which reads as *the market was reviewed and rejected*.
+ * ⛔ The correction must not be the mirror error either: one fed name is not
+ * `never-fed`, so all three states are asserted here against each other, and
+ * the counts are asserted with them — a stage word with no denominator behind
+ * it is the same silent promotion in a different spelling.
+ */
+const eightyThree = Array.from({ length: 83 }, (_, index) => ({ asset: `US${index}`, market: 'us', filings: [] }))
+eightyThree[0].filings = [{ periodEnd: '2026-06-30', operatingIncomeYoy: 0.2 }]
+const partialLanes = execute({ operation: 'upsideRadar', asOf: feedAsOf, input: { candidates: eightyThree.map((row) => ({ symbol: row.asset })) } }).data.lanes
+const feedOf = (rows, lanesIn = partialLanes) => feedRun('radarFeedDiagnosis', {
+  market: 'us',
+  symbols: eightyThree.map((row) => row.asset),
+  plan: { requests: [{ step: 'ticker-registry' }, { step: 'facts', cacheState: 'fresh' }] },
+  mapping: { registrySize: 12000, mapped: eightyThree.map((row) => ({ symbol: row.asset })), unmapped: [] },
+  responses: [{ step: 'facts', usable: true }],
+  candidates: { candidates: rows, fedCount: rows.filter((row) => row.filings.length).length, comparableCount: rows.filter((row) => row.filings.length).length },
+  lanes: lanesIn,
+}).data
+
+const oneOfEightyThree = feedOf(eightyThree)
+assert.equal(oneOfEightyThree.fedCount, 1)
+assert.equal(oneOfEightyThree.candidateCount, 83)
+assert.equal(oneOfEightyThree.stage, 'partially-fed', 'one candidate fed out of 83 is not the fed stage')
+assert.equal(oneOfEightyThree.cause, 'some-candidates-were-fed-and-the-rest-were-never-fed')
+assert.equal(oneOfEightyThree.fed, false)
+assert.equal(oneOfEightyThree.verdict, 'partially-fed')
+assert.notEqual(oneOfEightyThree.verdict, 'fed-and-genuinely-empty', 'the 82 that never arrived must not read as an answered market')
+assert.notEqual(oneOfEightyThree.verdict, 'never-fed', '⛔ and the one that did arrive must not be demoted away either')
+assert.deepEqual(oneOfEightyThree.coverage, { fed: 1, of: 83, unfed: 82 })
+assert.ok(oneOfEightyThree.stageOrder.indexOf('partially-fed') > oneOfEightyThree.stageOrder.indexOf('normalization'), 'partial feeding is the last stage before fed')
+
+// The absence is named with counts, on the diagnostic and on the lane header both.
+const partialAnswer = feedRun('radarFeedDiagnosis', {
+  market: 'us',
+  symbols: eightyThree.map((row) => row.asset),
+  plan: { requests: [{ step: 'ticker-registry' }, { step: 'facts', cacheState: 'fresh' }] },
+  mapping: { registrySize: 12000, mapped: eightyThree.map((row) => ({ symbol: row.asset })), unmapped: [] },
+  responses: [{ step: 'facts', usable: true }],
+  candidates: { candidates: eightyThree, fedCount: 1, comparableCount: 1 },
+  lanes: partialLanes,
+})
+assert.ok(feedHas(partialAnswer, 'radar_feed_broken'), 'a branch fed for one of 83 is an input-path finding')
+assert.equal(feedHas(partialAnswer, 'radar_lane_empty_not_starved'), false, '⛔ and it is emphatically not "the lanes answered"')
+const partialBroken = partialAnswer.diagnostics.find((row) => row.code === 'radar_feed_broken')
+assert.deepEqual(partialBroken.details.coverage, { fed: 1, of: 83, unfed: 82 })
+assert.ok(/1 of 83/.test(partialBroken.message) && /82/.test(partialBroken.message), 'the sentence carries the two counts')
+assert.equal(partialBroken.details.coverage.of, 83)
+assert.ok(!JSON.stringify(partialBroken.details).includes('US7'), '⛔ counts, never the symbols themselves')
+const partialRadar = execute({ operation: 'upsideRadar', asOf: feedAsOf, input: { candidates: eightyThree.map((row) => ({ symbol: row.asset })), feed: partialAnswer.data } })
+const partialHeader = partialRadar.data
+assert.equal(partialHeader.lanes.inflection.feedStage, 'partially-fed', 'the header a later run reads is where this has to be true')
+assert.deepEqual(partialHeader.lanes.inflection.feedCoverage, { fed: 1, of: 83, unfed: 82 })
+assert.deepEqual(partialHeader.feed.coverage, { fed: 1, of: 83, unfed: 82 })
+assert.ok(partialRadar.diagnostics.find((row) => row.code === 'radar_lane_starved').message.includes('82 of 83'), 'the starvation sentence says how much of the lane was never fed')
+
+// All 83 fed and the lanes still empty is the other state, and it keeps its word.
+const allFed = feedOf(eightyThree.map((row) => ({ ...row, filings: [{ periodEnd: '2026-06-30', operatingIncomeYoy: 0.2 }] })))
+assert.equal(allFed.fedCount, 83)
+assert.equal(allFed.candidateCount, 83)
+assert.equal(allFed.stage, 'fed')
+assert.equal(allFed.verdict, 'fed-and-genuinely-empty')
+assert.deepEqual(allFed.coverage, { fed: 83, of: 83, unfed: 0 })
+// …and with a lane that included something, it is the evaluated one.
+assert.equal(feedOf(eightyThree.map((row) => ({ ...row, filings: [{ periodEnd: '2026-06-30', operatingIncomeYoy: 0.2 }] })), { inflection: { starved: false, included: 4 } }).verdict, 'fed-and-evaluated')
+// Nothing fed at all stays never-fed, at its own stage.
+const noneFed = feedOf(eightyThree.map((row) => ({ ...row, filings: [] })))
+assert.equal(noneFed.fedCount, 0)
+assert.equal(noneFed.verdict, 'never-fed')
+assert.equal(noneFed.stage, 'normalization')
+assert.equal(new Set([noneFed.verdict, oneOfEightyThree.verdict, allFed.verdict]).size, 3, 'none, some and all are three answers')
+
+/**
+ * ⛔ And a reading that cannot count answers `null` rather than assuming the
+ * plate was whole — a caller that passed counts without the rows and without a
+ * roster has no denominator, and inventing one is how the promotion returns.
+ */
+const uncountable = feedRun('radarFeedDiagnosis', { market: 'kr', plan: freshPlan.data, mapping: joined, candidates: { fedCount: 1, comparableCount: 1 }, lanes: bare.data.lanes }).data
+assert.equal(uncountable.candidateCount, null)
+assert.equal(uncountable.coverage, null)
+assert.equal(uncountable.stage, 'fed', 'an unknown denominator is not evidence of a shortfall either')
+
 // Every new operation publishes its contract, and refuses a key it does not read.
 const published = feedRun('inputContracts').data
 for (const operation of ['fundamentalsPlan', 'mapCorporationCodes', 'dartVendorStatus', 'radarCandidates', 'radarFeedDiagnosis']) {

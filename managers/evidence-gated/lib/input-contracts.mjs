@@ -272,7 +272,7 @@ export const NESTED_CONTRACTS = {
     plan: 'The whole fundamentalsPlan data object; its requests carry the cache states this reads.',
     mapping: 'The whole mapCorporationCodes data object. ⚠️ null means the join was never attempted, which is a different finding from a join that returned nothing.',
     'responses[]': { step: STRING, symbol: STRING, feedFailure: STRING, classification: STRING, usable: BOOLEAN },
-    candidates: 'The whole radarCandidates data object.',
+    candidates: 'The whole radarCandidates data object — the `candidates` rows included, not only `fedCount`. ⚠️ They are the denominator: without them coverage falls back to the roster, and one fed name out of eighty-three reported as `fed` is what #178 measured. ⛔ A reading that can count neither answers `candidateCount: null` rather than assuming it was whole.',
     lanes: 'upsideRadar.data.lanes, so the reading can say fed-and-empty rather than starved.',
   },
   /**

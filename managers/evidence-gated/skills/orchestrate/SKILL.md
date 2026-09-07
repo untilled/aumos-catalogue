@@ -194,8 +194,9 @@ Collect dated filings, catalysts and events, then run both the price-pattern swe
 Scan holdings' news/disclosures through granted web and installed filing sources every cycle.
 Return researchActivity ({source, granted, attempts, succeeded}), each radar lane's exclusions and
 starvation with its feedStage/feedCause, and the feed verdict — fed-and-evaluated,
-fed-and-genuinely-empty or never-fed. The last two produce an identical empty list and mean
-opposite things; do not report one as the other. Persist the roster/Evidence references with researchState. If the roster cannot
+fed-and-genuinely-empty, partially-fed or never-fed. fed-and-genuinely-empty and never-fed produce
+an identical empty list and mean opposite things; do not report one as the other. Report
+partially-fed with its counts (feedCoverage: fed of, unfed) and never as either of them. Persist the roster/Evidence references with researchState. If the roster cannot
 be read or eligibility cannot be checked, report that scope gap in uncertainty; never substitute holdings.
 ```
 
