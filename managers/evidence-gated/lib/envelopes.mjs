@@ -1,5 +1,5 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
-import { INPUT_VOCABULARY } from './input-contracts.mjs'
+import { INPUT_VOCABULARY } from './vocabulary.mjs'
 import { METHODOLOGY } from './constants.mjs'
 
 /**

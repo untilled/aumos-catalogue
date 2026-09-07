@@ -1,243 +1,44 @@
+/**
+ * ── The registry, projected from the one definition (issue #212 ③) ─────────
+ *
+ * This file used to hold the `operations` map: 107 names, each beside the
+ * adapter that calls its leaf function, and each written again in
+ * `input-contracts.mjs` for its shape and again in
+ * `skills/deterministic-metrics` for its sentence. The map is now a projection
+ * of `OPERATIONS`, so a registered operation that nothing documents, or a
+ * documented operation nothing registers, is not a state this package can be in.
+ *
+ * ⛔ **What `operation_unknown` lists changed, and only that.** It names the
+ * published operations — the task-unit surface — and says how many others are
+ * steps of those and what returns them instead. Every internal operation still
+ * runs when it is called by name; `execute` reads `OPERATIONS`, which holds all
+ * of them.
+ */
 import { result, diagnostic } from './diagnostics.mjs'
-import { validateInput, INPUT_KEYS, INPUT_CONTRACTS, NESTED_CONTRACTS, GUARDED_OPERATIONS, INPUT_VOCABULARY } from './input-contracts.mjs'
-import { researchUniverse, researchState } from './research-state.mjs'
-import { normalizeBars, indicatorPacket } from './indicators.mjs'
-import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
-import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
-import { proposalDisclosure } from './proposal.mjs'
-import { executionRecord } from './execution-record.mjs'
-import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
-import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
-import { observationLedger } from './observation.mjs'
-import { calibrationSummary, closedOutcomeSamples, independentDateClusters, brierScore, benjaminiHochberg, promotionGate, quintileSpread, bootstrapClusterCi } from './calibration.mjs'
-import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
-import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
-import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
-import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, migrationMap, exitCheck } from './methodology.mjs'
-import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
-import { fundamentalsPlan, mapCorporationCodes, dartVendorStatus, radarCandidates, radarFeedDiagnosis } from './fundamentals-feed.mjs'
-import { catalystRegister } from './catalysts.mjs'
-import { thesisValuation, thesisGapSources } from './valuation.mjs'
-import { harnessAudit, lessonAudit } from './audit.mjs'
-import { lensEnvelope, clusterBlock, timeStopPolicy, exitDiscipline, ruleVersions, policyLint } from './envelopes.mjs'
-import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport, controlArmLane } from './learning.mjs'
-import { refutedMemoryRules } from './memory-rules.mjs'
-import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence, resolveWakeFlow, resolveTrancheWake, reconcileArmedReviews } from './schedule.mjs'
+import { validateInput } from './input-contracts.mjs'
+import { OPERATIONS, PUBLISHED_OPERATIONS, INTERNAL_OPERATIONS, SUBSUMED_BY } from './operations.mjs'
 
-const operations = {
-  researchUniverse: (input, asOf) => researchUniverse({ ...input, asOf }),
-  researchState: (input, asOf) => researchState({ ...input, asOf }),
-  /**
-   * ⚠️ Every registered operation is published, not the eleven a past issue
-   * happened to reach (#158). `keys` stays what it was — the name a run may
-   * already be reading — and `contracts` adds the type of each key and the mode
-   * that governs an unknown one, `nested` the shapes a key list cannot show
-   * (`config.schedule`, `researchActivity[]`), `guarded` the operations that
-   * refuse an unknown key outright.
-   */
-  inputContracts: () => ({
-    data: {
-      keys: INPUT_KEYS,
-      contracts: INPUT_CONTRACTS,
-      nested: NESTED_CONTRACTS,
-      guarded: GUARDED_OPERATIONS,
-      operationCount: Object.keys(INPUT_CONTRACTS).length,
-      vocabulary: INPUT_VOCABULARY,
-    },
-    diagnostics: [],
-  }),
-  indicators(input, asOf) {
-    const normalized = normalizeBars(input?.bars, asOf)
-    return { data: { bars: normalized.bars, indicators: indicatorPacket(normalized.bars) }, diagnostics: normalized.diagnostics }
-  },
-  scan(input, asOf) {
-    const normalized = normalizeBars(input?.bars, asOf)
-    const scanned = scanSymbol({ ...input, bars: normalized.bars })
-    return { data: scanned.candidate, diagnostics: [...normalized.diagnostics, ...scanned.diagnostics] }
-  },
-  relativeStrength(input) { return { data: relativeStrength(input?.assetBars ?? [], input?.benchmarkBars ?? [], input?.periods), diagnostics: [] } },
-  opportunityMetrics,
-  opportunityUniverse,
-  /**
-   * ⚠️ `asOf` is passed because this gate normalizes its own bars now (#180):
-   * the same `normalizeBars` `indicators` and `scan` run above, so a row one of
-   * them refuses cannot be a row this one silently reads as `undefined`.
-   */
-  trendState: (input, asOf) => trendState({ ...input, asOf }),
-  blendedSectorStrength: (input) => blendedSectorStrength(input?.assetBars ?? [], input?.benchmarkBars ?? [], input?.weights),
-  sectorStrength: (input, asOf) => sectorStrength({ ...input, asOf }),
-  regimeTag: (input, asOf) => regimeTag({ ...input, asOf }),
-  sleeveNav,
-  targetWeight: (input, asOf) => targetWeight({ ...input, asOf }),
-  experimentalCeiling,
-  effectivePositionCap: (input, asOf) => effectivePositionCap({ ...input, asOf }),
-  effectiveCashFloor,
-  singleNameBudget,
-  legacySizeSuggestion,
-  concentration,
-  /**
-   * ⚠️ Registered beside `concentration` because it answers the question that
-   * operation's clean pass leaves open (#162): what share of this book is
-   * bearing risk at all, and — when none of it is — whether that is a run that
-   * found nothing worth owning or one whose gates never got their inputs.
-   */
-  /**
-   * ⚠️ **Registered immediately before `mandateExecution` because it is the
-   * input that operation used to guess** (#212 ④). The cause of an empty
-   * single-name lane was decided by intersecting diagnostic strings with a
-   * classification table, and no input to that table counted anything — so a
-   * roster nobody had prepared, plus one gate refusing one name, came back as
-   * *the methodology is working*. This reads the host's own research job and
-   * result and answers the three facts as counts: was the roster prepared, did
-   * the recipe answer, how many cleared the gates.
-   *
-   * ⛔ It reads no diagnostic, and `mandateExecution` refuses a record it did
-   * not produce.
-   */
-  executionRecord,
-  mandateExecution,
-  /**
-   * ⚠️ **Registered beside sizing because it is the half sizing must not do**
-   * (#212 ②). `effectivePositionCap` read the proposal's `uncertainty` and
-   * `risks` and pushed `blocked`, and `targetWeight` returns `null` on any
-   * `blocked`, so **editing a sentence moved a position weight.** The
-   * arithmetic now names the obligation and this operation judges the assembled
-   * proposal against it — same codes, same `blocked`, one step later, where
-   * there is no number left to distort.
-   */
-  proposalDisclosure,
-  entryQualityGate,
-  newSinglePacing: (input, asOf) => newSinglePacing({ ...input, asOf }),
-  entryTranchePlan: (input, asOf) => entryTranchePlan({ ...input, asOf }),
-  specialistBudget,
-  globalAllocation,
-  coverage: (input, asOf) => coverageState({ ...input, asOf }),
-  discoveryCapacity,
-  validateWatch: (input, asOf) => validateWatch(input?.watch, input?.current, asOf, input?.config),
-  evaluateWatch: (input, asOf) => evaluateWatch({ ...input, asOf }),
-  watchAlertState: (input, asOf) => watchAlertState({ ...input, asOf }),
-  validateConsensus: (input, asOf) => validateConsensus(input, asOf),
-  researchGate,
-  crossCheckPrice,
-  validateMacro: (input, asOf) => validateMacroObservations({ ...input, asOf }),
-  /**
-   * ⚠️ Registered beside the other admission gates because it answers the one
-   * question they never asked (#692): of the things this run **read**, which
-   * ones did it end up citing? A value used to judge an invalidation condition
-   * and supported by none of the submitted ids is the 2026-09-06 failure, and
-   * it is now a computed finding rather than a note a run happened to make.
-   */
-  observationLedger: (input, asOf) => observationLedger({ ...input, asOf }),
-  calibration: calibrationSummary,
-  closedOutcomeSamples: (input, asOf) => closedOutcomeSamples({ ...input, asOf }),
-  clusters: (input) => ({ data: { clusters: independentDateClusters(input?.dates, input?.gapDays) }, diagnostics: [] }),
-  brier: (input) => ({ data: { score: brierScore(input?.probabilities, input?.outcomeIndex) }, diagnostics: [] }),
-  bhFdr: (input) => ({ data: { rows: benjaminiHochberg(input?.rows ?? [], input?.alpha) }, diagnostics: [] }),
-  quintileSpread: (input) => ({ data: { summary: quintileSpread(input?.values) }, diagnostics: [] }),
-  bootstrapClusterCi: (input) => ({ data: { interval: bootstrapClusterCi(input?.clusterValues, input?.options) }, diagnostics: [] }),
-  promotionGate,
-  attribution: decomposition,
-  twr: (input) => ({ data: { return: timeWeightedReturn(input?.dailyValues, input?.flows) }, diagnostics: [] }),
-  mwr: (input) => ({ data: { return: moneyWeightedReturn(input?.datedCashflows, input?.endingValue, input?.endingDate, input?.options) }, diagnostics: [] }),
-  portfolioMetrics,
-  netReturnBreakdown,
-  outcomeClassification,
-  forwardOutcome,
-  earningsActual,
-  trendGateForward,
-  dcaMultiplierBacktest,
-  oversoldStrata,
-  signalPaper: (input, asOf) => signalPaper({ ...input, asOf }),
-  paperAdmission: (input, asOf) => paperAdmission({ ...input, asOf }),
-  shadowTrack,
-  baselineTrack,
-  controlArmLane,
-  lensEnvelope,
-  clusterBlock: (input, asOf) => clusterBlock({ ...input, asOf }),
-  timeStopPolicy: (input, asOf) => timeStopPolicy({ ...input, asOf }),
-  exitDiscipline: (input, asOf) => exitDiscipline({ ...input, asOf }),
-  ruleVersions,
-  policyLint,
-  harnessAudit: (input, asOf) => harnessAudit({ ...input, asOf }),
-  lessonAudit: (input, asOf) => lessonAudit({ ...input, asOf }),
-  verdictReport: (input, asOf) => verdictReport({ ...input, asOf }),
-  validateThesis,
-  variantViewCheck: (input, asOf) => variantViewCheck({ ...input, asOf }),
-  thesisSentinel,
-  exitCheck: (input, asOf) => exitCheck({ ...input, asOf }),
-  upsideRadar: (input, asOf) => upsideRadar({ ...input, asOf }),
-  validateMemory: (input, asOf) => validateMemory({ ...input, asOf }),
-  migrationMap,
-  filterPointInTime: (input, asOf) => filterPointInTime(input?.rows, { ...input, asOf }),
-  normalizeSecFacts: (input, asOf) => normalizeSecFacts(input, asOf),
-  normalizeDartFilings: (input, asOf) => normalizeDartFilings(input, asOf),
-  parseDartCorpCodes: (input) => parseDartCorpCodes(input?.xml),
-  normalizeDartFinancials: (input, asOf) => normalizeDartFinancials(input, asOf),
-  normalizeSecSubmissions: (input, asOf) => normalizeSecSubmissions(input, asOf),
-  laneCoverage,
-  validateAdjustment: (input) => validateAdjustment(input?.series, input?.corporateActions),
-
-  /**
-   * ── The feeding path (issue #146) ────────────────────────────────────────
-   *
-   * In order, and the order is the fix: the registry that supplies the vendor's
-   * own filer id, the join onto the curated roster, the vendor status read off
-   * an HTTP 200, the candidates the radar eats, and the reading that says which
-   * of those stages lost the input when a lane comes back starved.
-   */
-  fundamentalsPlan: (input, asOf) => fundamentalsPlan({ ...input, asOf }),
-  mapCorporationCodes: (input, asOf) => mapCorporationCodes({ ...input, asOf }),
-  dartVendorStatus: (input) => dartVendorStatus(input),
-  radarCandidates: (input, asOf) => radarCandidates({ ...input, asOf }),
-  radarFeedDiagnosis: (input, asOf) => radarFeedDiagnosis({ ...input, asOf }),
-
-  /**
-   * ── The axis the feeding path never fed (issue #169) ─────────────────────
-   *
-   * The five above put **filings** on the plate. `upsideRadar` reads two more
-   * inputs — a catalyst window inside 60 days and an event announced inside 30
-   * — and nothing produced either, so the two lenses that do not require a
-   * price fall excluded every name for want of an input and said it in a
-   * sentence that reads as a finding about the company. This is the producer,
-   * and its answer is handed straight to `radarCandidates` as `catalysts` and
-   * `events`.
-   */
-  catalystRegister: (input, asOf) => catalystRegister({ ...input, asOf }),
-
-  /**
-   * ── The other end of the same wire (issue #160) ──────────────────────────
-   *
-   * The five above feed **discovery**. These two feed **sizing**: the fair
-   * value and the expected upside `validateThesis` asks for come off the same
-   * statements, and until they do, `variantViewCheck` reports three of four
-   * requirements met and `effectivePositionCap` turns a declared 0.2 into
-   * 0.01. `thesisGapSources` is what keeps *no source exists* and *the source
-   * was never called* from being written down as the same sentence.
-   */
-  thesisValuation: (input, asOf) => thesisValuation({ ...input, asOf }),
-  thesisGapSources: (input, asOf) => thesisGapSources({ ...input, asOf }),
-
-  zonedDateTimeToUtc: (input) => ({ data: { instant: zonedDateTimeToUtc(input?.date, input?.time, input?.timeZone) }, diagnostics: [] }),
-  nextMarketReview: (input, asOf) => nextMarketReview({ ...input, asOf }),
-  earningsCheckpoint: (input, asOf) => earningsCheckpoint(input?.observation, input?.marketSession, { ...input?.config, asOf }),
-  boundedRetry: (input, asOf) => boundedRetry({ ...input, asOf }, input?.config),
-  classifyScheduledWake,
-  scheduleDrift: (input, asOf) => scheduleDrift({ ...input, asOf }),
-  deduplicateObservations,
-  themeRadarDue: (input, asOf) => themeRadarDue({ ...input, asOf }),
-  nextReviewSequence: (input, asOf) => nextReviewSequence({ ...input, asOf }),
-  resolveWakeFlow,
-  resolveTrancheWake,
-  reconcileArmedReviews: (input, asOf) => reconcileArmedReviews({ ...input, asOf }),
-  refutedMemoryRules: (input, asOf) => refutedMemoryRules({ ...input, asOf }),
-}
+const operations = Object.fromEntries(Object.entries(OPERATIONS).map(([name, row]) => [name, row.run]))
 
 export function execute(request) {
   const diagnostics = []
   const operation = request?.operation
   const asOf = request?.asOf
   if (typeof operation !== 'string' || !Object.hasOwn(operations, operation)) {
-    diagnostics.push(diagnostic('operation_unknown', 'blocked', 'A supported operation is required', 'operation', { supported: Object.keys(operations) }))
+    /**
+     * ⚠️ **The list is the task-unit surface, and the rest is summarised rather
+     * than hidden** (#212 ③). `supported` was every registered name, eight of
+     * which are steps of other entries — a menu that invites a run to assemble
+     * a calculation this package already assembles. `internal` says how many
+     * there are and `subsumedBy` says what returns each of their answers, so a
+     * run that reaches for one is told where the answer already is instead of
+     * being told the name does not exist. ⛔ They all still run.
+     */
+    diagnostics.push(diagnostic('operation_unknown', 'blocked', 'A supported operation is required', 'operation', {
+      supported: PUBLISHED_OPERATIONS,
+      internal: INTERNAL_OPERATIONS.length,
+      subsumedBy: SUBSUMED_BY,
+    }))
     return result(operation ?? null, asOf ?? null, null, diagnostics)
   }
   if (typeof asOf !== 'string' || !Number.isFinite(Date.parse(asOf))) {
