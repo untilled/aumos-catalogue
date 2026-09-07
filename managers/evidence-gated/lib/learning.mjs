@@ -312,12 +312,28 @@ export function signalPaper({ rows = [], state = {}, admissions = [], horizons =
   const priorWindows = state?.openWindows ?? []
   const matured = []
   for (const [index, row] of rows.entries()) {
-    if (typeof row?.symbol !== 'string' || !row.symbol || !Number.isFinite(Date.parse(row?.signalAt))) {
-      diagnostics.push(diagnostic('paper_row_metadata_missing', 'blocked', 'A paper row needs symbol and signalAt copied from its registered window', `rows[${index}]`))
+    /**
+     * ⚠️ **The refusal names the field that is missing** (#183). It used to
+     * name the row — path `rows[<i>]`, message *"needs symbol and signalAt"* —
+     * so a caller who had written one of the two read a sentence about both and
+     * could not tell which half of it was the complaint. The sibling check in
+     * `mergeAdmissions` already answers at `admissions[<i>].symbol` /
+     * `.signalAt`; this is the same answer on this side.
+     *
+     * ⛔ **Key names, never values.** `missing` is a list of field names — what
+     * was not written — and the row's own contents are the caller's, not
+     * something a refusal carries back out.
+     */
+    const missing = [
+      ...(typeof row?.symbol === 'string' && row.symbol ? [] : ['symbol']),
+      ...(Number.isFinite(Date.parse(row?.signalAt)) ? [] : ['signalAt']),
+    ]
+    if (missing.length) {
+      diagnostics.push(diagnostic('paper_row_metadata_missing', 'blocked', `A paper row needs ${missing.join(' and ')} copied from its registered window; a row is one carried window, not one bar`, `rows[${index}].${missing[0]}`, { missing }))
       continue
     }
     if (!SETUP_COHORTS[row?.setup]) {
-      diagnostics.push(diagnostic('paper_setup_unknown', 'blocked', 'Every paper row names a published setup', `rows[${index}].setup`, { setup: row?.setup ?? null }))
+      diagnostics.push(diagnostic('paper_setup_unknown', 'blocked', 'Every paper row names a published setup', `rows[${index}].setup`, { setup: row?.setup ?? null, supported: Object.keys(SETUP_COHORTS) }))
       continue
     }
     if (row?.ruleVersion === undefined || row?.ruleVersion === null) {

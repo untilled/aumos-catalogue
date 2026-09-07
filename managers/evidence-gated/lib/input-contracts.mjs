@@ -289,6 +289,35 @@ export const NESTED_CONTRACTS = {
     receipt: 'One row per `observation_file` call, **as that tool answered it** — the id, the markers (`evidenceKind: "observation"`, `evidenceSource: "manager:web-research"`), `url`, `title`, `publishedAt`, `contentHash` and `excerptChars`. ⚠️ The tool returns the hash and this package cannot recompute it, so the value has to be **kept from the call and passed back here**; without it the row is `observation_hash_missing` — a receipt nothing can be compared against — and that finding is about the hash alone, never about the grade.',
     grade: 'Not something a claim states. A claim carries `evidenceId`, and the grade travels from the observation filed under that id — `claims[].gradeFrom` says `observation` when it did. ⛔ A claim naming an id no row in `observations` carries is `claim_grade_unstated` rather than a quiet `ungraded`: «this run filed no receipt under that id» and «the receipt has no markers» are different facts, and the main lane\'s `main_lane_rests_on_manager_attestation` disclosure is built on the answer. Carrying `evidenceKind`/`evidenceSource` onto the claim answers it too, and a claim that contradicts the receipt it cites is reported and read at the weaker grade.',
   },
+  /**
+   * ── `rows: "array"` was the whole published shape of the only path to the
+   * promotion gate (#183) ────────────────────────────────────────────────────
+   *
+   * A run finds the row shape by being refused three times: `{symbol, date,
+   * close}` → `paper_row_metadata_missing` ×23, plus `signalAt` →
+   * `paper_setup_unknown` ×23, plus `setup`/`ruleVersion` → processed. Every
+   * refusal is `blocked` and none of them is wrong, which is why this is a
+   * documentation defect and not a silent one — but `signalPaper` is called on
+   * **every** wake and the run that spends its calls guessing is the run that
+   * reports `paper_windows_unscored`, whose wording is *this run skipped the
+   * windows* rather than *this run fetched bars and could not name the shape*.
+   *
+   * ⚠️ **What is published here is what the code refuses, and no more.** Four
+   * fields are required — `symbol`, `signalAt`, `setup`, `ruleVersion` — and
+   * `cohort` and `benchmark`, which the run that filed this issue added on its
+   * third attempt, are read by nothing on a row: the cohort is derived from the
+   * setup and the benchmark is a **series**, `benchmarkBars`. Publishing them
+   * as required because a passing call happened to carry them would be the
+   * mirror of the defect this file exists to stop.
+   */
+  signalPaper: {
+    'rows[]': { symbol: STRING, signalAt: STRING, setup: STRING, ruleVersion: STRING, bars: ARRAY, benchmarkBars: ARRAY, sectorBars: ARRAY },
+    rowShape: `One row per **carried window**, not per bar: \`symbol\` and \`signalAt\` are copied from the \`state.openWindows\` entry the row is scoring, \`setup\` is one of ${Object.keys(PAPER_SETUP_COHORTS).join(', ')} — also inputContracts.vocabulary.paperSetups — and \`ruleVersion\` is the version the window was judged under, refused when absent or null so that rows from two versions are never pooled. The price history goes in \`bars\`, the benchmark's in \`benchmarkBars\` and the sector's in \`sectorBars\`. ⛔ A bar-shaped row — \`date\` and \`close\` at the top of the row — carries no window: \`date\` and \`close\` are read by nothing here, and so are \`cohort\` (derived from \`setup\`) and \`benchmark\` (the series is \`benchmarkBars\`). ⚠️ Absent \`benchmarkBars\` the row scores no excess and drops out of the aggregate rather than counting as zero.`,
+    'rows[].bars[]': { timestamp: STRING, close: NUMBER, high: NUMBER, low: NUMBER },
+    barShape: 'The instant is `timestamp` — ⛔ **not** `date` or `time`, which `indicators` and `trendState` do accept — and `close` must be a finite number. A row of bars written under `date` yields no usable bar at all, and the answer is `forward_base_missing` / `unevaluated` on a path of `bars`: *a last close before signalAt and later bars are required*, which reads as a window the calendar has not reached yet rather than a series this operation could not parse. `high` and `low` are optional and fall back to `close` for the excursion.',
+    state: 'The whole value read from `learning/paper-cohorts` — { schemaVersion, updatedAsOf, closed, openWindows, maturedThisRun } — and nothing else; an unknown field in it is `input_shape_invalid`. ⛔ Its `openWindows` passed at the **top level** is `paper_state_misplaced`: read there the track is invisible and the `nextState` this would return is the erasure of it.',
+    'admissions[]': { symbol: STRING, setup: STRING, ruleVersion: STRING, signalAt: STRING, benchmark: ANY },
+  },
 }
 
 /** `key: type` for every registered operation, with the mode that governs the rest. */
