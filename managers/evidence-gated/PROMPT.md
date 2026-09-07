@@ -653,7 +653,14 @@ hold. Hand `controlArmRemainingWeight` to `controlArmLane` as `experimentTotalRe
 ⛔ **And say what share of this book is bearing risk at all.** Call `mandateExecution` with the
 invocation's `mandate.objective` **verbatim** as `mandateObjective`, the same `positions` and
 `proposed` the two operations above received, this run's `cashWeight`, and `reportedDiagnostics` —
-the diagnostic codes the rest of this run already returned. It reports `parkedLiquidityWeight`,
+the diagnostic codes the rest of this run already returned. ⛔ **Pass those codes verbatim, as the
+operations returned them, never a paraphrase or a remembered spelling.** The vocabulary this cause is
+read against is `lib/diagnostic-codes.mjs`, one row per code naming the operation that emits it, and a
+code no operation emits matches nothing — which is how a run reporting `corp_code_unmapped_symbols`,
+`radar_lane_starved` and `lane_query_failed` was once told the methodology was working. ⚠️ The
+response carries `reportedDiagnosticCount` beside `recognisedCodes`: if the second is empty while the
+first is not, the cause is `unreported` and the codes you passed are not codes this package emits.
+It reports `parkedLiquidityWeight`,
 `coreWeight`, `singleNameWeight` and `riskBearingWeight` beside the objective the investor declared.
 ⚠️ **`parkedLiquidity` excludes a row from the sector, theme, factor and heat axes; it never
 excludes it from existing.** A book at 57.25% cash, 38.54% parked and 0.00% in any single name
@@ -663,7 +670,10 @@ as *the lane has room* rather than as *nothing this Mandate is for is being done
 name held the operation returns `mandate_objective_unexecuted`, and the **cause** is what matters:
 `no-candidate-cleared-the-gates` is `info` — holding cash because nothing cleared its gates is this
 methodology working, and it is never an argument for buying — while `input-path-incomplete` and
-`unreported` are `unevaluated`, which is not a pass. ⚠️ **Pass `thesisGapSources`' diagnostics in
+`unreported` are `unevaluated`, which is not a pass. ⚠️ **The `info` answer is earned rather than
+defaulted to**: it needs at least one code from a gate that actually ran and refused
+(`gateRanCodeVocabulary`), because *the gates ran and found nothing* is a positive claim and a run
+that reported nothing readable has not made it. ⚠️ **Pass `thesisGapSources`' diagnostics in
 with the rest.** `valuation_gap_is_unfetched_not_unfillable` is the one code that establishes a
 source exists for this instrument and was never called, and it makes the cause
 `input-path-incomplete`. ⛔ Its siblings do not:

@@ -18,6 +18,7 @@
     "check:publisher": "node tools/check-publisher.mjs",
     "check:provenance": "node tools/check-provenance.mjs",
     "check:allocator": "node tools/verify-evidence-gated-allocator.mjs",
+    "check:diagnostic-codes": "node tools/verify-evidence-gated-diagnostic-codes.mjs",
     "check:legacy-parity": "node tools/legacy-parity.mjs"
   },
   "dependencies": {

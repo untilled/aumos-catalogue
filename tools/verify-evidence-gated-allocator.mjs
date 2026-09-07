@@ -1,5 +1,7 @@
 import nodeAssert from 'node:assert/strict'
 import './verify-evidence-gated-input-regressions.mjs'
+/** #171: the cause vocabulary has to be the codes the siblings emit, proven. */
+import './verify-evidence-gated-diagnostic-codes.mjs'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated/lib/index.mjs'
@@ -1859,12 +1861,23 @@ assert.equal(wiringUnfinished.status, 'unevaluated', 'an empty lane because the 
 assert.ok(wiringUnfinished.diagnostics.some((row) => row.code === 'mandate_objective_unexecuted' && row.severity === 'unevaluated'))
 assert.equal(wiringUnfinished.diagnostics.some((row) => row.severity === 'blocked'), false, '⛔ and it refuses nothing: it is a report')
 
+/**
+ * ⚠️ **The code here was `research_gate_active_return_short` and no operation
+ * in this package emits it** (#171). The gate is `researchGate` and its code is
+ * `active_return_below_gate` — so this case was passing an invented spelling,
+ * matching nothing, and reaching the `info` answer by *falling through* rather
+ * than by carrying evidence that a gate ran. That is the same defect the run
+ * reported, standing inside the check that was supposed to catch it.
+ * `tools/verify-evidence-gated-diagnostic-codes.mjs` is what now makes an
+ * unemitted spelling a red build.
+ */
 const nothingCleared = execute({
   operation: 'mandateExecution',
   asOf: methodology.asOf,
-  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, reportedDiagnostics: ['research_gate_active_return_short'] },
+  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, reportedDiagnostics: ['active_return_below_gate'] },
 })
 assert.equal(nothingCleared.data.cause, 'no-candidate-cleared-the-gates')
+assert.deepEqual(nothingCleared.data.gateRanCodes, ['active_return_below_gate'], 'and the `info` answer is earned by a gate that ran, never fallen into')
 assert.equal(
   nothingCleared.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity,
   'info',
@@ -1898,11 +1911,11 @@ const unfetchedValuation = withCause(['valuation_gap_is_unfetched_not_unfillable
 assert.equal(unfetchedValuation.data.cause, 'input-path-incomplete', 'a source that exists for this instrument and was never called is the sharpest evidence there is that the lane is empty for want of wiring')
 assert.deepEqual(unfetchedValuation.data.inputPathCodes, ['valuation_gap_is_unfetched_not_unfillable'])
 
-const unfillableValuation = withCause(['valuation_gap_has_no_source_for_this_instrument', 'research_gate_active_return_short'])
+const unfillableValuation = withCause(['valuation_gap_has_no_source_for_this_instrument', 'active_return_below_gate'])
 assert.equal(unfillableValuation.data.cause, 'no-candidate-cleared-the-gates', '⛔ an instrument that publishes no statements is a fact about the instrument; filing it as unfinished wiring would promise a fix no fetch can deliver')
 assert.deepEqual(unfillableValuation.data.inputPathCodes, [])
 
-const unknownClass = withCause(['instrument_class_unknown', 'research_gate_active_return_short'])
+const unknownClass = withCause(['instrument_class_unknown', 'active_return_below_gate'])
 assert.equal(unknownClass.data.cause, 'unreported', '⛔ unknown is not incomplete — and it is not «the gates ran and found nothing» either')
 assert.deepEqual(unknownClass.data.unresolvedCodes, ['instrument_class_unknown'])
 assert.deepEqual(unknownClass.data.inputPathCodes, [], 'it never counts as evidence that the wiring is at fault')

@@ -53,6 +53,11 @@ The verifier covers:
   same `bar_value_invalid` count `indicators` raises on the byte-identical rows, the same series in
   numeric form answering `UPTREND` with every moving average computed, one bad row in two hundred
   refused, and no `trancheGuidance` on any of the refusals;
+- the diagnostic-code registry behind `mandateExecution` — every registered code proven to be emitted
+  by the module the row names, every registered operation proven to be one `execute` dispatches, the
+  three published vocabularies proven to be projections of that one table rather than copies of it,
+  and the causes re-derived end to end from `mapCorporationCodes`, `upsideRadar` and `laneCoverage`
+  output handed over unedited, including the six codes of the run that reversed the verdict;
 - absence of network, broker/order/database capabilities in the manager manifest.
 
 On 2026-08-25 all six proposal fixtures were also parsed directly by

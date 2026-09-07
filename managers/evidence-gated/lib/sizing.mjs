@@ -1,4 +1,5 @@
 import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW } from './diagnostics.mjs'
+import { causeCodesInLane, REGISTERED_CAUSE_CODES } from './diagnostic-codes.mjs'
 import { METHODOLOGY } from './constants.mjs'
 import { normalizeTriggerKind, variantViewCheck } from './methodology.mjs'
 import { trancheIntent } from './schedule.mjs'
@@ -1314,49 +1315,18 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
  *
  * Published rather than hidden, because it is the whole basis on which
  * `mandateExecution` separates *an empty single-name lane the run chose* from
- * *an empty one nobody was able to fill*. Every entry is a code this package
- * already emits from the input path — the roster, the corp-code join, the
- * vendor status, the source cache, the discovery denominator — so the
- * classification is a set intersection over diagnostics that already ran, and
- * not a second opinion about them.
+ * *an empty one nobody was able to fill*.
  *
- * ⛔ Codes from the sizing and lens gates are deliberately absent. A thesis
- * that did not clear its challenge is a *judgement* the methodology made, and a
- * run that filed it under "the wiring is unfinished" would be excusing its own
- * verdict. What belongs here is only ever a stage that lost an input.
- *
- * ⚠️ **`valuation_gap_is_unfetched_not_unfillable` is the strongest member of
- * this list and it arrived from `thesisGapSources` (#160/#166).** It is the one
- * code that says, of a *named* instrument, that a source which fills the gap
- * **exists** and **was never called** — the distinction the undifferentiated
- * `gaps` list had been hiding. Its two siblings are deliberately **not** here,
- * and the reason each is left out is the point:
- *
- * - `valuation_gap_has_no_source_for_this_instrument` is a fact about the
- *   *instrument* — an index ETF publishes no statements — so the gap stays open
- *   however well the wiring works. Filing that under "unfinished wiring" would
- *   promise a fix that no amount of fetching can deliver.
- * - `instrument_class_unknown` says the run could not establish whether a filer
- *   exists at all. ⛔ **Unknown is not "incomplete".** Reading it as one is the
- *   generalization #166 exists to stop, arriving from this side; it goes on
- *   `CAUSE_UNRESOLVED_CODES` instead, where it does the one honest thing —
- *   forbids the *other* conclusion too.
+ * ⚠️ **It is a projection of `diagnostic-codes.mjs` and not a list (#171).**
+ * It used to be written out here by hand, beside the operation that reads it,
+ * while the operations that emit the codes were written in four other modules —
+ * and the two spellings drifted until a run reporting `corp_code_unmapped_symb
+ * ols`, `radar_lane_starved` and `lane_query_failed` intersected with **none**
+ * of them and was told the methodology was working. The registry is where a
+ * code and its lane are decided now; nothing here may add a fourteenth entry
+ * without an operation that emits it.
  */
-export const INPUT_PATH_INCOMPLETE_CODES = Object.freeze([
-  'corp_code_mapping_pending',
-  'corp_code_registry_absent',
-  'dart_status_missing',
-  'dart_status_unknown',
-  'discovery_lane_dark',
-  'feed_universe_empty',
-  'radar_feed_broken',
-  'radar_feed_produced_nothing',
-  'source_cache_never_fetched',
-  'source_cache_refresh_failed',
-  'source_cache_state_unknown',
-  'source_cache_unreported',
-  'valuation_gap_is_unfetched_not_unfillable',
-])
+export const INPUT_PATH_INCOMPLETE_CODES = causeCodesInLane('input-path')
 
 /**
  * ── Codes that refuse both conclusions ─────────────────────────────────────
@@ -1373,10 +1343,26 @@ export const INPUT_PATH_INCOMPLETE_CODES = Object.freeze([
  * answer to `unreported`, which is this package's way of saying nobody has
  * established it — the rule `cash_floor_unevaluated` follows.
  */
-export const CAUSE_UNRESOLVED_CODES = Object.freeze([
-  'instrument_class_disputed',
-  'instrument_class_unknown',
-])
+export const CAUSE_UNRESOLVED_CODES = causeCodesInLane('unresolved')
+
+/**
+ * ── What the `info` answer has to be shown before it is given (#171) ───────
+ *
+ * `no-candidate-cleared-the-gates` claims *the gates ran, on their inputs, and
+ * nothing was worth owning* — the one positive assertion this operation makes,
+ * and until #171 it was the **fall-through**: any set of reported codes that
+ * matched neither list above arrived here. A vocabulary that had drifted out of
+ * step therefore did not produce an error, it produced the reassuring answer.
+ *
+ * So it is earned now. A gate that ran and refused — an expected active return
+ * under the gate, a challenge not cleared, a thesis still incomplete, a
+ * valuation gap no source can close for *this instrument* — is the evidence,
+ * and a run that reports none of it says `unreported` instead.
+ */
+export const CAUSE_GATE_RAN_CODES = causeCodesInLane('gate-ran')
+
+/** Every code this operation can read at all — membership decides `unreported`. */
+export const MANDATE_EXECUTION_CODE_VOCABULARY = REGISTERED_CAUSE_CODES
 
 export const MANDATE_EXECUTION_CAUSES = Object.freeze([
   'executing',
@@ -1463,6 +1449,14 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
     .filter((code) => typeof code === 'string' && code.length > 0))]
   const inputPathCodes = codes.filter((code) => INPUT_PATH_INCOMPLETE_CODES.includes(code)).sort()
   const unresolvedCodes = codes.filter((code) => CAUSE_UNRESOLVED_CODES.includes(code)).sort()
+  const gateRanCodes = codes.filter((code) => CAUSE_GATE_RAN_CODES.includes(code)).sort()
+  /**
+   * ⚠️ **«21 codes reported, 0 recognised» is not «the gates ran» (#171).** It
+   * is this operation saying it was handed a vocabulary it cannot read, and the
+   * honest answer to that is the one it already has for a run that reported
+   * nothing at all.
+   */
+  const recognisedCodes = codes.filter((code) => REGISTERED_CAUSE_CODES.includes(code)).sort()
 
   const laneEmpty = split.singleNameWeight <= 0
   /**
@@ -1472,12 +1466,18 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
    * answer, because `no-candidate-cleared-the-gates` claims the gates *ran* and
    * a run that cannot say whether the instrument even has a filer has not
    * earned that claim. (#162 reading #166's vocabulary.)
+   *
+   * ⚠️ **And the `info` answer is no longer the fall-through (#171).** It was
+   * the branch every unmatched set of codes reached, so a vocabulary that had
+   * drifted out of step with its siblings did not fail — it reassured. Two
+   * conditions now stand in front of it: at least one reported code this
+   * operation can read at all, and at least one of them a gate that ran.
    */
   const cause = !laneEmpty
     ? 'executing'
     : inputPathCodes.length
       ? 'input-path-incomplete'
-      : unresolvedCodes.length || !codes.length
+      : unresolvedCodes.length || !recognisedCodes.length || !gateRanCodes.length
         ? 'unreported'
         : 'no-candidate-cleared-the-gates'
 
@@ -1492,6 +1492,9 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
         cause,
         inputPathCodes,
         unresolvedCodes,
+        gateRanCodes,
+        reportedCodeCount: codes.length,
+        recognisedCodeCount: recognisedCodes.length,
         cashWeight: cash,
         parkedLiquidityWeight: split.parkedLiquidityWeight,
         cashLikeWeight: cashEquivalent,
@@ -1524,6 +1527,16 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
       /** ⛔ Why this run may not claim the gates ran and found nothing. */
       unresolvedCodes,
       unresolvedCodeVocabulary: CAUSE_UNRESOLVED_CODES,
+      /** ⚠️ What the `info` answer is earned with, rather than fallen into. */
+      gateRanCodes,
+      gateRanCodeVocabulary: CAUSE_GATE_RAN_CODES,
+      /**
+       * ⚠️ Read this beside `reportedDiagnosticCount`: codes reported and codes
+       * this operation could read are two numbers, and «many reported, none
+       * recognised» is the failure #171 records rather than a quiet `info`.
+       */
+      recognisedCodes,
+      codeVocabulary: MANDATE_EXECUTION_CODE_VOCABULARY,
       reportedDiagnosticCount: codes.length,
       /** ⑶ of #162, decided and recorded: reported here, capped nowhere. */
       parkedLiquidityIsUncapped: true,
