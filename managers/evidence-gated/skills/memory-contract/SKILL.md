@@ -177,6 +177,15 @@ the `signalAt`-after-`asOf` refusal are inside the function. A hand-built value 
 one shape that can silently lose a window, and it did: registration lived only in a sentence and the
 track held zero rows across every run.
 
+⛔ **And verbatim means unwrapped — this key carries no envelope.** `nextState` is the whole stored
+value, so the next run reads exactly what `signalPaper`'s `state` takes. Wrapped in the envelope the
+run skeleton asks of a memory value, every added field is refused by name — `input_shape_invalid`,
+`blocked`, *retain the previous record* — and a refused call returns no `nextState`, so the wrapping
+is not a harmless extra: it is the paper track standing still while the refusal says so out loud.
+The accepted members are published as `inputContracts.nested.signalPaper`. ⚠️ It is the opposite of
+`run/armed-reviews`, whose `previous` takes the stored record whole; the two keys are read
+differently and neither reading generalises to the other.
+
 ⚠️ **What it costs, and what it does not.** Private memory is namespaced by manager instance, so
 this track is invisible to any other manager on the same book. That is a worse home than a shared
 record, and it is the only one the runtime serves. ⚠️ **The lifetime is the instance's, not the
