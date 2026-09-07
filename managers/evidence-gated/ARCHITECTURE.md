@@ -105,6 +105,11 @@ kept as provenance. There is no macro score: a regime call is a Brief judgement 
 The package uses the stable keys documented in `skills/memory-contract/SKILL.md`, including a
 bounded `coverage/research-index` of names and Evidence references. Bundled KR 74 / US 83 rosters
 provide a reproducible research scope; host source storage is still needed for a fundamental cache.
+A second bounded exception, `research/catalyst-window` (#169), carries the catalyst calendar the
+discovery lanes read — event label, window, observation date and Evidence ids, and its instants are
+numbers because a window ends after `asOf` by construction and a later string timestamp is the one
+shape `memory_read` refuses. ⛔ Event records are not persisted: `sue`, `day1ExcessPct` and
+`preAnnouncementClose` are copied vendor numbers, so they are re-read each run.
 The review-memory record is what this instance **proposed** and whose instant has not passed —
 never a copy of a run's planned sequence, and ⛔ never gated on `decisions[].armed`, which is past
 tense and drops a promise from the record precisely while it still stands (#156). What stood at

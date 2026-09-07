@@ -14,6 +14,7 @@ import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backt
 import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap, exitCheck } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { fundamentalsPlan, mapCorporationCodes, dartVendorStatus, radarCandidates, radarFeedDiagnosis } from './fundamentals-feed.mjs'
+import { catalystRegister } from './catalysts.mjs'
 import { thesisValuation, thesisGapSources } from './valuation.mjs'
 import { harnessAudit, lessonAudit } from './audit.mjs'
 import { lensEnvelope, clusterBlock, timeStopPolicy, exitDiscipline, ruleVersions, policyLint } from './envelopes.mjs'
@@ -164,6 +165,19 @@ const operations = {
   dartVendorStatus: (input) => dartVendorStatus(input),
   radarCandidates: (input, asOf) => radarCandidates({ ...input, asOf }),
   radarFeedDiagnosis: (input, asOf) => radarFeedDiagnosis({ ...input, asOf }),
+
+  /**
+   * ── The axis the feeding path never fed (issue #169) ─────────────────────
+   *
+   * The five above put **filings** on the plate. `upsideRadar` reads two more
+   * inputs — a catalyst window inside 60 days and an event announced inside 30
+   * — and nothing produced either, so the two lenses that do not require a
+   * price fall excluded every name for want of an input and said it in a
+   * sentence that reads as a finding about the company. This is the producer,
+   * and its answer is handed straight to `radarCandidates` as `catalysts` and
+   * `events`.
+   */
+  catalystRegister: (input, asOf) => catalystRegister({ ...input, asOf }),
 
   /**
    * ── The other end of the same wire (issue #160) ──────────────────────────

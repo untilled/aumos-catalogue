@@ -91,7 +91,12 @@ provenance로 보관된다. macro score는 없다: 국면 판단은 한 `asOf`�
 
 패키지는 `skills/memory-contract/SKILL.md`의 안정 키를 쓰며 종목과 Evidence 참조를 담는 제한된
 `coverage/research-index`를 포함한다. 동봉한 KR 74종·US 83종 명부가 재현 가능한 조사 범위이며,
-펀더멘털 캐시는 여전히 호스트 소스 저장소가 필요하다. 예약 메모리는 이 인스턴스가 **약속한** 것 중 시각이 지나지 않은 것이다 —
+펀더멘털 캐시는 여전히 호스트 소스 저장소가 필요하다. 두 번째 제한적 예외인 `research/catalyst-window`(#169)는
+발굴 렌즈가 읽는 촉매 달력 — 사건 이름 · 창 · 관측 시각 · Evidence id — 을 나른다. 그 시각들이
+숫자인 이유는 촉매 창이 구조적으로 `asOf` 뒤에 끝나고, `asOf`보다 늦은 **문자열** 시각이 바로
+`memory_read`가 거절하는 그 모양이기 때문이다. ⛔ 이벤트 기록은 저장하지 않는다 — `sue` ·
+`day1ExcessPct` · `preAnnouncementClose`는 벤더의 답에서 베낀 숫자라 매 런 다시 읽는다.
+예약 메모리는 이 인스턴스가 **약속한** 것 중 시각이 지나지 않은 것이다 —
 실행이 계산한 시퀀스의 사본도 아니고, ⛔ `decisions[].armed`로 검증되지도 않는다(그 필드는 과거형이라
 약속이 서 있는 동안 오히려 기록에서 지운다, #156). `asOf`에 서 있던 것은 invocation의
 `standingPlans`에서 읽고, 행위가 아니라 보고에 쓴다. 값은 스키마

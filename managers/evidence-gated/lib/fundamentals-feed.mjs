@@ -553,6 +553,9 @@ export function radarCandidates({ market, symbols = [], financials = {}, facts =
   for (const row of roster) {
     const symbol = row.symbol
     const cached = documents[symbol]
+    const latestEarnings = (events[symbol] ?? [])
+      .filter((entry) => Number.isFinite(Date.parse(entry?.announcedAt)) && (!asOf || Date.parse(entry.announcedAt) <= Date.parse(asOf)))
+      .sort((a, b) => Date.parse(b.announcedAt) - Date.parse(a.announcedAt))[0] ?? null
     const supplied = cached !== undefined ? cached : market === 'kr' ? financials[symbol] : facts[symbol]
     const fromCache = cached !== undefined
     const perSymbol = []
@@ -574,6 +577,17 @@ export function radarCandidates({ market, symbols = [], financials = {}, facts =
       price: prices[symbol] ?? { status: 'unknown', reason: 'no-price-observation-supplied' },
       events: events[symbol] ?? [],
       catalysts: catalysts[symbol] ?? [],
+      /**
+       * ⚠️ **`upsideRadar` read this field and nothing anywhere wrote it**
+       * (#169). `expectation` is `{ status: 'unknown', reason: 'no-point-in-
+       * time-event-record' }` for every candidate in every run this package
+       * has ever produced, because the axis was read off `latestEarnings` and
+       * the only shape supplied here was `events`. The mirror of the defect
+       * this package keeps finding: computed and read by nobody, versus read
+       * and produced by nobody. The most recent event announced at or before
+       * `asOf` is what the axis is about, so it is what it gets.
+       */
+      ...(latestEarnings ? { latestEarnings } : {}),
       ...(valuations[symbol] ? { valuation: valuations[symbol] } : {}),
       feed: {
         filingsBuilt: filings.length,

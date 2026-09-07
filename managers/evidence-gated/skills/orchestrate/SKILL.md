@@ -201,7 +201,7 @@ Feed the fundamental branch before running it, in this order (#146): the registr
 vendor's own filer id (open-dart /api/corpCode.xml for corp_code, sec-edgar
 /files/company_tickers.json for the CIK) → mapCorporationCodes → fundamentalsPlan →
 source_cache_read / source_cache_refresh → dartVendorStatus on every OpenDART response →
-radarCandidates → radarFeedDiagnosis → upsideRadar({candidates, feed}). The registry call is the
+catalystRegister → radarCandidates → radarFeedDiagnosis → upsideRadar({candidates, feed}). The registry call is the
 one no run has ever made; without it nothing fetched can be addressed to a filer — on **both**
 sides (#179): sec-edgar companyfacts is the CIK file name
 (/api/xbrl/companyfacts/CIK{10-digit zero-padded}.json), and the ticker address answers 404.
@@ -211,6 +211,11 @@ at all?) and thesisValuation (fairValueRange and expectedUpsidePct off the bear/
 drivers checked against the filings). Without them a complete variant view still reads
 missing: ["thesisComplete"] and the investor's declared 20% cap operates at 1%.
 Collect dated filings, catalysts and events, then run both the price-pattern sweep and upsideRadar.
+⚠️ Catalysts and events had no producer until #169, so a flow that is not told to build them hands
+the radar an empty axis and the two lenses that need no price fall report it as a finding about the
+company — measured: post-event-continuation 0 of 83, inflection excluding the one name that cleared
+every filing test. catalystRegister is that producer, every row carries the evidenceIds the reading
+was filed under, and its nextState is persisted to research/catalyst-window with numeric instants.
 Scan holdings' news/disclosures through granted web and installed filing sources every cycle.
 Return researchActivity ({source, granted, attempts, succeeded}), each radar lane's exclusions and
 starvation with its feedStage/feedCause, and the feed verdict — fed-and-evaluated,

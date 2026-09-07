@@ -85,13 +85,43 @@ been fed. Do these in order and report each one:
    Three different findings; do not collapse them.
 5. **Read each response's own dates.** `normalizeSecFacts` takes `filed` as the availability
    instant — never the fiscal period end — and drops anything later than `asOf`.
-6. **`radarCandidates`** — vendor rows or cached documents in, radar candidates out. Every roster
+6. **`catalystRegister`** — the catalyst and event axis, which until #169 had **no producer at
+   all**. `radarCandidates` takes `catalysts` and `events`; `upsideRadar` reads a window open
+   inside 60 days and an event announced inside 30; nothing in this package ever built either, so
+   the two lenses that do not require a price fall excluded every name for want of an input and
+   said so in a sentence that reads as a finding about the company. Measured on
+   `run_73a3e6c41c204f468ee8be8d2923d898`: `post-event-continuation` 0 included of 83, all 83
+   `no-event-in-the-last-30-days`; `inflection` 0 included, and the one name that had cleared every
+   filing test — a sign flip from −3,136M to +1,796M — excluded for
+   `no-catalyst-registered-within-60-days`.
+   - **Research the window for every holding and every candidate on the roster.** Scheduled
+     earnings, an announced analyst day, a regulatory decision date, a tariff or rate decision the
+     name is exposed to. Granted web plus the broker's calendar and corporate-actions routes.
+   - **File the reading before you register it.** Every row takes `evidenceIds`, and a row without
+     one is refused rather than registered — a catalyst nobody can go and check is a claim. Use
+     `observation_file` for a web reading (the same route `consensusRefs` takes) and the Aumos
+     evidence id for a vendor answer.
+   - **Pass `roster`** — the same `symbols` you give `radarCandidates` — so the counts have a
+     denominator. `catalyst_window_unresearched` and `event_record_unresearched` are how many names
+     nobody looked at; a name that **was** researched and simply has nothing scheduled is not
+     counted there, and both are `input-path` causes `mandateExecution` reads.
+   - **Persist `nextState` verbatim to `research/catalyst-window`.** ⚠️ Its instants are
+     **numbers** on purpose: a catalyst window ends after `asOf` by construction, and a string
+     timestamp later than `asOf` is the one shape `memory_read` refuses. Do not rewrite them.
+     ⛔ Event records are not persisted and must not be — `sue`, `day1ExcessPct` and
+     `preAnnouncementClose` are numbers copied off a vendor answer, which
+     `skills/memory-contract/SKILL.md` forbids. Re-read them each run.
+
+7. **`radarCandidates`** — vendor rows or cached documents in, radar candidates out. Every roster
    name comes back, including the unfed ones, with the reason it is unfed.
-7. **`radarFeedDiagnosis`** — which stage lost the input: registry, mapping, request, response,
+   ⚠️ **Pass `catalysts` and `events` from the step above.** They are separate arguments and a
+   call that omits them is a call that hands the radar an empty catalyst axis — which the lanes
+   report as a fact about the company.
+8. **`radarFeedDiagnosis`** — which stage lost the input: registry, mapping, request, response,
    normalization, or none of them.
-8. **`upsideRadar({candidates, feed})`** — pass the diagnosis as `feed`. Without it a starved lane
+9. **`upsideRadar({candidates, feed})`** — pass the diagnosis as `feed`. Without it a starved lane
    can say it is unfed and not *why*, and that is `radar_starvation_cause_unreported`.
-9. **`thesisGapSources` and `thesisValuation` on any name that reaches a thesis** (#160). The same
+10. **`thesisGapSources` and `thesisValuation` on any name that reaches a thesis** (#160). The same
    statements feed sizing. `thesisGapSources({gaps, mapping, feed})` says whether an open
    `expectedUpsidePct` / `fairValueRange` gap is **unfetched** (a filer, so go and fetch) or
    **unfillable** (no filer — an index vehicle, and `candidate-research` §Core DCA already forbids
@@ -99,7 +129,7 @@ been fed. Do these in order and report each one:
    both fields from the bear/base/bull targets. ⛔ Without them a complete variant view still reads
    `missing: ["thesisComplete"]` and a declared 20% cap operates at 1%.
 
-10. **`observation_file` on every consensus reading, then carry the id onto the row** (#692). This
+11. **`observation_file` on every consensus reading, then carry the id onto the row** (#692). This
     is the step that turns a web reading into something the record holds. `variantViewCheck`'s
     `consensusRefs` requirement is the **only one of the four whose input exists nowhere but the
     web** — a broker estimate or a price target is in no filing and on no exchange feed — and your
@@ -118,7 +148,7 @@ been fed. Do these in order and report each one:
     proposal carries that code verbatim in one `rationale.risks` entry with the source URL and in
     one `uncertainty` entry, or the sizing is `blocked`. `risks` is not optional politeness — it is
     what the approval screen renders, and `uncertainty` is not on that screen at all.
-11. **`observationLedger` before you hand the flow back.** Pass what you filed
+12. **`observationLedger` before you hand the flow back.** Pass what you filed
     (`observations`), the ids the proposal will submit (`citedEvidenceIds`), and every web-read
     value your judgement leant on (`claims: [{claim, value, usedFor, evidenceId}]`). ⛔ A value
     used and uncited is `claim_evidence_missing` / `blocked` — that is the 2026-09-06 failure
@@ -154,7 +184,7 @@ Named, they are yours and the web lane is open; unnamed, that lane is an absence
 ⛔ They are for research and never for discovering tools — that is what the sentence above bans.
 
 ⚠️ **What they find is not evidence until you file it.** `observation_file` is the gateway tool
-that turns a reading into a citable row — see step 10 of the numbered branch above — and it is the
+that turns a reading into a citable row — see step 11 of the numbered branch above — and it is the
 only route by which anything you read on the web reaches `evidenceIds`. ⛔ **Reading a figure,
 judging on it, and citing nothing is the failure this manager is named after.** Run
 `observationLedger` before you hand back.
