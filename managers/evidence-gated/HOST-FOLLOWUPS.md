@@ -9,7 +9,7 @@ reading `decisions[].armed` as a receipt for a promise it cannot carry; 0.4.24 s
 lane from the maturity gate, read the Mandate's `cashFloor`, derived the single-name total from the
 Mandate and enforced the source's exit discipline.
 
-## Prepared research (#209 §8-D) — ⚠️ the route exists, one input is not fed yet
+## Prepared research (#209 §8-D) — ✅ the route exists and the input is now fed
 
 **0.4.53 declares two recipes and asks the host to run them.** `untilled/aumos#725` gave the host
 `research_prepare` / `research_job_get` / `research_job_cancel` / `research_result_get` and a way to
@@ -21,24 +21,54 @@ release**, because neither host PR was merged when this was written and `researc
 `research:read` are in no released binary, so an installed Aumos refuses the manifest whole. Same
 failure mode as `observation:file` below, for the fifth time.
 
-### ⛔ Still owed by the host: no collector writes a price series
+### ✅ Discharged: a collector writes a price series (`untilled/aumos#734`)
 
-`RecipeRequest.readings` is what this fund already collected about one symbol, out of
-`source_observations`. `COLLECTOR_ROUTES` holds **three** rows — `open-dart/filings`,
-`open-dart/financials`, `sec-edgar/companyfacts` — and **none of them is a price series**. So a
-roster prepared today comes back with filings and no bars, and both recipes answer
-`scanner_history_insufficient` / `opportunity_history_insufficient` with `count: 0`.
+**What was owed here was one row, and the host added it.** This section used to record that
+`COLLECTOR_ROUTES` held three rows — `open-dart/filings`, `open-dart/financials`,
+`sec-edgar/companyfacts` — none of them a price series, so a roster prepared through
+`research_prepare` came back with filings and no bars and both recipes answered
+`scanner_history_insufficient` / `opportunity_history_insufficient` with `count: 0`. It is deleted
+rather than carried forward because the sentence that made it true stopped being true:
+**`prices`/`daily` exists**, it writes exactly the `reading.normalized.bars` payload these recipes
+already read, and 0.4.54 calls it. ⛔ Nothing under `recipes/` or `lib/` changed to receive it — the
+prediction this file recorded (*"the day a row exists for it these recipes are already fed"*) is the
+thing that was checked.
 
-⚠️ **That is the honest answer and not a workaround.** The recipes read bars from
-`reading.normalized.bars` and nothing else; ⛔ they refuse to take them from `parameters`, which is
-the one channel that would work today and is the 1.91M characters of tool argument this whole issue
-exists to delete, with an extra process in the middle. The shape a price collector has to write is
-the one already read, so the day a `toss/bars` or `alpaca/bars` row exists in `COLLECTOR_ROUTES`
-these recipes are fed with no change here.
+⚠️ **What arrived is not what this file guessed.** It expected a `toss/bars` or `alpaca/bars` row —
+a vendor-named coordinate beside the two filing publishers. The host refused that shape and put the
+series on the **price-source** side of `naming.md` §4g instead: `MarketDataPort.history()` has been
+in the contract since aumos#161 with five adapters implementing it and no caller, so what #734 added
+was the caller. The store id is **`prices`** and never a vendor, which is why the instructions in
+this package name no vendor either, and why the series the sweep reads and the closes the Wake
+Engine marks the book with come from one function rather than from two lists that agree.
+⛔ `market_history` did **not** come back: no tool and no capability was added, no bar reaches an
+MCP payload, and what this package calls is `source_cache_refresh`, which it has held since 0.3.30.
 
-⚠️ **Until that row exists, the mechanical sweep is `unprepared` rather than empty** — and every
-document in this package now says so in those words, because an `unprepared` roster reported as a
-market that offered nothing is the exact error `untilled/aumos-catalogue#209` is named after.
+⚠️ **Three properties of it are load-bearing on this side and are written into the instructions**
+(`skills/data-source-contract/SKILL.md` owns them): `market` is the **venue MIC** and the `kr`/`us`
+research markets are refused, `vendorId` is refused, and the collection is **incremental** — a
+re-run over the same closed bar reaches no vendor and answers `satisfied`, which is what makes
+*«refresh the whole roster, every run»* an affordable instruction rather than a wasteful one.
+
+### ⛔ Still owed by the host: nothing, and the remaining risk is ours to measure
+
+⚠️ **`engines.aumos` does not move for this.** `prices`/`daily` is a **document name inside a tool
+this manifest already declares**, not a capability and not a manifest key, so a host that predates
+#734 refuses the name at call time — by name, with the accepted names in the message — instead of
+refusing this manifest whole. Raising the floor would trade a reportable run-time refusal for the
+silent catalogue drop this file has now recorded five times, and the floor stays at `>=0.3.34`: the
+release that carries #724/#726, which is what the manifest genuinely cannot be read without.
+⚠️ **So there is a window** — a host at 0.3.34 without #734 — in which the refresh is refused and
+the sweep is `unprepared`. That is the state every document here already describes, with the names
+attached, and it is why the wording was not deleted along with the debt.
+
+⬜ **Not measured on this side: a run with a live price source.** #734's own suite is fixture-fixed,
+this repository has no host at all, and `check:recipes` measures the recipes rather than the
+collector. What is unproven is the join — that a roster refreshed on `prices`/`daily` arrives at
+`roster-scan` as bars — and the first run with a connected broker answers it.
+⬜ And a run pinned during a session cannot see that session's own bar (`publishedAt = start + 24h`,
+about eight and a half hours after the XKRX close). One row in two hundred, stated in the
+instructions so it is not re-asked for and not reported as starvation.
 
 ## Web observations (#692) — ✅ the host built the route, and two things are still ours to watch
 
@@ -127,8 +157,9 @@ environment this was written in, so every step is fixture-fixed and none of it h
 against a vendor. `#146` stays open until a run with keys reports a lane that is fed rather than
 starved. Two smaller items remain host-side:
 
-- `source_cache_refresh` routes only `open-dart`/`filings`, `open-dart`/`financials` and
-  `sec-edgar`/`companyfacts`. There is **no cache document for the corp-code registry**, so the
+- `source_cache_refresh` routes four documents — `open-dart`/`filings`, `open-dart`/`financials`,
+  `sec-edgar`/`companyfacts` and, since `untilled/aumos#734`, `prices`/`daily`. There is still
+  **no cache document for the corp-code registry**, so the
   registry stays a `source_request` and its ZIP arrives relayed as sent — a run that cannot
   decompress it falls back to reading `corp_code`/`stock_code` off `list.json` rows.
 - `CachedDocument.normalized.metrics` is a free-form map. This package reads operating income and

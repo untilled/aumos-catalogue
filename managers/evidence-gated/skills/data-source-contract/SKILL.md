@@ -72,14 +72,65 @@ not `status`:
 
 `source_cache_read` takes `{provider, market, symbol, freshFor, asOf}` and `freshFor` has **no
 default**, deliberately: a default would be the host setting this methodology's deadline.
-`source_cache_refresh` additionally takes `document` — only `open-dart`/`filings`,
-`open-dart`/`financials` (which requires `parameters.year` and `parameters.reportCode` by name) and
-`sec-edgar`/`companyfacts` are routed — and `vendorId`, the vendor's own id for the filer, which
-Aumos does not resolve for you. ⛔ **There is no cache document for the corp-code registry**, which
-is why the registry above stays a `source_request` and stays first.
+`source_cache_refresh` additionally takes `document`. Four are routed, and the fourth is not a
+filing:
+
+| `provider`/`document` | `market` | `vendorId` | `parameters` |
+|---|---|---|---|
+| `open-dart`/`filings` | research market (`kr`) | the `corp_code`, **required** | — |
+| `open-dart`/`financials` | research market (`kr`) | the `corp_code`, **required** | `year` and `reportCode`, by name |
+| `sec-edgar`/`companyfacts` | research market (`us`) | the CIK, **required** | — |
+| **`prices`/`daily`** | ⛔ **the venue MIC** — `XKRX`, `XNAS`, `XNYS` | ⛔ **refused** | optional `assetClass` (`equity` default, or `etf`) and `days` |
+
+⛔ **There is no cache document for the corp-code registry**, which is why the registry above stays
+a `source_request` and stays first. And Aumos resolves no `vendorId` for you on the three filing
+rows.
 
 The host cuts every cached observation and attempt at the invocation's `asOf` before this process
 sees a row. Filter again anyway; a boundary enforced in one place is one refactor from being gone.
+
+### `prices`/`daily` — the fund's own copy of a daily series (aumos#732)
+
+⚠️ **This is the row that fed nothing until it existed.** Until `untilled/aumos#734` the three
+routed documents were all filings, so a roster prepared through `research_prepare` came back with
+receipts and no bars and both recipes answered `scanner_history_insufficient` with `count: 0`.
+`prices`/`daily` is the collector that fills `reading.normalized.bars`, and it is the **only** way
+a price series reaches the sweep.
+
+⛔ **It is not `market_history` coming back, and no bar is ever handed to you.** There is no new
+tool and no new capability: you call `source_cache_refresh`, which this package has held since
+0.3.30, and what you read back afterwards is what a recipe computed — a handful of numbers per
+name. A roster of bars typed into `calculate` is still the failure mode this whole route exists to
+delete.
+
+Four things about it differ from the filing rows, and each of them refuses rather than guesses:
+
+- ⛔ **`market` is the exchange, not the research market.** `kr` and `us` are correct for a filer,
+  whose documents are not filed at a venue, and are **refused here by name**: a bar is nothing but
+  one venue's record, and Upbit's BTC and Alpaca's BTC are two order books.
+- ⛔ **`vendorId` is refused.** You have already named the venue and the ticker; there is nothing
+  left for a vendor's own filer id to say. Which vendor answers is decided by the fund's own price
+  sources, in the same order the Wake Engine marks the book with — so the series the sweep reads and
+  the closes the engine marked come from the same place by construction.
+- ⚠️ **The window is incremental and it is the host's to compute, not yours.** A first collection
+  reaches back `days` calendar days (400 by default, roughly 270 sessions); every later one asks for
+  the **gap and nothing else**, and a re-run over the same closed bar reaches no vendor at all and
+  answers `state: 'satisfied'`. So refreshing the roster twice in one turn is cheap, and *«I already
+  did it»* is not a reason to skip it on the run that needs it.
+- ⚠️ **The newest bar you can read is yesterday's.** A daily bar becomes readable 24 hours after its
+  own opening stamp, which is at or after the close on every venue and needs no timezone table. On
+  XKRX that is about eight and a half hours after the close, so a run pinned during or just after a
+  session **cannot see that session's own bar**. ⛔ That is one row out of two hundred and it is not
+  starvation — do not report it as one, and do not re-ask for it.
+
+Read the `state` the same way as for a filing, plus the one refusal that is neither:
+
+| answer | what it is | ⚠️ what it is **not** |
+|---|---|---|
+| `observed` with `refreshed: n` | *n* newly closed bars are now in this fund's copy | not the total held — it is the gap that was filled |
+| `satisfied` | this fund already holds every bar that had closed at your `asOf` | ⛔ **not** an empty answer and not a failure — it is the cheap path working |
+| `failed` | the ask reached the price source and did not come back | not an empty cache; what is stored is behind |
+| `no-source-for-market` | ⛔ **nothing on this machine prices that venue** | not a vendor outage and not this run's to fix — it is a standing condition, it is the investor's control (connect the broker, or add a price source for that venue), and it is true of the **whole venue** rather than of the name |
 
 ### Toss's two time formats, and the one enum this package guessed
 

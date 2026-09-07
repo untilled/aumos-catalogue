@@ -41,14 +41,17 @@
  * series reaches these recipes **only** through that payload, under
  * `normalized.bars`.
  *
- * ⚠️ **No collector writes that payload today.** `COLLECTOR_ROUTES` in the host
- * holds three rows — `open-dart/filings`, `open-dart/financials`,
- * `sec-edgar/companyfacts` — and none of them is a price series, so at the time
- * this was written a roster prepared through `research_prepare` comes back with
- * filings and no bars and these recipes answer `scanner_history_insufficient`.
- * That is stated in `HOST-FOLLOWUPS.md` and it is a host gap, not a defect
- * here: the shape a price collector has to write is the one read below, and the
- * day a row exists for it these recipes are already fed.
+ * ⚠️ **A collector writes that payload as of `untilled/aumos#734`, and nothing
+ * here changed to receive it.** When this file was written the host's routes
+ * were three filings and none of them a price series, so a prepared roster came
+ * back with receipts and no bars and these recipes answered
+ * `scanner_history_insufficient` on every name; `HOST-FOLLOWUPS.md` recorded the
+ * debt and predicted that the shape a collector would have to write was the one
+ * read below. `prices`/`daily` writes exactly it, one closed bar per document,
+ * so the loop below — which accumulates `normalized.bars` across **every**
+ * reading before normalizing once — is what makes a series out of them.
+ * ⛔ The manager still asks for the collection (`source_cache_refresh`) and
+ * still never holds a bar; that is the whole route and it did not move.
  *
  * ⛔ **The bars are not accepted from `parameters`.** They could be — the field
  * is a free-form record — and it would be the same 1.91M characters of tool
