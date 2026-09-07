@@ -54,6 +54,17 @@ const TRADING_WEEKDAYS = '1-5'
  * nothing planned — and it is drawn as a faint forecast because cron does not
  * know a holiday, a half-day or a delayed open.
  *
+ * ⚠️ **It overlaps `manifest.schedule` and it is not the same claim, which is
+ * why #212 ⑤ left it alone.** The manifest declares three crons — the host's
+ * safety net under the armed chain, and the only recurrence PLANS actually
+ * draws (aumos#531, aumos#540) — and they carry this package's **default**
+ * buffers. This rule carries the same appointment *as the investor configured
+ * it*, which the manifest cannot say: `krCloseBufferMinutes` moves the review
+ * and no manifest key can follow it (`untilled/aumos` records that cost in as
+ * many words). Aumos accepts `rule` on an `at-time` trigger and reads it
+ * nowhere yet, so deleting it would remove the only carrier of a fact the
+ * manifest has no way to express, in exchange for nothing.
+ *
  * Derived from the same two numbers the exact instant used — the session's
  * local close and the investor's buffer — rather than written as a literal, so
  * a configured buffer moves the forecast and the appointment together. A buffer
@@ -170,7 +181,7 @@ export function boundedRetry({ checkpointAt, asOf, attempt = 0, announcedReplace
   return { data: { at: new Date(anchor + retryMinutes * 60_000).toISOString(), reason: 'release-not-yet-published', attempt: attempt + 1 }, diagnostics }
 }
 
-export function classifyScheduledWake({ watchId, summary, scheduledAt, asOf, consumedWatchIds = [], sourceStatus = 'available', releaseFound = false }, { lateToleranceMinutes = 5 } = {}) {
+export function classifyScheduledWake({ watchId, summary, armed, scheduledAt, asOf, consumedWatchIds = [], sourceStatus = 'available', releaseFound = false }, { lateToleranceMinutes = 5 } = {}) {
   const diagnostics = []
   if (!watchId || !Number.isFinite(Date.parse(scheduledAt)) || !Number.isFinite(Date.parse(asOf))) {
     diagnostics.push(diagnostic('scheduled_wake_invalid', 'blocked', 'watchId, scheduledAt and asOf are required', 'input'))
@@ -184,11 +195,19 @@ export function classifyScheduledWake({ watchId, summary, scheduledAt, asOf, con
    * a second operation means the run cannot ask whether it is due without also
    * being told what it was woken for.
    *
-   * `watchId` stays the dedupe key and `summary` is where the flow is: the
-   * first is Aumos's `eventId`, unique per firing, and the second is the
-   * sentence the manager itself armed. Neither can do the other's job.
+   * `watchId` stays the dedupe key and it is **not** where the flow is: it is
+   * Aumos's `eventId`, unique per firing and opaque, and this call used to hand
+   * it to the marker scan as though the manager's own words could be inside it.
+   * They cannot — no version of this package ever wrote a `watchId` — so the
+   * scan over it was a promise nothing could keep, and it is gone (#212 ⑤).
+   *
+   * ⚠️ **`armed` is what carries the answer now, and it is the host's.** Pass
+   * the `armed` entries of `history.recentDecisions`, flattened; the wake this
+   * run is answering is the one the host itself marked `fate: 'fired'` /
+   * `review: 'this-run'`. `summary` stays accepted as the legacy prose channel
+   * and `resolveWakeFlow` says, by name, when it had to fall back to it.
    */
-  const wake = resolveWakeFlow({ summary, watchId })
+  const wake = resolveWakeFlow({ summary, armed })
   diagnostics.push(...wake.diagnostics)
   const flow = wake.data?.flow ?? null
   if (consumedWatchIds.includes(watchId)) {
@@ -369,10 +388,75 @@ export function marketReviewIntent(flow, at) {
 }
 
 /**
- * Which flow a wake is for, read out of the event a fired plan raised.
+ * ── Which flow woke this run, and who owns the answer (#87, #212 ⑤) ────────
  *
- * Pass the `plan-trigger` event's `summary`; the manager's own `intent` is
- * inside it. A bare intent works too, which is what the arming side has.
+ * **The host owns the active appointment; this package owns the calendar
+ * arithmetic that produced its instant.** Four things were tangled here and the
+ * split is now one table:
+ *
+ * | the fact | owner | where it is read |
+ * |---|---|---|
+ * | the recurrence a review nominally falls on | the **host**, from `manifest.schedule` | nothing here reads it; PLANS draws it (aumos#531, aumos#540) |
+ * | the same recurrence *as the investor configured it* | **this package** | `marketReviewRule`, carried on the trigger as `rule`, drawing only — see its own note for why it is not a duplicate of the row above |
+ * | the exact instant of the next review | **this package** | `nextMarketReview` over sourced sessions — holidays, half-days and delayed opens |
+ * | which promise opened *this* run | the **host** | `decisions[].armed`, `fate: 'fired'` / `review: 'this-run'` (aumos#622) |
+ * | what stands right now | the **host** | `standingPlans` on the invocation (aumos#690), read as a floor by `reconcileArmedReviews` |
+ * | what this instance itself promised | **this package** | `run/armed-reviews`, first person, `reconcileArmedReviews` |
+ *
+ * ⛔ **What this function no longer does is recover state from prose.** It read
+ * a `market-review:<flow>:<at>` marker out of the event `summary` — a sentence
+ * the wake engine *composes* as `` `${verdict.reason} — watching for: ${intent}` ``
+ * — and out of `watchId`, which is Aumos's opaque `eventId` and has never
+ * contained a marker in any version of this package. So the flow this run
+ * dispatched was a regex over a host sentence, and any rewording upstream
+ * silently took the answer with it.
+ *
+ * ⚠️ **The primary path is the host's own structured attribution.** Hand this
+ * the `armed` entries of `history.recentDecisions`, flattened, exactly as the
+ * host wrote them. The **one** reading taken from them is *which promise of
+ * mine came true and opened this run* — the pair `fate: 'fired'` and
+ * `review: 'this-run'`, which is the field aumos#622 added for precisely this
+ * question — and the answer carries the host's `planId` and the host's `at`.
+ *
+ * ⛔ **This is not the receipt reading #156 was burned by, and the shape keeps
+ * them apart.** `decisions[].armed` is past tense and an empty array says
+ * *nothing has ended that you may see* — never *your arming failed*. So an
+ * empty `armed` here is not a refusal, not a blocker and not a claim about
+ * arming: it means the host attributed no promise of this manager's to this
+ * wake, and the answer falls through to the legacy adapter exactly as an
+ * unattributed wake always did. Nothing in this file reads a length as a
+ * verdict, and `reconcileArmedReviews` still **refuses** the journal outright
+ * (`armed_journal_not_a_receipt`), because there the question really was
+ * *"is it armed"*. Here it is *"what fired"*, which is the only tense that
+ * field speaks in.
+ *
+ * ⛔ **And it narrows no arming.** The flow this returns says what to dispatch;
+ * it reaches neither `toArm` nor `nextState`, and the published rule is
+ * unchanged: **re-arm the whole sequence at every judgement and let the host
+ * fold** (aumos#690's own field description, aumos#593 / aumos#704 for the two
+ * folds).
+ *
+ * ── The legacy adapter, and when it goes ───────────────────────────────────
+ *
+ * `summary` / `intent` are still read, in **one** place — the fall-through
+ * below, after the host has been asked and has not answered — and the fallback
+ * is reported by name (`wake_attribution_unreadable` when no `armed` was handed
+ * over, `wake_flow_unattributed` when it was and named nothing of this
+ * manager's).
+ *
+ * ⚠️ **It cannot be deleted yet, and the reason is a window rather than a
+ * version.** `engines.aumos` is already `>=0.3.34`, so every admitted host
+ * carries `armed` with `review` — but `armed` hangs off `history.recentDecisions`,
+ * which is a **window** (aumos#688): the judgement that armed a review can fall
+ * out of it, and then the host's attribution is absent for a wake it did
+ * attribute. `standingPlans` is not the substitute — a promise that has fired is
+ * no longer standing at `asOf`, by construction.
+ *
+ * ⛔ **So the removal condition is a host fact, not a release date:** delete the
+ * adapter when the invocation names the fired plan **on the wake itself** —
+ * a `planId` on the `plan-trigger` event, or an equivalent field not bounded by
+ * the `recentDecisions` window. `HOST-FOLLOWUPS.md` carries the request. Until
+ * then the fallback stays, and every use of it says so in a diagnostic.
  *
  * Returns `null` data for any wake this manager did not arm — a manual run, an
  * asset review, an earnings checkpoint. That is not an error and carries no
@@ -381,25 +465,113 @@ export function marketReviewIntent(flow, at) {
  * diagnostic is a market-review marker naming a flow nothing dispatches,
  * because that is a wake nobody will answer.
  */
-export function resolveWakeFlow({ summary, intent, watchId } = {}) {
-  const diagnostics = []
-  const text = [summary, intent, watchId].find((value) => typeof value === 'string' && value.includes(`${MARKET_REVIEW_PREFIX}:`))
-  if (text === undefined) return { data: null, diagnostics }
+export const WAKE_FLOW_BASIS = Object.freeze({
+  host: 'invocation.decisions[].armed',
+  prose: 'event.summary',
+})
+
+/**
+ * The marker decoded out of one string this package wrote, in one place.
+ *
+ * Both paths go through here, so *"a flow nothing dispatches"* and *"a marker
+ * not in the shape this package arms"* are one answer however the text was
+ * found — and `path` is the field the caller actually passed, because a
+ * diagnostic naming a key the input does not have is the #158 defect.
+ */
+function decodeMarketReviewMarker(text, path, diagnostics) {
   const match = MARKET_REVIEW_MARKER.exec(text)
   if (match === null) {
-    diagnostics.push(diagnostic('wake_marker_unreadable', 'unevaluated', 'A market-review marker is present but not in the shape this package arms', 'summary', { text }))
-    return { data: null, diagnostics }
+    diagnostics.push(diagnostic('wake_marker_unreadable', 'unevaluated', 'A market-review marker is present but not in the shape this package arms', path, { text }))
+    return null
   }
   const [, flow, scheduledAt] = match
   if (!DISPATCHABLE_FLOWS.includes(flow)) {
-    diagnostics.push(diagnostic('wake_flow_unknown', 'blocked', 'A market-review wake names a flow this manager does not dispatch', 'summary', { flow, dispatchable: DISPATCHABLE_FLOWS }))
-    return { data: null, diagnostics }
+    diagnostics.push(diagnostic('wake_flow_unknown', 'blocked', 'A market-review wake names a flow this manager does not dispatch', path, { flow, dispatchable: DISPATCHABLE_FLOWS }))
+    return null
   }
   if (!Number.isFinite(Date.parse(scheduledAt))) {
-    diagnostics.push(diagnostic('wake_instant_unreadable', 'unevaluated', 'A market-review wake carries no readable scheduled instant', 'summary', { flow }))
-    return { data: { flow, scheduledAt: null }, diagnostics }
+    diagnostics.push(diagnostic('wake_instant_unreadable', 'unevaluated', 'A market-review wake carries no readable scheduled instant', path, { flow }))
+    return { flow, scheduledAt: null }
   }
-  return { data: { flow, scheduledAt }, diagnostics }
+  return { flow, scheduledAt }
+}
+
+/**
+ * The host's own attribution: promises of this manager's that fired and opened
+ * **this** run.
+ *
+ * ⛔ Only that pair. A `fired` promise whose review was `sealed`,
+ * `no-judgement` or `unattributed` belongs to an earlier run, and `lapsed` /
+ * `replaced` never opened anything — reading any of them as this wake would put
+ * a past appointment's flow on the run in front of it.
+ */
+function firedThisRun(armed) {
+  return armed.filter((row) => (
+    row?.fate === 'fired'
+    && row?.review === 'this-run'
+    && typeof row?.intent === 'string'
+    && row.intent.includes(`${MARKET_REVIEW_PREFIX}:`)
+  ))
+}
+
+export function resolveWakeFlow({ armed, summary, intent } = {}) {
+  const diagnostics = []
+  const attributable = Array.isArray(armed)
+  const fired = attributable ? firedThisRun(armed) : []
+  const flows = [...new Set(fired.map((row) => MARKET_REVIEW_FLOW_MARKER.exec(row.intent)?.[1]))]
+  /**
+   * ⚠️ **Two flows can genuinely open one run** — the host folds plans armed
+   * for the same instant into one wake (aumos#593) — and picking one of them
+   * would dispatch half of what fired. `null` is the honest answer: the
+   * orchestrator's rule for a flowless wake is to run every flow, which is a
+   * superset of what woke it, and the diagnostic names them.
+   */
+  if (flows.length > 1) {
+    diagnostics.push(diagnostic('wake_flow_ambiguous', 'unevaluated', 'The host attributes this run to promises of more than one flow — plans armed for the same instant are folded into one wake (aumos#593) — so no single flow is what woke it: dispatch every named flow rather than choosing one, and say in `uncertainty` that the wake was folded', 'armed', { flows, planIds: fired.map((row) => row.planId ?? null) }))
+    return { data: null, diagnostics }
+  }
+  const entry = fired[0]
+  if (entry !== undefined) {
+    const marker = decodeMarketReviewMarker(entry.intent, 'armed[].intent', diagnostics)
+    if (marker === null) return { data: null, diagnostics }
+    const dated = Number.isFinite(Date.parse(entry.at)) ? entry.at : null
+    /**
+     * ⚠️ **Two instants for one appointment, and the host's is the one that
+     * runs.** `armed[].at` is *the moment the condition was met*, which for an
+     * `at-time` plan is the instant the host scheduled; the marker carries this
+     * package's copy of the same instant. They agree unless something wrote one
+     * of them wrong, and that disagreement is the whole reason a copy of a
+     * host-owned fact is worth reporting rather than silently preferring.
+     */
+    if (dated !== null && marker.scheduledAt !== null && Date.parse(marker.scheduledAt) !== Date.parse(dated)) {
+      diagnostics.push(diagnostic('wake_instant_disagrees', 'info', 'The instant the host recorded for the promise that fired and the instant this package wrote into its own marker are not the same. The instant the host recorded is the schedule; the marker is a copy of it. Report the pair rather than repairing either — a marker written for another instant is a stale arm, and a late fire is what the host itself recorded about when the condition was met', 'armed[].at', { hostAt: dated, markerAt: marker.scheduledAt, flow: marker.flow }))
+    }
+    return {
+      data: {
+        flow: marker.flow,
+        scheduledAt: dated ?? marker.scheduledAt,
+        planId: typeof entry.planId === 'string' ? entry.planId : null,
+        basis: WAKE_FLOW_BASIS.host,
+      },
+      diagnostics,
+    }
+  }
+  /* ── The legacy adapter: the marker read out of prose, in one place ────── */
+  const text = [summary, intent].find((value) => typeof value === 'string' && value.includes(`${MARKET_REVIEW_PREFIX}:`))
+  if (text === undefined) return { data: null, diagnostics }
+  const path = typeof summary === 'string' && summary.includes(`${MARKET_REVIEW_PREFIX}:`) ? 'summary' : 'intent'
+  const marker = decodeMarketReviewMarker(text, path, diagnostics)
+  if (marker === null) return { data: null, diagnostics }
+  /**
+   * ⚠️ **Absent and empty are two facts here as well** (#201's split, one
+   * function over), and they are two exclusive codes because the action differs:
+   * an unreadable attribution is fixed by passing the field, an unattributed
+   * wake is not fixable from this side at all.
+   */
+  diagnostics.push(attributable
+    ? diagnostic('wake_flow_unattributed', 'info', 'The host attributed no promise of this manager to this wake — no `armed` entry fired for this run carrying the marker this package writes — so the flow below was recovered from the event summary by the legacy adapter. That happens legitimately: the judgement that armed the review can be older than the `history.recentDecisions` window (aumos#688). ⛔ It is not evidence that the arm failed and not a reason to arm less', path, { flow: marker.flow, basis: WAKE_FLOW_BASIS.prose })
+    : diagnostic('wake_attribution_unreadable', 'info', 'This call was handed no `armed`, so the host could not be asked which promise opened this run, and the flow below was recovered from the event summary by the legacy adapter. Pass the `armed` entries of `history.recentDecisions`, flattened, to read the wake from the record the host itself keeps — it carries the `planId` as well. ⛔ Unreadable is not unattributed: an absent field means nobody was asked', path, { flow: marker.flow, basis: WAKE_FLOW_BASIS.prose }))
+  return { data: { ...marker, planId: null, basis: WAKE_FLOW_BASIS.prose }, diagnostics }
 }
 
 /**

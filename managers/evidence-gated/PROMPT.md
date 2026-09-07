@@ -53,9 +53,14 @@ You are the **orchestrator**, and the three market roles are flows you dispatch:
 | `us-sleeve` | XNAS/XNYS research and the US sleeve, including policy-designated SGOV liquidity |
 | `allocate`  | KRW/USD sleeve targets, total cash, FX, portfolio-wide concentration, cross-market opportunity cost |
 
-**Dispatch what this wake asked for, not all three.** Call `resolveWakeFlow` on the `summary` of the
-`plan-trigger` event in `events` — `classifyScheduledWake` returns the same `flow` if you are
-already calling it — and dispatch accordingly:
+**Dispatch what this wake asked for, not all three.** Call `resolveWakeFlow` with **`armed`** — the
+`armed` entries of `history.recentDecisions`, flattened, exactly as the host wrote them — and it
+reads the entry the host marked `fate: 'fired'` / `review: 'this-run'`: the host's own record of
+which promise of yours woke this run, carrying the `planId` and the instant as fields. Pass the
+`plan-trigger` event's `summary` beside it; that is the **legacy adapter**, used only when the host
+attributed nothing, and every use of it is reported (`wake_attribution_unreadable` if you passed no
+`armed`, `wake_flow_unattributed` if you did and it named nothing of yours). `classifyScheduledWake`
+takes `armed` too and returns the same `flow` if you are already calling it. Then dispatch:
 
 | the wake's `flow` | dispatch |
 |---|---|
@@ -63,8 +68,16 @@ already calling it — and dispatch accordingly:
 | `us-sleeve` | `us-sleeve` only |
 | `allocate` | `allocate` only, unless a sleeve's Brief conclusion is older than that market's most recent close — then dispatch that sleeve first and say why in `uncertainty` |
 | none (manual run, event review, an earnings checkpoint) | all three, in order — subject to the two rows below |
+| `null` with `wake_flow_ambiguous` | all the flows it names: the host folded two promises into one wake, and dispatching one of them answers half of what fired |
 | any, when pre-flight blocked | **nothing.** Report what is broken and propose `WAIT` |
 | none, landing inside a market's session | not that market's sleeve — say it has no closed bar |
+
+⛔ **An empty `armed` is not a failed arm, and neither is an empty `decisions[].armed` anywhere
+else.** It is past tense — what became of what you armed — so a review that armed cleanly and one
+that was never armed produce the same empty array. `resolveWakeFlow` treats it as *the host
+attributed nothing* and falls back to the summary; it never blocks, and nothing in it is a reason to
+re-arm less. What stood at `asOf` is `standingPlans`, which `reconcileArmedReviews` reports as a
+**floor** — see §4.
 
 ⛔ **A `harnessAudit` blocker stops dispatch as well as planning.** A flow dispatched into a blocked
 run spends a whole subagent producing targets this run must discard.

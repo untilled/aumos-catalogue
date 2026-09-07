@@ -154,7 +154,14 @@
       "configured-buffers-reach-the-calculation",
       "stated-cadence-draws-the-calendar",
       "dispatch-gaps-and-rearm-dedupe",
-      "armed-state-is-what-stands"
+      "armed-state-is-what-stands",
+      "wake-flow-host-owned",
+      "wake-flow-prose-invariance",
+      "wake-flow-empty-armed-is-not-a-failed-arm",
+      "wake-flow-past-fates-are-not-this-wake",
+      "wake-flow-folded-instant-is-not-one-flow",
+      "wake-flow-instant-is-the-hosts",
+      "wake-flow-does-not-narrow-arming"
     ],
     "sizing": [
       "legacy-sizing",

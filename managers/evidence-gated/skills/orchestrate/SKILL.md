@@ -7,18 +7,44 @@ description: How this manager runs its three market flows and assembles their an
 
 ## Which flows this run dispatches
 
-**Not all of them, most runs.** `resolveWakeFlow` reads the `summary` of the `plan-trigger`
-event that woke this run and returns the flow it was armed for; `classifyScheduledWake` returns
-the same `flow` alongside its due/duplicate/late verdict, so a run already making that call has
-the answer.
+**Not all of them, most runs.** `resolveWakeFlow` answers which flow opened this run.
+**Hand it `armed`** — the `armed` entries of `history.recentDecisions`, flattened, exactly as
+the host wrote them — and it reads the entry the host marked `fate: 'fired'` /
+`review: 'this-run'`: that is the host's own record of which promise of yours came true and
+woke you, and it carries the `planId` and the instant as fields. `classifyScheduledWake` takes
+`armed` too and returns the same `flow` alongside its due/duplicate/late verdict, so a run
+already making that call has the answer.
 
-⚠️ **The flow rides in the watch's `intent`, because nothing else survives the trip.** A watch
-the manager arms is `{ subject?, intent, trigger, expiresAt? }` — no id it may choose — and the
-`AumosEvent` a fired plan raises carries `eventId`, `kind`, `subject`, `occurredAt`,
-`detectedAt`, `summary`, `materiality` and `evidenceIds`, with no plan id on it. The wake engine
-composes the summary as `<what fired> — watching for: <the intent>`, which is the one place the
-manager's own words come back. Arm the intent `nextReviewSequence` returns and the marker is
-already in it.
+### Who owns which half of the schedule
+
+| the fact | owner | where it is read |
+|---|---|---|
+| the recurrence a review nominally falls on | the **host**, from `manifest.schedule` | you never compute it; PLANS draws it |
+| the exact instant of the next review | **this package** | `nextReviewSequence` over sourced sessions — holidays, half-days, delayed opens |
+| which promise opened **this** run | the **host** | `decisions[].armed`, `fate: 'fired'` / `review: 'this-run'` → pass as `armed` |
+| what stands right now | the **host** | `standingPlans` on the invocation → pass to `reconcileArmedReviews`, which reports it as a floor |
+| what this instance itself promised | **this package** | `run/armed-reviews`, first person |
+
+⛔ **None of those four host answers is permission to arm less.** Re-arm the whole sequence at
+every judgement; the host folds an identical promise at arming time and an identical instant at
+firing time, and a floor over live rows cannot establish that a review is already covered.
+
+⚠️ **The prose channel is a fallback and it says so.** A watch the manager arms is
+`{ subject?, intent, trigger, expiresAt? }` — no id it may choose — and the `AumosEvent` a fired
+plan raises carries `eventId`, `kind`, `subject`, `occurredAt`, `detectedAt`, `summary`,
+`materiality` and `evidenceIds`, with **no plan id on it**. So the wake engine composes the
+summary as `<what fired> — watching for: <the intent>`, and reading the flow out of that
+sentence was the only channel this package had. It still works — the judgement that armed a
+review can be older than the `history.recentDecisions` window, and then the host's attribution
+is genuinely absent — but it is a **legacy adapter**, and every use of it is reported:
+`wake_attribution_unreadable` when no `armed` was passed (fix it by passing the field),
+`wake_flow_unattributed` when it was passed and named nothing of yours. Arm the `intent`
+`nextReviewSequence` returns, verbatim, so that channel keeps working.
+
+⛔ **Two things `resolveWakeFlow` will not do.** It will not read an empty `armed` as a failed
+arm — past tense says nothing about what stands — and it will not pick one flow when the host
+attributes the run to two (a folded instant): that answers `null` with `wake_flow_ambiguous`,
+and `null` dispatches every flow, which is a superset of what fired.
 
 | the wake's `flow` | dispatch | why |
 |---|---|---|

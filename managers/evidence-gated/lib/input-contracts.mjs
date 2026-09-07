@@ -519,12 +519,27 @@ export const INPUT_CONTRACTS = {
   nextMarketReview: { mode: 'strict', keys: { sessions: ARRAY, bufferMinutes: NUMBER } },
   earningsCheckpoint: { mode: 'named', keys: { observation: OBJECT, marketSession: OBJECT, config: OBJECT } },
   boundedRetry: { mode: 'named', keys: { checkpointAt: STRING, attempt: NUMBER, announcedReplacementAt: STRING, config: OBJECT } },
-  classifyScheduledWake: { mode: 'named', keys: { watchId: STRING, summary: STRING, scheduledAt: STRING, asOf: STRING, consumedWatchIds: ARRAY, sourceStatus: STRING, releaseFound: BOOLEAN } },
+  classifyScheduledWake: { mode: 'named', keys: { watchId: STRING, summary: STRING, armed: ARRAY, scheduledAt: STRING, asOf: STRING, consumedWatchIds: ARRAY, sourceStatus: STRING, releaseFound: BOOLEAN } },
   scheduleDrift: { mode: 'named', keys: { previous: OBJECT, current: OBJECT } },
   deduplicateObservations: { mode: 'named', keys: { rows: ARRAY } },
   themeRadarDue: { mode: 'named', keys: { lastRunAt: STRING, intervalDays: NUMBER, dislocation: BOOLEAN } },
   nextReviewSequence: { mode: 'strict', keys: { krSessions: ARRAY, usSessions: ARRAY, globalReview: OBJECT, buffers: OBJECT, config: OBJECT } },
-  resolveWakeFlow: { mode: 'named', keys: { summary: STRING, intent: STRING, watchId: STRING } },
+  /**
+   * ⚠️ **`armed` is the host's answer to *which promise opened this run*, and
+   * it is the primary channel** (#212 ⑤): the `armed` entries of
+   * `history.recentDecisions`, flattened, exactly as the host wrote them. Only
+   * the pair `fate: 'fired'` / `review: 'this-run'` is read (aumos#622), so an
+   * empty array is never a statement about arming — it falls through to the
+   * legacy prose adapter, by name.
+   *
+   * ⛔ **`watchId` is gone from this operation.** It is Aumos's opaque
+   * `eventId` and no version of this package ever wrote a marker into one, so
+   * scanning it for the flow was a promise nothing could keep; a call that
+   * still passes it is answered `input_key_unread`, which says exactly that.
+   * ⚠️ `resolveTrancheWake` still declares it — a different marker on a
+   * different question — and is not this item's subject.
+   */
+  resolveWakeFlow: { mode: 'named', keys: { armed: ARRAY, summary: STRING, intent: STRING } },
   resolveTrancheWake: { mode: 'named', keys: { summary: STRING, intent: STRING, watchId: STRING } },
   /**
    * ⚠️ `standingPlans` is a **report-only** key (#201): the invocation's answer

@@ -1128,6 +1128,154 @@ assert.equal(
   "dedupe stays on the wake's own id — Aumos's eventId is unique per firing, and the intent is deliberately not, because tomorrow's KR review says the same words",
 )
 
+/**
+ * ── The flow comes from the host, and prose cannot move it (#212 ⑤) ────────
+ *
+ * The two cases above pass a **sentence** and get a flow back, which is the
+ * defect this case exists over: the summary is composed by the wake engine as
+ * `` `${verdict.reason} — watching for: ${intent}` ``, so a flow recovered from
+ * it is a regex over a host sentence and any rewording upstream takes the
+ * dispatch with it.
+ *
+ * `decisions[].armed` is the host's own answer — `fate: 'fired'` with
+ * `review: 'this-run'` is the pair aumos#622 added for exactly this question —
+ * and it carries the `planId` and the instant as fields rather than as words.
+ * What is asserted here is the property the prose path cannot have: **the
+ * verdict does not move when the prose does.**
+ */
+covers('schedule/wake-flow-host-owned')
+const armedFired = (flow, at, over = {}) => ({
+  planId: `pln_${flow}`,
+  kind: 'plan',
+  intent: marketReviewIntentFor(flow, at),
+  fate: 'fired',
+  review: 'this-run',
+  at,
+  ...over,
+})
+for (const row of reviewSequence.data.sequence) {
+  const attributed = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { armed: [armedFired(row.flow, row.at)] } })
+  assert.equal(attributed.data?.flow, row.flow, `the host's own attribution names the ${row.flow} wake without any sentence being parsed`)
+  assert.equal(attributed.data?.scheduledAt, row.at, 'and the instant is the one the host recorded for the condition it met')
+  assert.equal(attributed.data?.planId, `pln_${row.flow}`, 'and the row it happened to, which prose could never carry — a plan has no id the manager may choose')
+  assert.equal(attributed.data?.basis, 'invocation.decisions[].armed', 'the answer says which of the two channels produced it')
+  assert.equal(attributed.diagnostics.some((entry) => entry.code === 'wake_attribution_unreadable' || entry.code === 'wake_flow_unattributed'), false, 'and it does not report a fallback it did not take')
+}
+
+/**
+ * ⚠️ **The invariance, stated as three summaries that must not matter.** The
+ * host attribution is held fixed and the prose is rewritten underneath it: the
+ * real composed sentence, prose with no marker at all, and prose carrying a
+ * **different** flow's marker. The third is the one that fails on the old
+ * reading — it answered `us-sleeve` for a run the host says was opened by the
+ * Korean review.
+ */
+covers('schedule/wake-flow-prose-invariance')
+const krWake = reviewSequence.data.sequence.find((row) => row.flow === 'kr-sleeve')
+const usWake = reviewSequence.data.sequence.find((row) => row.flow === 'us-sleeve')
+const proseVariants = [
+  asFiredEvent(krWake.intent),
+  'A session closed and this manager was woken',
+  asFiredEvent(usWake.intent),
+  `${krWake.intent} rewritten in words nobody agreed on`,
+]
+const attributedVerdict = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { armed: [armedFired(krWake.flow, krWake.at)] } }).data
+for (const summary of proseVariants) {
+  const resolved = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { armed: [armedFired(krWake.flow, krWake.at)], summary } })
+  assert.deepEqual(resolved.data, attributedVerdict, 'the wake verdict is what the host attributed and is unchanged by how the summary is worded — including a summary carrying another flow\'s marker')
+}
+assert.equal(
+  execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { armed: [armedFired(krWake.flow, krWake.at)], summary: asFiredEvent(usWake.intent) } }).data?.flow,
+  'kr-sleeve',
+  'stated the other way round: a summary naming us-sleeve does not dispatch the US sleeve when the host says the Korean review is what fired',
+)
+
+/**
+ * ⛔ **An empty `armed` is not a failed arm** (#156, aumos#687). It is the
+ * absence this whole file has had to re-separate: past tense says nothing about
+ * what stands, so an empty array falls through to the legacy adapter exactly as
+ * an unattributed wake always did — no blocker, and no diagnostic claiming an
+ * arm failed. ⚠️ Absent and empty are still two reportable facts and the codes
+ * are exclusive.
+ */
+covers('schedule/wake-flow-empty-armed-is-not-a-failed-arm')
+const emptyArmed = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { armed: [], summary: asFiredEvent(krWake.intent) } })
+assert.notEqual(emptyArmed.status, 'blocked', 'an empty journal is a normal wake, not a refusal')
+assert.equal(emptyArmed.data?.flow, 'kr-sleeve', 'and the legacy adapter still answers, because the arming judgement can be older than the recentDecisions window (aumos#688)')
+assert.equal(emptyArmed.data?.basis, 'event.summary', 'the answer says it came from prose')
+assert.ok(emptyArmed.diagnostics.some((entry) => entry.code === 'wake_flow_unattributed'), 'handed the field and matching nothing is reported as unattributed')
+assert.equal(emptyArmed.diagnostics.some((entry) => entry.code === 'wake_attribution_unreadable'), false, 'and never as unreadable — the field was readable and answered')
+const unreadableArmed = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { summary: asFiredEvent(krWake.intent) } })
+assert.ok(unreadableArmed.diagnostics.some((entry) => entry.code === 'wake_attribution_unreadable'), 'not handed the field at all is the other fact, and it is the one a caller can fix')
+assert.equal(unreadableArmed.diagnostics.some((entry) => entry.code === 'wake_flow_unattributed'), false, 'the two codes are exclusive')
+for (const entry of [...emptyArmed.diagnostics, ...unreadableArmed.diagnostics]) {
+  assert.equal(entry.severity, 'info', 'an empty or absent journal escalates nothing — a severity here is what would make a run treat past tense as a verdict on its arming (#156)')
+}
+
+/**
+ * ⚠️ **Only the pair that means *this* run.** A promise that fired and was
+ * reviewed by an earlier judgement, one that lapsed and one that was replaced
+ * are all past appointments; reading any of them as this wake would dispatch a
+ * flow on the strength of something that ended.
+ */
+covers('schedule/wake-flow-past-fates-are-not-this-wake')
+for (const over of [{ review: 'sealed', reviewedByDecisionId: 'dec_old' }, { review: 'no-judgement' }, { review: 'unattributed' }, { fate: 'lapsed', review: undefined }, { fate: 'replaced', review: undefined }]) {
+  const resolved = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { armed: [armedFired('us-sleeve', usWake.at, over)] } })
+  assert.equal(resolved.data, null, `a promise recorded as ${over.fate ?? 'fired'}/${over.review ?? 'no review'} is not what opened this run, so no flow is claimed from it`)
+}
+
+/**
+ * ⚠️ **Two flows can open one run, and half of it is worse than none.** The
+ * host folds plans armed for the same instant into a single wake (aumos#593),
+ * so choosing one would dispatch half of what fired; `null` sends the
+ * orchestrator down its flowless path, which runs every flow — a superset.
+ */
+covers('schedule/wake-flow-folded-instant-is-not-one-flow')
+const folded = execute({
+  operation: 'resolveWakeFlow',
+  asOf: globalIntegration.asOf,
+  input: { armed: [armedFired('kr-sleeve', krWake.at), armedFired('allocate', krWake.at, { intent: marketReviewIntentFor('allocate', krWake.at) })] },
+})
+assert.equal(folded.data, null, 'a folded wake names no single flow')
+assert.ok(folded.diagnostics.some((entry) => entry.code === 'wake_flow_ambiguous'), 'and it says which flows were folded rather than picking one')
+
+/**
+ * ⚠️ **The host's instant wins and the disagreement is reported.** The marker
+ * is this package's copy of an appointment the host owns; a copy that has
+ * drifted is the reason the copy is worth reporting rather than silently
+ * preferring.
+ */
+covers('schedule/wake-flow-instant-is-the-hosts')
+const drifted = execute({
+  operation: 'resolveWakeFlow',
+  asOf: globalIntegration.asOf,
+  input: { armed: [{ ...armedFired('kr-sleeve', krWake.at), at: '2026-09-01T09:30:00.000Z' }] },
+})
+assert.equal(drifted.data?.scheduledAt, '2026-09-01T09:30:00.000Z', "the instant the host recorded for the condition it met is the schedule; the marker is a copy")
+assert.ok(drifted.diagnostics.some((entry) => entry.code === 'wake_instant_disagrees'), 'and the two copies disagreeing is reported rather than repaired')
+
+/**
+ * ⛔ **Attribution narrows no arming.** The whole point of reading the wake
+ * from the host is to dispatch one flow; it must not become a reason to arm
+ * fewer reviews. `reconcileArmedReviews` is handed a full `standingPlans` and
+ * the sequence, and `toArm` is still the whole sequence (aumos#690's own rule,
+ * aumos#593 / aumos#704 for the folds).
+ */
+covers('schedule/wake-flow-does-not-narrow-arming')
+const stillArmsEverything = execute({
+  operation: 'reconcileArmedReviews',
+  asOf: globalIntegration.asOf,
+  input: {
+    sequence: reviewSequence.data.sequence,
+    standingPlans: reviewSequence.data.sequence.map((row) => ({ planId: `pln_${row.flow}`, kind: 'plan', intent: row.intent, trigger: { kind: 'at-time', at: row.at }, armedAt: globalIntegration.asOf, armedByDecisionId: 'dec_prev' })),
+  },
+})
+assert.deepEqual(
+  stillArmsEverything.data.toArm.map((row) => row.flow),
+  reviewSequence.data.sequence.map((row) => row.flow),
+  'reading what fired and reading what stands both leave the re-arm obligation whole — the published rule is to re-arm at every judgement and let the host fold',
+)
+
 const orchestrateSkill = await readFile(new URL('../skills/orchestrate/SKILL.md', fixtureRoot), 'utf8')
 const orchestrationProse = `${await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')}\n${orchestrateSkill}`
 assert.ok(orchestrationProse.includes('resolveWakeFlow'), 'the prompt or its orchestration skill names the operation that reads the wake — otherwise the flow is minted and read by nobody, which is the #87 defect exactly')
