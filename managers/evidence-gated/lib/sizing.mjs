@@ -273,13 +273,19 @@ const UNPROMOTED_MATURITIES = ['insufficient', 'observing', 'reviewable']
  * as everything else, rather than a paragraph of prose a run may or may not
  * reconstruct.
  *
- * ⚠️ **The disclosure round-trips, the same way `discovery_lane_dark` does.**
- * Pass this run's `DecisionProposal.uncertainty` and a reduced cap that the
- * proposal does not carry is `blocked` — what is refused is the *proposal*,
- * never the run. The marker is the code `position_cap_reduced_by_maturity`
- * **verbatim** in one entry, a token rather than a sentence, because the prose
- * beside it is written in the invocation's `language`. Omitting `uncertainty`
- * leaves the disclosure unjudged rather than passed.
+ * ⚠️ **The disclosure round-trips, and since #212 ② it round-trips one step
+ * later.** This operation returns `disclosures` — the code, the fields and the
+ * row to copy — and `proposalDisclosure` is what reads the assembled proposal
+ * and refuses a reduced cap it does not carry. What is refused is the
+ * *proposal*, never the run, and the refusal is the same code it always was.
+ * The marker is `position_cap_reduced_by_maturity` **verbatim** in one entry, a
+ * token rather than a sentence, because the prose beside it is written in the
+ * invocation's `language`. Omitting a field leaves that half unjudged rather
+ * than passed.
+ *
+ * ⛔ **No prose is read here.** The version that read it made a sentence change
+ * a position weight, because `targetWeight` returns `null` on any `blocked`
+ * diagnostic this operation pushes — see the note above `disclosures` below.
  *
  * ── The floor above the cap ───────────────────────────────────────────────
  *
@@ -470,33 +476,49 @@ export function effectivePositionCap(input = {}) {
     : []
 
   /**
-   * The disclosure is judged on both halves, and each half is unjudged rather
-   * than passed when it was not handed over. A proposal that carries the
-   * diagnostic code in prose and leaves `effectiveConstraints` empty has told
-   * the run's reader and not the investor's screen, which is the same silence
-   * one layer up.
+   * ── What must be said, computed; whether it was said, not read here (#212 ②) ─
+   *
+   * ⚠️ **This operation used to read the proposal's prose and change its own
+   * answer over it.** It scanned `uncertainty` for a substring, compared the
+   * `effectiveConstraints` rows it had just produced against the ones handed
+   * back, and emitted `blocked` — and `targetWeight` pushes those diagnostics
+   * onto its own list and returns `null` for any `blocked` one. So **editing a
+   * sentence moved a position weight.** A run that rephrased one entry of nine
+   * lost its size; a run that copied a token it did not understand kept it.
+   * That is a calculator whose output depends on the wording beside it, which
+   * is the one thing a calculator may never be.
+   *
+   * So the split: **this operation says what has to be disclosed**, as a
+   * structured row with the code, the fields, the marker and the row to copy;
+   * **`proposalDisclosure` says whether the assembled proposal disclosed it**,
+   * and it is the only place the refusal lives. ⛔ Nothing is dropped — the same
+   * two codes, the same `details.missing`, the same `blocked` — it is emitted
+   * one step later, by the step that actually holds a proposal.
+   *
+   * ⛔ `uncertainty`, `risks` and `effectiveConstraints` are **not inputs to
+   * this operation any more**, and the published contract says so: handing them
+   * here is `input_key_unread`, which is the honest answer to a call that
+   * expects prose to be judged by the arithmetic.
    */
-  const uncertaintyDisclosed = Array.isArray(input?.uncertainty)
-    ? input.uncertainty.some((entry) => typeof entry === 'string' && entry.includes('position_cap_reduced_by_maturity'))
-    : null
-  const constraintDisclosed = Array.isArray(input?.effectiveConstraints)
-    ? input.effectiveConstraints.some((entry) => entry?.field === 'maxPositionWeight' && finite(entry?.effective) && Math.abs(entry.effective - effective) <= 1e-9)
-    : null
-  const disclosed = uncertaintyDisclosed === null && constraintDisclosed === null
-    ? null
-    : uncertaintyDisclosed !== false && constraintDisclosed !== false
-  if (reduced && disclosed === false) {
-    const missing = [
-      ...(uncertaintyDisclosed === false ? ['uncertainty'] : []),
-      ...(constraintDisclosed === false ? ['effectiveConstraints'] : []),
-    ]
-    diagnostics.push(diagnostic(
-      'position_cap_reduction_undisclosed',
-      'blocked',
-      'This proposal is sized under a cap smaller than the one the investor declared and does not say so; carry the code `position_cap_reduced_by_maturity` verbatim in one `uncertainty` entry and this operation’s `effectiveConstraints` row verbatim in the proposal',
-      missing[0] ?? 'uncertainty',
-      { declared: round(declared), effective, missing, expected: effectiveConstraints },
-    ))
+  const disclosures = []
+  if (reduced) {
+    disclosures.push({
+      /** The code a `uncertainty` entry has to carry verbatim. */
+      code: 'position_cap_reduced_by_maturity',
+      /** The refusal `proposalDisclosure` raises when it is not carried. */
+      undisclosedCode: 'position_cap_reduction_undisclosed',
+      reason: 'position-cap-reduced',
+      /**
+       * Both halves, and they are different readers: `uncertainty` is the run's
+       * later readers, `effectiveConstraints` is the machine-readable row the
+       * fund-settings screen draws (`untilled/aumos#681`). Prose without the row
+       * told one and not the other, which is the same silence a layer up.
+       */
+      fields: ['uncertainty', 'effectiveConstraints'],
+      expect: { effectiveConstraints },
+      details: { declared: round(declared), effective },
+      message: 'This proposal is sized under a cap smaller than the one the investor declared and does not say so; carry the code `position_cap_reduced_by_maturity` verbatim in one `uncertainty` entry and `effectivePositionCap`’s `effectiveConstraints` row verbatim in the proposal',
+    })
   }
 
   /**
@@ -569,12 +591,6 @@ export function effectivePositionCap(input = {}) {
   const attestationRefs = variant.data.managerAttestedRefs ?? []
   let mainLaneAttestation = null
   if (restsOnManagerAttestation) {
-    const carries = (value) => Array.isArray(value) ? value.some((entry) => typeof entry === 'string' && entry.includes(attestationCode)) : null
-    const risksDisclosed = carries(input?.risks)
-    const uncertaintyDisclosed = carries(input?.uncertainty)
-    const attestationDisclosed = risksDisclosed === null && uncertaintyDisclosed === null
-      ? null
-      : risksDisclosed !== false && uncertaintyDisclosed !== false
     mainLaneAttestation = {
       restsOnManagerAttestation: true,
       grade: 'manager',
@@ -583,10 +599,28 @@ export function effectivePositionCap(input = {}) {
       refs: attestationRefs.map((row) => ({ metric: row.metric, sourceUrl: row.sourceUrl, evidenceId: row.evidenceId, publishedAt: row.publishedAt })),
       /** Where the disclosure has to appear, and why each one. */
       disclosureFields: ['risks', 'uncertainty'],
-      risksDisclosed,
-      uncertaintyDisclosed,
-      disclosed: attestationDisclosed,
     }
+    /**
+     * ⚠️ **The verdict fields are gone from here on purpose (#212 ②).**
+     * `risksDisclosed` / `uncertaintyDisclosed` / `disclosed` were this
+     * operation reading the proposal's prose, and the `blocked` beside them
+     * reached `targetWeight`, so a rewritten `risks` entry changed a weight.
+     * What is left is the obligation; `proposalDisclosure` returns the verdict.
+     */
+    disclosures.push({
+      code: attestationCode,
+      undisclosedCode: 'main_lane_attestation_undisclosed',
+      reason: 'main-lane-attestation',
+      /**
+       * ⚠️ `risks` first because it is measured: `Approvals.tsx` renders
+       * `rationale.keyReasons` and `rationale.risks` and nothing else, so
+       * `risks` is the slot that reaches the investor **before** the approve
+       * button and `uncertainty` is what the run's later readers get.
+       */
+      fields: ['risks', 'uncertainty'],
+      details: { code: attestationCode, refs: mainLaneAttestation.refs },
+      message: `This proposal is sized in the main lane on the manager’s own reading and does not say so where the investor reads before approving. Carry \`${attestationCode}\` verbatim in one \`rationale.risks\` entry and one \`uncertainty\` entry`,
+    })
     diagnostics.push(diagnostic(
       attestationCode,
       'unevaluated',
@@ -594,19 +628,6 @@ export function effectivePositionCap(input = {}) {
       'thesis.consensusRefs',
       { refs: mainLaneAttestation.refs, disclosureFields: mainLaneAttestation.disclosureFields },
     ))
-    if (attestationDisclosed === false) {
-      diagnostics.push(diagnostic(
-        'main_lane_attestation_undisclosed',
-        'blocked',
-        `This proposal is sized in the main lane on the manager’s own reading and does not say so where the investor reads before approving. Carry \`${attestationCode}\` verbatim in one \`rationale.risks\` entry and one \`uncertainty\` entry`,
-        risksDisclosed === false ? 'risks' : 'uncertainty',
-        {
-          missing: [...(risksDisclosed === false ? ['risks'] : []), ...(uncertaintyDisclosed === false ? ['uncertainty'] : [])],
-          code: attestationCode,
-          refs: mainLaneAttestation.refs,
-        },
-      ))
-    }
   }
 
   return {
@@ -632,9 +653,14 @@ export function effectivePositionCap(input = {}) {
       mustReport: reduced,
       /** Copied into `DecisionProposal.effectiveConstraints` verbatim; empty is a complete answer. */
       effectiveConstraints,
-      disclosed,
-      uncertaintyDisclosed,
-      constraintDisclosed,
+      /**
+       * ⚠️ **What has to be disclosed, structured — never whether it was.**
+       * Hand this array to `proposalDisclosure` beside the assembled proposal;
+       * empty means this sizing owes the proposal nothing. The verdict fields
+       * that used to sit here (`disclosed`, `uncertaintyDisclosed`,
+       * `constraintDisclosed`) were prose reads and are gone (#212 ②).
+       */
+      disclosures,
       ceiling: ceiling.data,
       floorVersusCap,
       units: { declaredCap: 'portfolio-weight', effectiveCap: 'portfolio-weight', reducedToFraction: 'ratio' },
@@ -1032,6 +1058,13 @@ export function targetWeight(input) {
       effectiveConstraints: capReport.data.effectiveConstraints,
       /** Carried up so a run that only calls `targetWeight` still meets the obligation. (#692) */
       mainLaneAttestation: capReport.data.mainLaneAttestation,
+      /**
+       * ⚠️ The obligations this weight owes the proposal, carried up for the
+       * same reason — and they are obligations, not verdicts. ⛔ This weight is
+       * a function of the numbers alone since #212 ②: no wording anywhere can
+       * move it, because the operation that judges wording is a different one.
+       */
+      disclosures: capReport.data.disclosures,
       units: { rawWeight: 'portfolio-weight', bindingCap: 'portfolio-weight', targetWeight: 'portfolio-weight', experimentalCeiling: 'portfolio-weight', declaredPositionCap: 'portfolio-weight', effectivePositionCap: 'portfolio-weight' },
     },
     diagnostics,

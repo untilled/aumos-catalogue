@@ -144,7 +144,8 @@ been fed. Do these in order and report each one:
     characters is refused rather than truncated — file the passage the judgement rests on.
     ⚠️ **The row is filed as your testimony and it is graded as such everywhere.** That is the
     trade the investor accepted, and it holds only while the grade travels: when the main lane
-    opens on it, `effectivePositionCap` returns `main_lane_rests_on_manager_attestation` and the
+    opens on it, `effectivePositionCap` returns `main_lane_rests_on_manager_attestation` on
+    `disclosures`, `proposalDisclosure` judges the assembled proposal against it, and the
     proposal carries that code verbatim in one `rationale.risks` entry with the source URL and in
     one `uncertainty` entry, or the sizing is `blocked`. `risks` is not optional politeness — it is
     what the approval screen renders, and `uncertainty` is not on that screen at all.

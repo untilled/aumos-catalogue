@@ -1512,7 +1512,7 @@ assert.ok(
 const laneShut = execute({
   operation: 'effectivePositionCap',
   asOf: observationContract.asOf,
-  input: { mandatePositionCap: 0.2, maturityStatus: 'observing', lane: 'main', thesis: { ...methodology.thesis, consensusRefs: [] }, challengeVerdict: 'cleared', risks: [], uncertainty: [] },
+  input: { mandatePositionCap: 0.2, maturityStatus: 'observing', lane: 'main', thesis: { ...methodology.thesis, consensusRefs: [] }, challengeVerdict: 'cleared' },
 })
 assert.equal(laneShut.data.mainLaneOpen, false, 'with nothing filed the main lane is shut')
 assert.equal(laneShut.data.effectiveCap, 0.01, "and the investor's declared 0.20 is sized at the control arm's 0.01 — the measured run, reproduced")
@@ -1525,8 +1525,6 @@ const laneOpen = execute({
     lane: 'main',
     thesis: { ...methodology.thesis, consensusRefs: [observationContract.consensusRefs.managerAttested] },
     challengeVerdict: 'cleared',
-    risks: observationContract.disclosure.risks,
-    uncertainty: observationContract.disclosure.uncertainty,
   },
 })
 assert.equal(laneOpen.data.mainLaneOpen, true, 'one row filed through `observation_file` and the lane opens')
@@ -2575,7 +2573,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 105)
+assert.equal(supportedOperations.length, 106)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -4163,34 +4161,52 @@ const attestationCapInput = {
   thesis: thesisWith(consensusFixtures.managerAttested),
   challengeVerdict: 'cleared',
 }
-const undisclosedCap = execute({ operation: 'effectivePositionCap', asOf: observationAsOf, input: { ...attestationCapInput, risks: [], uncertainty: [] } })
-assert.equal(undisclosedCap.data.effectiveCap, 0.2, 'the cap is the Mandate’s and is not reduced — this refuses silence, not size')
-assert.equal(undisclosedCap.data.mainLaneOpen, true)
-assert.equal(undisclosedCap.status, 'blocked', 'opening the 20% lane on the manager’s own reading without saying so is refused')
-assert.ok(undisclosedCap.diagnostics.some((row) => row.code === 'main_lane_attestation_undisclosed'))
+/**
+ * ⚠️ **The sizing names the obligation and never judges the prose (#212 ②).**
+ * `effectivePositionCap` used to read `risks` and `uncertainty` itself and push
+ * `blocked` — which `targetWeight` turns into `targetWeight: null` — so a
+ * reworded sentence moved a position weight. The refusal is the same refusal;
+ * `proposalDisclosure` is where it lives.
+ */
+const attestedCap = execute({ operation: 'effectivePositionCap', asOf: observationAsOf, input: attestationCapInput })
+assert.equal(attestedCap.data.effectiveCap, 0.2, 'the cap is the Mandate’s and is not reduced — this refuses silence, not size')
+assert.equal(attestedCap.data.mainLaneOpen, true)
+assert.notEqual(attestedCap.status, 'blocked', 'the arithmetic refuses nothing about a proposal it was not handed')
+const attestationObligation = attestedCap.data.disclosures.find((row) => row.code === 'main_lane_rests_on_manager_attestation')
+assert.ok(attestationObligation, 'the obligation is returned as a row')
+assert.deepEqual(attestationObligation.fields, ['risks', 'uncertainty'], '`risks` is what the approval screen shows, `uncertainty` is what the run’s later readers get')
+assert.equal(attestationObligation.undisclosedCode, 'main_lane_attestation_undisclosed')
+assert.equal(attestedCap.data.mainLaneAttestation.refs[0].evidenceId, consensusFixtures.managerAttested.evidenceId, 'and the proposal can point at the row the investor is being asked to take on trust')
+
+const disclose = (proposal) => execute({ operation: 'proposalDisclosure', asOf: observationAsOf, input: { disclosures: attestedCap.data.disclosures, proposal } })
+const undisclosed = disclose({ risks: [], uncertainty: [] })
+assert.equal(undisclosed.status, 'blocked', 'opening the 20% lane on the manager’s own reading without saying so is refused')
+assert.ok(undisclosed.diagnostics.some((row) => row.code === 'main_lane_attestation_undisclosed'))
 assert.deepEqual(
-  undisclosedCap.diagnostics.find((row) => row.code === 'main_lane_attestation_undisclosed').details.missing,
+  undisclosed.diagnostics.find((row) => row.code === 'main_lane_attestation_undisclosed').details.missing,
   ['risks', 'uncertainty'],
   'and both halves are named: `risks` is what the approval screen shows, `uncertainty` is what the run’s later readers get',
 )
+assert.equal(disclose(undefined).data.disclosed, null, 'and a proposal that does not exist yet is unjudged rather than refused')
 
-const disclosedCap = execute({
-  operation: 'effectivePositionCap',
-  asOf: observationAsOf,
-  input: { ...attestationCapInput, risks: observationContract.disclosure.risks, uncertainty: observationContract.disclosure.uncertainty },
-})
-assert.notEqual(disclosedCap.status, 'blocked', 'disclosed, the same sizing stands')
-assert.equal(disclosedCap.data.effectiveCap, 0.2, 'at the same cap')
-assert.equal(disclosedCap.data.mainLaneAttestation.disclosed, true)
-assert.equal(disclosedCap.data.mainLaneAttestation.refs[0].evidenceId, consensusFixtures.managerAttested.evidenceId, 'and the proposal can point at the row the investor is being asked to take on trust')
+const disclosed = disclose({ rationale: { risks: observationContract.disclosure.risks }, uncertainty: observationContract.disclosure.uncertainty })
+assert.notEqual(disclosed.status, 'blocked', 'disclosed, the same sizing stands')
+assert.equal(disclosed.data.disclosed, true)
+assert.deepEqual(disclosed.data.required, ['main_lane_rests_on_manager_attestation'], '`rationale.risks` is where the proposal actually carries it, and that is the slot read')
 
 const vendorCap = execute({
   operation: 'effectivePositionCap',
   asOf: observationAsOf,
-  input: { ...attestationCapInput, thesis: thesisWith(consensusFixtures.vendorAttested), risks: [], uncertainty: [] },
+  input: { ...attestationCapInput, thesis: thesisWith(consensusFixtures.vendorAttested) },
 })
 assert.equal(vendorCap.data.mainLaneAttestation, null, 'a lane opened on vendor evidence owes no such disclosure — an obligation that fired on the ordinary case would be noise, and noise is how a real one gets scrolled past')
+assert.deepEqual(vendorCap.data.disclosures, [], 'and it owes the proposal nothing')
 assert.notEqual(vendorCap.status, 'blocked')
+assert.equal(
+  execute({ operation: 'proposalDisclosure', asOf: observationAsOf, input: { disclosures: vendorCap.data.disclosures, proposal: { risks: [], uncertainty: [] } } }).status,
+  'ok',
+  'so a silent proposal on vendor evidence clears — the check is the obligation’s, not the operation’s',
+)
 
 /**
  * ── Read it, judged on it, cited nothing (issue aumos#692, measured) ───────

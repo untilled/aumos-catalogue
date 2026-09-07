@@ -4,6 +4,7 @@ import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
 import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
+import { proposalDisclosure } from './proposal.mjs'
 import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
 import { observationLedger } from './observation.mjs'
@@ -80,6 +81,16 @@ const operations = {
    * found nothing worth owning or one whose gates never got their inputs.
    */
   mandateExecution,
+  /**
+   * ⚠️ **Registered beside sizing because it is the half sizing must not do**
+   * (#212 ②). `effectivePositionCap` read the proposal's `uncertainty` and
+   * `risks` and pushed `blocked`, and `targetWeight` returns `null` on any
+   * `blocked`, so **editing a sentence moved a position weight.** The
+   * arithmetic now names the obligation and this operation judges the assembled
+   * proposal against it — same codes, same `blocked`, one step later, where
+   * there is no number left to distort.
+   */
+  proposalDisclosure,
   entryQualityGate,
   newSinglePacing: (input, asOf) => newSinglePacing({ ...input, asOf }),
   entryTranchePlan: (input, asOf) => entryTranchePlan({ ...input, asOf }),

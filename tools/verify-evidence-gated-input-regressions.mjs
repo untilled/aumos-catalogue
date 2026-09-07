@@ -444,23 +444,95 @@ assert.deepEqual(promotedAgainstMandate.data.effectiveConstraints, [])
 // Only the axis this methodology actually narrows is named.
 assert.deepEqual([...new Set(constraints.map((row) => row.field))], ['maxPositionWeight'])
 
-// The disclosure round-trips exactly as `discovery_lane_dark` does, in both halves.
-assert.equal(capOf().data.disclosed, null, 'a call made before the proposal exists leaves the disclosure unjudged')
-assert.equal(has(capOf(), 'position_cap_reduction_undisclosed'), false)
-assert.ok(has(capOf({ uncertainty: ['the sweep found one candidate'] }), 'position_cap_reduction_undisclosed'))
-assert.equal(has(capOf({ uncertainty: ['position_cap_reduced_by_maturity: 0.20 declared, 0.01 operative'] }), 'position_cap_reduction_undisclosed'), false)
+/**
+ * ── #212 ②: the calculation says what must be disclosed; another operation
+ * says whether it was ─────────────────────────────────────────────────────
+ *
+ * ⚠️ **The obligation is a structured row now, not a prose read.**
+ * `effectivePositionCap` used to scan `uncertainty` for a substring and push
+ * `blocked`, which `targetWeight` turns into `targetWeight: null` — so a
+ * reworded sentence moved a position weight. The row below is what replaced
+ * the scan, and `proposalDisclosure` is what refuses silence.
+ */
+assert.deepEqual(declaredVersusEffective.data.disclosures.map((row) => row.code), ['position_cap_reduced_by_maturity'])
+const capDisclosure = declaredVersusEffective.data.disclosures[0]
+assert.deepEqual(capDisclosure.fields, ['uncertainty', 'effectiveConstraints'], 'both halves, and they are different readers')
+assert.equal(capDisclosure.undisclosedCode, 'position_cap_reduction_undisclosed', 'the refusal keeps the code it always had')
+assert.deepEqual(capDisclosure.expect.effectiveConstraints, constraints, 'and it carries the row to copy, so the check has something exact to compare')
+assert.deepEqual(capDisclosure.details, { declared: 0.2, effective: 0.01 })
+// A cap that was not reduced owes the proposal nothing.
+assert.deepEqual(promotedAgainstMandate.data.disclosures, [])
+
+// ⛔ The arithmetic no longer reads any of the three prose fields, and says so.
+for (const field of ['uncertainty', 'risks', 'effectiveConstraints']) {
+  const answer = capOf({ [field]: [] })
+  assert.equal(has(answer, 'position_cap_reduction_undisclosed'), false, `${field} raises nothing here — the calculator does not judge prose`)
+  assert.ok(
+    answer.diagnostics.some((row) => row.code === 'input_key_unread' && row.path === `input.${field}`),
+    `${field} is reported unread rather than silently honoured, which is the true answer once nothing reads it`,
+  )
+}
+
+// The disclosure round-trips exactly as `discovery_lane_dark` does, in both halves — one operation later.
+const disclosureOf = (proposal) => run('proposalDisclosure', { disclosures: capDisclosure ? [capDisclosure] : [], ...(proposal === undefined ? {} : { proposal }) })
+assert.equal(disclosureOf().data.disclosed, null, 'a call made before the proposal exists leaves the disclosure unjudged')
+assert.equal(has(disclosureOf(), 'position_cap_reduction_undisclosed'), false)
+assert.ok(has(disclosureOf({ uncertainty: ['the sweep found one candidate'] }), 'position_cap_reduction_undisclosed'))
+assert.equal(has(disclosureOf({ uncertainty: ['position_cap_reduced_by_maturity: 0.20 declared, 0.01 operative'], effectiveConstraints: constraints }), 'position_cap_reduction_undisclosed'), false)
 // Prose without the machine-readable row is still an undisclosed reduction.
-const proseOnly = capOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: [] })
+const proseOnly = disclosureOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: [] })
 assert.ok(has(proseOnly, 'position_cap_reduction_undisclosed'))
 assert.deepEqual(proseOnly.diagnostics.find((row) => row.code === 'position_cap_reduction_undisclosed').details.missing, ['effectiveConstraints'])
 // And the row without the prose is the same silence from the other side.
-assert.deepEqual(capOf({ uncertainty: [], effectiveConstraints: constraints }).diagnostics.find((row) => row.code === 'position_cap_reduction_undisclosed').details.missing, ['uncertainty'])
+assert.deepEqual(disclosureOf({ uncertainty: [], effectiveConstraints: constraints }).diagnostics.find((row) => row.code === 'position_cap_reduction_undisclosed').details.missing, ['uncertainty'])
 // Both halves carried, and the run is clear.
-const bothHalves = capOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: constraints })
+const bothHalves = disclosureOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: constraints })
 assert.equal(has(bothHalves, 'position_cap_reduction_undisclosed'), false)
 assert.equal(bothHalves.data.disclosed, true)
+assert.deepEqual(bothHalves.data.required, ['position_cap_reduced_by_maturity'])
 // A row naming another number is not this reduction.
-assert.ok(has(capOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: [{ ...constraints[0], effective: 0.2 }] }), 'position_cap_reduction_undisclosed'))
+assert.ok(has(disclosureOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: [{ ...constraints[0], effective: 0.2 }] }), 'position_cap_reduction_undisclosed'))
+// An absent `disclosures` array is not an empty one: nothing was judged and nothing is claimed.
+const noObligation = run('proposalDisclosure', { proposal: { uncertainty: [] } })
+assert.equal(noObligation.data.disclosed, null)
+assert.ok(has(noObligation, 'proposal_disclosure_inputs_missing'))
+assert.equal(run('proposalDisclosure', { disclosures: [], proposal: { uncertainty: [] } }).data.disclosed, null, 'no obligation is not a pass either')
+
+/**
+ * ── The invariant this issue is about: prose cannot move a number (#212 ②) ──
+ *
+ * Every field the arithmetic used to read, varied across the shapes that used
+ * to change the answer — absent, empty, silent prose, the token, the wrong
+ * number — against the two operations that produce a size. ⛔ If any of these
+ * ever differ again, the calculator is reading sentences.
+ */
+const proseShapes = [
+  {},
+  { uncertainty: [], risks: [], effectiveConstraints: [] },
+  { uncertainty: ['the sweep found one candidate'], risks: ['idiosyncratic single-name risk'] },
+  { uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: constraints },
+  { uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: [{ ...constraints[0], effective: 0.2 }] },
+  { risks: ['main_lane_rests_on_manager_attestation'], uncertainty: ['main_lane_rests_on_manager_attestation'] },
+]
+const numericKeys = ['declaredCap', 'effectiveCap', 'binding', 'reduced', 'reducedToFraction', 'reason', 'unlocksAt', 'resolvedLane', 'mainLaneOpen', 'ceilingApplies', 'effectiveConstraints']
+const capBaseline = capOf()
+const sizedInput = { ...issueBook, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'insufficient', researchGate: 'passed', challengeVerdict: 'cleared' }
+const weightBaseline = run('targetWeight', sizedInput)
+for (const shape of proseShapes) {
+  const label = JSON.stringify(shape)
+  const capAnswer = capOf(shape)
+  for (const key of numericKeys) {
+    assert.deepEqual(capAnswer.data[key], capBaseline.data[key], `effectivePositionCap.${key} is unmoved by ${label}`)
+  }
+  const weightAnswer = run('targetWeight', { ...sizedInput, ...shape })
+  assert.equal(weightAnswer.data.targetWeight, weightBaseline.data.targetWeight, `targetWeight is unmoved by ${label} — this is the defect #212 ② names`)
+  assert.equal(weightAnswer.data.bindingCap, weightBaseline.data.bindingCap, `bindingCap is unmoved by ${label}`)
+  assert.notEqual(weightAnswer.data.targetWeight, null, `and it is a number rather than a refusal: ${label}`)
+  assert.deepEqual(weightAnswer.data.disclosures, weightBaseline.data.disclosures, `the obligation it carries is unmoved by ${label}`)
+}
+// The baseline is a real reduction, so the loop above is testing something that could have failed.
+assert.equal(capBaseline.data.reduced, true)
+assert.equal(weightBaseline.data.positionCapReduced, true)
 
 // A promoted lens is held to the Mandate alone, so there is nothing to disclose.
 const promoted = promotedAgainstMandate

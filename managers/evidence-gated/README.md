@@ -309,9 +309,13 @@ hashes the passage and returns an evidence id. `engines.aumos` therefore require
 nothing and verified nothing; the row is graded `observation` / `manager:web-research` at every step.
 So `variantViewCheck` publishes the grade of each accepted consensus row, and when the main lane
 opens on one the manager filed itself, `effectivePositionCap` returns
-`main_lane_rests_on_manager_attestation` and the proposal must carry that code verbatim in one
-`rationale.risks` entry with the source URL and in one `uncertainty` entry — `risks` because that is
-what the approval screen renders. Missing either is `main_lane_attestation_undisclosed` / `blocked`.
+`main_lane_rests_on_manager_attestation` on `disclosures` and the proposal must carry that code
+verbatim in one `rationale.risks` entry with the source URL and in one `uncertainty` entry — `risks`
+because that is what the approval screen renders. `proposalDisclosure` is the operation that judges
+the assembled proposal against those obligations, and missing either half is
+`main_lane_attestation_undisclosed` / `blocked` there. ⛔ The arithmetic itself reads no prose since
+#212 ②: a `blocked` raised from a substring reached `targetWeight`, so editing a sentence moved a
+position weight.
 ⛔ Nothing about the four requirements, the caps or the control arm's 1% / 6% changes: what is
 refused is opening the lane **quietly**. And `observationLedger` closes the loop the other way — a
 value read on the web, used in judgement and supported by none of the submitted ids is
