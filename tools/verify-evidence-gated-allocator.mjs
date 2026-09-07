@@ -160,11 +160,25 @@ assert.equal(memory.revisions.length, 2, 'same key keeps both revisions')
 assert.notEqual(memory.revisions[0].revision, memory.revisions[1].revision, 'revisions are append-only')
 assert.equal(visibleRevision(memory.replay), memory.replay.expectedRevision, 'replay excludes future revision')
 assert.equal(visibleRevision(memory.isolation), null, 'another instance cannot read private memory')
+/**
+ * ── A model swap does not hide memory, and only one rule says so (#212 ①) ──
+ *
+ * The host keys private memory by manager **instance** alone: a model or vendor
+ * swap, an in-place update and a config change all keep the row. The helper
+ * above is that rule, and after #212 it is the *only* statement of it — the
+ * package's own `visibleMemoryRevision` re-derived the same answer and got it
+ * wrong, requiring `row.model === model` on top of instance/key/asOf. Measured
+ * on this fixture before the removal: `modelContinuity` came back `null` where
+ * the host returns revision 2, so the first run after a model change would have
+ * read no prior learning at all.
+ */
 assert.equal(
   visibleRevision(memory.modelContinuity),
   memory.modelContinuity.expectedRevision,
   'a model swap on the same instance still reads private memory',
 )
+assert.equal(memory.modelContinuity.instance, memory.revisions[1].instance, 'and the case is a model swap rather than a second instance — otherwise the assertion above passes for the wrong reason')
+assert.notEqual(memory.modelContinuity.model, memory.revisions[1].model, 'the model really does differ from the one that wrote the revision')
 assert.equal(memory.sharedBrief.visible, true, 'Brief is shared within the book')
 assert.equal(memory.sharedBrief.privateMemoryVisible, false, 'private memory is not shared with Brief reader')
 for (const row of memory.revisions) {
@@ -2561,13 +2575,26 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 106)
+assert.equal(supportedOperations.length, 105)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
   'the operation table and the registered operations agree in both directions',
 )
 assert.equal(new Set(tabledOperations).size, tabledOperations.length, 'no operation is listed twice')
+
+/**
+ * ⛔ **No operation re-derives who may read private memory (#212 ①).** The
+ * removed `visibleMemoryRevision` was the only one that named `model` as an
+ * input key, and the clause that made it wrong would come back the way it
+ * arrived: quietly, inside one operation's filter. The published input
+ * vocabulary is where that is visible, so it is where this is checked.
+ */
+assert.equal(supportedOperations.includes('visibleMemoryRevision'), false, 'the package does not answer a second time what memory a run may read — the host namespaces by instance and pins asOf')
+const publishedInputKeys = execute({ operation: 'inputContracts', asOf: methodology.asOf, input: {} }).data.keys
+for (const [operation, keys] of Object.entries(publishedInputKeys)) {
+  assert.equal(keys.includes('model'), false, `${operation} does not take a model: memory outlives the model, so no calculation here may be keyed by one`)
+}
 
 /**
  * ── Which groups have a frozen fixture, and which do not (issue #70 §4) ────

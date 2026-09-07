@@ -488,7 +488,6 @@ export const INPUT_CONTRACTS = {
   thesisSentinel: { mode: 'strict', keys: { invalidations: ARRAY, evidence: ARRAY, priorVerdicts: ARRAY } },
   exitCheck: { mode: 'strict', keys: { symbol: STRING, price: NUMBER, rules: OBJECT, thesis: OBJECT, sentinel: ANY } },
   validateMemory: { mode: 'named', keys: { value: ANY, expectedSchemaVersion: NUMBER } },
-  visibleMemoryRevision: { mode: 'named', keys: { revisions: ARRAY, instanceId: STRING, model: STRING, key: STRING } },
   migrationMap: { mode: 'named', keys: { records: ARRAY, cutoverAt: STRING, schemaVersion: NUMBER } },
 
   // ── Point-in-time source parsing ───────────────────────────────────────
