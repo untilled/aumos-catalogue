@@ -50,7 +50,7 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `relativeStrength` | asset vs benchmark excess return over each period |
 | `opportunityMetrics` | the five oversold axes for one candidate |
 | `opportunityUniverse` | the declared universe, with held and pending excluded |
-| `trendState` | core ETF trend gate: `full` / `half` / `small_or_wait` / `stop` |
+| `trendState` | core ETF trend gate: `full` / `half` / `small_or_wait` / `stop` — over bars validated by the same rule `indicators` applies, so an unreadable row is `state: "insufficient_data"` and never a guidance. ⚠️ Bars are `{date, open, high, low, close, volume}` with **numeric** prices; a vendor candle payload (`closePrice` as a string) is refused row by row |
 | `blendedSectorStrength` | one sector's weighted RS against one benchmark |
 | `sectorStrength` | L1: lane ranking, rank moves, regime, `researchQueue`, bot baselines |
 | `regimeTag` | a Brief regime call, canonicalized, attributed, and compared with the sector reading |

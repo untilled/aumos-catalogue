@@ -1310,3 +1310,78 @@ assert.deepEqual(valContracts.vocabulary.memoryRuleKeys, ['failures/repeated-pat
 assert.equal(valRun('thesisValuation', { asset: 'X', price: 100, multiple: 12 }).status, 'blocked', 'a multiple is not a key this package reads, and is refused rather than absorbed')
 
 console.log('evidence-gated issue #160 valuation-wiring regression tests passed')
+
+/**
+ * ── #180: the core tranche gate answered off bars it never parsed ──────────
+ *
+ * The measured call: 200 Toss candle rows, unchanged — `closePrice` and
+ * friends, every value a string — into `trendState`. It answered `status: ok`,
+ * `state: "DOWNTREND"`, `trancheGuidance: "stop"`, **`diagnostics: []`**, with
+ * `ma20`/`ma50`/`ma200` all `null`. `bars.length` reads 200 whatever the rows
+ * hold, so nothing said the history was short; the state fell out of
+ * `undefined > null` comparisons that are all false, and `DOWNTREND` halts
+ * core deployment.
+ *
+ * The control that made it a defect rather than a guess: the sibling operation
+ * `indicators`, over the byte-identical rows, refuses **every one** of them.
+ * The validator was in the package; this gate did not call it.
+ */
+const trendAsOf = '2026-09-05T00:00:00Z'
+const trendDay = (index) => new Date(Date.parse('2025-10-01T00:00:00Z') + index * 86_400_000).toISOString()
+const trendCloses = Array.from({ length: 200 }, (_, index) => 100 + index * 0.5)
+const numericBars = trendCloses.map((close, index) => ({ date: trendDay(index), open: close, high: close + 1, low: close - 1, close, volume: 1000 }))
+/** The vendor's own shape, which is what `connection_request` hands a run. */
+const vendorBars = trendCloses.map((close, index) => ({
+  timestamp: trendDay(index),
+  openPrice: String(close), highPrice: String(close + 1), lowPrice: String(close - 1), closePrice: String(close),
+  volume: '1000',
+}))
+const trendRun = (input) => execute({ operation: 'trendState', asOf: trendAsOf, input })
+const trendHas = (answer, code) => answer.diagnostics.some((row) => row.code === code)
+
+/** ⑴ Vendor-shaped bars are refused, and the two operations now agree they are unreadable. */
+const vendorTrend = trendRun({ symbol: '069500', bars: vendorBars })
+assert.equal(vendorTrend.data.state, 'insufficient_data', 'a state read off unparsed bars is not a state')
+assert.equal(vendorTrend.data.trancheGuidance, undefined, 'and a hard stop is never issued on a reading that was not taken')
+assert.notEqual(vendorTrend.status, 'ok', 'the run is told, rather than handed a confident verdict')
+assert.ok(trendHas(vendorTrend, 'bar_value_invalid'), 'the same code its sibling raises on the same rows')
+assert.ok(trendHas(vendorTrend, 'trend_bars_unreadable'))
+assert.equal(vendorTrend.data.barsRejected, 200)
+assert.equal(
+  execute({ operation: 'indicators', asOf: trendAsOf, input: { bars: vendorBars } }).diagnostics.filter((row) => row.code === 'bar_value_invalid').length,
+  vendorTrend.data.barsRejected,
+  'the control: `indicators` and `trendState` refuse exactly the same rows',
+)
+
+/** ⑵ The same series in the published numeric shape answers, and the averages compute. */
+const numericTrend = trendRun({ symbol: '069500', bars: numericBars })
+assert.equal(numericTrend.status, 'ok')
+assert.equal(numericTrend.data.state, 'UPTREND')
+assert.equal(numericTrend.data.trancheGuidance, 'small_or_wait')
+for (const key of ['close', 'ma20', 'ma50', 'ma200']) {
+  assert.ok(Number.isFinite(numericTrend.data[key]), `${key} computed; the null that made the wrong answer look arithmetic is gone`)
+}
+assert.equal(numericTrend.data.goldenCross, true)
+
+/** ⑶ One bad row in two hundred is enough: this gate does not average over what it could read. */
+const oneBadRow = trendRun({ symbol: '069500', bars: [...numericBars.slice(0, 199), { ...numericBars[199], close: 'x' }] })
+assert.equal(oneBadRow.data.state, 'insufficient_data')
+assert.equal(oneBadRow.data.barsRejected, 1)
+assert.ok(trendHas(oneBadRow, 'trend_bars_unreadable'))
+
+/** ⑷ The second belt: no computed MA200, no state and no guidance — whatever left it null. */
+const shortHistory = trendRun({ symbol: '069500', bars: numericBars.slice(0, 50) })
+assert.equal(shortHistory.data.state, 'insufficient_data')
+assert.equal(shortHistory.data.trancheGuidance, undefined)
+assert.ok(trendHas(shortHistory, 'trend_history_insufficient'))
+
+/** ⑸ And the row shape is published, so the next caller does not have to guess it. */
+const trendContract = execute({ operation: 'inputContracts', asOf: trendAsOf, input: {} }).data
+assert.ok(trendContract.nested.trendState, 'trendState publishes the shape its key list cannot show')
+assert.deepEqual(
+  trendContract.nested.trendState['bars[]'],
+  { date: 'string', open: 'number', high: 'number', low: 'number', close: 'number', volume: 'number' },
+)
+assert.ok(/closePrice/.test(trendContract.nested.trendState.barShape), 'the vendor shape is named as the one that is refused')
+
+console.log('evidence-gated issue #180 trend-gate bar-validation regression tests passed')

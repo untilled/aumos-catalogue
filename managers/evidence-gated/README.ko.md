@@ -301,6 +301,23 @@ forbidden"*이라고 적어 놓고, 발표 주체가 있든 없든 모든 event�
 (`invalidation_event_undated` — *"아직 발표 안 됐다"*는 영원히 참인 답이기 때문이다), 그리고 WATCH
 어휘도 캡도 승격 게이트도 대조군 수치도 하나도 움직이지 않았다.
 
+**코어 트랜치 게이트가 이제 자기 형제가 거부하는 봉을 함께 거부한다.** `trendState`는 코어 배치를
+계속할지 정하는 게이트인데, 토스 캔들 200봉을 벤더 형태 그대로 — `closePrice`·`highPrice`, 값은 전부
+**문자열** — 받고서 `status: ok`, `state: "DOWNTREND"`, `trancheGuidance: "stop"`을, **진단 0건**과
+`ma20`·`ma50`·`ma200` 전부 `null`인 채로 답했다. 이동평균을 하나도 계산하지 못한 것이다: 상태를
+정하는 비교가 전부 `undefined > null`이라 거짓이고, 거짓이면 `DOWNTREND`이며, `DOWNTREND`는 코어
+트랜치를 멈춘다. `bars.length`는 어느 형태에서든 200으로 읽히므로 이력 검사도 발동하지 않았다. 같은
+계열을 `{date, open, high, low, close, volume}` 숫자형으로 넘기면 `UPTREND` / `small_or_wait`이고
+`ma200`은 92,704.055 — 사흘 전 다른 봉 묶음으로 무장된 플랜의 트리거 레벨과 소수점까지 일치한다.
+⛔ **검증기는 이미 이 패키지 안에 있었다**: 형제 연산 `indicators`는 바이트가 같은 행에 대해
+`normalizeBars`를 돌려 전부 `bar_value_invalid`로 거부한다. 이 게이트가 그것을 부르지 않았을 뿐이고,
+이제 부른다. ⚠️ **여기서 거부된 행은 «버려진 행»이 아니다** — `indicators`는 답 자체가 행별 보고라
+보고하고 넘어가지만, 자본 배치를 멈추는 게이트는 «읽을 수 있었던 부분집합»으로 평균을 내고 그것을
+추세라고 부를 수 없다: 읽히지 않는 행이 하나라도 있으면 답은 `state: "insufficient_data"`이고 진단이
+어느 행인지 말한다. 그 뒤에 두 번째 벨트가 선다 — `ma200`이 계산되지 않았으면 어떤 경로로 그렇게
+됐든 `state`도 `trancheGuidance`도 반환하지 않는다 — 그리고 `inputContracts.nested.trendState`가 행
+형태를 게시한다. 게시된 계약이 `bars: "array"` 하나여서 벤더 페이로드가 그것을 만족시켰기 때문이다.
+
 **선언된 권한 둘은 현재 아무것도 서빙하지 않는다.** `thesis:read`와 `evidence:read`는 매니페스트
 어휘에 있고, 현재 Aumos 빌드는 각각을 빈 도구 목록으로 매핑하므로 실행에 그 도구가 생기지 않는다.
 프롬프트가 *가능할 때* 읽는다고 적고 매니페스트가 둘을 `optionalSkills`에 두는 이유가 정확히
