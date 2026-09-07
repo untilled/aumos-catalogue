@@ -318,6 +318,25 @@ forbidden"*이라고 적어 놓고, 발표 주체가 있든 없든 모든 event�
 됐든 `state`도 `trancheGuidance`도 반환하지 않는다 — 그리고 `inputContracts.nested.trendState`가 행
 형태를 게시한다. 게시된 계약이 `bars: "array"` 하나여서 벤더 페이로드가 그것을 만족시켰기 때문이다.
 
+**진단 코드의 뜻을 정하는 표가 하나가 됐다 — 두 곳에 적혀 있었기 때문이다.** `mandateExecution`은
+«이 북이 빈 것은 방법론이 작동한 결과인가, 게이트가 입력을 받은 적이 없어서인가»를 그 런이 보고한
+코드와 어휘의 교집합으로 답하는데, 어휘는 읽는 쪽 옆에 손으로 적혀 있었고 코드는 다른 모듈 다섯이
+낸다. 둘은 조용히 어긋났다 — 아무것도 매칭하지 못하는 코드는 그냥 매칭하지 않기 때문이다.
+`corp_code_unmapped_symbols`(레지스트리를 읽었고 로스터 이름을 놓쳤다) · `radar_lane_starved`(레이더
+자신의 낱말로 *«비어 있는 것이 아니라 먹이지 않은 것»*) · `lane_query_failed`(리서치 레인을 질의했고
+쓸 수 있는 답이 없었다)를 보고한 런이 그 목록과 **0건** 교차했고, 배선이 세 단계에서 입력을 잃은 북에
+대고 `no-candidate-cleared-the-gates` / `info` — *방법론이 작동 중* — 을 답했다. 목록이 찾고 있던 것은
+`corp_code_mapping_pending`과 `radar_feed_produced_nothing`이었다: 실재하는 코드이지만 **다른** 연산이
+다른 모듈에서 내는 것이다. ⛔ **어휘는 이제 목록이 아니라 `lib/diagnostic-codes.mjs`의 투영이다.**
+행마다 코드 · 그것을 내는 연산 · 그것을 담고 있어야 하는 모듈 · 읽히는 레인을 이름 대고,
+`tools/verify-evidence-gated-diagnostic-codes.mjs`가 그 모듈들을 열어 «읽는 쪽만 아는 철자»에서 빌드를
+빨갛게 만든 다음, `mapCorporationCodes`·`upsideRadar`·`laneCoverage`를 실제로 돌려 그 진단을 손대지 않고
+`mandateExecution`에 넘긴다. ⚠️ **그리고 `info`는 더 이상 fall-through가 아니다.** 매칭하지 못한 코드
+집합이 전부 도달하던 갈래여서, 어긋난 어휘는 실패하지 않고 **안심시켰다**. 이제는 «실제로 돌아서
+거절한 게이트»의 코드가 하나는 있어야 얻고, 이 연산이 아예 읽을 수 없는 코드만 보고한 런은 아무것도
+보고하지 않은 런과 같은 답 — `unreported` — 을 받는다. ⛔ 원인 셋도, 그 severity도, «현금을 들고 있는
+것은 절대 매수의 논거가 아니다»라는 규칙도 하나도 안 움직였다.
+
 **선언된 권한 둘은 현재 아무것도 서빙하지 않는다.** `thesis:read`와 `evidence:read`는 매니페스트
 어휘에 있고, 현재 Aumos 빌드는 각각을 빈 도구 목록으로 매핑하므로 실행에 그 도구가 생기지 않는다.
 프롬프트가 *가능할 때* 읽는다고 적고 매니페스트가 둘을 `optionalSkills`에 두는 이유가 정확히

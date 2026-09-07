@@ -347,6 +347,29 @@ the rows named. A second belt stands behind it — no computed `ma200`, no `stat
 `trancheGuidance`, whatever left it null — and `inputContracts.nested.trendState` now publishes the
 row shape, since `bars: "array"` was the whole contract and a vendor payload satisfies it.
 
+**One table now decides what a diagnostic code means, because it was being spelled twice.**
+`mandateExecution` answers *«is this book empty because the methodology worked, or because its gates
+never received their inputs?»* by intersecting the codes a run reports with a vocabulary — and the
+vocabulary was written out by hand beside the reader while the codes are emitted by five other
+modules. They drifted, silently, because a code that matches nothing simply does not match. A run
+reporting `corp_code_unmapped_symbols` (the join read the registry and missed roster names),
+`radar_lane_starved` (*"unfed rather than empty"*, in the radar's own words) and `lane_query_failed`
+(the research lane was queried and answered nothing usable) intersected the list at **zero**, and was
+told `no-candidate-cleared-the-gates` / `info` — *the methodology is working* — over a book whose
+wiring had lost its inputs at three separate stages. The list was looking for
+`corp_code_mapping_pending` and `radar_feed_produced_nothing`: real codes, emitted by *different*
+operations in different modules. ⛔ **The vocabulary is not a list any more**, it is a projection of
+`lib/diagnostic-codes.mjs`, where each row names the code, the operation that emits it, the module
+that must contain it and the lane it is read in; `tools/verify-evidence-gated-diagnostic-codes.mjs`
+opens those modules and fails the build on a spelling only the reader knows, then runs
+`mapCorporationCodes`, `upsideRadar` and `laneCoverage` for real and hands their diagnostics to
+`mandateExecution` unedited. ⚠️ **And `info` is no longer the fall-through.** It was the branch every
+unmatched set of codes reached, so a vocabulary out of step did not fail — it reassured. It is earned
+now, by at least one code from a gate that actually ran and refused; a run reporting codes this
+operation cannot read at all says `unreported`, the answer it already had for a run that reported
+nothing. ⛔ Nothing about the three causes, their severities or the rule that holding cash is never an
+argument for buying moved.
+
 **Two declared capabilities currently serve nothing.** `thesis:read` and `evidence:read`
 are in the manifest vocabulary, and the current Aumos build maps each to an empty tool
 list, so a run gets no such tool. The prompt reads them *when available* and the manifest
