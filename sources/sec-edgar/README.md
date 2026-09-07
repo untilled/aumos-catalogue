@@ -47,8 +47,16 @@ contact address and signs the request; what it stops doing is reading the answer
 
 | the agent may ask | and receives |
 |---|---|
-| `/files/company_tickers.json` | SEC's whole ticker→CIK table |
-| `/api/xbrl/companyfacts/{CIK……….json}` | every XBRL fact SEC holds for that filer |
+| `/files/company_tickers.json` | SEC's whole ticker→CIK table — the first call, not an optional one |
+| `/api/xbrl/companyfacts/CIK{ten digits}.json` | every XBRL fact SEC holds for that filer |
+
+The allowlist published to an agent reads `/api/xbrl/companyfacts/{symbol}`, and **`{symbol}`
+there is a filename rather than a ticker.** `SourceSpec/1` has exactly one placeholder and it
+is spelled that way in every document; what goes in the slot for this endpoint is `CIK` plus
+the ten-digit zero-padded CIK plus `.json` — `CIK0000050863.json`, not `INTC`. A ticker in
+that slot answers `404 NoSuchKey`, which reads like *SEC holds nothing for this filer* and is
+not that. So the registry call above is a **precondition** of the facts call and not a
+convenience, and the `cik_str` it returns is an integer (`50863`) the caller pads itself.
 
 The difference is not small and it is the reason this exists: the `fundamentals` port
 answers with **seven metrics for one period**, chosen and dated by rules written into the

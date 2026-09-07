@@ -299,7 +299,7 @@
     {
       "name": "sec-edgar",
       "source": "./sources/sec-edgar",
-      "version": "0.3.2",
+      "version": "0.3.3",
       "metadata": {
         "publisher": "aumos",
         "vendor": "sec-edgar",
