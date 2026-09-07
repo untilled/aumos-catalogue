@@ -314,6 +314,10 @@ what the approval screen renders. Missing either is `main_lane_attestation_undis
 refused is opening the lane **quietly**. And `observationLedger` closes the loop the other way — a
 value read on the web, used in judgement and supported by none of the submitted ids is
 `claim_evidence_missing` / `blocked`, which is the 2026-09-06 BOK-rate failure made into a finding.
+⚠️ The grade travels there too, and by evidence id: a claim citing a receipt passed in the same call
+is graded by that receipt, and an id nothing in the call filed is named `claim_grade_unstated` —
+because «nothing here can say» and «ungraded» are two different answers, and the main lane's
+disclosure is built on which one it is.
 
 **And the requirement behind that lane could not be met honestly until now: a real falsifier had
 nowhere to go.** The main lane's first requirement is a *complete* thesis, and a thesis is complete

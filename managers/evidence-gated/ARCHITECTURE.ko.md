@@ -62,7 +62,10 @@ bar 시각. 항상 현재 상태를 돌려주는 스냅샷은 replay 소스가 �
 증언으로 기록되고 그 사실을 표지 둘로 나른다 — kind `observation`, source `manager:web-research`.
 이 패키지는 그 등급을 `variantViewCheck`에서 읽고, `effectivePositionCap`을 지나 제안의
 `rationale.risks`까지 나르며, 반대 방향은 `observationLedger`가 감사한다 — 웹에서 읽어 판단에 썼는데
-제출된 id가 받치지 않는 값은 거부된다.
+제출된 id가 받치지 않는 값은 거부된다. ⚠️ **표지는 영수증에 달려 있으므로 claim의 등급도 거기서
+온다** — 같은 호출에 넘긴 관측이 그 claim을 등급하고, 그 호출의 어느 영수증도 들고 있지 않은 id는
+`ungraded`로 답하지 않고 `claim_grade_unstated`로 이름을 댄다: «여기서는 말할 수 없다»는 판독이
+아니다(#176).
 
 OpenDART의 동작 셋은 매니저의 몫이다. Aumos가 읽지 않고 중계하기 때문이다: `corpCode.xml`은
 ZIP으로 답하고(대신 `list.json`의 `corp_code`/`stock_code`를 읽는다), 오류가 HTTP 200의 `status`

@@ -1823,3 +1823,130 @@ assert.ok(/`level`/.test(contract.nested.thesisSentinel.fieldNames))
 assert.ok(/availableAt/.test(contract.nested.thesisSentinel.fieldNames))
 
 console.log('evidence-gated issue #177 input-shape regression tests passed')
+
+/**
+ * ── Issue #176: the grade travels from the receipt to the claim ────────────
+ *
+ * The same run again, and the same shape of failure one level down. The
+ * markers that grade a web reading — `evidenceKind`, `evidenceSource` — are on
+ * the **receipt** `observation_file` returned; a claim carries the id and the
+ * value. Graded off its own fields, every ordinarily written claim came back
+ * `ungraded`, `strongestClaimAttestation: "ungraded"`, `status: "ok"`,
+ * `diagnostics: []` — and that grade is the input to the main lane's
+ * `main_lane_rests_on_manager_attestation` disclosure, which `PROMPT.md` §2
+ * says holds *only while the grade reaches the approval screen*.
+ *
+ * ⚠️ Filling in `contentHash` changed nothing: the hash was a second finding
+ * and the issue measured both arms to establish that.
+ */
+const ledgerFixture = JSON.parse(await readFile(new URL('../managers/evidence-gated/fixtures/observation-contract.json', import.meta.url), 'utf8')).bokRateCase
+const ledger = (input) => execute({ operation: 'observationLedger', asOf: ledgerFixture.asOf, input })
+const receipt = ledgerFixture.observation
+const claimOf = (extra = {}) => ({ ...ledgerFixture.claim, ...extra })
+
+/* ── ⑯ a claim citing a filed receipt is graded by that receipt ───────────── */
+
+const propagated = ledger({
+  observations: [receipt],
+  citedEvidenceIds: [receipt.evidenceId],
+  claims: [claimOf({ evidenceId: receipt.evidenceId })],
+})
+assert.equal(propagated.data.filed[0].grade, 'manager')
+assert.equal(propagated.data.claims[0].grade, 'manager', 'the measured defect: the receipt is the manager’s word and so is the claim standing on it')
+assert.equal(propagated.data.claims[0].gradeFrom, 'observation')
+assert.equal(propagated.data.claims[0].statedGrade, 'ungraded', 'what the claim itself said is kept — the resolution is visible rather than assumed')
+assert.equal(propagated.data.strongestClaimAttestation, 'manager')
+assert.deepEqual(propagated.data.claimAttestation, { aumos: 0, manager: 1, ungraded: 0, uncited: 0 })
+assert.deepEqual(propagated.data.claimsGradedFromFiling, ['bokBaseRatePct'])
+assert.deepEqual(propagated.data.claimsGradeUnstated, [])
+assert.equal(propagated.status, 'ok')
+
+/** ⛔ Nothing is upgraded on the way: a vendor row cited by a claim stays vendor evidence. */
+const vendorReceipt = { ...receipt, evidenceId: 'ev_dart_filing', evidenceKind: 'fundamentals', evidenceSource: 'open-dart' }
+const vendorClaim = ledger({
+  observations: [vendorReceipt],
+  citedEvidenceIds: [vendorReceipt.evidenceId],
+  claims: [claimOf({ evidenceId: vendorReceipt.evidenceId })],
+})
+assert.equal(vendorClaim.data.claims[0].grade, 'aumos')
+
+/**
+ * ⚠️ **The absence is named, and there are two of them.** A quiet `ungraded`
+ * for both would have rebuilt the defect one level down: *this run filed no
+ * receipt under that id* and *the receipt carries no markers* are different
+ * facts, and only the first one is unanswerable here.
+ */
+const unfiledId = ledger({
+  observations: [receipt],
+  citedEvidenceIds: [receipt.evidenceId, 'ev_vendor_row'],
+  claims: [claimOf({ evidenceId: 'ev_vendor_row' })],
+})
+assert.equal(unfiledId.data.claims[0].grade, 'ungraded')
+assert.equal(unfiledId.data.claims[0].gradeFrom, null, 'nothing in this call answered the question')
+assert.deepEqual(unfiledId.data.claimsGradeUnstated, ['bokBaseRatePct'])
+assert.ok(has(unfiledId, 'claim_grade_unstated'))
+assert.equal(unfiledId.status, 'unevaluated', '⛔ and «nobody said» is not a pass')
+assert.equal(unfiledId.data.claims[0].carried, true, 'the id was submitted — this finding is about the grade and nothing else')
+
+const ungradedReceipt = { evidenceId: receipt.evidenceId, url: receipt.url, title: receipt.title, publishedAt: receipt.publishedAt, contentHash: receipt.contentHash, excerptChars: receipt.excerptChars }
+const receiptLostMarkers = ledger({
+  observations: [ungradedReceipt],
+  citedEvidenceIds: [receipt.evidenceId],
+  claims: [claimOf({ evidenceId: receipt.evidenceId })],
+})
+assert.equal(receiptLostMarkers.data.claims[0].grade, 'ungraded')
+assert.equal(receiptLostMarkers.data.claims[0].gradeFrom, 'observation', 'the ledger did answer; the answer is that the receipt says nothing')
+assert.deepEqual(receiptLostMarkers.data.claimsGradeUnstated, [], '⛔ not this absence — the fault is at the receipt and it is reported there')
+assert.ok(has(receiptLostMarkers, 'observation_grade_unexpected'))
+assert.equal(has(receiptLostMarkers, 'claim_grade_unstated'), false)
+
+/** A claim that carries the markers itself is still read off them — the receipt is one route, not the only one. */
+const statedOnClaim = ledger({
+  observations: [],
+  citedEvidenceIds: [receipt.evidenceId],
+  claims: [claimOf({ evidenceId: receipt.evidenceId, evidenceKind: 'observation', evidenceSource: 'manager:web-research' })],
+})
+assert.equal(statedOnClaim.data.claims[0].grade, 'manager')
+assert.equal(statedOnClaim.data.claims[0].gradeFrom, 'claim')
+assert.equal(has(statedOnClaim, 'claim_grade_unstated'), false)
+
+/**
+ * ⛔ **And a receipt that lost its markers does not pull the claim down with
+ * it.** `ungraded` is not a low grade, it is the question unanswered; letting
+ * it outrank a stated one would be this defect again with the arrows reversed.
+ */
+const claimOverUngradedReceipt = ledger({
+  observations: [ungradedReceipt],
+  citedEvidenceIds: [receipt.evidenceId],
+  claims: [claimOf({ evidenceId: receipt.evidenceId, evidenceKind: 'observation', evidenceSource: 'manager:web-research' })],
+})
+assert.equal(claimOverUngradedReceipt.data.filed[0].grade, 'ungraded')
+assert.equal(claimOverUngradedReceipt.data.claims[0].grade, 'manager', 'the claim answered and the receipt did not; the answer stands')
+assert.equal(claimOverUngradedReceipt.data.claims[0].gradeFrom, 'claim')
+assert.equal(has(claimOverUngradedReceipt, 'claim_grade_conflicts_with_filing'), false, 'silence is not a disagreement')
+
+/**
+ * ⛔ One id is one row and has one grade. A claim calling a filed observation
+ * vendor evidence is malformed, and the safe reading is the one that does not
+ * promote the manager's own testimony into something Aumos obtained.
+ */
+const conflicting = ledger({
+  observations: [receipt],
+  citedEvidenceIds: [receipt.evidenceId],
+  claims: [claimOf({ evidenceId: receipt.evidenceId, evidenceKind: 'fundamentals', evidenceSource: 'open-dart' })],
+})
+assert.equal(conflicting.data.claims[0].statedGrade, 'aumos')
+assert.equal(conflicting.data.claims[0].grade, 'manager', 'the weaker of the two answering grades')
+assert.equal(conflicting.data.claims[0].gradeFrom, 'observation')
+const gradeConflict = conflicting.diagnostics.find((row) => row.code === 'claim_grade_conflicts_with_filing')
+assert.equal(gradeConflict.details.statedGrade, 'aumos')
+assert.equal(gradeConflict.details.filedGrade, 'manager')
+
+/** ⚠️ Published, because the receipt is what the caller has to keep and `claims: "array"` said none of it. */
+const ledgerContract = shape('inputContracts', {}).data.nested.observationLedger
+assert.equal(ledgerContract['observations[]'].contentHash, 'string')
+assert.equal(ledgerContract['claims[]'].evidenceId, 'string')
+assert.ok(/passed back here/.test(ledgerContract.receipt), 'the hash cannot be recomputed here, so the contract says to keep it')
+assert.ok(/claim_grade_unstated/.test(ledgerContract.grade))
+
+console.log('evidence-gated issue #176 attestation-propagation regression tests passed')
