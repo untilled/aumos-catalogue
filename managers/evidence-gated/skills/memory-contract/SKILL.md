@@ -27,6 +27,7 @@ Use only:
 - `failures/repeated-patterns`
 - `coverage/universe-state`
 - `coverage/research-index`
+- `research/catalyst-window`
 - `learning/paper-cohorts`
 
 Do not generate a key per run, asset or date.
@@ -39,6 +40,30 @@ sector and an extension flag; no prices, filings, portfolio weights or source bo
 Refetch filing data from installed sources each run until the host provides queryable source
 storage; an Evidence id is a reference, not a promise that its payload can be read back.
 Capacity failure preserves the prior revision and requires explicit roster review.
+
+`research/catalyst-window` is the second bounded exception, and it exists because the axis it
+carries had no producer at all (#169). `radarCandidates` takes `catalysts` and `events`,
+`upsideRadar` reads a window open inside 60 days and an event announced inside 30, and nothing in
+this package ever built either — so `inflection` and `post-event-continuation`, the two lenses that
+do not require a price fall, excluded every candidate for want of an input and reported it as a
+finding about the company. Use `catalystRegister({previous, catalysts, events, roster})` and persist
+only a non-null `nextState`. It carries at most 200 rows of symbol, market, an event label, the
+window, the observation date and up to eight Evidence ids — no prices, no filing numbers, no
+positions.
+
+⚠️ **Its instants are numbers, for the same reason `run/armed-reviews`' are.** A catalyst window
+ends after `asOf` by construction, and `memory_read` refuses a payload carrying a **string**
+timestamp later than `asOf` — the better this key were filled the more certainly it would be
+refused. `windowStartEpochMs`, `windowEndEpochMs` and `observedAtEpochMs` are what the operation
+writes; `catalystRegister` reads either that or the RFC 3339 rows a caller hands it, and the map it
+returns to `radarCandidates` is RFC 3339 because that is what `Date.parse` is given there. Write
+`nextState` verbatim and do not re-encode it.
+
+⛔ **Event records are not persisted, and that is this contract rather than an omission.** `sue`,
+`day1ExcessPct` and `preAnnouncementClose` are numbers copied off a vendor's answer, which the Write
+section below forbids in as many words. They are re-read from the corporate-actions route every run;
+what persists is the calendar. A window that has closed leaves the register on the next run and is
+reported as `catalyst_window_closed` — score whether the catalyst happened before dropping the name.
 
 For `run/armed-reviews`, `reconcileArmedReviews` persists what **this instance proposed** and whose
 instant has not passed. ⛔ It is not verified against `decisions[].armed` and cannot be: that field

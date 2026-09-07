@@ -1,0 +1,205 @@
+{
+  "spec": "EvidenceGatedCatalystContract/1",
+  "note": "⚠️ No live key and no network. The filings below are the shape `source_cache_read` hands back and the numbers are INTC's as the 2026-09-07 US branch read them — operating income −3,136M in the quarter ended 2026-03-28 and +1,796M in the one ended 2026-06-27, which is the sign flip that cleared every filing test on `run_73a3e6c41c204f468ee8be8d2923d898`. The catalyst window and the event record are the two inputs that run had no way to produce; what this fixture measures is that producing them is the whole difference between `no-catalyst-registered-within-60-days` and `sign-flip-with-a-registered-catalyst` on the same candidate.",
+  "asOf": "2026-09-07T00:00:00.000Z",
+  "market": "us",
+  "roster": [
+    "INTC",
+    "AMD",
+    "MU"
+  ],
+  "documents": {
+    "INTC": [
+      {
+        "documentKey": "intc-2025Q1",
+        "version": 1,
+        "publishedAt": "2025-04-24",
+        "normalized": {
+          "period": {
+            "start": "2025-01-01",
+            "end": "2025-03-29",
+            "fiscalPeriod": "Q1"
+          },
+          "currency": "USD",
+          "metrics": {
+            "operatingIncome": 1000,
+            "revenue": 12000
+          }
+        }
+      },
+      {
+        "documentKey": "intc-2026Q1",
+        "version": 1,
+        "publishedAt": "2026-04-24",
+        "normalized": {
+          "period": {
+            "start": "2026-01-01",
+            "end": "2026-03-28",
+            "fiscalPeriod": "Q1"
+          },
+          "currency": "USD",
+          "metrics": {
+            "operatingIncome": -3136,
+            "revenue": 12000
+          }
+        }
+      },
+      {
+        "documentKey": "intc-2025Q2",
+        "version": 1,
+        "publishedAt": "2025-07-25",
+        "normalized": {
+          "period": {
+            "start": "2025-03-30",
+            "end": "2025-06-28",
+            "fiscalPeriod": "Q2"
+          },
+          "currency": "USD",
+          "metrics": {
+            "operatingIncome": 500,
+            "revenue": 12500
+          }
+        }
+      },
+      {
+        "documentKey": "intc-2026Q2",
+        "version": 1,
+        "publishedAt": "2026-07-24",
+        "normalized": {
+          "period": {
+            "start": "2026-03-29",
+            "end": "2026-06-27",
+            "fiscalPeriod": "Q2"
+          },
+          "currency": "USD",
+          "metrics": {
+            "operatingIncome": 1796,
+            "revenue": 13000
+          }
+        }
+      }
+    ]
+  },
+  "prices": {
+    "INTC": {
+      "status": "confirmed",
+      "close": 35,
+      "ma200": 30,
+      "ma50": 34,
+      "offHigh200": -0.1
+    }
+  },
+  "researched": {
+    "note": "What the flow read this cycle. Every row names the evidence ids the reading was filed under — the catalyst through `observation_file`, the event through the Alpaca corporate-actions relay — because a window nobody can go and check is a claim rather than a registered catalyst. ⚠️ MU's window is real and opens in January, four months past the 60-day horizon `upsideRadar` reads: it is a name that **was** researched and genuinely has nothing scheduled inside the window, which is the case the unresearched count must not swallow.",
+    "catalysts": [
+      {
+        "symbol": "INTC",
+        "market": "us",
+        "event": "Q3 results and foundry customer update",
+        "windowStart": "2026-10-20T00:00:00.000Z",
+        "windowEnd": "2026-10-25T00:00:00.000Z",
+        "observedAt": "2026-09-06T12:00:00.000Z",
+        "evidenceIds": [
+          "obs_intc_ir_calendar"
+        ],
+        "publisher": "Intel Investor Relations"
+      },
+      {
+        "symbol": "MU",
+        "market": "us",
+        "event": "FY guidance update",
+        "windowStart": "2027-01-12T00:00:00.000Z",
+        "windowEnd": "2027-01-16T00:00:00.000Z",
+        "observedAt": "2026-09-06T12:00:00.000Z",
+        "evidenceIds": [
+          "obs_mu_ir_calendar"
+        ],
+        "publisher": "Micron Investor Relations"
+      }
+    ],
+    "events": [
+      {
+        "symbol": "INTC",
+        "market": "us",
+        "announcedAt": "2026-08-25T00:00:00.000Z",
+        "sue": 1.4,
+        "day1ExcessPct": 3.2,
+        "preAnnouncementClose": 30,
+        "evidenceIds": [
+          "obs_intc_corporate_action"
+        ]
+      }
+    ]
+  },
+  "carried": {
+    "note": "A prior revision of `research/catalyst-window`, in the encoding the operation writes: the instants are **numbers**, because a catalyst window ends after `asOf` by construction and `memory_read` refuses a payload carrying a later string timestamp. The AMD row's window closed on 2026-08-17 and leaves the register; the INTC row is the same window re-read above, observed four days earlier, so the fresh reading wins.",
+    "schemaVersion": 1,
+    "updatedAsOf": "2026-09-05T00:00:00.000Z",
+    "rows": [
+      {
+        "symbol": "AMD",
+        "market": "us",
+        "event": "Analyst day",
+        "windowStartEpochMs": 1786982400000,
+        "windowEndEpochMs": 1786982400000,
+        "observedAtEpochMs": 1786636800000,
+        "evidenceIds": [
+          "obs_amd_analyst_day"
+        ]
+      },
+      {
+        "symbol": "INTC",
+        "market": "us",
+        "event": "Q3 results and foundry customer update",
+        "windowStartEpochMs": 1792454400000,
+        "windowEndEpochMs": 1792886400000,
+        "observedAtEpochMs": 1788350400000,
+        "evidenceIds": [
+          "obs_intc_ir_calendar_first_reading"
+        ]
+      }
+    ]
+  },
+  "refused": {
+    "note": "One row per refusal this operation makes, so «registered» keeps meaning something.",
+    "uncited": {
+      "symbol": "INTC",
+      "market": "us",
+      "event": "Q3 results",
+      "windowStart": "2026-10-20T00:00:00.000Z",
+      "windowEnd": "2026-10-25T00:00:00.000Z",
+      "observedAt": "2026-09-06T12:00:00.000Z"
+    },
+    "invertedWindow": {
+      "symbol": "INTC",
+      "market": "us",
+      "event": "Q3 results",
+      "windowStart": "2026-10-25T00:00:00.000Z",
+      "windowEnd": "2026-10-20T00:00:00.000Z",
+      "observedAt": "2026-09-06T12:00:00.000Z",
+      "evidenceIds": [
+        "obs_intc_ir_calendar"
+      ]
+    },
+    "observedAfterAsOf": {
+      "symbol": "INTC",
+      "market": "us",
+      "event": "Q3 results",
+      "windowStart": "2026-10-20T00:00:00.000Z",
+      "windowEnd": "2026-10-25T00:00:00.000Z",
+      "observedAt": "2026-09-08T00:00:00.000Z",
+      "evidenceIds": [
+        "obs_intc_ir_calendar"
+      ]
+    },
+    "eventAfterAsOf": {
+      "symbol": "INTC",
+      "market": "us",
+      "announcedAt": "2026-09-08T00:00:00.000Z",
+      "sue": 1.4,
+      "evidenceIds": [
+        "obs_intc_corporate_action"
+      ]
+    }
+  }
+}

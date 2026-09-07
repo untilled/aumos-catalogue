@@ -45,6 +45,7 @@ const usSchedule = JSON.parse(await readFile(new URL('us/schedule.json', fixture
 const globalIntegration = JSON.parse(await readFile(new URL('global/integration.json', fixtureRoot), 'utf8'))
 const research = JSON.parse(await readFile(new URL('research-contract.json', fixtureRoot), 'utf8'))
 const observationContract = JSON.parse(await readFile(new URL('observation-contract.json', fixtureRoot), 'utf8'))
+const catalystContract = JSON.parse(await readFile(new URL('catalyst-contract.json', fixtureRoot), 'utf8'))
 
 /**
  * ── Coverage names that have to be earned (issue #70 §4) ───────────────────
@@ -2560,7 +2561,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 105)
+assert.equal(supportedOperations.length, 106)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),
@@ -4187,6 +4188,187 @@ for (const text of observationProse) {
 for (const text of observationProse.slice(1)) {
   assert.ok(/^1[01]\. \*\*/m.test(text), 'and in the sleeve skills it is a numbered step in the branch checklist, which is the shape #146 had to be rewritten into')
 }
+
+/**
+ * ── The discovery axis that had no producer (issue #169) ───────────────────
+ *
+ * `radarCandidates` takes `catalysts` and `events`, `upsideRadar` reads a
+ * window open inside 60 days and an event announced inside 30, and **nothing
+ * in this package built either**. So the two lenses that do not require a
+ * price fall excluded every candidate for want of an input and reported it in
+ * a sentence that reads as a finding about the company.
+ *
+ * The fixture is the measured run's one surviving candidate: INTC, operating
+ * income −3,136M in the quarter ended 2026-03-28 and +1,796M in the one ended
+ * 2026-06-27. Both ends are asserted on the **same** candidate, so what is
+ * being measured is the input and not the fixture.
+ */
+covers('research/catalyst-axis-producer')
+const catalystAsOf = catalystContract.asOf
+const radarInput = { market: catalystContract.market, symbols: catalystContract.roster, documents: catalystContract.documents, prices: catalystContract.prices }
+const starvedCandidates = execute({ operation: 'radarCandidates', asOf: catalystAsOf, input: radarInput })
+const starvedRadar = execute({ operation: 'upsideRadar', asOf: catalystAsOf, input: { candidates: starvedCandidates.data.candidates } })
+const starvedIntc = [...starvedRadar.data.ranked, ...starvedRadar.data.unranked].find((row) => row.asset === 'INTC')
+assert.equal(starvedIntc.axes.inflection.signFlip, true, 'the filing test is cleared — this is not a candidate that failed on its numbers')
+assert.equal(
+  starvedIntc.lanes.inflection.reason,
+  'no-catalyst-registered-within-60-days',
+  'and it is excluded for the one input nothing in this package produced — the measured run, reproduced',
+)
+assert.equal(starvedIntc.lanes['post-event-continuation'].reason, 'no-event-in-the-last-30-days')
+assert.equal(starvedIntc.axes.expectation.status, 'unknown', '`latestEarnings` was read by `upsideRadar` and written by nobody, so this axis was unknown in every run this package has ever produced')
+
+const register = execute({
+  operation: 'catalystRegister',
+  asOf: catalystAsOf,
+  input: {
+    market: catalystContract.market,
+    roster: catalystContract.roster,
+    previous: catalystContract.carried,
+    catalysts: catalystContract.researched.catalysts,
+    events: catalystContract.researched.events,
+  },
+})
+const fedCandidates = execute({ operation: 'radarCandidates', asOf: catalystAsOf, input: { ...radarInput, catalysts: register.data.catalysts, events: register.data.events } })
+const fedRadar = execute({ operation: 'upsideRadar', asOf: catalystAsOf, input: { candidates: fedCandidates.data.candidates } })
+const fedIntc = [...fedRadar.data.ranked, ...fedRadar.data.unranked].find((row) => row.asset === 'INTC')
+assert.equal(fedIntc.lanes.inflection.included, true, 'one researched window and the lane admits the candidate it had been refusing')
+assert.equal(fedIntc.lanes.inflection.reason, 'sign-flip-with-a-registered-catalyst')
+assert.equal(fedIntc.lanes['post-event-continuation'].included, true, 'and the event lane, whose 83 exclusions were all one absent input')
+assert.equal(fedIntc.axes.expectation.status, 'recorded', 'and `latestEarnings` now has a producer, so the axis reads')
+assert.deepEqual(fedIntc.lensesEntered, ['inflection', 'post-event-continuation'])
+
+/**
+ * ⚠️ **Researched-and-absent is not unresearched.** AMD's window closed on
+ * 2026-08-17 — somebody looked, and there is nothing inside the horizon — and
+ * it is still counted as unresearched here only because this run did not
+ * re-read it. What the counts must never do is collapse: `upsideRadar` excludes
+ * both under one sentence, which is why the denominator lives here.
+ */
+covers('research/catalyst-axis-producer')
+assert.equal(register.data.coverage.rosterCount, 3, 'the denominator is the roster `radarCandidates` is given, not the rows that happened to arrive')
+assert.equal(register.data.coverage.researched, 2, 'INTC and MU both have a window on file')
+assert.equal(register.data.coverage.withCatalystInHorizon, 1, 'and only INTC\'s falls inside the 60 days the lane reads — MU opens in January')
+assert.equal(register.data.coverage.unresearchedCatalysts, 1, "⛔ one, not two: MU was researched and genuinely has nothing scheduled inside the horizon, and collapsing that into «nobody looked» is the swap this whole operation exists to refuse")
+assert.deepEqual(register.data.expired, [{ symbol: 'AMD', market: 'us', event: 'Analyst day', windowEnd: '2026-08-17T16:00:00.000Z' }], 'a closed window leaves the register and is reported, because a name dropped in silence reads as a name nobody researched')
+const unresearched = register.diagnostics.find((row) => row.code === 'catalyst_window_unresearched')
+assert.equal(unresearched.severity, 'unevaluated', 'an unfed axis is not a pass')
+assert.deepEqual(unresearched.details.symbols, ['AMD'])
+assert.ok(register.diagnostics.some((row) => row.code === 'event_record_unresearched'), 'and the event side is its own finding, because its producer is a different route')
+
+/** Both codes are readable by `mandateExecution`, which is the point of registering them. */
+covers('research/catalyst-axis-producer')
+const emptyBook = execute({
+  operation: 'mandateExecution',
+  asOf: catalystAsOf,
+  input: { mandateObjective: 'Buy what the market has mispriced.', positions: [], cashWeight: 1, reportedDiagnostics: register.diagnostics },
+})
+assert.equal(emptyBook.data.cause, 'input-path-incomplete', "a book holding nothing while its catalyst axis was never fed is not «the methodology is working»")
+assert.deepEqual(emptyBook.data.inputPathCodes, ['catalyst_window_unresearched', 'event_record_unresearched'])
+
+/**
+ * ⛔ A window nobody can go and check is not a registered catalyst. Every
+ * refusal is one shape a run could otherwise have registered a claim under.
+ */
+covers('research/catalyst-axis-producer')
+for (const [name, row] of Object.entries(catalystContract.refused)) {
+  if (name === 'note') continue
+  const field = name === 'eventAfterAsOf' ? 'events' : 'catalysts'
+  const refused = execute({ operation: 'catalystRegister', asOf: catalystAsOf, input: { market: 'us', roster: ['INTC'], [field]: [row] } })
+  assert.equal(refused.status, 'blocked', `${name} is refused rather than registered`)
+  assert.ok(refused.diagnostics.some((entry) => entry.code === 'catalyst_observation_invalid' && entry.severity === 'blocked'))
+  assert.equal(refused.data.nextState, null, 'and a refused calculation never offers a replacement for durable memory')
+}
+
+/**
+ * ── The encoding, which is the reason this key is readable at all ─────────
+ *
+ * A catalyst window ends after `asOf` by construction, and `memory_read`
+ * refuses a payload carrying a **string** timestamp later than `asOf`. So the
+ * revision holds numbers and the map holds RFC 3339, exactly as
+ * `run/armed-reviews`' `atEpochMs` does.
+ */
+covers('research/catalyst-register-encoding')
+const persisted = register.data.nextState
+assert.equal(persisted.schemaVersion, 1)
+assert.equal(persisted.updatedAsOf, catalystAsOf)
+for (const row of persisted.rows) {
+  for (const field of ['windowStartEpochMs', 'windowEndEpochMs', 'observedAtEpochMs']) {
+    assert.equal(typeof row[field], 'number', `${field} is a number — written as a string later than asOf it is the one shape memory_read refuses`)
+  }
+  assert.ok(row.evidenceIds.length, 'and every carried row still names what it was read from')
+}
+assert.equal(
+  JSON.stringify(persisted).includes('2026-10-'),
+  false,
+  'no future instant survives as a string anywhere in the revision — the whole reason run/armed-reviews moved to epoch',
+)
+assert.deepEqual(persisted.rows.map((row) => row.symbol).sort(), ['INTC', 'MU'], 'the closed window is gone and the live ones are kept — including the one outside the horizon, which is still a fact somebody established')
+assert.equal(persisted.rows.find((row) => row.symbol === 'INTC').evidenceIds[0], 'obs_intc_ir_calendar', 'and the fresher observation wins over the carried one')
+assert.equal(register.data.eventsPersisted, false, 'events are not persisted: sue, day1ExcessPct and preAnnouncementClose are copied vendor numbers and the memory contract forbids them there')
+/** ⚠️ The carried rows keep both markets: a US run must not erase the KR calendar. */
+const krRun = execute({
+  operation: 'catalystRegister',
+  asOf: catalystAsOf,
+  input: { market: 'kr', roster: ['005930'], previous: register.data.nextState },
+})
+assert.deepEqual(krRun.data.nextState.rows.map((row) => row.symbol).sort(), ['INTC', 'MU'], 'a carried collection is never smaller on the way out, whichever sleeve is running')
+assert.deepEqual(Object.keys(krRun.data.catalysts), [], 'and the map it hands radarCandidates is this sleeve only')
+
+/**
+ * ── And it is a step a flow is told to take, not a function that exists ────
+ *
+ * The whole of #146 was that a written operation nobody was instructed to call
+ * is not a stage of the run loop. Before this issue the only sentence about
+ * this axis was *"`earningsCheckpoint` fills the rolling event window these
+ * lanes read"* — a description of a window, not a step that fills one.
+ */
+covers('audit/catalyst-research-is-a-numbered-step')
+const catalystProse = {
+  'PROMPT.md': await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8'),
+  'skills/kr-sleeve/SKILL.md': await readFile(new URL('../skills/kr-sleeve/SKILL.md', fixtureRoot), 'utf8'),
+  'skills/us-sleeve/SKILL.md': await readFile(new URL('../skills/us-sleeve/SKILL.md', fixtureRoot), 'utf8'),
+  'skills/orchestrate/SKILL.md': await readFile(new URL('../skills/orchestrate/SKILL.md', fixtureRoot), 'utf8'),
+  'skills/memory-contract/SKILL.md': await readFile(new URL('../skills/memory-contract/SKILL.md', fixtureRoot), 'utf8'),
+}
+for (const [name, text] of Object.entries(catalystProse)) {
+  assert.ok(text.includes('catalystRegister'), `${name} names the producer — an operation no document sends a flow to is exactly the #146 defect`)
+}
+assert.ok(
+  !catalystProse['PROMPT.md'].includes('`earningsCheckpoint` fills the rolling event window these lanes read.'),
+  'and the sentence that stood in for the step is gone, rather than left beside it to be read as the instruction',
+)
+for (const flow of ['skills/kr-sleeve/SKILL.md', 'skills/us-sleeve/SKILL.md']) {
+  const text = catalystProse[flow]
+  const step = text.match(/^(\d+)\. \*\*`catalystRegister`\*\*/m)
+  assert.ok(step, `${flow} carries it as a numbered step in the branch checklist`)
+  const radar = text.match(/^(\d+)\. \*\*`radarCandidates`\*\*/m)
+  assert.ok(Number(step[1]) < Number(radar[1]), 'and it comes before the operation that consumes what it produces')
+  assert.ok(/Pass `catalysts` and `events` from the step above/.test(text), 'the consuming step says where the two maps come from')
+  assert.ok(text.includes('research/catalyst-window'), 'and the flow is told where the register is carried')
+  assert.ok(text.includes('evidenceIds'), 'and that a row with no citation is refused rather than registered')
+}
+assert.ok(
+  catalystProse['skills/memory-contract/SKILL.md'].includes('- `research/catalyst-window`'),
+  'the key is in the closed stable-key list, because a key that is not is a key a run may not write',
+)
+assert.ok(
+  /windowEndEpochMs/.test(catalystProse['skills/memory-contract/SKILL.md']),
+  'and the encoding is stated where a run reads it, since RFC 3339 here makes the key unreadable rather than wrong',
+)
+
+/**
+ * ⚠️ **§37: nothing new is asked of the investor.** The inputs come from tools
+ * this package already declares — `observation_file` for a web reading, the
+ * broker relay for a vendor calendar, manager memory for the register — and
+ * the operation itself is `mcp__evidence-gated-metrics__calculate`.
+ */
+covers('audit/catalyst-research-is-a-numbered-step')
+assert.deepEqual(
+  manifest.capabilities.map((row) => row.kind).sort(),
+  ['brief:read', 'brief:write', 'connection:passthrough', 'evidence:read', 'manager-memory:read', 'manager-memory:write', 'observation:file', 'portfolio:read', 'source-cache:read', 'source-cache:write', 'source:passthrough', 'thesis:read'],
+  'the capability set is unchanged by this issue — the axis was unfed for want of a step, not for want of a permission',
+)
 
 assertCoverageWasEarned()
 

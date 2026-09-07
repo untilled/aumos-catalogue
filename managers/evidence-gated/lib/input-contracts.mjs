@@ -1,5 +1,6 @@
 import { diagnostic, readCashByCurrency, MARKET_CURRENCIES, MANAGER_ID } from './diagnostics.mjs'
 import { MACRO_INDICATORS } from './evidence.mjs'
+import { CATALYST_MEMORY_KEY } from './catalysts.mjs'
 
 export const PAPER_SETUP_COHORTS = {
   thesis_call: 'llm-research', thesis_watch: 'llm-research', thesis_rejected: 'llm-research',
@@ -46,6 +47,17 @@ export const INPUT_VOCABULARY = {
   filingFacts: ['revenue', 'operatingIncome', 'operatingIncomeYoy', 'marginDeltaYoy'],
   instrumentClasses: ['single-name-filer', 'non-filer-instrument', 'unknown'],
   memoryRuleKeys: ['failures/repeated-patterns', 'run/theme-radar-last'],
+  /**
+   * ⚠️ The two windows `upsideRadar` reads, published because they were the
+   * unwritten half of an input nothing produced (#169). A catalyst is counted
+   * when its window overlaps the next 60 days; an event when it was announced
+   * inside the last 30. `catalystRegister` returns both as `horizonDays` and
+   * `eventLookbackDays` so a caller reads them off the answer rather than this
+   * table's copy.
+   */
+  catalystHorizonDays: 60,
+  eventLookbackDays: 30,
+  catalystMemoryKey: CATALYST_MEMORY_KEY,
   /**
    * ⚠️ Whose word an Evidence row is (#692). `aumos` is a row this host obtained
    * and signed for; `manager` is one filed through `observation_file`, which is
@@ -156,6 +168,19 @@ export const NESTED_CONTRACTS = {
   refutedMemoryRules: {
     patterns: 'The whole value read from `failures/repeated-patterns` — an array of rows, or the stored object holding them under `patterns`/`rows`/`entries`/`failures`. Read under a key that is not there, a carried rule reads as absent and stays uncorrected.',
     memory: 'An object keyed by stable memory key — { "run/theme-radar-last": <whatever was read> } — for the refuted rules filed somewhere other than `failures/repeated-patterns`. ⚠️ A false durable claim is not only ever a failure pattern (#160); the value may be prose and fields rather than a row list, and is matched either way.',
+  },
+  /**
+   * ⚠️ Both row shapes are published because both were **absent inputs**, not
+   * wrong ones (#169): a caller that has never sent a catalyst has no wrong
+   * spelling to learn from, and `catalysts: "array"` is the shape a guess is
+   * built on.
+   */
+  catalystRegister: {
+    'catalysts[]': { symbol: STRING, market: STRING, event: STRING, windowStart: STRING, windowEnd: STRING, observedAt: STRING, evidenceIds: ARRAY },
+    'events[]': { symbol: STRING, market: STRING, announcedAt: STRING, sue: NUMBER, day1ExcessPct: NUMBER, preAnnouncementClose: NUMBER, guidanceSurprise: NUMBER, evidenceIds: ARRAY },
+    evidenceIds: 'Required on every row of both arrays, and this is the whole discipline of the operation: a catalyst window nobody can go and check is not a registered catalyst, it is a claim. File the reading with `observation_file` and put the returned id here — the same route `consensusRefs` takes.',
+    previous: 'The whole value read from `research/catalyst-window` — { schemaVersion: 1, updatedAsOf, rows[] }. ⚠️ Its rows carry `windowStartEpochMs` / `windowEndEpochMs` as **numbers**, because a catalyst window ends after `asOf` by construction and `memory_read` refuses a payload carrying a later **string** timestamp. Persist `nextState` verbatim; do not rewrite the instants as RFC 3339.',
+    roster: 'The same `symbols` argument `radarCandidates` is given — the denominator the coverage counts are taken against, so the two operations cannot disagree about who was in the sweep. Absent, the counts are zero and no unresearched finding is raised: a denominator nobody declared is not evidence that nothing was missed.',
   },
   thesisValuation: {
     'scenarios.<bear|base|bull>': { probability: NUMBER, target: NUMBER, return: NUMBER, drivers: ARRAY },
@@ -482,6 +507,9 @@ export const INPUT_CONTRACTS = {
   dartVendorStatus: { mode: 'named', keys: { payload: OBJECT, path: STRING } },
   radarCandidates: { mode: 'strict', keys: { market: STRING, symbols: ARRAY, financials: OBJECT, facts: OBJECT, documents: OBJECT, prices: OBJECT, events: OBJECT, catalysts: OBJECT, valuations: OBJECT } },
   radarFeedDiagnosis: { mode: 'strict', keys: { market: STRING, symbols: ARRAY, plan: OBJECT, mapping: OBJECT, responses: ARRAY, candidates: OBJECT, lanes: OBJECT } },
+
+  // ── The catalyst and event axis, which had no producer at all (#169) ───
+  catalystRegister: { mode: 'strict', keys: { market: STRING, previous: OBJECT, catalysts: ARRAY, events: ARRAY, roster: ARRAY } },
 
   // ── The valuation end of the same wiring (#160) ────────────────────────
   thesisValuation: { mode: 'strict', keys: { asset: STRING, market: STRING, price: NUMBER, currency: STRING, scenarios: OBJECT, filings: ARRAY } },

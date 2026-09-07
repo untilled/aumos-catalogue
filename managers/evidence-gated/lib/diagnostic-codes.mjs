@@ -107,6 +107,31 @@ export const CAUSE_CODE_REGISTRY = Object.freeze([
    */
   { code: 'radar_lane_starved', operation: 'upsideRadar', module: 'methodology.mjs', lane: 'input-path' },
 
+  /**
+   * ── the axis with no producer (#169) ─────────────────────────────────
+   *
+   * ⚠️ **`input-path`, and the lane choice is the judgement.** `upsideRadar`
+   * excludes a name with no catalyst window under
+   * `no-catalyst-registered-within-60-days` and one with no event record under
+   * `no-event-in-the-last-30-days`, and both sentences read as findings about
+   * the company. Measured on `run_73a3e6c41c204f468ee8be8d2923d898`: 83 of 83
+   * names excluded from `post-event-continuation`, and the single name that
+   * cleared every filing test excluded from `inflection` — while nothing in
+   * the package had ever produced either input. That is a stage that lost an
+   * input, exactly as `radar_lane_starved` is one axis over.
+   *
+   * ⛔ Two rows and not one, because the two have different producers: a
+   * catalyst window comes from web research filed through `observation_file`,
+   * an event record from the broker's corporate-actions route. A run told only
+   * that «the axis is unfed» cannot tell which door to open.
+   *
+   * ⛔ Neither is raised by a name that was researched and genuinely has
+   * nothing scheduled — that is the `never-fed` ⇄ `fed-and-genuinely-empty`
+   * distinction, and `catalystRegister` counts the two separately.
+   */
+  { code: 'catalyst_window_unresearched', operation: 'catalystRegister', module: 'catalysts.mjs', lane: 'input-path' },
+  { code: 'event_record_unresearched', operation: 'catalystRegister', module: 'catalysts.mjs', lane: 'input-path' },
+
   /* ── the research lanes ──────────────────────────────────────────────── */
   { code: 'lane_not_queried', operation: 'laneCoverage', module: 'source-parsers.mjs', lane: 'input-path' },
   { code: 'lane_query_failed', operation: 'laneCoverage', module: 'source-parsers.mjs', lane: 'input-path' },

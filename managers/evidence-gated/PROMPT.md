@@ -569,7 +569,8 @@ So the branch has a written path and the flow skills carry it as a numbered step
 
 `researchUniverse` → **the registry** (`corpCode.xml`, or `company_tickers.json` for the CIK) →
 `mapCorporationCodes` → `fundamentalsPlan` → `source_cache_read` / `source_cache_refresh` →
-`dartVendorStatus` → `radarCandidates` → `radarFeedDiagnosis` → `upsideRadar({candidates, feed})`.
+`dartVendorStatus` → **`catalystRegister`** → `radarCandidates` → `radarFeedDiagnosis` →
+`upsideRadar({candidates, feed})`.
 
 ⚠️ **`researchUniverse` and everything on that path take `'kr'` / `'us'`, not a MIC.**
 `inputContracts.vocabulary` published only the MIC list, so the one market vocabulary a caller
@@ -602,7 +603,37 @@ and `partially-fed` its own verdict, and every lane header carries `feedCoverage
 unfed }` — ⛔ report the counts, never «fed», and never the mirror error of calling one fed name
 `never-fed`.
 
-`earningsCheckpoint` fills the rolling event window these lanes read.
+⛔ **And the catalyst axis had no producer at all, which is the same defect one axis over** (#169).
+This paragraph used to be one sentence — *"`earningsCheckpoint` fills the rolling event window these
+lanes read"* — and that is a description of a window, not a step that fills one; `earningsCheckpoint`
+schedules a wake around an announcement it is handed. `radarCandidates` takes `catalysts` and
+`events`, `upsideRadar` reads a window open inside 60 days and an event announced inside 30, and
+**nothing built either.** Measured on `run_73a3e6c41c204f468ee8be8d2923d898`, on the first US branch
+this book ever fed to the end: `post-event-continuation` 0 included of 83, every one of them
+`no-event-in-the-last-30-days`; `inflection` 0 included, and the single name whose operating income
+had flipped −3,136M → +1,796M against the previous comparable quarter excluded for
+`no-catalyst-registered-within-60-days`. ⇒ The two lenses that do not require a price fall were
+structurally dead, and they said so in sentences that read as findings about the companies.
+
+`catalystRegister` is the producer and the flow skills carry it as a **numbered step** before
+`radarCandidates`: research the window for every roster name, file the reading (`observation_file`
+for the web, the Aumos evidence id for a vendor calendar), and pass the two maps on. ⛔ Every row
+takes `evidenceIds` and a row without one is refused — «a catalyst is registered» has to mean
+somebody can go and check what it was, or the axis is worse than empty.
+
+⚠️ **Researched-and-absent is not unresearched, and the count is what tells them apart.** A name
+with no window at all is a name nobody looked at; a name whose window closed last month was looked
+at and genuinely has nothing inside the horizon. `upsideRadar` excludes both under one sentence, so
+`catalystRegister` counts them separately and reports `catalyst_window_unresearched` /
+`event_record_unresearched` — `input-path` causes, which is what stops `mandateExecution` reading an
+unfed axis as *the methodology is working*. The same `never-fed` ⇄ `fed-and-genuinely-empty`
+distinction the feeding path above is built on.
+
+⚠️ **The register is carried in `research/catalyst-window`, and its instants are numbers.** A
+catalyst window ends after `asOf` by construction and `memory_read` refuses a payload carrying a
+later **string** timestamp — the shape `run/armed-reviews` hit first. ⛔ Event records are not
+persisted: `sue`, `day1ExcessPct` and `preAnnouncementClose` are copied vendor numbers and
+`skills/memory-contract/SKILL.md` forbids them there, so they are re-read every run.
 
 ⚠️ **The same statements feed sizing, and that half of the wire was never connected** (#160). The
 2026-09-06 run built a full variant view and was answered `satisfied: [variantView, consensusRefs,
