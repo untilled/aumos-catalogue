@@ -198,10 +198,16 @@ through `mcp__evidence-gated-metrics__calculate` — never through `Bash`.
 
 ⛔ **And you dispatch nothing.** One tier: the orchestrator dispatched you and you answer.
 `hooks/guard-budget.mjs` refuses an `Agent` call from inside a flow (`delegation_depth_exceeded`).
-The sweep is `calculate` in this context, one call per operation — never a worker opened to relay
-bars, walk listing pages or batch the roster. If it does not fit in this turn, persist what you did
-review with `researchState` and hand back the unreviewed scope, so the orchestrator's `WAIT` can say
-the data was not prepared rather than that nothing qualified.
+⛔ **And the roster sweep is not relayed either.** It is `research_prepare` over the two recipes
+this package declares — `roster-scan` and `opportunity-metrics` — then `research_job_get` until it
+settles and `research_result_get` for the summary; the bars stay in the host and the row that comes
+back carries no series. ⛔ Never a worker opened to relay bars, walk listing pages or batch the
+roster, and ⛔ never a roster of bars typed back as `calculate` arguments.
+`skills/candidate-research/SKILL.md` owns the procedure and the three counts.
+⚠️ Read `unprepared` as **blindness, never as an absence of opportunity**: the names come back and
+`source_cache_refresh` is what fixes them. If it does not fit in this turn, persist what you did
+review with `researchState` and hand back the unreviewed scope with its reason, so the
+orchestrator's `WAIT` can say the data was not prepared rather than that nothing qualified.
 
 ## What is different about this market
 

@@ -219,6 +219,13 @@ every filing test. catalystRegister is that producer, every row carries the evid
 was filed under, and its nextState is persisted to research/catalyst-window with numeric instants.
 Do all of that in your own context with calculate — do not open subagents to batch the roster, to
 relay bars, or to walk listing pages; that is refused and the run is charged for it either way.
+Run the whole-universe price sweep through research_prepare over this package's declared recipes
+(roster-scan, opportunity-metrics), then research_job_get and research_result_get; the bars stay in
+the host and never become tool arguments. Report sourced, evaluated and unprepared as three
+separate counts and never their sum, and treat unprepared as blindness with the names attached and
+source_cache_refresh as its fix — never as a market that offered nothing. If the four research
+tools were not named in your grant, say so in uncertainty and do not reopen the relay path.
+skills/candidate-research/SKILL.md owns the procedure.
 Scan holdings' news/disclosures through granted web and installed filing sources every cycle.
 Return researchActivity ({source, granted, attempts, succeeded}), each radar lane's exclusions and
 starvation with its feedStage/feedCause, and the feed verdict — fed-and-evaluated,

@@ -116,11 +116,24 @@ namespace is this one instance.
 | a `subagent_type` outside `agents/` — the roster is `kr-sleeve`, `us-sleeve`, `allocate` | `delegation_flow_undeclared` |
 | more than **2 dispatches of one flow** or **6 in a run** | `delegation_budget_exhausted` |
 
-⛔ **Mechanical work is not delegated — it is calculated.** Do not open a worker to convert or relay
-price arrays, to walk pages of a vendor listing, or to split a roster into batches. The sweep is
-`mcp__evidence-gated-metrics__calculate`, one call per operation, and a model retyping bars as tool
-arguments so another model can hand them back is the most expensive way this package has ever failed
-to reach a judgement.
+⛔ **Mechanical work is neither delegated nor relayed — it is prepared.** Do not open a worker to
+convert or relay price arrays, to walk pages of a vendor listing, or to split a roster into batches,
+and do not type a roster of bars back in as tool arguments: a model retyping bars so another model
+can hand them back is the most expensive way this package has ever failed to reach a judgement.
+The whole-universe sweep is `research_prepare` over the two recipes this package declares in
+`aumos.json` — **`roster-scan`** and **`opportunity-metrics`** — then `research_job_get` and
+`research_result_get`. Host code runs this package's own `execute()` over the bars the host already
+stores, one process per symbol, and hands back counts and a reference. Everything else — a single
+name, a sizing call, a methodology gate — stays `mcp__evidence-gated-metrics__calculate` in your own
+context, one call per operation.
+
+⚠️ **`sourced`, `evaluated` and `unprepared` are three reports and are never summed.**
+`unprepared` means nothing about those names was readable at this `asOf`: it is **blindness with the
+names attached**, its control is `source_cache_refresh`, and reporting it as a market that offered
+nothing is the same error as reporting `never-fed` as `fed-and-genuinely-empty`.
+⚠️ The four research tools are **optional skills**: unserved, say which one in `uncertainty` and
+report the sweep as not prepared. ⛔ That is not licence to reopen the relay path.
+`skills/candidate-research/SKILL.md` owns the procedure.
 
 ⚠️ **When a limit stops you, leave a checkpoint rather than a silence.** Persist the roster you did
 review with `researchState` to `coverage/research-index` (`skills/memory-contract/SKILL.md` owns that
@@ -395,8 +408,10 @@ Forward research is the one crossing: the theme radar examines an axis outside i
 joins the universe as an extension, so a run that skips the radar leaves the boundary permanently
 where it was.
 
-⛔ **Do the sweep in your own context.** It is `calculate` calls over a roster, not work to split
-across workers — see §Orchestration's delegation budget.
+⛔ **The sweep is prepared, not split and not relayed.** It is `research_prepare` over
+`roster-scan` and `opportunity-metrics`, read back as a summary — not work to split across workers
+and not a roster of bars carried through your context. See §Orchestration above and
+`skills/candidate-research/SKILL.md` for the three calls and the three counts.
 
 #### Price patterns — `scan`, `opportunityMetrics`
 

@@ -617,7 +617,7 @@ for (const [group, checks] of Object.entries(groupCoverage.groups)) assert.ok(ch
  */
 covers('audit/package-boundary-scan', 'owner-cutover/no-order-code')
 assert.equal(manifest.network.mode, 'deny', 'manager package cannot access the network directly')
-assert.equal(manifest.engines.aumos, '>=0.3.32', 'runtime requires the current invocation and package-MCP contracts, and — since untilled/aumos#693 — an Aumos whose capability enum has `observation:file` in it, which is the release that gave `variantViewCheck`\'s `consensusRefs` requirement a supply route at all (#692): broker estimates and price targets are on the web and in no filing and on no exchange feed, and `observation_file` is the only tool that turns a web reading into an evidence id. ⚠️ **Measured rather than assumed**: the tool merged after the `v0.3.31` tag and is in no released binary yet, so the floor is the next release, `0.3.32`. It was `>=0.3.30` because of untilled/aumos#671 and #683 and an Aumos whose capability enum has `source-cache:read` and `source-cache:write` in it, which is the release that gave `upsideRadar` somewhere to be fed from (#146). ⚠️ The floor has now moved for the fourth time for the **same** reason, and the reason has not changed once. ⚠️ The floor moved from `>=0.3.18` for the third time for the **same** reason, and the reason has not changed once: `capabilities[].kind` is a closed enum, so a value an older build does not know is not an unknown key that gets stripped — the **whole manifest** is refused and this package drops out of that build\'s catalogue with nobody told. It was `>=0.3.18` because of untilled/aumos#576 and `connection:passthrough`. ⚠️ The floor moved from `>=0.3.17` for the **same** reason it moved the time before, one field over: `capabilities[].kind` is a closed enum, so a value an older build does not know is not an unknown key that gets stripped — the **whole manifest** is refused and this package drops out of that build\'s catalogue with nobody told. It was `>=0.3.17` because of untilled/aumos#540 and an Aumos that reads `schedule` as a **list**. ⚠️ The floor moved from `>=0.3.15` for a sharper reason than the one it replaced: `schedule` is a key 0.3.16 already knows and reads as a single object, so a list is not an unknown key that gets stripped — it is a known key of the wrong shape, and the **whole manifest** is refused. An older build drops this package from its catalogue without the author being told (#233 measured that failure). The `rule` floor this line used to state is gone with the field: nothing reads a plan\'s `rule` any more, and AMP still accepts it precisely so an older-schema package is not refused')
+assert.equal(manifest.engines.aumos, '>=0.3.34', 'runtime requires the current invocation and package-MCP contracts, and — since untilled/aumos#724 and #726 — an Aumos whose capability enum has `research:prepare` and `research:read` in it and whose manifest parser reads `recipes`, which is the release that lets this package hand its own `scan` and `opportunityMetrics` to host code instead of relaying a roster of daily bars back as tool arguments (#209 §8-D): one measured run spent ~1.91M characters of `calculate` input and 29 subagents doing exactly that and submitted no judgement. ⚠️ **Measured rather than assumed**: neither host pull request was merged when this line was written and `v0.3.33` is the current tag, so the floor is the next release, `0.3.34`. ⚠️ The floor has now moved for the **fifth** time for the same reason, and the reason has not changed once: `capabilities[].kind` is a closed enum, so a value an older build does not know is not an unknown key that gets stripped — the **whole manifest** is refused and this package drops out of that build\'s catalogue with nobody told. ⚠️ `recipes` is the opposite and is not why the floor moved: it is a **top-level** key, and `managerPackageManifestSchema` strips top-level keys it does not know, so an older build reads the rest of this document unchanged and merely has no name for the computation. It was `>=0.3.32` because of untilled/aumos#693 and `observation:file`, the release that gave `variantViewCheck`\'s `consensusRefs` requirement a supply route at all (#692); `>=0.3.30` because of untilled/aumos#671 and #683 and `source-cache:read`/`:write`, which gave `upsideRadar` somewhere to be fed from (#146); `>=0.3.18` because of untilled/aumos#576 and `connection:passthrough`; `>=0.3.17` because of untilled/aumos#540 and an Aumos that reads `schedule` as a **list** — a known key of the wrong shape, refused whole, which #233 measured. The `rule` floor this line used to state is gone with the field: nothing reads a plan\'s `rule` any more, and AMP still accepts it precisely so an older-schema package is not refused')
 assert.equal(manifest.capabilities.some((row) => /order|broker|database/i.test(row.kind)), false, 'manager package declares no order/broker/database capability')
 /**
  * ⚠️ **Two assertions stood here and the collection split retired them.**
@@ -4237,7 +4237,21 @@ assert.ok(
   'and its reason names both what it is for and what grade the row carries, because the install screen is where an investor decides whether to grant it',
 )
 assert.ok(manifest.requires.optionalSkills.includes('observation_file'), 'the tool is listed beside the other gateway skills this package calls')
-assert.equal(manifest.engines.aumos, '>=0.3.32', 'and the engine floor is the release that introduced it — a manifest declaring `observation:file` stops parsing on any older binary')
+/**
+ * ⚠️ **At least, rather than exactly.** The line above this one pins the floor
+ * to the release this package currently needs; this one asks a narrower
+ * question — is the floor still at or above the release that introduced
+ * `observation:file`? A floor only ever moves forward, so equality here made
+ * every later bump fail a check about a capability the bump had nothing to do
+ * with, and the fix each time was to edit an assertion that was not wrong.
+ */
+const engineFloor = (manifest.engines.aumos.match(/\d+\.\d+\.\d+/) ?? ['0.0.0'])[0]
+  .split('.')
+  .map(Number)
+assert.ok(
+  engineFloor[0] > 0 || engineFloor[1] > 3 || (engineFloor[1] === 3 && engineFloor[2] >= 32),
+  'and the engine floor is at least the release that introduced it — a manifest declaring `observation:file` stops parsing on any older binary',
+)
 
 const observationProse = [
   await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8'),
@@ -4429,8 +4443,8 @@ assert.ok(
 covers('audit/catalyst-research-is-a-numbered-step')
 assert.deepEqual(
   manifest.capabilities.map((row) => row.kind).sort(),
-  ['brief:read', 'brief:write', 'connection:passthrough', 'evidence:read', 'manager-memory:read', 'manager-memory:write', 'observation:file', 'portfolio:read', 'source-cache:read', 'source-cache:write', 'source:passthrough', 'thesis:read'],
-  'the capability set is unchanged by this issue — the axis was unfed for want of a step, not for want of a permission',
+  ['brief:read', 'brief:write', 'connection:passthrough', 'evidence:read', 'manager-memory:read', 'manager-memory:write', 'observation:file', 'portfolio:read', 'research:prepare', 'research:read', 'source-cache:read', 'source-cache:write', 'source:passthrough', 'thesis:read'],
+  'the capability set is unchanged by this issue — the axis was unfed for want of a step, not for want of a permission. ⚠️ The list is exact rather than a subset check, deliberately: it is the one place a new permission has to be argued, and #209 §8-D is the argument for the two `research:*` rows — the roster sweep is this package\'s own arithmetic moved from a model\'s tool arguments into host code, and asking for it is a permission the catalyst axis never needed and still does not',
 )
 
 assertCoverageWasEarned()

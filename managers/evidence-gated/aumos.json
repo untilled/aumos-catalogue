@@ -3,7 +3,7 @@
   "id": "evidence-gated",
   "publisher": "aumos",
   "name": "Evidence-Gated Allocator",
-  "version": "0.4.52",
+  "version": "0.4.53",
   "description": "One evidence-gated methodology run as three market flows: a Korean sleeve, a US sleeve, and the allocator that sets their budgets and proposes the cross-market rebalance. The flows are subagents of one manager; only the orchestrator submits.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
@@ -24,6 +24,20 @@
       "label": "allocate"
     }
   ],
+  "recipes": [
+    {
+      "id": "roster-scan",
+      "version": "1.0.0",
+      "entrypoint": "recipes/roster-scan.mjs",
+      "description": "The price-pattern lens sweep (scan) plus the entry-quality gate for a candidate that named a lens, over one symbol, from the daily bars this fund already collected. Host code runs it; the manager reads counts and a reference."
+    },
+    {
+      "id": "opportunity-metrics",
+      "version": "1.0.0",
+      "entrypoint": "recipes/opportunity-metrics.mjs",
+      "description": "The opportunity metric row (opportunityMetrics) for one symbol, from stored daily bars. The cross-roster fold (opportunityUniverse) stays a calculate call over these rows, which carry no bars."
+    }
+  ],
   "runtimes": [
     "claude"
   ],
@@ -36,7 +50,7 @@
     "notice": "./NOTICE.md"
   },
   "engines": {
-    "aumos": ">=0.3.32"
+    "aumos": ">=0.3.34"
   },
   "ampVersion": 1,
   "contributes": {
@@ -114,6 +128,14 @@
       "reason": "Broker consensus estimates and price targets exist on the web and in no filing and on no exchange feed, and `variantViewCheck` will not open the 20% single-name lane without a dated consensus citation. `observation_file` is the only route by which a reading reaches `evidenceIds` at all: the source's own words, its URL and its publication date are filed and hashed, so what the lane rests on is something an auditor can go and check. The row is filed as this manager's testimony rather than as an Aumos observation, and every proposal it sizes says so where the investor reads before approving."
     },
     {
+      "kind": "research:prepare",
+      "reason": "The whole-universe mechanical sweep is this package's own arithmetic run by host code over stored inputs, one process per symbol, instead of a model relaying a roster of daily bars back as tool arguments. `recipes` names the two computations; this is the permission to ask for one and to cancel a job that is no longer wanted."
+    },
+    {
+      "kind": "research:read",
+      "reason": "A prepared roster is read as a summary and then by named symbol and field. The three counts are read apart — how many had readable documents, how many the recipe answered for, and how many had nothing readable at this asOf — because the last of those is blindness to be reported and never an absence of opportunity."
+    },
+    {
       "kind": "connection:passthrough",
       "connectors": [
         "toss",
@@ -128,6 +150,10 @@
       "connection_request"
     ],
     "optionalSkills": [
+      "research_prepare",
+      "research_job_get",
+      "research_job_cancel",
+      "research_result_get",
       "source_cache_read",
       "source_cache_refresh",
       "observation_file",
