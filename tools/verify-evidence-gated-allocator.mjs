@@ -1441,6 +1441,83 @@ assert.equal(
 )
 
 /**
+ * ── The filing tool has to reach the flow too (issue #182) ────────────────
+ *
+ * #130 above is this defect's first half and was fixed alone: the dispatch
+ * block learned to name `WebSearch`/`WebFetch`, so a flow could **read** the
+ * web. It still could not **file** what it read, because
+ * `mcp__aumos__observation_file` was not on the block either — and by
+ * `agents/*.md`'s own rule an unnamed tool is an absence to report, never one
+ * to go and find.
+ *
+ * ⚠️ **That closes the 20% lane by construction, not by accident.**
+ * `variantViewCheck` opens the main single-name lane on four requirements, one
+ * of which is `consensusRefs`, and a broker estimate or a price target is on
+ * the web and in no filing and on no exchange feed. The only route from a
+ * reading to an `evidenceId` is `observation_file` (aumos#693). Cut it out of
+ * the dispatch prompt and the requirement is unfillable for every flow, which
+ * is every market: measured 2026-09-07, run
+ * `run_996380fbdd9a41a5bb3d74f3eca761a2` — the `us-sleeve` flow reported
+ * `observation_file_not_granted`, filed nothing rather than invent an excerpt,
+ * and the investor's declared 0.20 cap operated at 0.01.
+ *
+ * ⛔ The manifest was never the gap: `observation:file` has been declared since
+ * 0.4.30 and the sleeve skills have carried the filing step since. Nothing here
+ * grants anything new — the tool the manager already holds is named where the
+ * flow that needs it can read it. So the assertions are prose assertions on the
+ * one literal a run copies, plus the arithmetic showing what that literal was
+ * costing.
+ */
+covers('audit/observation-file-reaches-the-flow')
+assert.ok(
+  dispatchBlock.includes('mcp__aumos__observation_file'),
+  'the canonical dispatch block names the filing tool — off it, a flow reads the consensus figure and can never cite it',
+)
+assert.ok(
+  !discoveryBan.includes('observation_file'),
+  'and it is not in the discovery ban, which a flow reads as "you may not"',
+)
+for (const flow of ['kr-sleeve', 'us-sleeve']) {
+  const sleeveSkill = await readFile(new URL(`../skills/${flow}/SKILL.md`, fixtureRoot), 'utf8')
+  assert.ok(
+    sleeveSkill.includes('observation_file'),
+    `skills/${flow} instructs the filing step — the block names the tool and the skill says what to do with it; either alone is the three-document disagreement this issue is`,
+  )
+}
+assert.ok(
+  orchestrateSkill.includes('run_996380fbdd9a41a5bb3d74f3eca761a2') && orchestrateSkill.includes('consensusRefs'),
+  'and the skill states what the omission cost, so the line is not silently dropped again as tidying',
+)
+
+/**
+ * The arithmetic the missing line was denying, at both ends. ⚠️ `thesisComplete`
+ * falls with `consensusRefs` rather than beside it: the completeness check reads
+ * the same rows, so one absent input takes two requirements down.
+ */
+const laneShut = execute({
+  operation: 'effectivePositionCap',
+  asOf: observationContract.asOf,
+  input: { mandatePositionCap: 0.2, maturityStatus: 'observing', lane: 'main', thesis: { ...methodology.thesis, consensusRefs: [] }, challengeVerdict: 'cleared', risks: [], uncertainty: [] },
+})
+assert.equal(laneShut.data.mainLaneOpen, false, 'with nothing filed the main lane is shut')
+assert.equal(laneShut.data.effectiveCap, 0.01, "and the investor's declared 0.20 is sized at the control arm's 0.01 — the measured run, reproduced")
+const laneOpen = execute({
+  operation: 'effectivePositionCap',
+  asOf: observationContract.asOf,
+  input: {
+    mandatePositionCap: 0.2,
+    maturityStatus: 'observing',
+    lane: 'main',
+    thesis: { ...methodology.thesis, consensusRefs: [observationContract.consensusRefs.managerAttested] },
+    challengeVerdict: 'cleared',
+    risks: observationContract.disclosure.risks,
+    uncertainty: observationContract.disclosure.uncertainty,
+  },
+})
+assert.equal(laneOpen.data.mainLaneOpen, true, 'one row filed through `observation_file` and the lane opens')
+assert.equal(laneOpen.data.effectiveCap, 0.2, 'at the cap the investor declared — twentyfold, and the only thing that changed is that the flow was told the tool exists')
+
+/**
  * ── The universe is declared each run, and by a named owner (issue #129) ───
  *
  * `lib/coverage.mjs` now refuses to call an empty sweep complete, which is the
