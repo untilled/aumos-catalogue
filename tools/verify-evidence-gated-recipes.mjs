@@ -163,7 +163,7 @@ for (const [entrypoint, operation] of [
  * ⚠️ **It used to be what every row looked like and no longer is.** Before
  * `untilled/aumos#734` the host collected three filing documents and no price
  * series, so this was the answer for the whole roster. `prices`/`daily` is now
- * a route and 0.4.54's instructions call it before preparing — which is why the
+ * a route and 0.4.55's instructions call it before preparing — which is why the
  * case stays here rather than being deleted: it is now the shape of a name that
  * was *not collected*, and the instructions have to keep telling those apart
  * from a name whose series was collected and is genuinely short.

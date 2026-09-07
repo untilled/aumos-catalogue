@@ -30,7 +30,7 @@ failure mode as `observation:file` below, for the fifth time.
 `scanner_history_insufficient` / `opportunity_history_insufficient` with `count: 0`. It is deleted
 rather than carried forward because the sentence that made it true stopped being true:
 **`prices`/`daily` exists**, it writes exactly the `reading.normalized.bars` payload these recipes
-already read, and 0.4.54 calls it. ⛔ Nothing under `recipes/` or `lib/` changed to receive it — the
+already read, and 0.4.55 calls it. ⛔ Nothing under `recipes/` or `lib/` changed to receive it — the
 prediction this file recorded (*"the day a row exists for it these recipes are already fed"*) is the
 thing that was checked.
 
