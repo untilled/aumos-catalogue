@@ -1,10 +1,10 @@
 # SEC EDGAR
 
-Company fundamentals for US-listed companies, read from the SEC's own filings.
+SEC EDGAR's own endpoints, handed to an agent unread.
 
-This source serves the `fundamentals` port: when an agent asks Aumos for a company's
-revenue, net income, assets, liabilities, equity, cash or shares outstanding, the numbers
-come from `data.sec.gov` — the filings themselves, not a vendor's copy of them.
+Aumos holds the contact address SEC requires and signs the request; what comes back is
+exactly what SEC sent. There is no mapping and no summary in between — this source
+declares no port, and the `source.json` beside this page is the whole of what it does.
 
 ## What you get
 
@@ -12,18 +12,17 @@ come from `data.sec.gov` — the filings themselves, not a vendor's copy of them
 |---|---|
 | **Serves** | EDGAR's own endpoints, relayed unread |
 | **Reaches** | `www.sec.gov`, `data.sec.gov` |
-| **Fidelity** | as-filed |
-| **Coverage** | US filers with a CIK, annual and quarterly periods |
+| **Fidelity** | `none` — Aumos neither reads the answer nor dates it |
+| **Coverage** | US filers with a CIK |
 | **Cost** | free; SEC publishes this data and asks only that callers identify themselves |
 
-**As-filed** is the strong claim, and it is what makes this source usable for judging the
-past. Every figure carries the date it was *filed*, and Aumos will not hand an agent a
-figure filed after the instant it is judging. Where a period was filed more than once —
-an original and then a restatement — this source hands over the **earliest** filing, so a
-question about last March is answered with what was actually known last March rather than
-with what the company said about it a year later.
+**`none` is the honest fidelity, and it is what this source is for.** Aumos does not fold
+the answer into a shape of its own and does not stamp it with a date: the response is
+SEC's bytes, carrying every period and every restatement SEC holds. Judging *when*
+something was known is therefore the reading agent's work rather than the host's, and what
+that costs is listed under **EDGAR as a library** below.
 
-What that does not do is check whether the filing was *true*. A company that misstated its
+What no source can do is check whether a filing was *true*. A company that misstated its
 own accounts is reported as it filed; no data source can tell you otherwise, and this one
 does not pretend to.
 
@@ -39,11 +38,11 @@ SEC's rate limits and any complaint about traffic follow the address in the head
 it in SETTINGS → Data sources; Aumos keeps it in the system keychain, and no agent ever
 sees it.
 
-## The other half: EDGAR as a library
+## EDGAR as a library
 
 An agent can ask this source for EDGAR's own endpoints and get
 back exactly what SEC sent — no mapping, no summary, no rewriting. Aumos still holds the
-contact address and signs the request; what it stops doing is reading the answer.
+contact address and signs the request; what it does not do is read the answer.
 
 | the agent may ask | and receives |
 |---|---|
@@ -58,21 +57,20 @@ that slot answers `404 NoSuchKey`, which reads like *SEC holds nothing for this 
 not that. So the registry call above is a **precondition** of the facts call and not a
 convenience, and the `cik_str` it returns is an integer (`50863`) the caller pads itself.
 
-The difference is not small and it is the reason this exists: the `fundamentals` port
-answers with **seven metrics for one period**, chosen and dated by rules written into the
-document. The same filer's `companyfacts` document carries **503 US-GAAP tags** with every
-period and every restatement in it, and an agent that wants to do its own arithmetic over
-that can now have it.
+`companyfacts` is a filer's whole XBRL history: every tag SEC holds for it, every period,
+and every restatement of a period. An agent that wants to do its own arithmetic over that
+can have it. An agent that wanted a handful of chosen, dated numbers instead cannot get
+them here, because nothing in this path chooses and nothing dates.
 
-What it costs is everything the mapping bought, and none of it comes back:
+What that leaves to the caller, and none of it is done for you:
 
-- **No dates Aumos checked.** The port's answers carry `knownAt` and are cut off at the
-  instant being judged. A relayed response carries whatever SEC put in it, and Aumos does
-  not look. An agent reading this is responsible for its own point-in-time discipline.
-- **It is EDGAR-shaped.** An agent written against these two endpoints cannot be pointed
-  at another filings source; one written against the `fundamentals` port can.
-- **Nothing is dated by Aumos.** Reading the filing dates out of the response is the
-  caller's work, and the moment a request asked about is recorded rather than enforced.
+- **No dates Aumos checked.** A relayed response carries whatever SEC put in it, and Aumos
+  does not look. An agent reading this is responsible for its own point-in-time discipline.
+- **It is EDGAR-shaped.** An agent written against these two endpoints is written against
+  EDGAR, and pointing it at another filings source is rewriting it.
+- **Restatements are not resolved.** Where a period was filed more than once, the response
+  carries all of them; which one answers a question about last March is a decision the
+  reading agent makes and records, not one this source made before handing the bytes over.
 
 The paths above are the whole list — a request to anything else is refused by name. What a
 source may declare there has a ceiling it cannot raise: no document may relay to a
@@ -81,20 +79,19 @@ trades.
 
 ## What it will not do
 
-- **It maps one thing.** Prices, news, filings-as-text and analyst estimates are other
-  ports and other sources. The `fundamentals` port answers questions about the accounts.
-- **It has no prose.** A data source hands Aumos numbers, dates and currency codes, and
-  cannot hand it a sentence. There is no summary field for a source to write into, which
-  is deliberate: a paragraph is where an unbounded claim about the future would enter a
-  judgement that is supposed to be bounded by a date.
+- **It relays two paths.** Prices, news, filings as text and analyst estimates are other
+  sources; the two paths above are the whole of this one.
+- **It does not summarise.** Aumos hands the response over as it arrived. The one sentence
+  this source writes for a reader is the `caveat` in `source.json`, and that is a warning
+  about how to address the endpoint rather than an interpretation of what it returns.
 - **It reaches nowhere else.** The two hosts above are declared in the document Aumos
   installed and are the only ones it can request; a redirect elsewhere is refused rather
   than followed.
 
-## A disclosure about currency
+## A note about currency
 
 A filer reports its figures in a unit, and a company that reports in more than one leaves
-the question of which to call the statement's currency. This source answers **last** — the
-currency of the last metric read. That is a choice rather than a fact about the filing, and
-it is written into the document rather than left to whichever number happened to be read
-most recently, which is what the code this replaced did without saying so.
+the question of which to call the statement's currency. Nothing here answers it: in
+`companyfacts` the facts hang under a `units` object keyed by the unit SEC recorded, and
+Aumos hands that over exactly as it arrived. Picking one — or declining to, and saying so
+in the judgement — belongs to the agent doing the reading.
