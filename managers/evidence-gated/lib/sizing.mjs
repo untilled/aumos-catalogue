@@ -14,9 +14,45 @@ import { trancheIntent } from './schedule.mjs'
  * halves come to disagree about what a flow is called.
  */
 
+/**
+ * ── A position's value carries its own currency, and it is not always the
+ *    asset's (issue #177) ──────────────────────────────────────────────────
+ *
+ * `currency` on a position row was read as **both** facts at once: which sleeve
+ * the name belongs to, and which unit `marketValue` is counted in. Those are
+ * the same fact only on a book marked in the currency its assets quote in, and
+ * the host's `portfolio_read` does not hand one over: it marks **every**
+ * position in the book's base currency (aumos#689 — a level belongs to the
+ * asset's currency, and the mark is a conversion of it). On the USD book that
+ * measured this, two KRW listings arrived as `marketValue` 653.73 and 4,063.43
+ * **USD** with `valueCurrency: "USD"` beside them — a key `sleeveNav` did not
+ * read, in an operation whose `named` mode does not report unread keys inside a
+ * row. The dollars were added to the won bucket at face value: `krwSleeveNav`
+ * came back **11,119,948.16** against a true 17,430,791.23, every converted
+ * figure short by the rate itself (1,338.848×), and `status: ok` with no
+ * diagnostic.
+ *
+ * ⚠️ **The two facts are separated rather than a spelling being guessed at.**
+ * `currency` stays the currency the asset quotes in — it is what puts the row
+ * in the KR or US sleeve — and `valueCurrency` states the unit `marketValue` is
+ * counted in. The conversion into the sleeve uses the rate this package was
+ * **handed**, exactly as `specialistBudget` does (#174), and the answer says
+ * where it came from.
+ *
+ * ⛔ An absent `valueCurrency` still reads as the position's own currency: that
+ * is what the contract has always meant, it is right on every single-currency
+ * book, and refusing it would refuse every caller. What it does not do is stay
+ * silent about which reading it took — `marketValueBasis` says whether the
+ * units were stated or assumed.
+ *
+ * ⛔ A row whose value cannot be put in its sleeve's currency is **dropped and
+ * named**, never added at face value. A number in the wrong unit is the defect
+ * this whole comment is about.
+ */
 export function sleeveNav({ cash = [], positions = [], fx = {} }) {
   const diagnostics = []
   const totals = { KRW: 0, USD: 0 }
+  const usdKrw = finite(fx?.USDKRW) && fx.USDKRW > 0 ? fx.USDKRW : null
   for (const row of cash) {
     if (!['KRW', 'USD'].includes(row?.currency) || !finite(row?.amount)) {
       diagnostics.push(diagnostic('cash_row_unevaluated', 'unevaluated', 'Cash row needs currency and amount', 'cash'))
@@ -24,22 +60,51 @@ export function sleeveNav({ cash = [], positions = [], fx = {} }) {
     }
     totals[row.currency] += row.amount
   }
-  for (const row of positions) {
+  let stated = 0
+  let assumed = 0
+  const valued = []
+  for (const [index, row] of positions.entries()) {
     if (!['KRW', 'USD'].includes(row?.currency) || !finite(row?.marketValue)) {
       diagnostics.push(diagnostic('position_value_unevaluated', 'unevaluated', 'Position needs currency and marketValue', 'positions'))
       continue
     }
-    totals[row.currency] += row.marketValue
+    const declared = row?.valueCurrency
+    const unstated = declared === undefined || declared === null
+    if (!unstated && !['KRW', 'USD'].includes(declared)) {
+      diagnostics.push(diagnostic(
+        'position_value_unevaluated',
+        'unevaluated',
+        'valueCurrency states the unit marketValue is counted in and is KRW or USD; a value whose unit cannot be read is left out of the sleeve rather than added at face value',
+        `positions[${index}].valueCurrency`,
+        { symbol: row.symbol ?? null, valueCurrency: declared },
+      ))
+      continue
+    }
+    const from = unstated ? row.currency : declared
+    if (unstated) assumed += 1
+    else stated += 1
+    const amount = convertCurrency(row.marketValue, from, row.currency, usdKrw)
+    if (!finite(amount)) {
+      diagnostics.push(diagnostic(
+        'position_value_unevaluated',
+        'unevaluated',
+        `This position is marked in ${from} and quotes in ${row.currency}; converting it needs fx.USDKRW, which this package is handed and never sources. Without it the row is left out rather than counted in the wrong unit`,
+        'fx.USDKRW',
+        { symbol: row.symbol ?? null, valueCurrency: from, positionCurrency: row.currency },
+      ))
+      continue
+    }
+    totals[row.currency] += amount
+    valued.push({ symbol: row.symbol, currency: row.currency, amount })
   }
-  const sgov = positions
-    .filter((row) => row?.symbol === 'SGOV' && row?.currency === 'USD' && finite(row.marketValue))
-    .reduce((sum, row) => sum + row.marketValue, 0)
+  const sgov = valued
+    .filter((row) => row.symbol === 'SGOV' && row.currency === 'USD')
+    .reduce((sum, row) => sum + row.amount, 0)
   const idleUsd = cash
     .filter((row) => row?.currency === 'USD' && finite(row.amount))
     .reduce((sum, row) => sum + row.amount, 0)
   const usdLiquidity = idleUsd + sgov
-  const usdKrw = fx?.USDKRW
-  const globalKrw = finite(usdKrw) && usdKrw > 0 ? totals.KRW + totals.USD * usdKrw : null
+  const globalKrw = usdKrw !== null ? totals.KRW + totals.USD * usdKrw : null
   if (globalKrw === null) diagnostics.push(diagnostic('fx_missing', 'unevaluated', 'USDKRW is required for global NAV', 'fx.USDKRW'))
   return {
     data: {
@@ -49,6 +114,17 @@ export function sleeveNav({ cash = [], positions = [], fx = {} }) {
       sgovReserve: round(sgov, 2),
       usdLiquidity: round(usdLiquidity, 2),
       globalNavKrw: round(globalKrw, 2),
+      /**
+       * ⚠️ Which reading the sleeve totals were computed under: `stated` when
+       * every counted row named the unit of its `marketValue`, `assumed` when
+       * none did and the position's own currency was taken, `mixed` when the
+       * rows disagreed about saying so.
+       */
+      marketValueBasis: stated + assumed === 0 ? null : stated === 0 ? 'assumed-position-currency' : assumed === 0 ? 'stated' : 'mixed',
+      valuedPositionCount: valued.length,
+      /** ⚠️ Where the rate came from; this package never sources one (#174). */
+      fxUsed: usdKrw,
+      fxBasis: usdKrw === null ? null : 'input.fx.USDKRW',
       units: { krwSleeveNav: 'KRW', usdSleeveNav: 'USD', usdLiquidity: 'USD', globalNavKrw: 'KRW' },
     },
     diagnostics,
@@ -1661,7 +1737,8 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
  */
 export function specialistBudget({ managerId = MANAGER_ID, flow, market, currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight, emergencyExit = false, sleeveCashByCurrency, portfolioNav, portfolioNavCurrency, fx }) {
   const diagnostics = []
-  if (managerId !== MANAGER_ID) diagnostics.push(diagnostic('manager_id_unknown', 'blocked', 'This package publishes one manager id', 'managerId', { managerId, expected: MANAGER_ID }))
+  /** ⚠️ The literal id, never the host's instance id — an `inst_…` refused the whole call against a contract that said only `managerId: "string"` (#177). */
+  if (managerId !== MANAGER_ID) diagnostics.push(diagnostic('manager_id_unknown', 'blocked', `This package publishes one manager id and it is the literal \`${MANAGER_ID}\`, not the instance id the host addresses this manager by; the market roles are flows of it, named in \`flow\`, and omitting managerId is the safe call`, 'managerId', { managerId, expected: MANAGER_ID, supported: [MANAGER_ID] }))
   if (!SLEEVE_FLOW_MARKETS[flow]) diagnostics.push(diagnostic('flow_unknown', 'blocked', 'A sleeve flow is required; the allocator flow does not take a sleeve budget', 'flow', { flow, supported: Object.keys(SLEEVE_FLOW_MARKETS) }))
   else if (!SLEEVE_FLOW_MARKETS[flow].includes(market)) diagnostics.push(diagnostic('specialist_market_not_owned', 'blocked', 'Sleeve flow cannot allocate outside its market lane', 'market', { flow, market }))
   /**

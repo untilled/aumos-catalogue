@@ -393,6 +393,13 @@ It is never `met`: an invalidation nobody supplied evidence for cannot become th
 verdict that owes a resize. So an `unevaluated` line is a reading to supply, not a condition to
 report as clear — name the evidence and call it again rather than writing the rule off.
 
+⚠️ **And spell the two fields the way the operation reads them.** The number a rule compares against
+is `level` (a `time` rule's instant is `at`); the reading on the evidence row is `value` and its
+instant is `availableAt`. `threshold`, `observed` and `observedAt` are `input_shape_invalid` — they
+used to be dropped, and a rule written under them joined its evidence, found it, and answered
+*"Rule and evidence are not comparable"*: a price through a registered invalidation reported as a
+condition nobody could judge.
+
 **Forward research, when `themeRadarDue` says so.** Call it against `run/theme-radar-last`; when it
 is due, load `skills/theme-radar/SKILL.md` and run it before naming lenses, because it is where a
 candidate that no scanner would surface comes from. Call `sectorStrength` first — its
@@ -675,6 +682,16 @@ that currency is `sleeve_budget_not_fundable_in_currency`: ⚠️ a **warning**,
 currency and selling the other sleeve are both legitimate — and both are `allocate`'s judgement and
 the investor's approval, never something a sleeve flow may assume it already has. Say the shortfall
 in `uncertainty` and let `allocate` answer it.
+
+**And a position's value carries its own currency — say which.** `portfolio_read` marks **every**
+holding in the book's base currency, so on a USD book a KRW listing arrives as a *dollar* figure.
+`sleeveNav`'s `currency` is the currency the asset **quotes** in — it is what puts the row in the KR
+or the US sleeve — so pass `valueCurrency` beside it whenever the mark is in something else, and
+`fx.USDKRW` with it. ⛔ Omitted, `marketValue` is read as already being in the position's own
+currency: on the book that measured this, USD 4,717.16 of KRW listings went into the won bucket at
+face value and `krwSleeveNav` came back **11,119,948.16** against a true 17,430,791.23 — short by the
+rate itself, `status: ok`, no diagnostic. Check `marketValueBasis` in the answer: `stated` is the
+reading you asked for, `assumed-position-currency` is the one that was inferred.
 
 ⛔ **The single-name total is the Mandate's as well, and this package ships no constant for it.**
 Call `singleNameBudget` with `mandateCashFloor`, `mandatePositionCap`, the book's `positions` and
