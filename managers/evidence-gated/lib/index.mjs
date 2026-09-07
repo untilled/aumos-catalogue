@@ -5,6 +5,7 @@ import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
 import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { proposalDisclosure } from './proposal.mjs'
+import { executionRecord } from './execution-record.mjs'
 import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
 import { observationLedger } from './observation.mjs'
@@ -80,6 +81,20 @@ const operations = {
    * bearing risk at all, and — when none of it is — whether that is a run that
    * found nothing worth owning or one whose gates never got their inputs.
    */
+  /**
+   * ⚠️ **Registered immediately before `mandateExecution` because it is the
+   * input that operation used to guess** (#212 ④). The cause of an empty
+   * single-name lane was decided by intersecting diagnostic strings with a
+   * classification table, and no input to that table counted anything — so a
+   * roster nobody had prepared, plus one gate refusing one name, came back as
+   * *the methodology is working*. This reads the host's own research job and
+   * result and answers the three facts as counts: was the roster prepared, did
+   * the recipe answer, how many cleared the gates.
+   *
+   * ⛔ It reads no diagnostic, and `mandateExecution` refuses a record it did
+   * not produce.
+   */
+  executionRecord,
   mandateExecution,
   /**
    * ⚠️ **Registered beside sizing because it is the half sizing must not do**

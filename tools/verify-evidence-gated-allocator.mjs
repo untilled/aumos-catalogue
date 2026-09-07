@@ -1959,28 +1959,61 @@ assert.ok(wiringUnfinished.diagnostics.some((row) => row.code === 'mandate_objec
 assert.equal(wiringUnfinished.diagnostics.some((row) => row.severity === 'blocked'), false, '⛔ and it refuses nothing: it is a report')
 
 /**
- * ⚠️ **The code here was `research_gate_active_return_short` and no operation
- * in this package emits it** (#171). The gate is `researchGate` and its code is
- * `active_return_below_gate` — so this case was passing an invented spelling,
- * matching nothing, and reaching the `info` answer by *falling through* rather
- * than by carrying evidence that a gate ran. That is the same defect the run
- * reported, standing inside the check that was supposed to catch it.
- * `tools/verify-evidence-gated-diagnostic-codes.mjs` is what now makes an
- * unemitted spelling a red build.
+ * ⚠️ **What earns the positive answer is a counted record, not a code** (#212 ④).
+ * This case used to hand over `['active_return_below_gate']` alone and expect
+ * `no-candidate-cleared-the-gates` — #171's `gate-ran` lane. The lane is
+ * deleted: the code says a gate refused **one** name and says nothing about
+ * whether the roster was prepared, so a run blind across its whole universe
+ * earned *the methodology is working* by refusing one candidate. What earns it
+ * now is `executionRecord` over the host's own research result — a prepared
+ * roster, an answered recipe and nought eligible.
  */
+const preparedRoster = execute({
+  operation: 'executionRecord',
+  asOf: methodology.asOf,
+  input: {
+    result: { resultRef: 'res_september', summary: { sourced: 74, evaluated: 74, unprepared: 0, failed: 0, unpreparedSymbols: [], failedSymbols: [] } },
+    eligibleSymbols: [],
+  },
+})
+assert.equal(preparedRoster.data.dataPreparation, 'prepared')
+assert.equal(preparedRoster.data.candidateEvaluation, 'evaluated')
+assert.equal(preparedRoster.data.eligibleCount, 0, 'an empty list folded is a measurement; an absent one is not')
+assert.equal(preparedRoster.data.inferredFromDiagnostics, false)
+
 const nothingCleared = execute({
   operation: 'mandateExecution',
   asOf: methodology.asOf,
-  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, reportedDiagnostics: ['active_return_below_gate'] },
+  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, reportedDiagnostics: ['active_return_below_gate'], executionRecord: preparedRoster.data },
 })
 assert.equal(nothingCleared.data.cause, 'no-candidate-cleared-the-gates')
-assert.deepEqual(nothingCleared.data.gateRanCodes, ['active_return_below_gate'], 'and the `info` answer is earned by a gate that ran, never fallen into')
+assert.equal(nothingCleared.data.executionRecordRead, true, 'and it says which of the two it rested on')
+assert.equal(nothingCleared.data.causeInferredFromDiagnostics, false)
 assert.equal(
   nothingCleared.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity,
   'info',
   '⛔ holding cash because nothing cleared the gates is this methodology working, and this operation is never an argument for filling the lane',
 )
 assert.equal(nothingCleared.data.parkedLiquidityIsUncapped, true, '⑶ of the issue, decided: reported here and capped nowhere — a ceiling on cash-equivalent weight is a floor under deployment by another name')
+
+/** ⛔ The same code, the same book, no record: the claim is withdrawn. */
+const codeAlone = execute({
+  operation: 'mandateExecution',
+  asOf: methodology.asOf,
+  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, reportedDiagnostics: ['active_return_below_gate'] },
+})
+assert.equal(codeAlone.data.cause, 'unreported', 'one gate refusing one candidate never established that the roster had been judged')
+assert.equal(codeAlone.data.executionRecordRead, false)
+
+/** ⛔ And a record nobody counted is refused rather than read as one. */
+const forgedRecord = execute({
+  operation: 'mandateExecution',
+  asOf: methodology.asOf,
+  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, executionRecord: { dataPreparation: 'prepared', candidateEvaluation: 'evaluated', eligibleCount: 0 } },
+})
+assert.equal(forgedRecord.data.cause, 'unreported', 'an object asserting a state nobody counted is the inference this issue removes, wearing the new field\'s name')
+assert.equal(forgedRecord.data.executionRecordRead, false)
+assert.ok(forgedRecord.diagnostics.some((row) => row.code === 'execution_record_unreadable' && row.severity === 'unevaluated'))
 
 const noReason = execute({ operation: 'mandateExecution', asOf: methodology.asOf, input: { positions: septemberBook, cashWeight: 0.5725 } })
 assert.equal(noReason.data.cause, 'unreported', 'a run that reported no diagnostics has not established that it looked')
@@ -1999,21 +2032,23 @@ assert.ok(noReason.diagnostics.some((row) => row.code === 'mandate_objective_unr
  * `info` answer without earning the other one. Unknown is not incomplete.
  */
 covers('sizing/mandate-execution-reads-gap-sources')
-const withCause = (reportedDiagnostics) => execute({
+const withCause = (reportedDiagnostics, executionRecord = undefined) => execute({
   operation: 'mandateExecution',
   asOf: methodology.asOf,
-  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, reportedDiagnostics },
+  input: { mandateObjective: objective, positions: septemberBook, cashWeight: 0.5725, reportedDiagnostics, ...(executionRecord === undefined ? {} : { executionRecord }) },
 })
 const unfetchedValuation = withCause(['valuation_gap_is_unfetched_not_unfillable'])
 assert.equal(unfetchedValuation.data.cause, 'input-path-incomplete', 'a source that exists for this instrument and was never called is the sharpest evidence there is that the lane is empty for want of wiring')
 assert.deepEqual(unfetchedValuation.data.inputPathCodes, ['valuation_gap_is_unfetched_not_unfillable'])
 
-const unfillableValuation = withCause(['valuation_gap_has_no_source_for_this_instrument', 'active_return_below_gate'])
+const unfillableValuation = withCause(['valuation_gap_has_no_source_for_this_instrument', 'active_return_below_gate'], preparedRoster.data)
 assert.equal(unfillableValuation.data.cause, 'no-candidate-cleared-the-gates', '⛔ an instrument that publishes no statements is a fact about the instrument; filing it as unfinished wiring would promise a fix no fetch can deliver')
 assert.deepEqual(unfillableValuation.data.inputPathCodes, [])
+/** ⚠️ Both codes are unregistered since #212 ④ — the record is what carries this answer, and they no longer withdraw it. */
+assert.deepEqual(unfillableValuation.data.recognisedCodes, [])
 
-const unknownClass = withCause(['instrument_class_unknown', 'active_return_below_gate'])
-assert.equal(unknownClass.data.cause, 'unreported', '⛔ unknown is not incomplete — and it is not «the gates ran and found nothing» either')
+const unknownClass = withCause(['instrument_class_unknown', 'active_return_below_gate'], preparedRoster.data)
+assert.equal(unknownClass.data.cause, 'unreported', '⛔ unknown is not incomplete — and it is not «the gates ran and found nothing» either, even over a prepared roster: an unresolved code still withdraws the positive claim')
 assert.deepEqual(unknownClass.data.unresolvedCodes, ['instrument_class_unknown'])
 assert.deepEqual(unknownClass.data.inputPathCodes, [], 'it never counts as evidence that the wiring is at fault')
 assert.equal(
@@ -2573,7 +2608,7 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 106)
+assert.equal(supportedOperations.length, 107)
 assert.deepEqual(
   [...tabledOperations].sort(),
   [...supportedOperations].sort(),

@@ -50,22 +50,34 @@
  * either; it demotes the answer to `unreported` without claiming the wiring is
  * at fault. (#166)
  *
- * `gate-ran` — **the positive evidence for `no-candidate-cleared-the-gates`.**
- * This lane is new with #171 and it exists because `info` was the *default*:
- * any set of codes that matched nothing fell through to *the methodology is
- * working*, which is the one answer in this operation that asserts something.
- * It has to be earned. A gate that ran and refused a candidate — an expected
- * active return under the gate, a challenge not cleared, a thesis still
- * incomplete, a gap no source can close for this instrument — is what earns it.
+ * ── ⛔ The third lane is deleted, and what replaced it (#212 ④) ────────────
  *
- * ⚠️ A code that is in **none** of the three lanes counts for nothing, and a
- * run whose every reported code is unregistered is `unreported`: it has told
- * this operation nothing it can read. That is the safe side. The unsafe side is
- * the behaviour this file replaces.
+ * `gate-ran` was #171's answer to `info` being the *default*: the positive claim
+ * had to be earned by a code from a gate that ran and refused — an expected
+ * active return under the gate, a challenge not cleared, a thesis still
+ * incomplete, a gap no source can close for this instrument.
+ *
+ * ⚠️ **One refused candidate is not a judged roster.** `active_return_below_gate`
+ * says a gate refused **one** name; it says nothing about whether the other
+ * seventy-three were prepared at all, so a run blind across its whole universe
+ * could emit it once and be told the methodology was working. That is
+ * `untilled/aumos-catalogue#209`'s error reached through #171's own check.
+ *
+ * So the positive claim is earned by a **counted record** now — `executionRecord`
+ * over the host's research job and result (`aumos#724`, `#730`), requiring
+ * `dataPreparation: 'prepared'`, `candidateEvaluation: 'evaluated'` and
+ * `eligibleCount === 0`. The four rows that lane held are unregistered: they are
+ * still emitted, still explain *why* a candidate was refused, and no longer
+ * grant anything. `README.md` carries the deleted-to-replacement pairing.
+ *
+ * ⚠️ A code that is in **neither** lane counts for nothing, and a run whose
+ * every reported code is unregistered is `unreported`: it has told this
+ * operation nothing it can read. That is the safe side, and it is the half of
+ * #171 that stays.
  */
 
-/** `input-path` · `unresolved` · `gate-ran` — see above. */
-export const CAUSE_LANES = Object.freeze(['input-path', 'unresolved', 'gate-ran'])
+/** `input-path` · `unresolved` — see above. */
+export const CAUSE_LANES = Object.freeze(['input-path', 'unresolved'])
 
 /**
  * Every row: the code, the operation that emits it, the module the verifier
@@ -152,28 +164,16 @@ export const CAUSE_CODE_REGISTRY = Object.freeze([
    * real reason a book holds no single name — and it is neither of the other
    * two answers. It is not `input-path`: the candidate path is intact, nothing
    * upstream lost a roster or a filing, and filing it there would promise a fix
-   * that fetching cannot deliver. It is emphatically not `gate-ran`: *the
-   * methodology is working* is a positive claim, and a run that never had the
-   * dollars did not establish it. What it does is forbid the `info` answer,
-   * which is exactly what this lane is for.
+   * that fetching cannot deliver. And it is emphatically not evidence for *the
+   * methodology is working* — that is a positive claim, and a run that never
+   * had the dollars did not establish it. What it does is forbid the `info`
+   * answer, which is exactly what this lane is for.
    *
    * ⛔ Neither row makes the operation say the wiring is at fault, and neither
    * blocks anything at its own site: converting currency is a legitimate move.
    */
   { code: 'sleeve_budget_not_fundable_in_currency', operation: 'specialistBudget', module: 'sizing.mjs', lane: 'unresolved' },
   { code: 'sleeve_budget_fundability_unevaluated', operation: 'specialistBudget', module: 'sizing.mjs', lane: 'unresolved' },
-  /**
-   * ⛔ An index ETF publishes no statements, so this gap stays open however
-   * well the wiring works — filing it as unfinished wiring would promise a fix
-   * no fetch can deliver. It is a fact the run established, so it earns the
-   * `info` answer rather than removing it.
-   */
-  { code: 'valuation_gap_has_no_source_for_this_instrument', operation: 'thesisGapSources', module: 'valuation.mjs', lane: 'gate-ran' },
-
-  /* ── gates that ran and refused ──────────────────────────────────────── */
-  { code: 'active_return_below_gate', operation: 'researchGate', module: 'evidence.mjs', lane: 'gate-ran' },
-  { code: 'challenge_not_cleared', operation: 'researchGate', module: 'evidence.mjs', lane: 'gate-ran' },
-  { code: 'thesis_incomplete', operation: 'validateThesis', module: 'methodology.mjs', lane: 'gate-ran' },
 ])
 
 /** The codes of one lane, sorted, frozen — the only way a consumer gets a list. */

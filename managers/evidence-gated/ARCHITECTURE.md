@@ -343,7 +343,13 @@ fixture asserts the difference so it cannot be undone silently.
   `effectivePositionCap` still computes the comparison, names it as owed on `disclosures`, and
   `proposalDisclosure` refuses a proposal that does not carry it
   (`position_cap_reduced_by_maturity`), which closes the asymmetry against
-  `concentration_cap_missing`; what it does not do is shorten the wait. `promotionGate` wants
+  `concentration_cap_missing`; what it does not do is shorten the wait.
+  ⚠️ **And the neighbouring asymmetry — an empty lane read as a working methodology — is closed by a
+  count rather than a code since #212 ④.** `executionRecord` reads the host's research job and result
+  (`untilled/aumos#724`, `#730`) and answers `dataPreparation`, `candidateEvaluation` and
+  `eligibleCount`; `mandateExecution` decides the cause from that record and no longer from the
+  `gate-ran` lane it used to intersect, which is deleted. ⛔ Diagnostics still *withdraw* the positive
+  answer and no longer grant it, and `README.md` carries the deleted-to-replacement pairing. `promotionGate` wants
   30 samples, 10 clusters and **3 regimes**, and only the first two respond to a higher
   candidate rate — a regime turns on the calendar. Two questions are recorded as open rather
   than answered here: what total the single-name lanes may reach together, and whether an

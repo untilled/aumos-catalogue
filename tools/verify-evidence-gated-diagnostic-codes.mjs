@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated/lib/index.mjs'
 import { CAUSE_CODE_REGISTRY, CAUSE_LANES, REGISTERED_CAUSE_CODES, causeCodesInLane } from '../managers/evidence-gated/lib/diagnostic-codes.mjs'
-import { INPUT_PATH_INCOMPLETE_CODES, CAUSE_UNRESOLVED_CODES, CAUSE_GATE_RAN_CODES } from '../managers/evidence-gated/lib/sizing.mjs'
+import { INPUT_PATH_INCOMPLETE_CODES, CAUSE_UNRESOLVED_CODES } from '../managers/evidence-gated/lib/sizing.mjs'
 
 /**
  * ── The check the vocabulary never had (issue #171) ────────────────────────
@@ -29,6 +29,13 @@ import { INPUT_PATH_INCOMPLETE_CODES, CAUSE_UNRESOLVED_CODES, CAUSE_GATE_RAN_COD
  *     diagnostics they return are handed to `mandateExecution` unedited, and the
  *     cause is asserted. Nothing in this step reads the registry, so a rename on
  *     either side fails here whatever the tables say.
+ *
+ * ⚠️ **And since #212 ④ this file also checks what a code may no longer do.** The
+ * registry is the vocabulary of codes that *withdraw* the positive answer; the
+ * `gate-ran` lane that used to **grant** it is deleted, and what grants it now is
+ * `executionRecord`'s counted record. Both halves are asserted below — the four
+ * spellings registered in neither remaining lane, one gate refusing one
+ * candidate earning nothing, and a prepared roster earning it.
  */
 
 const libRoot = new URL('../managers/evidence-gated/lib/', import.meta.url)
@@ -76,12 +83,25 @@ for (const row of CAUSE_CODE_REGISTRY) {
 
 assert.deepEqual(INPUT_PATH_INCOMPLETE_CODES, causeCodesInLane('input-path'), 'the input-path vocabulary is the registry projected, never a copy of it')
 assert.deepEqual(CAUSE_UNRESOLVED_CODES, causeCodesInLane('unresolved'))
-assert.deepEqual(CAUSE_GATE_RAN_CODES, causeCodesInLane('gate-ran'))
 assert.deepEqual(
   REGISTERED_CAUSE_CODES,
-  [...INPUT_PATH_INCOMPLETE_CODES, ...CAUSE_UNRESOLVED_CODES, ...CAUSE_GATE_RAN_CODES].sort(),
-  'the three lanes partition the registry — a row readable by nobody is a row that decides nothing',
+  [...INPUT_PATH_INCOMPLETE_CODES, ...CAUSE_UNRESOLVED_CODES].sort(),
+  'the two lanes partition the registry — a row readable by nobody is a row that decides nothing',
 )
+
+/**
+ * ── ⛔ The lane that granted the positive answer is gone (#212 ④) ──────────
+ *
+ * `gate-ran` existed so `no-candidate-cleared-the-gates` would be earned rather
+ * than fallen into, and a code was what earned it. One refused candidate is not
+ * a judged roster, so the earning moved to a counted record and these four
+ * spellings are unregistered: still emitted, still explaining *why* a candidate
+ * was refused, granting nothing.
+ */
+assert.equal(CAUSE_LANES.includes('gate-ran'), false, 'no code grants the positive answer any more; `executionRecord` does')
+for (const code of ['active_return_below_gate', 'challenge_not_cleared', 'thesis_incomplete', 'valuation_gap_has_no_source_for_this_instrument']) {
+  assert.equal(REGISTERED_CAUSE_CODES.includes(code), false, `${code} is a gate's own finding and no longer a licence to claim the whole roster was judged`)
+}
 for (const code of ['corp_code_unmapped_symbols', 'corp_code_mapping_empty', 'radar_lane_starved', 'lane_query_failed']) {
   assert.ok(INPUT_PATH_INCOMPLETE_CODES.includes(code), `${code} is a stage that lost an input and the 2026-09-07 run reported it; it has to be readable`)
 }
@@ -173,12 +193,61 @@ assert.equal(
   'unevaluated',
 )
 
-const gateRan = cause(['active_return_below_gate'])
-assert.equal(gateRan.data.cause, 'no-candidate-cleared-the-gates', 'a gate that ran and refused is what earns the `info` answer')
-assert.deepEqual(gateRan.data.gateRanCodes, ['active_return_below_gate'])
-assert.equal(gateRan.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity, 'info')
+/**
+ * ── What earns the positive answer now, and what no longer does (#212 ④) ───
+ *
+ * The old assertion here was that `['active_return_below_gate']` earns
+ * `no-candidate-cleared-the-gates`. ⚠️ **That is the check this issue removes**:
+ * the code says a gate refused *one* name and says nothing about whether the
+ * rest of the roster was ever prepared, so a run blind across its universe
+ * earned *the methodology is working* by refusing one candidate. Both halves are
+ * asserted — the code alone no longer earns it, and a counted record does.
+ */
+const gateRanOnly = cause(['active_return_below_gate'])
+assert.equal(gateRanOnly.data.cause, 'unreported', '⛔ one gate refusing one candidate is not a judged roster, and it never was')
+assert.equal(gateRanOnly.data.executionRecordRead, false, 'the answer says out loud that it rests on no counted record')
+assert.equal(gateRanOnly.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity, 'unevaluated')
+
+const preparedRecord = execute({
+  operation: 'executionRecord',
+  asOf,
+  input: {
+    result: { resultRef: 'res_kr_1', summary: { sourced: 74, evaluated: 74, unprepared: 0, failed: 0, unpreparedSymbols: [], failedSymbols: [] } },
+    eligibleSymbols: [],
+  },
+}).data
+const earned = execute({
+  operation: 'mandateExecution',
+  asOf,
+  input: { mandateObjective: 'Buy what the market has mispriced.', positions: book, cashWeight: 0.5725, reportedDiagnostics: ['active_return_below_gate'], executionRecord: preparedRecord },
+})
+assert.equal(earned.data.cause, 'no-candidate-cleared-the-gates', 'a prepared roster, an answered recipe and nought eligible is what earns it')
+assert.equal(earned.data.executionRecordRead, true)
+assert.equal(earned.data.causeInferredFromDiagnostics, false)
+assert.equal(earned.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity, 'info')
+assert.ok(
+  earned.diagnostics.some((row) => row.code === 'mandate_execution_codes_unrecognised' && row.severity === 'info'),
+  '⛔ and the unreadable code is said rather than ignored — the half of #171 that had to survive',
+)
+
+/** ⛔ Blindness is not an absence of opportunity, and the record is what tells them apart. */
+const blindRecord = execute({
+  operation: 'executionRecord',
+  asOf,
+  input: {
+    result: { resultRef: 'res_kr_2', summary: { sourced: 0, evaluated: 0, unprepared: 74, failed: 0, unpreparedSymbols: ['005930'], failedSymbols: [] } },
+    eligibleSymbols: [],
+  },
+}).data
+assert.equal(blindRecord.dataPreparation, 'unprepared')
+const blind = execute({
+  operation: 'mandateExecution',
+  asOf,
+  input: { mandateObjective: 'Buy what the market has mispriced.', positions: book, cashWeight: 0.5725, reportedDiagnostics: ['active_return_below_gate'], executionRecord: blindRecord },
+})
+assert.equal(blind.data.cause, 'input-path-incomplete', 'the same single gate code, over a roster nobody prepared — this is `untilled/aumos-catalogue#209`, and it now answers differently')
 
 const none = cause([])
 assert.equal(none.data.cause, 'unreported', 'and a run that reported nothing is unchanged')
 
-console.log(`evidence-gated diagnostic codes: ${CAUSE_CODE_REGISTRY.length} registered across ${CAUSE_LANES.length} lanes, every one emitted by the module that owns it`)
+console.log(`evidence-gated diagnostic codes: ${CAUSE_CODE_REGISTRY.length} registered across ${CAUSE_LANES.length} lanes, every one emitted by the module that owns it — and none of them grants the positive answer`)

@@ -405,7 +405,22 @@ export const INPUT_CONTRACTS = {
   singleNameBudget: { mode: 'named', keys: { mandateCashFloor: NUMBER, mandatePositionCap: NUMBER, positions: ARRAY, proposed: ARRAY, controlArmWeight: NUMBER } },
   legacySizeSuggestion: { mode: 'named', keys: { riskRewardRatio: NUMBER, capWeight: NUMBER, minimumCalibrationSamples: NUMBER, calibrationSamples: NUMBER, winProbability: NUMBER, kellyFraction: NUMBER, stopDistance: NUMBER, fullCapAtRiskReward: NUMBER, expectedValue: NUMBER } },
   concentration: { mode: 'strict', keys: { positions: ARRAY, proposed: ARRAY, caps: OBJECT, config: OBJECT } },
-  mandateExecution: { mode: 'strict', keys: { mandateObjective: STRING, positions: ARRAY, proposed: ARRAY, cashWeight: NUMBER, reportedDiagnostics: ARRAY } },
+  /**
+   * ⚠️ **`prepared`, `job` and `result` are the three research tools' answers,
+   * handed back verbatim** (#212 ④); `eligibleSymbols` is the one number that is
+   * this package's rather than the host's — the names this run's own fold found
+   * eligible, from which the count is derived. ⛔ An absent list is `null` and
+   * not `0`.
+   */
+  executionRecord: { mode: 'strict', keys: { prepared: OBJECT, job: OBJECT, result: OBJECT, eligibleSymbols: ARRAY } },
+  /**
+   * ⚠️ **`executionRecord` is what decides the cause now** (#212 ④).
+   * `reportedDiagnostics` stays and still says *why* — an `input-path` code
+   * names a stage that lost an input the research job cannot see — but it no
+   * longer grants the positive answer. Omitting the record is `unreported`, not
+   * a pass.
+   */
+  mandateExecution: { mode: 'strict', keys: { mandateObjective: STRING, positions: ARRAY, proposed: ARRAY, cashWeight: NUMBER, reportedDiagnostics: ARRAY, executionRecord: OBJECT } },
   newSinglePacing: { mode: 'named', keys: { proposedNewSingles: ARRAY, priorNewSingles: ARRAY, sizingPolicyUpdatedAt: STRING, closedOutcomeCount: NUMBER, reviewReadyClosedOutcomes: NUMBER } },
   entryTranchePlan: { mode: 'named', keys: { symbol: STRING, lens: STRING, maturity: STRING, price: NUMBER, plannedTotalWeight: NUMBER, tranches: ARRAY, execution: OBJECT } },
   /**

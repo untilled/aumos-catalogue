@@ -95,7 +95,8 @@ been fed. Do these in order and report each one:
    - **Pass `roster`** — the same `symbols` you give `radarCandidates` — so the counts have a
      denominator. `catalyst_window_unresearched` and `event_record_unresearched` are how many names
      nobody looked at; a name that **was** researched and simply has nothing scheduled is not
-     counted there, and both are `input-path` causes `mandateExecution` reads.
+     counted there, and both are `input-path` causes `mandateExecution` reads — ⚠️ they **withdraw**
+     its positive answer rather than granting one, which since `#212` ④ is what a reported code can do.
    - **Persist `nextState` verbatim to `research/catalyst-window`.** ⚠️ Its instants are
      **numbers** on purpose: a catalyst window ends after `asOf` by construction, and a string
      timestamp later than `asOf` is the one shape `memory_read` refuses. Do not rewrite them.

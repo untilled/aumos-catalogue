@@ -301,6 +301,12 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   `effectivePositionCap`이 여전히 그 비교를 계산해 `disclosures`에 의무로 이름 대고,
   `proposalDisclosure`가 그것을 싣지 않은 제안을 거절한다(`position_cap_reduced_by_maturity`).
   `concentration_cap_missing`과의 비대칭은 이것으로 닫힌다.
+  ⚠️ **그리고 그 옆의 비대칭 — 빈 레인을 «방법론이 작동 중»으로 읽던 것 — 은 #212 ④부터 코드가
+  아니라 카운트가 닫는다.** `executionRecord`가 호스트의 조사 job과 result(`untilled/aumos#724`,
+  `#730`)를 읽어 `dataPreparation` · `candidateEvaluation` · `eligibleCount`를 답하고,
+  `mandateExecution`은 그 record에서 원인을 정하며 전에 교차하던 `gate-ran` 레인은 지워졌다.
+  ⛔ 진단은 여전히 긍정적 답을 **철회**하고 더 이상 부여하지 않으며, 지운 것과 대체한 것의 짝은
+  `README.md`가 든다.
   닫지 *못하는* 것은 대기 시간이다. `promotionGate`는 표본 30건, 클러스터 10개, **레짐 3개**를
   요구하고 앞의 둘만 후보 생성률에 반응한다 — 레짐은 달력이 지나야 바뀐다. 두 질문은 답하지 않고
   열린 채로 기록한다: 개별종목 레인들이 합쳐서 어디까지 갈 수 있는가, 그리고 1%와 완전 승격 사이에
