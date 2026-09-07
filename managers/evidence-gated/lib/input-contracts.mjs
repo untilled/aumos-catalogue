@@ -275,6 +275,19 @@ export const NESTED_CONTRACTS = {
     candidates: 'The whole radarCandidates data object.',
     lanes: 'upsideRadar.data.lanes, so the reading can say fed-and-empty rather than starved.',
   },
+  /**
+   * ⚠️ `observations: "array"` and `claims: "array"` was the whole published
+   * shape, and both rows are receipts whose fields this gate reads one by one
+   * (#176). The measured cost: a receipt filed as the manager's word, cited by
+   * its id, came back `strongestClaimAttestation: "ungraded"` with `status:
+   * "ok"` — and that grade is the input to the main lane's disclosure.
+   */
+  observationLedger: {
+    'observations[]': { evidenceId: STRING, evidenceKind: STRING, evidenceSource: STRING, url: STRING, title: STRING, publishedAt: STRING, contentHash: STRING, excerptChars: NUMBER },
+    'claims[]': { claim: STRING, value: ANY, usedFor: STRING, evidenceId: STRING },
+    receipt: 'One row per `observation_file` call, **as that tool answered it** — the id, the markers (`evidenceKind: "observation"`, `evidenceSource: "manager:web-research"`), `url`, `title`, `publishedAt`, `contentHash` and `excerptChars`. ⚠️ The tool returns the hash and this package cannot recompute it, so the value has to be **kept from the call and passed back here**; without it the row is `observation_hash_missing` — a receipt nothing can be compared against — and that finding is about the hash alone, never about the grade.',
+    grade: 'Not something a claim states. A claim carries `evidenceId`, and the grade travels from the observation filed under that id — `claims[].gradeFrom` says `observation` when it did. ⛔ A claim naming an id no row in `observations` carries is `claim_grade_unstated` rather than a quiet `ungraded`: «this run filed no receipt under that id» and «the receipt has no markers» are different facts, and the main lane\'s `main_lane_rests_on_manager_attestation` disclosure is built on the answer. Carrying `evidenceKind`/`evidenceSource` onto the claim answers it too, and a claim that contradicts the receipt it cites is reported and read at the weaker grade.',
+  },
 }
 
 /** `key: type` for every registered operation, with the mode that governs the rest. */

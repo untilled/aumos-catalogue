@@ -80,6 +80,32 @@ export function attestationOf(row) {
   return 'aumos'
 }
 
+/**
+ * Whether a grade answers the question at all.
+ *
+ * ⚠️ `ungraded` and `uncited` are **not** grades — they are the two ways the
+ * question comes back unanswered, and treating them as low grades is what makes
+ * an absence indistinguishable from a reading. Anything that compares two
+ * grades has to know the difference.
+ */
+export function attestationAnswers(grade) {
+  return grade === 'aumos' || grade === 'manager'
+}
+
+/**
+ * The safer of two grades that both answer — the later one in `ATTESTATION_GRADES`.
+ *
+ * ⛔ **Only ever called with two answering grades.** `ungraded` is later than
+ * both, so admitting it here would make «the receipt lost its markers» outrank
+ * «the claim says whose word it is», which is the demotion this file exists to
+ * refuse. The one real use is a claim that says `aumos` over a row this run
+ * filed as the manager's testimony: the same id cannot be both, and the reading
+ * that does not promote testimony into vendor evidence is the manager one.
+ */
+export function weakerAttestation(a, b) {
+  return ATTESTATION_GRADES.indexOf(a) >= ATTESTATION_GRADES.indexOf(b) ? a : b
+}
+
 /** The best grade in a set, in `ATTESTATION_GRADES` order; `null` for an empty set. */
 export function strongestAttestation(grades = []) {
   for (const grade of ATTESTATION_GRADES) if (grades.includes(grade)) return grade
@@ -203,6 +229,43 @@ export function observationLedger({ observations = [], citedEvidenceIds = [], cl
     ))
   }
 
+  /**
+   * ── The grade travels from the receipt to the claim that cites it (#176) ───
+   *
+   * ⚠️ **It did not, and the failure was silent.** A claim carries the id and
+   * the reading; the markers — `evidenceKind`, `evidenceSource` — are on the
+   * **receipt**, which is the row already in `observations`. Grading the claim
+   * off its own fields therefore answered `ungraded` for every ordinarily
+   * written claim: measured on the reported run, a receipt filed `manager` and
+   * cited by its id came back `claimAttestation: { manager: 0, ungraded: 1 }`,
+   * `strongestClaimAttestation: 'ungraded'`, `status: 'ok'`, `diagnostics: []`.
+   * Filling in `contentHash` changed nothing — the hash was a second, unrelated
+   * finding — and `status: ok` is the part that made it invisible.
+   *
+   * ⛔ **And it collapses the trade `PROMPT.md` §2 states.** The main lane opens
+   * to the Mandate's `maxPositionWeight` on a manager-attested citation *only
+   * while the grade reaches the approval screen*; a grade that cannot leave the
+   * ledger is the disclosure requirement dropped without anyone dropping it.
+   *
+   * So the join is by evidence id, and it is a **join, not a default**:
+   *
+   * | what the claim says | what this run filed under that id | resolved |
+   * |---|---|---|
+   * | nothing | a grade | that grade, `gradeFrom: 'observation'` |
+   * | nothing | a filed row carrying no markers | `ungraded`, `gradeFrom: 'observation'` — the receipt is the one at fault and says so at its own row |
+   * | nothing | nothing (no such filing this run) | `ungraded`, `gradeFrom: null`, **named** as `claim_grade_unstated` |
+   * | a grade | nothing, or the same grade | that grade, `gradeFrom: 'claim'` |
+   * | a grade | a different answering grade | the weaker of the two, and the disagreement is reported |
+   *
+   * ⚠️ **The third row is the whole of requirement 4.** *«This run filed no
+   * receipt under that id»* and *«the receipt has no grade»* are different
+   * facts, and the fix would have re-created the defect one level down if both
+   * came back as a quiet `ungraded`. `gradeFrom` distinguishes them for a
+   * reader and the diagnostic says the first one out loud.
+   */
+  const filedGrades = new Map()
+  for (const row of filed) if (!filedGrades.has(row.evidenceId)) filedGrades.set(row.evidenceId, row.grade)
+
   const claimRows = []
   for (const [index, row] of (Array.isArray(claims) ? claims : []).entries()) {
     const at = `claims[${index}]`
@@ -217,7 +280,7 @@ export function observationLedger({ observations = [], citedEvidenceIds = [], cl
         `${at}.evidenceId`,
         { claim: label, value: row?.value ?? null, usedFor },
       ))
-      claimRows.push({ claim: label, value: row?.value ?? null, usedFor, evidenceId: null, grade: 'uncited', carried: false })
+      claimRows.push({ claim: label, value: row?.value ?? null, usedFor, evidenceId: null, statedGrade: 'uncited', grade: 'uncited', gradeFrom: 'claim', carried: false })
       continue
     }
     const carried = cited.has(evidenceId)
@@ -230,7 +293,36 @@ export function observationLedger({ observations = [], citedEvidenceIds = [], cl
         { claim: label, evidenceId, usedFor },
       ))
     }
-    claimRows.push({ claim: label, value: row?.value ?? null, usedFor, evidenceId, grade: attestationOf(row), carried })
+    const statedGrade = attestationOf(row)
+    const filedGrade = filedGrades.has(evidenceId) ? filedGrades.get(evidenceId) : null
+    let grade = statedGrade
+    let gradeFrom = attestationAnswers(statedGrade) ? 'claim' : null
+    if (filedGrade !== null) {
+      if (!attestationAnswers(statedGrade)) {
+        grade = filedGrade
+        gradeFrom = 'observation'
+      } else if (attestationAnswers(filedGrade) && filedGrade !== statedGrade) {
+        grade = weakerAttestation(statedGrade, filedGrade)
+        gradeFrom = grade === statedGrade ? 'claim' : 'observation'
+        diagnostics.push(diagnostic(
+          'claim_grade_conflicts_with_filing',
+          'unevaluated',
+          `\`${label}\` grades ${evidenceId} as \`${statedGrade}\` and this run filed that same id as \`${filedGrade}\`. One id is one row and it has one grade, so the pair is malformed; the reading taken is \`${grade}\`, because the safe side of a malformed grade is the one that does not promote the manager's own testimony into evidence Aumos obtained. Carry the markers back from the receipt rather than restating them`,
+          `${at}.evidenceKind`,
+          { claim: label, evidenceId, statedGrade, filedGrade, resolved: grade },
+        ))
+      }
+    }
+    if (gradeFrom === null) {
+      diagnostics.push(diagnostic(
+        'claim_grade_unstated',
+        'unevaluated',
+        `\`${label}\` names ${evidenceId} and nothing here says what kind of row that is: the claim carries no \`evidenceKind\`/\`evidenceSource\`, and no observation filed this run has that id. So whether this judgement rests on the manager's own reading cannot be answered — which is not the same as it resting on nothing. Pass the receipt in \`observations\` and the grade travels by itself, or carry \`evidenceKind\` and \`evidenceSource\` back onto the claim`,
+        `${at}.evidenceKind`,
+        { claim: label, evidenceId, usedFor },
+      ))
+    }
+    claimRows.push({ claim: label, value: row?.value ?? null, usedFor, evidenceId, statedGrade, grade, gradeFrom, carried })
   }
 
   const grades = claimRows.map((row) => row.grade)
@@ -243,6 +335,10 @@ export function observationLedger({ observations = [], citedEvidenceIds = [], cl
       claims: claimRows,
       claimsUncited: claimRows.filter((row) => row.evidenceId === null).map((row) => row.claim),
       claimsNotCarried: claimRows.filter((row) => row.evidenceId !== null && !row.carried).map((row) => row.claim),
+      /** Claims naming an id nothing here grades — `gradeFrom: null`. ⚠️ Not the same set as the `ungraded` count: a filed receipt that lost its own markers is `ungraded` and answered. (#176) */
+      claimsGradeUnstated: claimRows.filter((row) => row.evidenceId !== null && row.gradeFrom === null).map((row) => row.claim),
+      /** Claims whose grade came off the receipt rather than off the claim row. (#176) */
+      claimsGradedFromFiling: claimRows.filter((row) => row.gradeFrom === 'observation').map((row) => row.claim),
       claimAttestation: attestationCounts(grades),
       strongestClaimAttestation: strongestAttestation(grades),
       /** Every claim names an id and every id is submitted. Says nothing about whether the reading is true. */

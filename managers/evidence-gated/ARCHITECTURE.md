@@ -69,7 +69,10 @@ row is filed as the manager's testimony and carries two independent markers of i
 `observation`, source `manager:web-research`. This package reads that grade in `variantViewCheck`,
 carries it through `effectivePositionCap` into the proposal's `rationale.risks`, and audits the
 other direction with `observationLedger`: a value read on the web and used in judgement without a
-submitted id behind it is refused.
+submitted id behind it is refused. ⚠️ **The markers sit on the receipt, so that is where a claim's
+grade comes from** — a claim citing an observation passed in the same call is graded by it, and an
+id no receipt in the call carries is reported as `claim_grade_unstated` rather than answered
+`ungraded`: «nothing here can say» is not a reading (#176).
 
 Three OpenDART behaviours are the manager's to handle, because Aumos relays unread:
 `corpCode.xml` answers with a ZIP (read `corp_code`/`stock_code` off `list.json`

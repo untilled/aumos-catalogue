@@ -341,6 +341,18 @@ source is `manager:web-research`, and every screen an investor reads and every l
 it tells it apart from data Aumos obtained itself. Carry both markers back onto whatever row cites
 it, so this package can read the grade too.
 
+⚠️ **Keep what `observation_file` hands back — the whole answer, not just the id.** The
+`contentHash` it computes over the passage cannot be recomputed here, and neither can `title`,
+`publishedAt` or `excerptChars`; whatever you do not keep from that call is a field nothing later in
+the run can supply. `observationLedger` wants them in `observations[]` exactly as they arrived, and
+a row without the hash is `observation_hash_missing` — a receipt with nothing to compare against.
+⛔ **On a `consensusRefs` row, restate the markers; into `observationLedger`, pass the receipt.**
+A claim carries `evidenceId` and the grade travels from the observation filed under it, so the two
+places want different things and a claim that says nothing about the grade is answered rather than
+guessed — but only when the receipt is in the same call. Name an id you did not file this run and
+the answer is `claim_grade_unstated`: not *ungraded*, which would be a reading, but *nothing here
+can say*, which is what it is.
+
 ⛔ **Then check that you cited what you read.** Before submitting, call `observationLedger` with
 what you filed, the ids the proposal carries, and every web-read value your judgement leant on.
 A value used and uncited is `claim_evidence_missing` / `blocked`. That is not hypothetical: on
