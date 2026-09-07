@@ -51,6 +51,7 @@ for (const [operation, input] of [
   ['concentration', { positions: [{ symbol: 'DKS', weight: 0.01, theme: 'retail' }] }],
   ['exitCheck', { price: { last: 139.15, close: 139.15, asOf, evidenceId: 'ev-price' } }],
   ['entryQualityGate', { scanHistory: [] }],
+  /* ⚠️ Still refused, and #204 is why the line is worth keeping: `openWindow` is outside the §1 envelope, so it reads as a misspelled member rather than as a carried record. */
   ['signalPaper', { state: { openWindow: [] } }],
   ['paperAdmission', { setup: 'thesis_call', symbol: 'DKS' }],
 ]) {
@@ -2199,4 +2200,92 @@ assert.ok(has(datedRow, 'forward_base_missing'), 'the divergence is real and thi
 assert.equal(has(paper({ rows: [paperRow()] }), 'forward_base_missing'), false, 'the same bars under `timestamp` score')
 assert.ok(/`timestamp`/.test(paperContract.barShape) && /forward_base_missing/.test(paperContract.barShape))
 
+/**
+ * ── `state` ignores the §1 envelope, and stores none of it (#204) ───────────
+ *
+ * Two published readings answered *«pass back what you read from memory»* in
+ * opposite directions: `signalPaper`'s `state` refused every field outside its
+ * five members, one `input_shape_invalid` / `blocked` per key, while
+ * `reconcileArmedReviews`' `previous`, `refutedMemoryRules`' `patterns` and
+ * `watchAlertState`' `previous` took the stored record whole. #199 measured the
+ * cost — a run that satisfied §1 got `blocked`, `data: null`, seven named paths,
+ * no `nextState`, and §5 step 4 then held the prior revision, so the only path
+ * to the 30-sample gate stood still once per wake — and wrote the asymmetry into
+ * two documents rather than choosing. The owner chose the loose side.
+ *
+ * ⚠️ **Two properties, and the second is the one #199 was right to worry
+ * about.** Accepting the wrapper is only safe if the wrapper cannot be stored
+ * again: «write `nextState` back verbatim» and «the stored value carries an
+ * envelope» cannot both be rules. `signalPaper` builds `nextState` as a literal
+ * of its five members, so the ignoring lives on the reading side alone — and
+ * that is asserted here rather than assumed.
+ *
+ * ⛔ **Ignored is not silent, and it is not blanket.** Each carried field is
+ * named back at `info` — «this record never had that field» and «this operation
+ * did not read it» are different facts — and every field *outside* the envelope
+ * is still refused, because there an unknown key reads as a misspelled member
+ * and a misspelled `openWindows` is the #137 erasure.
+ */
+const envelopeWindow = { symbol: '139260', signalAt: '2026-02-01T00:00:00Z', setup: 'thesis_call', ruleVersion: 'ega-1.0.0' }
+const ENVELOPE_FIELDS = ['decisionIds', 'evidenceIds', 'sampleCount', 'independentDateClusterCount', 'computableMetrics', 'missingFields', 'status']
+const envelopedState = {
+  schemaVersion: 2,
+  updatedAsOf: '2026-02-20T00:00:00Z',
+  closed: {},
+  openWindows: [envelopeWindow],
+  maturedThisRun: [],
+  decisionIds: ['dec-1'], evidenceIds: ['ev-1'], sampleCount: 1, independentDateClusterCount: 1,
+  computableMetrics: {}, missingFields: [], status: 'insufficient',
+}
+const enveloped = paper({ state: envelopedState })
+
+/* ⑴ the call the run skeleton's own §1 produces now answers. */
+assert.notEqual(enveloped.status, 'blocked', 'the §1 envelope is ignored rather than refused')
+assert.ok(enveloped.data?.nextState, 'so the wake advances the track instead of holding the prior revision')
+assert.equal(enveloped.diagnostics.filter((row) => row.code === 'input_shape_invalid').length, 0)
+assert.deepEqual(enveloped.data.nextState.openWindows, [envelopeWindow], 'and the carried window survives the wrapping')
+
+/* ⑵ and nothing of the envelope reaches the value step 4 writes back verbatim. */
+assert.deepEqual(
+  Object.keys(enveloped.data.nextState).sort(),
+  ['closed', 'maturedThisRun', 'openWindows', 'schemaVersion', 'updatedAsOf'],
+  'nextState is the five published members: not one envelope field is carried back, so a revision stored wrapped is stored unwrapped from here on',
+)
+for (const field of ENVELOPE_FIELDS) {
+  assert.equal(enveloped.data.nextState[field], undefined, `nextState.${field} would be the wrapper surviving its own reading`)
+}
+assert.equal(enveloped.data.nextState.schemaVersion, 1, 'and the version is the operation\'s own, not the wrapper\'s 2')
+
+/* ⑶ ignored is said, by name, at a severity that claims nothing about the verdict. */
+assert.deepEqual(
+  enveloped.diagnostics.filter((row) => row.code === 'input_state_envelope_ignored').map((row) => row.path).sort(),
+  ENVELOPE_FIELDS.map((field) => `input.state.${field}`).sort(),
+  'each carried field is named — the two the paper record shares, schemaVersion and updatedAsOf, are read and so are not among them',
+)
+for (const row of enveloped.diagnostics.filter((entry) => entry.code === 'input_state_envelope_ignored')) {
+  assert.equal(row.severity, 'info', 'none of the seven takes part in the verdict, so ignoring one is not an answer this run could not reach')
+  assert.equal(JSON.stringify(row).includes('dec-1'), false, 'key names, never the values the record carried')
+}
+
+/* ⑷ the loosening stops at the envelope. */
+const misspelledMember = paper({ state: { openWindow: [envelopeWindow] } })
+assert.equal(misspelledMember.status, 'blocked', 'a member misspelled outside the envelope is still refused')
+assert.equal(misspelledMember.data, null)
+assert.deepEqual(
+  misspelledMember.diagnostics.filter((row) => row.code === 'input_shape_invalid').map((row) => row.path),
+  ['input.state.openWindow'],
+)
+
+/* ⑸ and the published contract says both halves, so a caller need not find them by being refused. */
+assert.ok(/input_state_envelope_ignored/.test(paperContract.state), 'the published `state` description names the code the ignoring reports under')
+assert.ok(/input_shape_invalid/.test(paperContract.state), 'and says that everything outside the envelope is still refused')
+
+/* ⑹ the reading now generalises: the three sibling keys already answered this way. */
+assert.notEqual(
+  execute({ operation: 'reconcileArmedReviews', asOf: paperAsOf, input: { previous: { armed: [], schemaVersion: 1, status: 'insufficient', decisionIds: [] } } }).status,
+  'blocked',
+  'reconcileArmedReviews.previous was already loose — that is the majority this change joins',
+)
+
 console.log('evidence-gated issue #183 paper-row shape regression tests passed')
+console.log('evidence-gated issue #204 paper-state envelope regression tests passed')
