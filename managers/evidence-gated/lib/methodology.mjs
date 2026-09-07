@@ -897,11 +897,39 @@ export function validateMemory({ value, asOf, expectedSchemaVersion = 1 }) {
   return { data: { accepted: diagnostics.length === 0, value: diagnostics.length ? null : value }, diagnostics }
 }
 
-export function visibleMemoryRevision({ revisions = [], asOf, instanceId, model, key }) {
-  const diagnostics = []
-  const visible = revisions.filter((row) => row.instanceId === instanceId && row.model === model && row.key === key && Date.parse(row.writtenAsOf) <= Date.parse(asOf)).sort((a, b) => b.revision - a.revision)[0] ?? null
-  return { data: { revision: visible }, diagnostics }
-}
+/**
+ * ⛔ `visibleMemoryRevision` was here, and it is gone (#212 ①).
+ *
+ * It answered *which revision may this run read* by filtering rows on
+ * `instanceId`, `key`, `writtenAsOf <= asOf` — and on `model`. Every one of
+ * those four is the host's answer already: `memory_read` namespaces private
+ * memory by manager **instance** and refuses another instance's by name
+ * (`cross-namespace-private-memory`), and the run's `asOf` pin governs what a
+ * payload may carry. So this was a second answer to a question that already had
+ * one, and a second answer is only ever as good as the day it was written.
+ *
+ * ⚠️ **It had already drifted, and in the direction that loses memory.** The
+ * host keys `manager_memory` by instance **alone** — a model or vendor swap, an
+ * in-place package update and a config change all keep the row, which is what
+ * `MEMORY_LIFETIME` on `memory_read`/`memory_write` promises and what
+ * `skills/memory-contract/SKILL.md` §Isolation tells a run to expect. The
+ * `row.model === model` clause said the opposite: measured on
+ * `fixtures/memory-contract.json`, swapping the model on the same instance
+ * turned revision 2 into `null`. A run composing it would have read *no prior
+ * learning* on the first run after a model change and written its baseline
+ * again from zero.
+ *
+ * ⛔ **No legacy adapter, and that is a measurement rather than a preference.**
+ * This package never persisted revisions itself — rows arrive from the host,
+ * whose table has no model column to have written one — so there is no old
+ * shape for an adapter to translate. An adapter here would be a permanent
+ * second path guarding nothing, which is the thing §212 asks to stop.
+ *
+ * ⚠️ **`model` left the input vocabulary with it.** It was the only operation
+ * that named `model` as an input key, and `verify-evidence-gated-allocator.mjs`
+ * now asserts that no registered operation names it again — the way this clause
+ * came back would be quietly, one operation at a time.
+ */
 
 export function migrationMap({ records = [], cutoverAt, schemaVersion = 1 }) {
   const diagnostics = []

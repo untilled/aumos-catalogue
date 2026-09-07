@@ -11,7 +11,7 @@ import { calibrationSummary, closedOutcomeSamples, independentDateClusters, brie
 import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetrics } from './attribution.mjs'
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
-import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, visibleMemoryRevision, migrationMap, exitCheck } from './methodology.mjs'
+import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, migrationMap, exitCheck } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { fundamentalsPlan, mapCorporationCodes, dartVendorStatus, radarCandidates, radarFeedDiagnosis } from './fundamentals-feed.mjs'
 import { catalystRegister } from './catalysts.mjs'
@@ -141,7 +141,6 @@ const operations = {
   exitCheck: (input, asOf) => exitCheck({ ...input, asOf }),
   upsideRadar: (input, asOf) => upsideRadar({ ...input, asOf }),
   validateMemory: (input, asOf) => validateMemory({ ...input, asOf }),
-  visibleMemoryRevision: (input, asOf) => visibleMemoryRevision({ ...input, asOf }),
   migrationMap,
   filterPointInTime: (input, asOf) => filterPointInTime(input?.rows, { ...input, asOf }),
   normalizeSecFacts: (input, asOf) => normalizeSecFacts(input, asOf),

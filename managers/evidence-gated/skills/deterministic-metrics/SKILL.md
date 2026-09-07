@@ -213,7 +213,6 @@ carry, and the 2026-09-06 run never asked for it.
 | operation | what it decides |
 |---|---|
 | `validateMemory` | the memory value contract; refuses copied source prose |
-| `visibleMemoryRevision` | the revision a run at this `asOf` may read |
 | `migrationMap` | a legacy record → its canonical Aumos owner |
 
 A `check` in `tools/verify-evidence-gated-allocator.mjs` fails when this table and the registered
