@@ -21,6 +21,7 @@
  * definition, in `operations.mjs` or `vocabulary.mjs`.
  */
 import { diagnostic } from './diagnostics.mjs'
+import { canonicalizeInput as canonicalizeWith } from './canonical-input.mjs'
 import { OPERATIONS, INPUT_CONTRACTS, INTERNAL_INPUT_CONTRACTS, ALL_INPUT_CONTRACTS, INPUT_KEYS, NESTED_CONTRACTS, GUARDED_OPERATIONS, PUBLISHED_OPERATIONS, INTERNAL_OPERATIONS, SUBSUMED_BY, GROUPS } from './operations.mjs'
 import { ANY, ARRAY_OF_ARRAYS, KEY_MESSAGES, TYPE_LABELS, typeMatches, INPUT_VOCABULARY, PAPER_SETUP_COHORTS, PAPER_STATE_MEMBERS, MEMORY_ENVELOPE_FIELDS, laneOutcome, laneOutcomeRejection } from './vocabulary.mjs'
 
@@ -85,6 +86,20 @@ export {
  * `promotionGate`, `lensEnvelope` and `validateAdjustment` all had the same
  * leak on their own keys.
  */
+
+/**
+ * ── The representation is folded before the shape is judged (#212 ⑥) ───────
+ *
+ * `canonical` is the sixth projection of a definition row and the only one that
+ * *changes* the call: it turns the five second spellings this package accepts
+ * into the one internal type, so `validateInput` below and every leaf beyond it
+ * read one shape. ⛔ It is dispatched exactly the way `shape` is — the row names
+ * the conversion, nothing compares the operation to a string — and an operation
+ * that names none gets its input back untouched.
+ */
+export function canonicalizeInput(operation, input) {
+  return canonicalizeWith(OPERATIONS[operation], input)
+}
 
 export function validateInput(operation, input, asOf = undefined) {
   const diagnostics = []

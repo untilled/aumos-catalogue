@@ -15,7 +15,7 @@
  * of them.
  */
 import { result, diagnostic } from './diagnostics.mjs'
-import { validateInput } from './input-contracts.mjs'
+import { canonicalizeInput, validateInput } from './input-contracts.mjs'
 import { OPERATIONS, PUBLISHED_OPERATIONS, INTERNAL_OPERATIONS, SUBSUMED_BY } from './operations.mjs'
 
 const operations = Object.fromEntries(Object.entries(OPERATIONS).map(([name, row]) => [name, row.run]))
@@ -52,10 +52,22 @@ export function execute(request) {
      * the answer it did compute is still the answer — withholding it would
      * turn a published contract into a stricter gate than the operation is.
      */
-    const shapeDiagnostics = validateInput(operation, request.input ?? {}, asOf)
-    if (shapeDiagnostics.some((row) => row.severity === 'blocked')) return result(operation, asOf, null, shapeDiagnostics)
+    /**
+     * ⚠️ **Canonicalization runs first, and it is a conversion rather than a
+     * gate** (#212 ⑥). The five representations this package used to detect
+     * inside whichever function needed them — a MIC for a sleeve, a `Money` for
+     * an amount, cash rows for a per-currency object, an aliased trigger, a
+     * wrapped memory value — become the internal spelling here, once, so no leaf
+     * carries a branch for the second one. ⛔ A value in no recognised shape is
+     * handed on untouched, so `validateInput` and the leaf's own gate refuse it
+     * exactly as they did.
+     */
+    const canonical = canonicalizeInput(operation, request.input ?? {})
+    diagnostics.push(...canonical.diagnostics)
+    const shapeDiagnostics = validateInput(operation, canonical.input, asOf)
+    if (shapeDiagnostics.some((row) => row.severity === 'blocked')) return result(operation, asOf, null, [...diagnostics, ...shapeDiagnostics])
     diagnostics.push(...shapeDiagnostics)
-    const output = operations[operation](request.input ?? {}, asOf)
+    const output = operations[operation](canonical.input, asOf)
     // A rejected calculation must never offer a replacement for durable memory.
     if (output?.data?.nextState && output.diagnostics?.some((row) => row.severity === 'blocked')) output.data.nextState = null
     return result(operation, asOf, output?.data ?? null, [...diagnostics, ...(output?.diagnostics ?? [])])

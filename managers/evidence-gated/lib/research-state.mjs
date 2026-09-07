@@ -5,7 +5,7 @@ import { diagnostic } from './diagnostics.mjs'
 // A bounded research index, never a copy of provider responses or a portfolio.
 export function researchUniverse({ market, extensions = [], asOf } = {}) {
   const seed = market === 'kr' ? kr : market === 'us' ? us : null
-  if (!seed) return { data: null, diagnostics: [diagnostic('research_market_invalid', 'blocked', 'Expected kr or us', 'market')] }
+  if (!seed) return { data: null, diagnostics: [diagnostic('research_market_invalid', 'blocked', 'Expected kr or us — the sleeve. ⚠️ The MIC (XKRX/XNAS/XNYS) is read too and converted at the one input boundary (#212 ⑥), so a value refused here is neither spelling', 'market')] }
   const visible = Date.parse(asOf) >= Date.parse(seed.updated ?? seed.updated_at)
   if (!visible) return { data: null, diagnostics: [diagnostic('research_universe_post_as_of', 'unevaluated', 'The curated snapshot did not yet exist at asOf', 'asOf')] }
   const rows = new Map(seed.symbols.map((row) => [row.symbol, { ...row, market }]))

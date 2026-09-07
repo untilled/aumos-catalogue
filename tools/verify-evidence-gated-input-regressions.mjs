@@ -1076,7 +1076,15 @@ assert.deepEqual(run('laneCoverage', { lane: 'kr', intent: 'holding-news', sourc
  */
 for (const [operation, wrongShape] of [
   ['coverage', { scannerUniverses: [{ scanner: 'kr' }] }],
-  ['sleeveNav', { cash: { KRW: 1000 } }],
+  /**
+   * ⚠️ **This was `{ cash: { KRW: 1000 } }` until #212 ⑥.** The object is the
+   * internal type now — per-currency cash arrives as it or as the
+   * `{ currency, amount }` rows `portfolio.cashByCurrency` carries, and the two
+   * are folded at the one input boundary — so it is read rather than refused.
+   * What is still refused, and refused by name, is the shape that cannot be
+   * either: a bare amount naming no currency, which is #174's aggregate.
+   */
+  ['sleeveNav', { cash: 5 }],
   ['opportunityUniverse', { rows: {} }],
   ['promotionGate', { rows: {} }],
   ['lensEnvelope', { lens: 'mean-reversion', triggers: {} }],
@@ -1131,7 +1139,21 @@ const usRoster = feedRun('researchUniverse', { market: 'us' })
 assert.equal(krRoster.data.symbols.length, 74)
 assert.equal(usRoster.data.symbols.length, 83)
 assert.equal(krRoster.data.snapshotDate, '2026-07-24')
-assert.equal(feedRun('researchUniverse', { market: 'XKRX' }).status, 'blocked', 'the MIC is refused rather than answered')
+/**
+ * ⚠️ **This asserted `blocked` until #212 ⑥.** The MIC was refused by four
+ * leaves with the same sentence written four times, so a caller who reached for
+ * the wrong one of the two published vocabularies had its whole calculation
+ * refused. The MIC is the host's own spelling (aumos#571 made `MarketCode`
+ * always an exchange), so the two are one fact and the conversion is total in
+ * that direction: it is folded to the sleeve at the one input boundary and the
+ * answer is the same answer, byte for byte, with an `info` naming the internal
+ * spelling. ⛔ A value that is neither is still refused by the leaf.
+ */
+const micRoster = feedRun('researchUniverse', { market: 'XKRX' })
+assert.equal(micRoster.status, 'ok', 'the MIC is read and converted rather than refused')
+assert.deepEqual(micRoster.data, krRoster.data, 'and it is the same answer as the sleeve spelling, field for field')
+assert.ok(micRoster.diagnostics.some((row) => row.code === 'market_spelling_alias' && row.severity === 'info' && row.path === 'market'), 'it says which spelling is internal rather than converting silently')
+assert.equal(feedRun('researchUniverse', { market: 'KOSPI' }).status, 'blocked', 'a value that is neither spelling is still refused, by the leaf that owns the vocabulary')
 const vocabulary = feedRun('inputContracts').data.vocabulary
 assert.deepEqual(vocabulary.researchMarkets, ['kr', 'us'], 'the sleeve vocabulary is published beside the MIC list, which is what made the wrong one the obvious guess')
 assert.deepEqual(vocabulary.markets, ['XKRX', 'XNAS', 'XNYS'])
@@ -1423,7 +1445,13 @@ for (const operation of ['fundamentalsPlan', 'mapCorporationCodes', 'dartVendorS
   assert.ok(published.keys[operation].length, `${operation} publishes its keys`)
 }
 assert.equal(feedRun('fundamentalsPlan', { market: 'kr', symbols: ['005930'], corpCodes: [] }).status, 'blocked', 'a guessed key name is refused rather than absorbed')
-assert.equal(feedRun('radarCandidates', { market: 'XKRX', symbols: [] }).status, 'blocked')
+/** ⚠️ The MIC is read on this operation too (#212 ⑥), and one table says so for all five. */
+assert.deepEqual(
+  feedRun('radarCandidates', { market: 'XKRX', symbols: [] }).data,
+  feedRun('radarCandidates', { market: 'kr', symbols: [] }).data,
+  'the MIC and the sleeve are one fact on every operation that takes a market',
+)
+assert.equal(feedRun('radarCandidates', { market: 'KOSPI', symbols: [] }).status, 'blocked')
 
 console.log('evidence-gated issue #146 fundamental-feed regression tests passed')
 

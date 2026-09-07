@@ -42,41 +42,6 @@ export const DISPATCHABLE_FLOWS = [...Object.keys(SLEEVE_FLOW_MARKETS), ALLOCATO
 export const MARKET_CURRENCIES = Object.freeze({ XKRX: 'KRW', XNAS: 'USD', XNYS: 'USD' })
 
 /**
- * Cash stated per currency, read from either shape the book actually arrives in.
- *
- * `portfolio_read` carries `cashByCurrency` as rows, `sleeveNav` already takes
- * `cash: [{ currency, amount }]`, and this package's other per-currency input —
- * `experimentalPositionFloor` — is an object keyed by currency. Both are read
- * and a **bare amount is refused by name**: a single number names no currency,
- * and the aggregate is exactly what #174 is about. On the book that found it,
- * `cash` read USD 8,596.10 and 96.6% of it was KRW.
- *
- * ⛔ It does not convert and it does not total. Adding two currencies is what
- * produced the number nobody could spend.
- */
-export function readCashByCurrency(value) {
-  if (value === undefined || value === null) return { totals: null, rejection: null }
-  const bare = 'Cash is stated per currency — { KRW: 11115231, USD: 294.02 }, or the { currency, amount } rows the invocation carries under portfolio.cashByCurrency. ⛔ A bare amount names no currency, and an aggregate across currencies is the one number a sleeve cannot be paid in'
-  if (Array.isArray(value)) {
-    const totals = {}
-    for (const row of value) {
-      if (typeof row?.currency !== 'string' || !row.currency || !finite(row?.amount)) {
-        return { totals: null, rejection: 'Each cash row is { currency, amount } with a currency code and a finite amount' }
-      }
-      totals[row.currency] = (totals[row.currency] ?? 0) + row.amount
-    }
-    return { totals, rejection: null }
-  }
-  if (typeof value !== 'object') return { totals: null, rejection: bare }
-  const totals = {}
-  for (const [currency, amount] of Object.entries(value)) {
-    if (!finite(amount)) return { totals: null, rejection: `Cash is keyed by currency code with a finite amount; ${currency} carries something else` }
-    totals[currency] = amount
-  }
-  return { totals, rejection: null }
-}
-
-/**
  * KRW ↔ USD at a rate this package was **handed**, never one it derived.
  *
  * ⚠️ The rate is an input and the answer says where it came from. A run that

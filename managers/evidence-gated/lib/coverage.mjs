@@ -1,6 +1,6 @@
 import { diagnostic } from './diagnostics.mjs'
 import { METHODOLOGY } from './constants.mjs'
-import { WATCH_TRIGGER_KINDS, normalizeWatch } from './methodology.mjs'
+import { WATCH_TRIGGER_KINDS } from './methodology.mjs'
 
 /**
  * Coverage over a universe, and the answer when there was no universe.
@@ -248,12 +248,13 @@ export function discoveryCapacity({ radar = null, coverage = null, uncertainty =
  * deciding it should.
  */
 export function validateWatch(watch, current, asOf, config = {}) {
-  // AMP's spelling of the level and the band is read here too, so a watch
-  // written the only way a `DecisionProposal` accepts it is evaluable (see
-  // `normalizeWatch`). The `info` lines it raises say which name is canonical.
-  const normalized = normalizeWatch(watch)
-  const diagnostics = [...normalized.diagnostics]
-  watch = normalized.watch
+  /**
+   * ⚠️ AMP's spelling of the kind, the level and the band was folded at the one
+   * boundary before this ran (#212 ⑥), so a watch written the only way a
+   * `DecisionProposal` accepts it arrives evaluable and this function reads one
+   * shape. The `info` lines naming the canonical spelling are raised there.
+   */
+  const diagnostics = []
   const kind = watch?.kind
   if (!WATCH_TRIGGER_KINDS.has(kind)) diagnostics.push(diagnostic('watch_kind_unsupported', 'blocked', 'Use at-time, price or weight-drift; event producers are not assumed', 'watch.kind', { supported: [...WATCH_TRIGGER_KINDS] }))
   if (watch?.kind === 'at-time') {
@@ -383,9 +384,8 @@ const NEAR_DEFAULTS = METHODOLOGY.watchNear
  * of the session.
  */
 export function evaluateWatch({ watch, observation = {}, blocks = [], alertedSessionKeys = [], asOf, config = {} } = {}) {
-  const normalized = normalizeWatch(watch)
-  const diagnostics = [...normalized.diagnostics]
-  watch = normalized.watch
+  /** ⚠️ One spelling, folded at the boundary (#212 ⑥). */
+  const diagnostics = []
   const kind = watch?.kind
   const rule = WATCH_EVALUATION[kind]
   if (!rule) {

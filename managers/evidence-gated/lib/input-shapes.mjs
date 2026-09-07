@@ -16,7 +16,8 @@
  * chain emitted. What moved is where the operation name comes from — it is
  * passed in, so `details.operation` still reads the same.
  */
-import { diagnostic, readCashByCurrency } from './diagnostics.mjs'
+import { diagnostic } from './diagnostics.mjs'
+import { readCashByCurrency } from './canonical-input.mjs'
 import { MACRO_INDICATORS } from './evidence.mjs'
 import { INPUT_VOCABULARY, PAPER_STATE_MEMBERS, MEMORY_ENVELOPE_FIELDS, laneOutcomeRejection } from './vocabulary.mjs'
 
@@ -167,10 +168,16 @@ export const labelAxes = collect(({ input, operation, diagnostics, reject }) => 
 /**
  * ⛔ The aggregate is the shape that hid #174, so the bare amount is refused
  * by name rather than read as the sleeve's own currency.
+ *
+ * ⚠️ **The key is a parameter** (#212 ⑥). Per-currency cash arrives under two
+ * names — `sleeveCashByCurrency` and `sleeveNav`'s `cash` — in two
+ * representations each, and the representations are folded at the one input
+ * boundary. What cannot be folded is a bare amount, and that refusal is the
+ * same sentence for both operations, so it is written once and named twice.
  */
-export const sleeveCash = collect(({ input, operation, diagnostics, reject }) => {
-  const { rejection } = readCashByCurrency(input.sleeveCashByCurrency)
-  if (rejection) reject('input.sleeveCashByCurrency', rejection)
+export const sleeveCash = (key) => collect(({ input, reject }) => {
+  const { rejection } = readCashByCurrency(input[key])
+  if (rejection) reject(`input.${key}`, rejection)
 })
 
 /** A price is the observation's value here, not the envelope it arrived in. */
