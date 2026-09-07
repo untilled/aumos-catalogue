@@ -64,14 +64,19 @@ been fed. Do these in order and report each one:
 
 1. **`researchUniverse({market: "us"})`** — ⚠️ the argument is **`"us"`**, the sleeve, and **never
    the MIC `XNAS`/`XNYS`**. `inputContracts.vocabulary.researchMarkets` publishes the pair.
-2. **`source_request` `sec-edgar` `/files/company_tickers.json`** — the CIK registry. ⚠️ **This
-   side has the lower barrier and has still never been fed.** `/api/xbrl/companyfacts/{symbol}` is
-   keyed by the **ticker**, so the vendor route needs no mapping at all; the host cache route wants
-   SEC's own `vendorId`, which is the CIK, and this file is where it comes from. The previous run's
-   US candidate was recorded as *why-cheap unresolved (sec-edgar was open and unused)* — open and
-   unused is the entire finding.
+2. **`source_request` `sec-edgar` `/files/company_tickers.json`** — the CIK registry, and it is a
+   **precondition of every later call on this side**, the vendor route included. ⛔ This step used
+   to say the opposite — *"`/api/xbrl/companyfacts/{symbol}` is keyed by the ticker, so the vendor
+   route needs no mapping at all"* — and it was false (#179). Measured 2026-09-07:
+   `/api/xbrl/companyfacts/INTC` → **404 `NoSuchKey`**;
+   `/api/xbrl/companyfacts/CIK0000050863.json` → **200**. The allowlist's `{symbol}` is the
+   **CIK file name**. ⚠️ `cik_str` in this file is an **unpadded integer** (`50863`); the ten-digit
+   zero-pad is yours to apply — `mapCorporationCodes` and `fundamentalsPlan` both do it, so take
+   the id from them rather than pasting `cik_str` into an address.
 3. **`mapCorporationCodes({market: "us", tickerRows})`** — ticker → CIK. Report the unmapped names;
-   a name with no CIK can still be reached on the vendor route and not through the cache.
+   ⛔ **a name with no CIK cannot be reached on either route** and `fundamentalsPlan` plans nothing
+   for it. Do not fall back to the ticker: that request answers 404, and a 404 reads as *the vendor
+   holds nothing for this filer* — which is how 83 unaddressed names looked like 83 empty ones.
 4. **`fundamentalsPlan`** — it returns the ordered calls with the host cache state already read.
    Call `source_cache_read` for each (`provider`, `market`, `symbol`, `freshFor`, `asOf`), and
    `source_cache_refresh` (which also needs `document: "companyfacts"` and the CIK as `vendorId`)

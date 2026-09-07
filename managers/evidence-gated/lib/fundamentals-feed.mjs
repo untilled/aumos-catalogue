@@ -17,16 +17,22 @@ import { diagnostic, finite, round } from './diagnostics.mjs'
  *   supplies it — `/api/corpCode.xml` — is already on the allowlist and
  *   `parseDartCorpCodes` already reads it. It was simply never requested.
  *
- * ⇒ **KR is not a dead lane; it is an unfed one.** And US is easier still —
- * `/api/xbrl/companyfacts/{symbol}` is keyed by the ticker, so there is no
- * mapping step at all, and the branch has still never been fed on this book.
+ * ⇒ **KR is not a dead lane; it is an unfed one.** And US is the same lane with
+ * a different registry, which is *not* what this comment used to say (#179):
+ * it read *"US is easier still — companyfacts is keyed by the ticker, so there
+ * is no mapping step at all"*, and that sentence was false. Measured
+ * 2026-09-07: `GET /api/xbrl/companyfacts/INTC` → **404 `NoSuchKey`**;
+ * `GET /api/xbrl/companyfacts/CIK0000050863.json` → **200, 4,311,809 bytes**.
+ * The `{symbol}` in the allowlist is a **CIK file name**, never a ticker, so
+ * `/files/company_tickers.json` is a precondition of the *vendor* route and not
+ * only of the cache's `vendorId`. ⚠️ `cik_str` there is an unpadded integer
+ * (`50863`); the ten-digit zero-pad is the caller's job.
  *
  * This module is that one line, made into operations a flow can be told to
- * call in order:
+ * call in order — and the two markets now have the same shape:
  *
- *   corpCode.xml → `mapCorporationCodes` → fnlttSinglAcntAll → `radarCandidates`
- *                                                                    ↓
- *   companyfacts ─────────────────────────────────────────────→ `upsideRadar`
+ *   corpCode.xml       → `mapCorporationCodes` → fnlttSinglAcntAll ─┐
+ *   company_tickers.json → `mapCorporationCodes` → companyfacts ────┴→ `radarCandidates` → `upsideRadar`
  *
  * ⚠️ **Nothing here stores anything.** `skills/memory-contract/SKILL.md`
  * forbids private memory from being a source cache in as many words, and the
@@ -150,6 +156,16 @@ export const CACHE_DOCUMENTS = {
 const KR_SYMBOL = /^\d{6}$/
 const MARKET_MIC = { kr: 'XKRX', us: 'XNAS' }
 
+/**
+ * The one place this package spells a `companyfacts` address (#179).
+ *
+ * ⚠️ It takes a CIK and never a ticker, and the file name carries the `CIK`
+ * prefix, ten zero-padded digits and the `.json` suffix — all three, measured
+ * 2026-09-07: `.../companyfacts/INTC` is a 404 `NoSuchKey`,
+ * `.../companyfacts/CIK0000050863.json` is a 200.
+ */
+export const secFactsPath = (cik) => `/api/xbrl/companyfacts/CIK${String(cik).padStart(10, '0')}.json`
+
 function cacheEntry(cache, key) {
   const row = cache?.[key]
   if (row === undefined || row === null) return { state: null, reported: false }
@@ -197,8 +213,21 @@ export function fundamentalsPlan({ market, symbols = [], corporationCodes = [], 
   const mapped = new Map()
   for (const row of corporationCodes) {
     const symbol = typeof row === 'string' ? null : row?.symbol ?? row?.stockCode ?? null
-    const code = typeof row === 'string' ? row : row?.corporationCode ?? row?.vendorId ?? null
-    if (symbol && code) mapped.set(symbol, code)
+    const code = typeof row === 'string' ? row : row?.corporationCode ?? row?.cik ?? row?.vendorId ?? null
+    if (!symbol || code === null || code === undefined) continue
+    if (market === 'us') {
+      /**
+       * ⚠️ The pad is applied here as well as in `mapCorporationCodes`, because
+       * `corporationCodes` is an argument and a flow may hand over the vendor's
+       * own unpadded `cik_str`. An id that is not a CIK at all is left out of
+       * the map rather than pasted into an address — it then appears by name in
+       * `corp_code_mapping_pending` below, which is the whole point.
+       */
+      const digits = String(code)
+      if (/^\d{1,10}$/.test(digits)) mapped.set(symbol, digits.padStart(10, '0'))
+      continue
+    }
+    mapped.set(symbol, code)
   }
 
   if (market === 'kr') {
@@ -220,17 +249,30 @@ export function fundamentalsPlan({ market, symbols = [], corporationCodes = [], 
     }
   } else {
     /**
-     * ⚠️ The vendor route needs no mapping — `/api/xbrl/companyfacts/{symbol}`
-     * is keyed by the ticker — which is what makes *"it was never fed"* the
-     * whole explanation on this side. ⛔ The **cache** route still wants a
-     * `vendorId`, and SEC's is the CIK, so `company_tickers.json` is planned
-     * for exactly the names whose CIK this run does not already hold.
+     * ⚠️ **The registry is step one here too, and it used to not be** (#179).
+     * This branch addressed the vendor as `/api/xbrl/companyfacts/${symbol}`
+     * with the roster ticker in it, on the strength of the comment above — and
+     * that address answers 404 for every one of the 83 names. It is the same
+     * shape as the KR defect this module was written for: the roster carries a
+     * listing symbol, every route is keyed by the vendor's own filer id, and
+     * nothing joined them. SEC's id is the CIK and `/files/company_tickers.json`
+     * is where it comes from, for the **vendor** route as much as for the
+     * cache's `vendorId`.
+     *
+     * ⛔ A name with no CIK is not planned on either route. There is no address
+     * to plan — and a request built out of a ticker is not a lower-quality
+     * attempt, it is a 404 that reads as *"the vendor holds nothing for this
+     * filer"*. It is reported by name instead, exactly as KR reports its own.
      */
     const unresolved = names.filter((symbol) => !mapped.has(symbol))
-    if (unresolved.length) push({ step: 'ticker-registry', tool: 'source_request', source: 'sec-edgar', path: '/files/company_tickers.json', query: {}, symbol: null, parseWith: 'raw-json', reads: ['ticker', 'cik_str'], resolves: unresolved.length })
+    if (unresolved.length) {
+      push({ step: 'ticker-registry', tool: 'source_request', source: 'sec-edgar', path: '/files/company_tickers.json', query: {}, symbol: null, parseWith: 'raw-json', reads: ['ticker', 'cik_str'], resolves: unresolved.length })
+      diagnostics.push(diagnostic('corp_code_mapping_pending', 'unevaluated', 'These roster symbols have no CIK yet, so no call for them can be addressed — neither the vendor route, whose companyfacts file name is the CIK, nor the cache, which takes the same id', 'corporationCodes', { unmapped: unresolved.slice(0, 20), unmappedCount: unresolved.length, of: names.length, vendorIdKind: 'cik' }))
+    }
     for (const symbol of names) {
       const vendorId = mapped.get(symbol) ?? null
-      push({ step: 'facts', tool: vendorId ? 'source_cache_read' : 'source_request', source: 'sec-edgar', document: 'companyfacts', market: mic, symbol, vendorId, parameters: {}, freshForSeconds, path: vendorId ? null : `/api/xbrl/companyfacts/${symbol}`, cacheKey: `sec-edgar:companyfacts:${symbol}`, refreshWith: 'source_cache_refresh', parseWith: 'normalizeSecFacts' })
+      if (!vendorId) continue
+      push({ step: 'facts', tool: 'source_cache_read', source: 'sec-edgar', document: 'companyfacts', market: mic, symbol, vendorId, parameters: {}, freshForSeconds, path: null, vendorPath: secFactsPath(vendorId), cacheKey: `sec-edgar:companyfacts:${symbol}`, refreshWith: 'source_cache_refresh', parseWith: 'normalizeSecFacts' })
     }
   }
 
@@ -297,7 +339,7 @@ export function mapCorporationCodes({ market = 'kr', symbols = [], registryRows 
   if (!registrySize) {
     diagnostics.push(diagnostic('corp_code_registry_absent', 'unevaluated', market === 'kr'
       ? 'No corp_code registry rows were supplied, so no KR symbol can be addressed; this is an unrequested registry, never an absence of filers'
-      : 'No SEC ticker rows were supplied, so no CIK is known; the vendor route still works by ticker but the cache route cannot be addressed', market === 'kr' ? 'registryRows' : 'tickerRows'))
+      : 'No SEC ticker rows were supplied, so no CIK is known; every companyfacts address is the CIK file name, so neither the vendor route nor the cache can be addressed — this is an unrequested registry, never an absence of filers', market === 'kr' ? 'registryRows' : 'tickerRows'))
   }
   const mapped = []
   const unmapped = []
@@ -587,10 +629,20 @@ export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping 
 
   let stage = 'fed'
   let cause = null
-  const registryPlanned = requests.some((row) => row.step === 'corp-code-registry')
-  const registryFailed = responseRows.find((row) => row?.step === 'corp-code-registry' && row?.usable === false)
+  /**
+   * ⚠️ **Both registries, and both markets** (#179). The four registry-stage
+   * branches below used to be gated on `market === 'kr'`, on the strength of
+   * the claim that US needed no join. It needs the same one: `companyfacts` is
+   * addressed by the CIK file name, so a US run holding no `company_tickers`
+   * mapping lost its input at the *registry*, and reporting that as
+   * `no-fundamental-request-was-planned` names the wrong stage — which is the
+   * one thing this operation exists to get right.
+   */
+  const REGISTRY_STEPS = ['corp-code-registry', 'ticker-registry']
+  const registryPlanned = requests.some((row) => REGISTRY_STEPS.includes(row.step))
+  const registryFailed = responseRows.find((row) => REGISTRY_STEPS.includes(row?.step) && row?.usable === false)
 
-  if (market === 'kr' && mapping === null) {
+  if (mapping === null) {
     /**
      * ⛔ This is the 2026-09-06 branch, and naming it is half of ask 4. The
      * roster was declared, the radar was called, and no run ever asked for the
@@ -599,13 +651,13 @@ export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping 
      */
     stage = 'registry'
     cause = registryPlanned ? 'registry-planned-but-never-read' : 'registry-never-requested'
-  } else if (market === 'kr' && registryFailed) {
+  } else if (registryFailed) {
     stage = 'registry'
     cause = 'registry-request-failed'
-  } else if (market === 'kr' && mapping && mapping.registrySize === 0) {
+  } else if (mapping && mapping.registrySize === 0) {
     stage = 'registry'
     cause = 'registry-received-but-empty'
-  } else if (market === 'kr' && mapping && mapping.mapped?.length === 0 && rosterCount > 0) {
+  } else if (mapping && mapping.mapped?.length === 0 && rosterCount > 0) {
     stage = 'mapping'
     cause = 'registry-read-but-no-roster-symbol-matched'
   } else if (!requests.filter((row) => ['financials', 'facts'].includes(row.step)).length) {
