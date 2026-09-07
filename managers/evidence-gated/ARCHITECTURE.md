@@ -113,7 +113,9 @@ shape `memory_read` refuses. ⛔ Event records are not persisted: `sue`, `day1Ex
 The review-memory record is what this instance **proposed** and whose instant has not passed —
 never a copy of a run's planned sequence, and ⛔ never gated on `decisions[].armed`, which is past
 tense and drops a promise from the record precisely while it still stands (#156). What stood at
-`asOf` is read from the invocation's `standingPlans` instead, and reported rather than acted on. Values
+`asOf` is read from the invocation's `standingPlans` instead, handed to the same call as a
+report-only parameter, and reported rather than acted on: it produces `standingArms`, a floor, and
+reaches neither the reviews to arm nor the state written back (#201). Values
 are JSON objects with schema version, update instant, supporting Decision/Evidence ids,
 sample/independent cluster counts, computable metrics, missing fields and maturity status.
 Writes reuse a key and create a new revision only when an aggregate changes. A historical
@@ -249,6 +251,9 @@ fixture asserts the difference so it cannot be undone silently.
   stood at `asOf` with `planId`, `armedAt`, `armedByDecisionId`, `expiresAt`, `intent` and
   `trigger` — and it changes what may be **reported**, not what is armed: it is a floor, a promise
   it cannot date is left out rather than guessed at, and the field publishes that rule about itself.
+  `reconcileArmedReviews` takes it as a report-only parameter and answers `standingArms`, a floor
+  that says so in its own shape; ⛔ not handed the field is **unreadable** and handed `[]` is a
+  floor of zero, which are two different facts (#201).
   So this package still arms at every judgement and the host folds. ⚠️ **There are two folds now,
   and the ledger one landed second.** Firing time folds an identical instant per instance
   (`untilled/aumos#593`, `untilled/aumos#624`), which was never enough on its own — the duplicate

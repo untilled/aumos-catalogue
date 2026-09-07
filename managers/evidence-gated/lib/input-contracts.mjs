@@ -527,7 +527,16 @@ export const INPUT_CONTRACTS = {
   nextReviewSequence: { mode: 'strict', keys: { krSessions: ARRAY, usSessions: ARRAY, globalReview: OBJECT, buffers: OBJECT, config: OBJECT } },
   resolveWakeFlow: { mode: 'named', keys: { summary: STRING, intent: STRING, watchId: STRING } },
   resolveTrancheWake: { mode: 'named', keys: { summary: STRING, intent: STRING, watchId: STRING } },
-  reconcileArmedReviews: { mode: 'strict', keys: { previous: OBJECT, sequence: ARRAY, armed: ANY, journalArmed: ANY } },
+  /**
+   * ⚠️ `standingPlans` is a **report-only** key (#201): the invocation's answer
+   * to what stood at `asOf` (aumos#690), read into `standingArms` as a floor
+   * and into nothing else. It is published here because this operation is
+   * `strict` — before it was declared, a run that followed §4 and handed the
+   * field over had the whole calculation refused as an unknown key, while a run
+   * that did not could report no floor at all. ⛔ Absent is not `[]`: absent is
+   * unreadable, `[]` is a floor of zero.
+   */
+  reconcileArmedReviews: { mode: 'strict', keys: { previous: OBJECT, sequence: ARRAY, standingPlans: ARRAY, armed: ANY, journalArmed: ANY } },
 
   // ── State the run carries ──────────────────────────────────────────────
   researchState: { mode: 'strict', keys: { previous: OBJECT, observations: ARRAY } },

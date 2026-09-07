@@ -209,6 +209,51 @@ assert.ok(has(rearmed, 'armed_state_unreadable'))
 assert.equal(rearmed.data.standingArms, null)
 assert.equal(rearmed.data.standingArmsAreUnreadable, true)
 assert.equal(rearmed.status, 'ok', 'an unreadable standing count is a true statement about the contract, not a failed calculation')
+assert.equal(has(rearmed, 'standing_arms_are_a_floor'), false, 'a call handed no standingPlans has no floor to report')
+
+/**
+ * ── #201: the floor is read, and the two absences stay two facts ───────────
+ *
+ * `standingArms` was hard-coded `null` while `standingPlans` shipped, and this
+ * operation is `strict` — so a run that followed §4 and handed the field over
+ * had the whole calculation refused as an unknown key, while one that did not
+ * could report no floor at all. It is report-only: it reaches `standingArms`
+ * and reaches nothing else.
+ */
+const standingRows = standingPlansOfDecC914.map((row) => ({ planId: row.planId, armedAt: asOf, expiresAt: row.at, intent: `market-review:${row.flow}`, trigger: { kind: 'at-time', at: row.at } }))
+const withFloor = run('reconcileArmedReviews', { previous: remembered, sequence, standingPlans: standingRows })
+assert.equal(withFloor.status, 'ok', 'the field a run is told to read is not an unknown key')
+assert.equal(has(withFloor, 'input_shape_invalid'), false)
+assert.deepEqual(withFloor.data.standingArms, { atLeast: 3, basis: 'invocation.standingPlans' }, 'the count arrives under a word that makes it a floor rather than a total')
+assert.equal(withFloor.data.standingArmsAreUnreadable, false)
+assert.ok(has(withFloor, 'standing_arms_are_a_floor'))
+assert.equal(has(withFloor, 'armed_state_unreadable'), false, 'it is readable now, and the two codes are exclusive')
+// ⛔ Report-only: reading what stands narrows nothing. Same inputs, same arming answer.
+assert.deepEqual(withFloor.data.toArm, rearmed.data.toArm, 'toArm is the whole sequence whether or not the floor was read')
+assert.deepEqual(withFloor.data.toArm, sequence)
+assert.deepEqual(withFloor.data.duplicateFlows, rearmed.data.duplicateFlows)
+assert.deepEqual(withFloor.data.superseded, rearmed.data.superseded)
+assert.deepEqual(withFloor.data.previouslyProposed, rearmed.data.previouslyProposed)
+assert.deepEqual(withFloor.data.nextState, rearmed.data.nextState, 'the state written back is built from memory and the sequence alone')
+// Three standing rows for a sequence of one: a floor over the whole book never suppresses.
+assert.equal(withFloor.data.toArm.length, 1)
+// ⛔ Absent and empty are two facts. Empty is an answer; absent is not.
+const emptyFloor = run('reconcileArmedReviews', { previous: remembered, sequence, standingPlans: [] })
+assert.deepEqual(emptyFloor.data.standingArms, { atLeast: 0, basis: 'invocation.standingPlans' }, 'nothing stood that the host could date, and that zero is the answer')
+assert.equal(emptyFloor.data.standingArmsAreUnreadable, false, 'an empty array is an answer, not a silence')
+assert.ok(has(emptyFloor, 'standing_arms_are_a_floor'))
+assert.equal(has(emptyFloor, 'armed_state_unreadable'), false)
+// A host older than aumos#690 carries no such field, and a run may forward the null it read.
+for (const absent of [{}, { standingPlans: null }]) {
+  const answer = run('reconcileArmedReviews', { previous: remembered, sequence, ...absent })
+  assert.equal(answer.data.standingArms, null, 'not handed the field is unreadable, never a floor of zero')
+  assert.equal(answer.data.standingArmsAreUnreadable, true)
+  assert.ok(has(answer, 'armed_state_unreadable'))
+  assert.equal(has(answer, 'standing_arms_are_a_floor'), false)
+}
+// The floor is counted, never parsed into a narrower one.
+assert.equal(run('reconcileArmedReviews', { previous: remembered, sequence, standingPlans: [{ planId: 'p1' }, { planId: 'p2' }] }).data.standingArms.atLeast, 2)
+assert.equal(run('reconcileArmedReviews', { previous: remembered, sequence, standingPlans: 3 }).status, 'blocked', 'a count is not a list of promises')
 // The promise survives the run that could not confirm it — #148 emptied it here.
 assert.equal(rearmed.data.nextState.armed.length, 1)
 assert.equal(run('reconcileArmedReviews', { previous: remembered, sequence: [] }).data.nextState.armed.length, 1, 'a run with nothing to arm still carries what it promised')
@@ -692,6 +737,9 @@ assert.deepEqual(Object.keys(contracts.nested.harnessAudit['positions[].origin']
 assert.equal(contracts.contracts.harnessAudit.keys.totalDecisions, 'number')
 assert.ok(/never a statement that the window is whole/.test(contracts.nested.harnessAudit.totalDecisions), 'and the published contract says what an absent face means, which is the half a type cannot carry')
 assert.equal(contracts.contracts.reconcileArmedReviews.keys.journalArmed, 'any', 'the refused parameter stays published so it can be named rather than silently dropped')
+// #201: and the report-only one is published, because a strict operation refuses what it does not declare.
+assert.equal(contracts.contracts.reconcileArmedReviews.keys.standingPlans, 'array')
+assert.ok(contracts.keys.reconcileArmedReviews.includes('standingPlans'))
 assert.ok(contracts.guarded.includes('refutedMemoryRules'))
 // ⚠️ `memory` joined it in #160: the second refuted rule is filed under `run/theme-radar-last`.
 assert.deepEqual(contracts.keys.refutedMemoryRules, ['patterns', 'memory'])

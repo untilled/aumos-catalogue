@@ -136,8 +136,10 @@ Thesis, Brief and WATCH, which are the investor's records rather than a message 
 Read `task`, `portfolio`, `mandate`, `events`, `standingPlans`, `asOf`, `language` and config from
 the invocation. **`standingPlans` is the promises of yours that stood at `asOf`** — read it for what
 it is, a floor under what you are holding open and the only place a count of standing reviews may
-be reported from (§4). ⛔ It is not an input to `reconcileArmedReviews` and not a licence to arm
-less; §4 says why both.
+be reported from (§4). **Pass it to `reconcileArmedReviews` as `standingPlans`** — a report-only
+parameter, which is how the floor reaches `standingArms` — and ⛔ it is still not a licence to arm
+less: it narrows nothing in that answer, and `toArm` comes back as the whole sequence either way.
+§4 says why.
 Do this **before** dispatching anything: `asOf` and `language` are what every flow is handed, and
 a flow that had to read the invocation itself would be a second reader of the same document.
 **`events` is also where the wake is** — a fired `at-time` WATCH arrives there with the id it
@@ -945,7 +947,8 @@ it still keeps the duplicate row. Which is why the depth read from `standingPlan
 **report**, and never a reason to arm less.
 
 **Reconcile before you arm.** Read `run/armed-reviews` and pass **the whole value you read as
-`previous`**, the sequence as `sequence`, to `reconcileArmedReviews`; arm everything it returns in
+`previous`**, the sequence as `sequence`, and the invocation's `standingPlans` **verbatim** as
+`standingPlans`, to `reconcileArmedReviews`; arm everything it returns in
 `toArm`, which is the whole sequence. ⛔ **Do not pass `journalArmed`** — that parameter built a
 receipt out of a field that answers a different question, and it is refused with
 `armed_journal_not_a_receipt` rather than ignored. ⛔ The parameter name is the instruction: passing
@@ -963,19 +966,24 @@ about what is standing; a run with nothing to arm still writes back its unexpire
 state smaller than the promises it was built from is refused with `armed_state_lost`. A blocked
 calculation has no writable `nextState`.
 
-⛔ **Never report a count of standing reviews out of `reconcileArmedReviews`, and never report zero
-out of it.** That operation's only inputs are this instance's own memory and the sequence it is
-about to arm, so it returns `standingArms: null` beside `standingArmsAreUnreadable: true` and says
-the same thing in `armed_state_unreadable` — and all three are statements about **that operation's
-input**, never about the run. A Brief that told the investor *"standing market reviews: 0"* while
-six were ARMED is what this sentence exists to prevent.
+⛔ **Never report a count of standing reviews out of `previouslyProposed`, and never report zero out
+of it.** That field is what this instance proposed — its inputs are this instance's own memory and
+the sequence it is about to arm — and it is never presented as what stands. A Brief that told the
+investor *"standing market reviews: 0"* while six were ARMED is what this sentence exists to
+prevent.
 
-⚠️ **The count itself is reportable — from `standingPlans`, and only from there.** When the
-invocation carries it, the Brief and `uncertainty` may say how many of this manager's promises stood
-at `asOf`, attributed to that field and to its floor: *at least this many*, because a promise with
-no instant to date it by is left out rather than guessed at. When the invocation does not carry it,
-the number is unknown and the word is **unreadable**, never zero. `previouslyProposed` stays what
-this instance proposed and is never presented as what stands.
+⚠️ **The count itself is reportable — from `standingPlans`, and only from there.** Hand that field
+to `reconcileArmedReviews` and it comes back as **`standingArms: { atLeast, basis }`** beside
+`standingArmsAreUnreadable: false`, and the Brief and `uncertainty` may say how many of this
+manager's promises stood at `asOf` — attributed to that field and reported with the word:
+*at least this many*, because a promise with no instant to date it by is left out rather than
+guessed at. ⛔ **Absent and empty are two facts.** Where this call was handed no `standingPlans` —
+the invocation has none, or you dropped it — the answer is `standingArms: null` beside
+`standingArmsAreUnreadable: true` and `armed_state_unreadable`, the number is unknown, and the word
+is **unreadable**, never zero. Where it was handed `[]`, the floor is **0** and that zero is an
+answer: nothing of yours stood that the host could date. ⚠️ The floor reaches `standingArms` and
+reaches nothing else — `toArm`, `duplicateFlows`, `superseded` and `nextState` are computed without
+it — so reading what stands never narrows what you arm.
 
 ⚠️ **The instants in that key are epoch milliseconds, not RFC 3339.** `run/armed-reviews` holds
 future instants by design and `memory_read` refuses a result carrying any *string* timestamp after

@@ -70,8 +70,11 @@ instant has not passed. ⛔ It is not verified against `decisions[].armed` and c
 is past tense, and a review that armed cleanly and one that was never armed produce the same empty
 array (#156, aumos#687). Never hand-write epoch values. ⛔ A count taken from this key is never
 published as a count of standing reviews, and never as zero. ⚠️ The reportable count is the
-invocation's `standingPlans` (aumos#690) and only that — as a floor, *at least this many* — and
-where the invocation does not carry it the number appears in uncertainty as **unreadable**.
+invocation's `standingPlans` (aumos#690) and only that — pass it to the same call as
+`standingPlans` and it comes back as `standingArms: { atLeast }`, a floor, *at least this many*
+(#201). ⛔ Absent and empty are two facts: handed nothing, the answer is `standingArms: null` with
+`standingArmsAreUnreadable: true` and the number appears in uncertainty as **unreadable**; handed
+`[]`, the floor is **0** and that zero is an answer.
 The earlier #136 dedupe diagnosis was refuted in #148; the #148 journal cross-check was refuted in
 turn by #156.
 
@@ -82,7 +85,9 @@ armed. ⚠️ **It exists because a manager can arm a WATCH and cannot read one 
 publishes no watch or plan capability at all, not even a declared-but-empty one. WATCHes leave in a
 `DecisionProposal` and no tool returns them. ⚠️ The host does publish a **field** — the
 invocation's `standingPlans`, what stood at `asOf` (aumos#690) — and it is a floor, not a ceiling,
-so it changes what may be reported and never what is armed.
+so it changes what may be reported and never what is armed. ⚠️ It reaches `reconcileArmedReviews`
+as a **report-only** parameter (#201): it produces `standingArms` and touches neither `toArm` nor
+the state written back.
 
 Since #87 that costs more than it did: every wake dispatches one flow, so two `kr-sleeve` reviews
 armed half an hour apart each run the Korean sleeve and each seal a judgement — two rows on the
