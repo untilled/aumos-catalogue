@@ -49,6 +49,10 @@ The verifier covers:
 - produced `event` thesis invalidations — five triggers transcribed from hand-written theses accepted
   with `producer: { publisher, document }` and `checkBy`, and the same five refused without a
   producer, with half a producer, with a producer written as prose, and with no deadline;
+- the core tranche gate over unreadable bars — two hundred vendor-shaped candle rows refused with the
+  same `bar_value_invalid` count `indicators` raises on the byte-identical rows, the same series in
+  numeric form answering `UPTREND` with every moving average computed, one bad row in two hundred
+  refused, and no `trancheGuidance` on any of the refusals;
 - absence of network, broker/order/database capabilities in the manager manifest.
 
 On 2026-08-25 all six proposal fixtures were also parsed directly by

@@ -1,5 +1,5 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
-import { indicatorPacket } from './indicators.mjs'
+import { indicatorPacket, normalizeBars } from './indicators.mjs'
 import { LENS_ENVELOPES } from './envelopes.mjs'
 
 function volumeCapitulation(bars) {
@@ -402,14 +402,72 @@ export function opportunityUniverse({ rows = [] }) {
   return { data: { rows: ranked, sectorAverages: Object.fromEntries(averages) }, diagnostics }
 }
 
-export function trendState({ symbol, bars = [] }) {
-  const diagnostics = []
-  if (bars.length < 200) {
-    diagnostics.push(diagnostic('trend_history_insufficient', 'unevaluated', 'MA200 requires 200 bars', 'bars', { count: bars.length }))
-    return { data: { symbol, state: 'insufficient_data', bars: bars.length }, diagnostics }
+/**
+ * ── The core tranche gate reads the same bars its sibling refuses (issue #180) ─
+ *
+ * ⚠️ **This operation returned `DOWNTREND` / `stop` off bars it had not parsed
+ * a single value from, with zero diagnostics.** Handed 200 rows in the vendor's
+ * own shape — `{timestamp, closePrice, highPrice, lowPrice, openPrice, volume}`,
+ * every value a **string** — `indicatorPacket` read `bar.close` as `undefined`,
+ * every moving average came back `null`, and the comparisons that decide the
+ * state are all `undefined > null` → `false`. `uptrend` false is `DOWNTREND`,
+ * and `DOWNTREND` is `trancheGuidance: 'stop'`: a run believing that answer
+ * halts core deployment on a reading that was never taken. `bars.length` is
+ * 200 either way, so `trend_history_insufficient` never fired.
+ *
+ * ⛔ **The validator was already in this package.** The sibling operation
+ * `indicators` runs `normalizeBars` over the byte-identical rows and refuses
+ * every one of them — `bar_value_invalid`, *"OHLC values are invalid"*. This
+ * gate simply never called it. It does now, and the whole point is that the
+ * two operations can no longer disagree about whether a row is readable.
+ *
+ * The measured case: the same series in `{date, open, high, low, close, volume}`
+ * numeric form answers `UPTREND` / `small_or_wait` with `ma200` 92,704.055 —
+ * a value independently corroborated to the cent by a plan armed three days
+ * earlier off a different bar set.
+ *
+ * ⚠️ **A rejected row is not a dropped row here.** `indicators` reports and
+ * carries on because its answer *is* the per-row report; a gate that stops
+ * capital deployment cannot average over the rows it could read and call that
+ * the trend. One `unevaluated` row and the state is `insufficient_data` —
+ * the diagnostics name which rows and why, so the caller fixes the shape rather
+ * than reading a verdict computed from a subset it never chose.
+ *
+ * ⚠️ And the second belt, kept even though the first makes it unreachable
+ * today: **an MA that did not compute yields no state and no guidance.** A
+ * verdict standing on `ma200: null` is not a verdict, whatever route left it
+ * null.
+ */
+export function trendState({ symbol, bars = [], asOf }) {
+  const normalized = normalizeBars(bars, asOf)
+  const diagnostics = [...normalized.diagnostics]
+  const rejected = normalized.diagnostics.filter((row) => row.severity === 'unevaluated')
+  if (rejected.length) {
+    diagnostics.push(diagnostic(
+      'trend_bars_unreadable',
+      'unevaluated',
+      'Bars this gate could not read are not averaged over; the trend state stands on every bar or on none',
+      'bars',
+      { submitted: Array.isArray(bars) ? bars.length : 0, readable: normalized.bars.length, rejected: rejected.length, codes: [...new Set(rejected.map((row) => row.code))] },
+    ))
+    return { data: { symbol, state: 'insufficient_data', bars: normalized.bars.length, barsSubmitted: Array.isArray(bars) ? bars.length : 0, barsRejected: rejected.length }, diagnostics }
   }
-  const packet = indicatorPacket(bars)
-  const closes = bars.map((row) => row.close)
+  if (normalized.bars.length < 200) {
+    diagnostics.push(diagnostic('trend_history_insufficient', 'unevaluated', 'MA200 requires 200 bars', 'bars', { count: normalized.bars.length }))
+    return { data: { symbol, state: 'insufficient_data', bars: normalized.bars.length }, diagnostics }
+  }
+  const packet = indicatorPacket(normalized.bars)
+  if (![packet.close, packet.ma20, packet.ma50, packet.ma200].every(finite)) {
+    diagnostics.push(diagnostic(
+      'trend_moving_average_unavailable',
+      'unevaluated',
+      'A trend state cannot be read off a moving average that did not compute',
+      'bars',
+      { close: packet.close, ma20: packet.ma20, ma50: packet.ma50, ma200: packet.ma200 },
+    ))
+    return { data: { symbol, state: 'insufficient_data', bars: normalized.bars.length, close: packet.close, ma20: packet.ma20, ma50: packet.ma50, ma200: packet.ma200 }, diagnostics }
+  }
+  const closes = normalized.bars.map((row) => row.close)
   const offHighPct = packet.offHigh200 * 100
   const extensionPct = packet.ma200Distance * 100
   const uptrend = packet.close > packet.ma200 && packet.ma50 > packet.ma200

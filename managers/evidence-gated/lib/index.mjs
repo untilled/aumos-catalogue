@@ -55,7 +55,12 @@ const operations = {
   relativeStrength(input) { return { data: relativeStrength(input?.assetBars ?? [], input?.benchmarkBars ?? [], input?.periods), diagnostics: [] } },
   opportunityMetrics,
   opportunityUniverse,
-  trendState,
+  /**
+   * ⚠️ `asOf` is passed because this gate normalizes its own bars now (#180):
+   * the same `normalizeBars` `indicators` and `scan` run above, so a row one of
+   * them refuses cannot be a row this one silently reads as `undefined`.
+   */
+  trendState: (input, asOf) => trendState({ ...input, asOf }),
   blendedSectorStrength: (input) => blendedSectorStrength(input?.assetBars ?? [], input?.benchmarkBars ?? [], input?.weights),
   sectorStrength: (input, asOf) => sectorStrength({ ...input, asOf }),
   regimeTag: (input, asOf) => regimeTag({ ...input, asOf }),

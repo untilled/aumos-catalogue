@@ -329,6 +329,24 @@ without a producer is still `blocked` (`invalidation_producer_missing`), a produ
 deadline is `blocked` too (`invalidation_event_undated`, because *"not announced yet"* is a true
 answer forever), and no WATCH kind, cap, promotion gate or control-arm number moved.
 
+**The core tranche gate now reads bars its own sibling would refuse.** `trendState` decides whether
+core deployment continues, and it was handed two hundred Toss candle rows in the vendor's shape —
+`closePrice`, `highPrice`, every value a **string** — and answered `status: ok`, `state: "DOWNTREND"`,
+`trancheGuidance: "stop"`, with **zero diagnostics** and `ma20`/`ma50`/`ma200` all `null`. Not one
+moving average had been computed: the comparisons that decide the state are `undefined > null`, all
+false, and false is `DOWNTREND`, and `DOWNTREND` halts core tranches. `bars.length` reads 200
+whichever shape the rows hold, so the history check never fired either. The same series in
+`{date, open, high, low, close, volume}` numeric form answers `UPTREND` / `small_or_wait` with
+`ma200` 92,704.055 — corroborated to the cent by a plan armed three days earlier off a different bar
+set. ⛔ The validator was already in this package: `indicators` runs `normalizeBars` over the
+byte-identical rows and refuses every one as `bar_value_invalid`. This gate simply never called it,
+and now it does. ⚠️ **A rejected row is not a dropped row here** — `indicators` reports per row
+because its answer *is* the report, but a gate that stops capital deployment cannot average over the
+subset it happened to parse: one unreadable row and the answer is `state: "insufficient_data"` with
+the rows named. A second belt stands behind it — no computed `ma200`, no `state` and no
+`trancheGuidance`, whatever left it null — and `inputContracts.nested.trendState` now publishes the
+row shape, since `bars: "array"` was the whole contract and a vendor payload satisfies it.
+
 **Two declared capabilities currently serve nothing.** `thesis:read` and `evidence:read`
 are in the manifest vocabulary, and the current Aumos build maps each to an empty tool
 list, so a run gets no such tool. The prompt reads them *when available* and the manifest

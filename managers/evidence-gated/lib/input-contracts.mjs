@@ -152,6 +152,17 @@ export const NESTED_CONTRACTS = {
   nextMarketReview: {
     'sessions[]': { isOpen: BOOLEAN, date: STRING, closeLocal: STRING, timeZone: STRING },
   },
+  /**
+   * ⚠️ `bars: "array"` was the whole published shape, and the vendor payload is
+   * an array (#180). A run that passed the Toss candle rows through unchanged —
+   * `closePrice` and friends, every value a **string** — satisfied the contract
+   * as published and got a hard `stop` off moving averages that were all `null`.
+   * The row shape is the part that had to be said.
+   */
+  trendState: {
+    'bars[]': { date: STRING, open: NUMBER, high: NUMBER, low: NUMBER, close: NUMBER, volume: NUMBER },
+    barShape: 'One row per session, oldest or newest first — this sorts. The instant may be given as `date`, `timestamp` or `time`; the four prices are named `open`/`high`/`low`/`close` and must be finite **numbers**, not strings. ⛔ A vendor payload is not this shape: Toss candles carry `openPrice`/`highPrice`/`lowPrice`/`closePrice` as strings and are refused row by row as `bar_value_invalid`, exactly as `indicators` refuses them. One unreadable row and the answer is `state: "insufficient_data"` — this gate stops capital deployment and does not average over the rows it happened to parse.',
+  },
   experimentalCeiling: {
     experimentalPositionFloor: 'An object keyed by venue currency — { KRW: 300000, USD: 200 } — never a bare amount; the currency of the position being sized selects the row.',
     fx: { USDKRW: NUMBER },
