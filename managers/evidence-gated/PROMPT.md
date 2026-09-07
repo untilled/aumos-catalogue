@@ -918,16 +918,22 @@ field reading, then writing the conclusion into durable memory. One run here did
 of this field and armed **nothing**; three reviews happened to be standing, which is luck and not a
 method. `reconcileArmedReviews` returns the whole sequence in `toArm` and suppresses nothing.
 
-⚠️ **What re-arming costs today is plan rows, and that cost is the host's to remove.** The fold the
-host has is a **firing-time** fold — one wake per instance per instant (`untilled/aumos#593`,
-`untilled/aumos#624`) — so a duplicate never produces a second wake and the plan **row** stays,
-with no verb that withdraws one (`untilled/aumos#704`). Two consecutive runs that read `armed: []`
-as *"the arm failed"* left three intents standing 3 / 3 / 2 deep, and what made that possible was
-not the duplicate: it was believing the journal had answered. ⬜ `untilled/aumos` PR **712 is open
-and not merged**; it moves the fold to **arming** time, so re-arming an identical promise — same
-`kind`, `subject`, `intent` and `trigger` — retires the older row as `rearmed` instead of adding to
-it. Until that ships, the depth is something to **report** from `standingPlans`, never a reason to
-arm less.
+⚠️ **Re-arming a promise you already hold no longer costs a plan row either — the host retires the
+older one.** `untilled/aumos#704` was the ledger half of this and it **landed** (PR
+`untilled/aumos#712`): the host folds at **arming** time now, inside the same transaction that seals
+the judgement and over the same list `standingPlans` showed you, so re-arming an identical promise
+retires the older row as `rearmed` instead of adding to it. ⚠️ **Identity, not resemblance** — the
+host compares `kind`, `subject`, `intent` and `trigger` as the bytes you wrote and parses none of
+them, and `expiresAt` is deliberately not part of it, so the same review re-armed with a fresh
+horizon folds while one re-armed for a **different** instant is a second appointment and stays one.
+That remaining duplicate is `review_superseded` below, and nothing withdraws it. ⚠️ The
+firing-time folds are untouched and still separate — one wake per instance per instant
+(`untilled/aumos#593`, `untilled/aumos#624`). ⛔ **None of this changes what you arm.** Two
+consecutive runs that read `armed: []` as *"the arm failed"* left three intents standing 3 / 3 / 2
+deep, and what made that possible was not the duplicate: it was believing the journal had answered.
+⬜ **Merged is not shipped**: the fold landed after `untilled/aumos` `v0.3.32`, so a host older than
+it still keeps the duplicate row. Which is why the depth read from `standingPlans` is something to
+**report**, and never a reason to arm less.
 
 **Reconcile before you arm.** Read `run/armed-reviews` and pass **the whole value you read as
 `previous`**, the sequence as `sequence`, to `reconcileArmedReviews`; arm everything it returns in

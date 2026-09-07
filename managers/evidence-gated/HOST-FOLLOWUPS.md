@@ -133,7 +133,11 @@ host does not fold — the same flow promised at a **different** instant — is 
 (a rename would fail silently on the consumer side, and a fourth `fate` value would restore the
 “permission to stop” #622 refused), and states the invariant in the field's published
 `description` and in `AMP_MANAGER_INSTRUCTIONS`: `decisions[].armed` is not an arming receipt;
-re-arm at every judgement; the host folds identical instants per instance (#593).
+re-arm at every judgement; the host folds. ⚠️ Both published sentences were widened by
+`untilled/aumos#712` to say **which** folds and to bound them — an identical promise at arming time
+and an identical instant per instance at firing time (#593), *"identity, not resemblance"* — because
+until that landed *"arming a review you already hold … changes nothing"* was true of the wake and
+false of the ledger.
 
 ✅ **The face this section asked for landed as `untilled/aumos#690`.** `ManagerInvocation.standingPlans`
 carries the watches and plans that stood at `asOf` over this book, armed by this manager, each with
@@ -147,12 +151,19 @@ left out rather than guessed at, so one missing from the list may still be stand
 own `description` says in as many words that no reading of it licenses skipping an arm. The package
 therefore reports from it and arms exactly as before; `PROMPT.md` §4 carries that split.
 
-⬜ **What is still missing is a verb, not a read.** A promise wrongly armed cannot be withdrawn:
-the wake-time fold (#593, #624) keeps a duplicate from producing a second wake and leaves the plan
-**row** standing, which is `untilled/aumos#704`. This book stands 3 / 3 / 2 deep on three review
-intents for that reason. `untilled/aumos` PR **712 is open and unmerged** and moves the fold to
-arming time — an identical promise (`kind`, `subject`, `intent`, `trigger`) retires the older row as
-`rearmed` — which closes it from the host side with no tool and no AMP field added.
+✅ **The verb this section asked for next arrived as a fold, and no verb at all.** A promise wrongly
+armed could not be withdrawn: the wake-time fold (#593, #624) kept a duplicate from producing a
+second wake and left the plan **row** standing — this book stood 3 / 3 / 2 deep on three review
+intents for that reason — which was `untilled/aumos#704`. `untilled/aumos` PR **712 merged** and
+closed it from the host side with **no tool and no AMP field added**: a second fold runs at
+**arming** time, inside the transaction that seals the judgement and over the same list
+`standingPlans` showed the run, and an identical promise (`kind`, `subject`, `intent`, `trigger`,
+compared as written bytes with `expiresAt` deliberately excluded) retires the older row as
+`rearmed`. ⚠️ **Identity, not resemblance**, so the one duplicate this section named as the harm —
+the same flow promised at a **different** instant — is untouched and still has no verb; that stays
+`review_superseded`, first-person, reported and not withdrawn. ⬜ **And merged is not shipped**: the
+fold landed after `untilled/aumos` `v0.3.32`, so a host older than it still keeps the row, and the
+depth read from `standingPlans` remains something to report rather than a reason to arm less.
 (`untilled/aumos-catalogue#175`)
 
 The #136 claim that correctly supplied `previous.armed` never deduped was refuted in #148; #148's

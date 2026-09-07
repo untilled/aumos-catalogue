@@ -97,9 +97,11 @@ three. A row leaves when its instant passes, and only then.
 
 ⛔ **This key no longer suppresses a re-arm, and it never should have.** ⚠️ Neither does
 `standingPlans`: a floor establishes what stood, never that what is missing is gone, and the field's
-published description says so itself. Every judgement re-arms its reviews and the host folds an
-identical instant per instance (aumos#593, aumos#624) — a duplicate costs a plan row and never a
-second wake, and no verb withdraws that row (aumos#704). What the record still answers, and nothing else can, is whether this instance
+published description says so itself. Every judgement re-arms its reviews and the host folds twice:
+an identical **promise** at arming time (aumos#704 — `kind`, `subject`, `intent`, `trigger`, with
+`expiresAt` excluded; the older row retires as `rearmed`) and an identical **instant** per instance
+at firing time (aumos#593, aumos#624). So a duplicate re-arm costs neither a plan row nor a second
+wake — ⬜ on a host carrying that fold, which landed after aumos `v0.3.32`. What the record still answers, and nothing else can, is whether this instance
 already promised the same flow at a **different** instant — two wakes, two judgements on one book on
 one day (#87) — which is `review_superseded`. A row can be stale in exactly one direction: the
 promise behind it may already have fired, lapsed or been replaced without this instance seeing it.
