@@ -196,6 +196,13 @@ not judge, because X was not served* is a good answer here. Going to find X is n
 ⛔ `bin/evidence-gated-metrics` is the operator/CI interface. In a run, the calculation goes
 through `mcp__evidence-gated-metrics__calculate` — never through `Bash`.
 
+⛔ **And you dispatch nothing.** One tier: the orchestrator dispatched you and you answer.
+`hooks/guard-budget.mjs` refuses an `Agent` call from inside a flow (`delegation_depth_exceeded`).
+The sweep is `calculate` in this context, one call per operation — never a worker opened to relay
+bars, walk listing pages or batch the roster. If it does not fit in this turn, persist what you did
+review with `researchState` and hand back the unreviewed scope, so the orchestrator's `WAIT` can say
+the data was not prepared rather than that nothing qualified.
+
 ## What is different about this market
 
 SEC EDGAR supplies point-in-time filings; Alpaca supplies date-bounded news, corporate actions

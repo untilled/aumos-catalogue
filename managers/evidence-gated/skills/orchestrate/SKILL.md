@@ -201,7 +201,8 @@ Feed the fundamental branch before running it, in this order (#146): the registr
 vendor's own filer id (open-dart /api/corpCode.xml for corp_code, sec-edgar
 /files/company_tickers.json for the CIK) → mapCorporationCodes → fundamentalsPlan →
 source_cache_read / source_cache_refresh → dartVendorStatus on every OpenDART response →
-catalystRegister → radarCandidates → radarFeedDiagnosis → upsideRadar({candidates, feed}). The registry call is the
+catalystRegister → radarCandidates → radarFeedDiagnosis → upsideRadar({candidates, feed}). If the registry cannot be read, report corp_code_unmapped_symbols, let radarFeedDiagnosis name the
+registry stage and run the price branch — never reconstruct it by walking disclosure pages. The registry call is the
 one no run has ever made; without it nothing fetched can be addressed to a filer — on **both**
 sides (#179): sec-edgar companyfacts is the CIK file name
 (/api/xbrl/companyfacts/CIK{10-digit zero-padded}.json), and the ticker address answers 404.
@@ -216,6 +217,8 @@ the radar an empty axis and the two lenses that need no price fall report it as 
 company — measured: post-event-continuation 0 of 83, inflection excluding the one name that cleared
 every filing test. catalystRegister is that producer, every row carries the evidenceIds the reading
 was filed under, and its nextState is persisted to research/catalyst-window with numeric instants.
+Do all of that in your own context with calculate — do not open subagents to batch the roster, to
+relay bars, or to walk listing pages; that is refused and the run is charged for it either way.
 Scan holdings' news/disclosures through granted web and installed filing sources every cycle.
 Return researchActivity ({source, granted, attempts, succeeded}), each radar lane's exclusions and
 starvation with its feedStage/feedCause, and the feed verdict — fed-and-evaluated,
@@ -295,3 +298,34 @@ is what makes that a refusal instead of a habit.
 ⛔ **A flow never calls `decision_submit`.** `hooks/hooks.json` refuses it, and the refusal is
 the second line of defence: the first is that the flows are told not to, here and in each of
 their own skills.
+
+## The delegation budget
+
+⛔ **One tier, three flows, and it is enforced rather than described.** `hooks/guard-budget.mjs`
+runs on every `PreToolUse` and refuses a dispatch it does not recognise, with the reason on stderr
+and a code to carry verbatim into `uncertainty`:
+
+| limit | code | why that number |
+|---|---|---|
+| a dispatch made from **inside a flow** | `delegation_depth_exceeded` | the package declares one tier: `agents/` holds three files and *"nothing here fans out"* is this document's own sentence. There is no second tier to budget for, so a dispatch from inside one is undeclared work by construction |
+| a `subagent_type` outside `agents/` | `delegation_flow_undeclared` | a worker with no agent file has no skill, no market and no rule about what it may not do. The roster is read out of `agents/`, so it moves when the package does |
+| more than **2 dispatches of one flow**, or **6 in a run** | `delegation_budget_exhausted` | 2 is the one reason this document gives for dispatching a flow twice — the stale-sleeve fallback above. 6 is that across the three flows, and it leaves every documented dispatch reachable: a manual run's three, plus one recovery each |
+
+⚠️ **This was measured before it was written** (`untilled/aumos-catalogue#209`). One run opened **29
+unique subagents** — one `kr-sleeve` and 28 `general-purpose`, three tiers deep — spent ~1.91M
+characters of tool arguments on bar arrays one model had retyped so another could hand them back,
+and **submitted no judgement at all**. The topology in this document was correct throughout. It was
+just not enforced, and a rule this package only states is a rule the next context talks itself out
+of.
+
+⛔ **Mechanical work is calculated, never delegated.** The sweep is
+`mcp__evidence-gated-metrics__calculate`, one call per operation over a roster. Do not open a worker
+to convert or relay price arrays, to walk a vendor's listing pages, or to split a roster into
+batches — and do not write a dispatch prompt that asks a flow to do any of those either.
+
+⚠️ **When a limit stops the run, leave a checkpoint rather than a silence.** Persist the roster that
+was reviewed with `researchState` to `coverage/research-index` — the key
+`skills/memory-contract/SKILL.md` already owns, and ⛔ not a new one — name the unreviewed scope and
+the refusal code in `uncertainty`, and submit. A `WAIT` whose data was never prepared is a different
+answer from a `WAIT` where the gates ran and nothing qualified, and `PROMPT.md`'s invariant 5 asks
+for the two to be told apart.
