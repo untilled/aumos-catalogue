@@ -60,6 +60,94 @@ for (const [operation, input] of [
 assert.equal(run('thesisSentinel').data.verdict, 'unevaluated')
 assert.equal(run('thesisSentinel', { invalidations: [{ kind: 'price_below', level: 90, evidenceId: 'ev' }], evidence: [{ id: 'ev', value: 100 }] }).data.verdict, 'intact')
 assert.notEqual(run('thesisSentinel', { invalidations: [{ kind: 'time', at: 'invalid', evidenceId: 'ev' }], evidence: [{ id: 'ev', availableAt: asOf }] }).data.verdict, 'intact')
+
+/**
+ * ── #181: evidence is joined to an invalidation by key, never by position ──
+ *
+ * The four controls the issue filed, run against
+ * `run_996380fbdd9a41a5bb3d74f3eca761a2`'s own numbers. Before the fix the
+ * lookup key was `undefined` on both sides — an unnamed rule asked for
+ * `undefined` and every id-less evidence row was filed under it — so each rule
+ * silently borrowed the last id-less row and compared itself against it.
+ *
+ * ⛔ The direction is the point of pinning it: a price borrowed by an FX rule
+ * clears an FX threshold by three orders of magnitude, so the fabricated state
+ * is always `met`, `met` is `threatened`, and three of those owe a resize or a
+ * liquidation. **The state an unjoined rule answers must be `unevaluated` —
+ * not `met`, which invents a breach, and not `not-met`, which reports an
+ * invalidation as checked and clear on evidence nobody supplied.**
+ */
+const sentinelRules = [
+  { id: 'bok-base-rate', kind: 'metric', metric: 'policy-rate', operator: 'below', level: 2.5 },
+  { id: 'usdkrw', kind: 'metric', metric: 'usdkrw', operator: 'above', level: 1543.4 },
+  { id: 'carry-20bar', kind: 'metric', metric: 'carry-20bar-annualized-pct', operator: 'below', level: 0 },
+  { id: 'hard-stop', kind: 'price_below', level: 104254.4 },
+]
+const sentinelEvidence = [
+  { metric: 'policy-rate', value: 3.0 },
+  { metric: 'usdkrw', value: 1344.1 },
+  { metric: 'carry-20bar-annualized-pct', value: 2.5388 },
+  { value: 113320 },
+]
+const stateOf = (answer, id) => answer.data.evaluations.find((row) => row.id === id)?.state
+// (a) Four rules, four metric-bearing rows. Each metric rule reads its own metric.
+const controlA = run('thesisSentinel', { invalidations: sentinelRules, evidence: sentinelEvidence })
+assert.equal(stateOf(controlA, 'usdkrw'), 'not-met', '1344.1 is not above 1543.4, and the price row is not the USDKRW row')
+assert.equal(stateOf(controlA, 'bok-base-rate'), 'not-met')
+assert.equal(stateOf(controlA, 'carry-20bar'), 'not-met')
+// The price row names no rule and no metric, so the price rule joins to nothing.
+assert.equal(stateOf(controlA, 'hard-stop'), 'unevaluated', 'a price rule with no evidenceId joins to nothing and is unevaluated')
+assert.equal(controlA.data.verdict, 'watch', 'one unjoined rule is a watch a person reads, never an intact thesis')
+assert.ok(has(controlA, 'sentinel_evidence_missing'))
+// (b) The operators were never the defect; all four answers stay correct.
+for (const [operator, level, expected] of [['above', 1000, 'met'], ['above', 1543.4, 'not-met'], ['below', 1543.4, 'met'], ['below', 1000, 'not-met']]) {
+  const isolated = run('thesisSentinel', {
+    invalidations: [{ id: 'usdkrw', kind: 'metric', metric: 'usdkrw', operator, level }],
+    evidence: [{ metric: 'usdkrw', value: 1344.1 }],
+  })
+  assert.equal(stateOf(isolated, 'usdkrw'), expected, `usdkrw ${operator} ${level}`)
+}
+// (c) Dropping the price rule while keeping the price row leaves usdkrw alone.
+assert.equal(stateOf(run('thesisSentinel', { invalidations: sentinelRules.slice(0, 3), evidence: sentinelEvidence }), 'usdkrw'), 'not-met')
+// (d) Dropping the price row must not move the wrong answer onto hard-stop.
+const controlD = run('thesisSentinel', { invalidations: sentinelRules, evidence: sentinelEvidence.slice(0, 3) })
+assert.equal(stateOf(controlD, 'usdkrw'), 'not-met')
+assert.equal(stateOf(controlD, 'hard-stop'), 'unevaluated', '2.5388 is a carry reading, not this position\'s price')
+// The three published keys each join, and the answer says which one stood.
+const sentinelJoined = run('thesisSentinel', {
+  invalidations: [
+    { id: 'by-id', kind: 'price_below', level: 90, evidenceId: 'ev-price' },
+    { id: 'by-reverse', kind: 'price_below', level: 90 },
+    { id: 'by-metric', kind: 'metric', metric: 'usdkrw', operator: 'below', level: 1000 },
+  ],
+  evidence: [{ id: 'ev-price', value: 100 }, { invalidationId: 'by-reverse', value: 100 }, { metric: 'usdkrw', value: 1344.1 }],
+})
+assert.deepEqual(sentinelJoined.data.evaluations.map((row) => row.joinedBy), ['evidenceId', 'invalidationId', 'metric'])
+assert.equal(sentinelJoined.data.verdict, 'intact')
+// A named evidenceId that matches nothing is unevaluated, not the row beside it.
+assert.equal(run('thesisSentinel', { invalidations: [{ id: 'r', kind: 'price_below', level: 90, evidenceId: 'absent' }], evidence: [{ id: 'ev', value: 10 }] }).data.verdict, 'watch')
+// Two rows under one key is a tie, and a broken tie is the defect this replaces.
+const ambiguous = run('thesisSentinel', {
+  invalidations: [{ id: 'usdkrw', kind: 'metric', metric: 'usdkrw', operator: 'above', level: 1543.4 }],
+  evidence: [{ metric: 'usdkrw', value: 1344.1 }, { metric: 'usdkrw', value: 1600 }],
+})
+assert.equal(stateOf(ambiguous, 'usdkrw'), 'unevaluated')
+assert.ok(has(ambiguous, 'sentinel_evidence_ambiguous'))
+// An unnamed rule is still named by position, and the substitution is reported.
+const unnamed = run('thesisSentinel', { invalidations: [{ kind: 'price_below', level: 90, evidenceId: 'ev' }], evidence: [{ id: 'ev', value: 100 }] })
+assert.equal(unnamed.data.evaluations[0].id, 'rule-0')
+assert.ok(has(unnamed, 'sentinel_rule_unnamed'))
+// The id a caller passes is never replaced by rule-N.
+assert.equal(run('thesisSentinel', { invalidations: [{ id: 'usdkrw', kind: 'price_below', level: 90, evidenceId: 'ev' }], evidence: [{ id: 'ev', value: 100 }] }).data.evaluations[0].id, 'usdkrw')
+// ⛔ Three unjoined rules must not accumulate toward a forced resize.
+assert.equal(run('thesisSentinel', {
+  invalidations: sentinelRules,
+  evidence: [],
+  priorVerdicts: [{ asOf: '2026-09-03T00:00:00Z', verdict: 'threatened' }, { asOf: '2026-09-04T00:00:00Z', verdict: 'threatened' }],
+}).data.escalationRequired, false, 'evidence nobody supplied cannot be the third threatened verdict')
+// The join keys are published, so the shape is documented rather than guessed.
+assert.deepEqual(run('inputContracts').data.vocabulary.sentinelJoinKeys, ['evidenceId', 'invalidationId', 'metric'])
+assert.ok(run('inputContracts').data.nested.thesisSentinel['evidence[]'].includes('invalidationId'))
 const wrongTargets = run('globalAllocation', { targets: [{ symbol: 'DKS', market: 'XNYS', targetWeight: 0.01 }, { symbol: 'SGOV', market: 'XNYS', targetWeight: 0.02 }] })
 assert.ok(has(wrongTargets, 'global_target_key_missing'))
 assert.equal(has(wrongTargets, 'global_target_duplicate'), false)

@@ -513,15 +513,108 @@ export function variantViewCheck({ thesis = null, challengeVerdict = null, evide
   }
 }
 
+/**
+ * ── Which evidence row answers which invalidation (issue #181) ─────────────
+ *
+ * The join was `new Map(evidence.map((row) => [row.id, row]))` read with
+ * `evidenceById.get(rule.evidenceId)`, and both halves of that line fail on the
+ * same value: **`undefined`**. A rule that names no `evidenceId` looks the key
+ * `undefined` up, and every evidence row that carries no `id` was *filed* under
+ * `undefined` — last one wins. So an unjoined rule did not go unevaluated; it
+ * silently borrowed **whichever id-less evidence row happened to come last**
+ * and was then compared against it as if it were its own observation.
+ *
+ * ⚠️ The measured shape of that (control (a) of the issue, run
+ * `run_996380fbdd9a41a5bb3d74f3eca761a2`): four rules and four id-less rows,
+ * every rule joined to the last row — the price, 113,320 — and the rule
+ * *"USDKRW above 1,543.40"* answered **`met`**, because 113,320 is indeed above
+ * 1,543.40. Control (d) moved the same wrong answer onto `hard-stop` merely by
+ * dropping the price row, which is the proof that position, not key, was doing
+ * the joining. The operators were never wrong (control (b): 4 of 4 correct).
+ *
+ * ⛔ **The direction of the error is the reason this is not a cosmetic bug.**
+ * A borrowed number is compared against a threshold it was never scaled to, and
+ * a price borrowed by an FX rule clears an FX threshold by three orders of
+ * magnitude — so the fabricated answer is `met`, `met` is `threatened`, and
+ * three `threatened` in a row sets `escalationRequired`, which `PROMPT.md` §2b
+ * turns into an owed resize or liquidation. The defect manufactures forced
+ * selling on an invalidation that never fired.
+ *
+ * ── What joins now, and what an unjoined rule answers ──────────────────────
+ *
+ * Three keys, tried in this order, each of them something the caller wrote
+ * down rather than something inferred from position:
+ *
+ * | key | direction | why it is here |
+ * |---|---|---|
+ * | `rule.evidenceId` → `evidence[].id` | rule names its row | the key the code always meant to use, and the only one the old tests exercised |
+ * | `evidence[].invalidationId` → `rule.id` | row names its rule | the shape the `us-sleeve` observer tried in the same run; refusing it taught nothing |
+ * | `rule.metric` → `evidence[].metric` | same measurement | a `metric` rule and a `metric` observation of the same name are the same quantity; this is the shape the orchestrator passed |
+ *
+ * ⛔ **Anything else is `unevaluated`, and so is anything ambiguous.** Two rows
+ * answering one key is not a tie to be broken — a broken tie is exactly the
+ * silent borrowing this replaces — and `unevaluated` is the safe direction
+ * because of what each state costs: `unevaluated` makes the verdict `watch`,
+ * which a person reads, while a wrong `met` makes it `threatened`, which
+ * accumulates toward an automatic sell. ⛔ Nor is the fallback ever `not-met`:
+ * that would report an invalidation as *checked and clear* on evidence nobody
+ * supplied, hiding a real breach the same way the old code invented one.
+ *
+ * ⚠️ `joinedBy` rides on every evaluation so the answer says which key stood.
+ */
+export const SENTINEL_JOIN_KEYS = Object.freeze(['evidenceId', 'invalidationId', 'metric'])
+
+const named = (value) => (typeof value === 'string' && value.trim().length ? value.trim() : null)
+
+export function resolveSentinelEvidence(rule, evidence = []) {
+  const rows = Array.isArray(evidence) ? evidence.filter((row) => row && typeof row === 'object') : []
+  const pick = (key, matches) => {
+    if (matches.length === 1) return { observation: matches[0], joinedBy: key, reason: null }
+    if (matches.length > 1) return { observation: null, joinedBy: null, reason: 'ambiguous', key, matched: matches.length }
+    return null
+  }
+
+  const wantedId = named(rule?.evidenceId)
+  if (wantedId) {
+    return pick('evidenceId', rows.filter((row) => named(row.id) === wantedId)) ??
+      { observation: null, joinedBy: null, reason: 'no-such-evidence-id', key: 'evidenceId' }
+  }
+
+  const ruleId = named(rule?.id)
+  if (ruleId) {
+    const answered = pick('invalidationId', rows.filter((row) => named(row.invalidationId) === ruleId))
+    if (answered) return answered
+  }
+
+  const metric = named(rule?.metric)
+  if (rule?.kind === 'metric' && metric) {
+    return pick('metric', rows.filter((row) => named(row.metric) === metric)) ??
+      { observation: null, joinedBy: null, reason: 'no-evidence-for-metric', key: 'metric' }
+  }
+
+  return { observation: null, joinedBy: null, reason: 'unjoined', key: null }
+}
+
 export function thesisSentinel({ invalidations = [], evidence = [], priorVerdicts = [] }) {
   const diagnostics = []
   if (!invalidations.length) diagnostics.push(diagnostic('sentinel_rules_missing', 'unevaluated', 'No invalidation was evaluated; an empty rule set cannot establish an intact thesis', 'invalidations'))
-  const evidenceById = new Map(evidence.map((row) => [row.id, row]))
   const evaluations = invalidations.map((rule, index) => {
-    const observation = evidenceById.get(rule.evidenceId)
+    const id = named(rule?.id) ?? `rule-${index}`
+    if (!named(rule?.id)) {
+      diagnostics.push(diagnostic('sentinel_rule_unnamed', 'info', 'This invalidation carries no id, so the answer names it by position and evidence cannot address it by invalidationId; the id you pass is kept verbatim', `invalidations[${index}].id`, { synthesized: id }))
+    }
+    const { observation, joinedBy, reason, key, matched } = resolveSentinelEvidence(rule, evidence)
     if (!observation) {
-      diagnostics.push(diagnostic('sentinel_evidence_missing', 'unevaluated', 'Invalidation could not be evaluated', `invalidations[${index}].evidenceId`))
-      return { id: rule.id ?? `rule-${index}`, state: 'unevaluated' }
+      diagnostics.push(diagnostic(
+        reason === 'ambiguous' ? 'sentinel_evidence_ambiguous' : 'sentinel_evidence_missing',
+        'unevaluated',
+        reason === 'ambiguous'
+          ? 'More than one evidence row answers this invalidation under the same key, and a broken tie is a guess; the rule is left unevaluated rather than decided by whichever row came last'
+          : 'No evidence row joins to this invalidation, so it is unevaluated — never met. Join by evidenceId, by an evidence row naming this rule in invalidationId, or, for a metric rule, by an evidence row carrying the same metric',
+        key ? `invalidations[${index}].${key}` : `invalidations[${index}]`,
+        { joinKeys: [...SENTINEL_JOIN_KEYS], reason, ...(matched ? { matched } : {}) },
+      ))
+      return { id, state: 'unevaluated', joinedBy: null }
     }
     let met = null
     if (rule.kind === 'price_below' && finite(observation.value) && finite(rule.level)) met = observation.value < rule.level
@@ -529,7 +622,7 @@ export function thesisSentinel({ invalidations = [], evidence = [], priorVerdict
     else if (rule.kind === 'metric' && finite(observation.value) && finite(rule.level)) met = rule.operator === 'above' ? observation.value > rule.level : observation.value < rule.level
     else if (rule.kind === 'time' && Number.isFinite(Date.parse(observation.availableAt)) && Number.isFinite(Date.parse(rule.at))) met = Date.parse(observation.availableAt) >= Date.parse(rule.at)
     if (met === null) diagnostics.push(diagnostic('sentinel_rule_unevaluated', 'unevaluated', 'Rule and evidence are not comparable', `invalidations[${index}]`))
-    return { id: rule.id ?? `rule-${index}`, state: met === null ? 'unevaluated' : met ? 'met' : 'not-met', evidenceId: observation.id }
+    return { id, state: met === null ? 'unevaluated' : met ? 'met' : 'not-met', evidenceId: named(observation.id) ?? null, joinedBy }
   })
   const verdict = !evaluations.length ? 'unevaluated' : evaluations.some((row) => row.state === 'met') ? 'threatened' : evaluations.some((row) => row.state === 'unevaluated') ? 'watch' : 'intact'
   let consecutiveThreatened = 0

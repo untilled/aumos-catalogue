@@ -370,6 +370,22 @@ operation cannot read at all says `unreported`, the answer it already had for a 
 nothing. ⛔ Nothing about the three causes, their severities or the rule that holding cash is never an
 argument for buying moved.
 
+**And once a falsifier is registered, the sentinel has to read the right number against it.** It did
+not. `thesisSentinel` looked its evidence up under `rule.evidenceId`, and every evidence row carrying
+no `id` was filed under the same missing key — so a rule that named no row did not go unevaluated, it
+borrowed **whichever id-less row came last** and was compared against it. Measured: four rules and
+four readings, and *"USDKRW above 1,543.40"* answered `met` on a share price of 113,320, which is
+indeed above 1,543.40. Dropping the price row moved the same wrong answer onto the price rule, which
+is the proof that position was doing the joining. ⛔ The error only ever pointed one way — a borrowed
+number clears a threshold it was never scaled to, `met` is `threatened`, and three of those set
+`escalationRequired`, which this prompt turns into an owed resize or liquidation. **The defect could
+manufacture forced selling on an invalidation that never fired.** Evidence now joins by key —
+`evidenceId`, an evidence row's `invalidationId`, or the shared `metric` of a metric rule, all three
+published under `inputContracts` — and a rule that joins to nothing or to two rows at once answers
+`unevaluated`. That makes the verdict `watch`, which a person reads. ⛔ It is never `met`, which
+invents a breach, and never `not-met`, which would report an invalidation as checked and clear on
+evidence nobody supplied.
+
 **Two declared capabilities currently serve nothing.** `thesis:read` and `evidence:read`
 are in the manifest vocabulary, and the current Aumos build maps each to an empty tool
 list, so a run gets no such tool. The prompt reads them *when available* and the manifest
