@@ -258,6 +258,12 @@ lost it**, not an empty opportunity set. ⛔ And `fed-and-genuinely-empty` is re
 the market was looked at and declined nobody, which is a different sentence from *nothing was ever
 looked at* and produces the same empty list.
 
+⚠️ **A partly fed branch is a third sentence and it is said in numbers** (#178). Pass the
+`radarCandidates` **rows** to `radarFeedDiagnosis`, not only its counts: they are the denominator,
+and without them a roster of 83 that produced one usable filing came back `fed`. The answer is
+`stage: 'partially-fed'` with `coverage: { fed, of, unfed }`, and it is neither «the market was
+reviewed» nor «nothing was ever looked at».
+
 `entryQualityGate` needs historical OHLC `bars` (at least 60; 200+ for the long indicators),
 not a `scanHistory` field or prior scan runs. A first run can fetch those bars and evaluate quality.
 

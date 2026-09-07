@@ -769,6 +769,14 @@ export function upsideRadar({ candidates = [], feed = null, asOf }) {
    */
   const feedStage = typeof feed?.stage === 'string' ? feed.stage : null
   const feedCause = typeof feed?.cause === 'string' ? feed.cause : null
+  /**
+   * ⚠️ **The header carries the count, because the header is what gets read**
+   * (#178). `feedStage: 'fed'` on a branch that fed one name out of 83 is how
+   * 82 never-fed names became «the market was reviewed and rejected», and the
+   * fix is only worth anything where that sentence is formed. `null` when the
+   * reading could not count — never a coverage nobody measured.
+   */
+  const feedCoverage = feed?.coverage && finite(feed.coverage.fed) && finite(feed.coverage.of) ? { fed: feed.coverage.fed, of: feed.coverage.of, unfed: feed.coverage.unfed ?? feed.coverage.of - feed.coverage.fed } : null
   const laneCoverage = Object.fromEntries(Object.keys(RADAR_LANES).map((lane) => {
     const verdicts = rows.map((row) => row.lanes[lane])
     const excluded = verdicts.filter((verdict) => !verdict.included)
@@ -780,19 +788,21 @@ export function upsideRadar({ candidates = [], feed = null, asOf }) {
       diagnostics.push(diagnostic(
         'radar_lane_starved',
         'unevaluated',
-        feedCause
-          ? `This lane is unfed rather than empty, and the feed broke at the ${feedStage} stage: ${feedCause}`
-          : 'This lane received no candidates or excluded almost every candidate for missing input; it is unfed rather than empty',
+        feedCause && feedCoverage && feedStage === 'partially-fed'
+          ? `This lane is unfed for ${feedCoverage.unfed} of ${feedCoverage.of} candidates and fed for ${feedCoverage.fed}; the exclusions below are not one answer about the market: ${feedCause}`
+          : feedCause
+            ? `This lane is unfed rather than empty, and the feed broke at the ${feedStage} stage: ${feedCause}`
+            : 'This lane received no candidates or excluded almost every candidate for missing input; it is unfed rather than empty',
         'candidates',
-        { lane, reason: dominant?.[0] ?? 'no-candidates-supplied', of: rows.length, feedStage, feedCause },
+        { lane, reason: dominant?.[0] ?? 'no-candidates-supplied', of: rows.length, feedStage, feedCause, ...(feedCoverage ? { feedCoverage } : {}) },
       ))
     }
-    return [lane, { ruleVersion: RADAR_LANES[lane], included: verdicts.length - excluded.length, excluded: excluded.length, reasons, starved, feedStage, feedCause }]
+    return [lane, { ruleVersion: RADAR_LANES[lane], included: verdicts.length - excluded.length, excluded: excluded.length, reasons, starved, feedStage, feedCause, feedCoverage }]
   }))
   const starvedLanes = Object.entries(laneCoverage).filter(([, row]) => row.starved).map(([lane]) => lane)
   if (starvedLanes.length && !feedCause) diagnostics.push(diagnostic('radar_starvation_cause_unreported', 'unevaluated', 'A lane starved and no feed reading was supplied, so this run can say that it is unfed but not what stage lost the input; pass radarFeedDiagnosis as feed', 'feed', { starvedLanes }))
-  if (feedCause && !starvedLanes.length && feed?.fed === false) diagnostics.push(diagnostic('radar_feed_broken_lanes_passed', 'info', 'The feed reading says the branch was not fully fed while every lane evaluated; the lanes are answerable and the shortfall is still worth reporting', 'feed', { feedStage, feedCause }))
-  return { data: { ranked, unranked: rows.filter((row) => !row.eligible), lanes: laneCoverage, starvedLanes, feed: feedCause ? { stage: feedStage, cause: feedCause, fed: feed?.fed ?? null } : null, branch: 'fundamental-and-event', rankMeaning: 'research-priority-only' }, diagnostics }
+  if (feedCause && !starvedLanes.length && feed?.fed === false) diagnostics.push(diagnostic('radar_feed_broken_lanes_passed', 'info', 'The feed reading says the branch was not fully fed while every lane evaluated; the lanes are answerable and the shortfall is still worth reporting', 'feed', { feedStage, feedCause, ...(feedCoverage ? { feedCoverage } : {}) }))
+  return { data: { ranked, unranked: rows.filter((row) => !row.eligible), lanes: laneCoverage, starvedLanes, feed: feedCause ? { stage: feedStage, cause: feedCause, fed: feed?.fed ?? null, coverage: feedCoverage } : null, branch: 'fundamental-and-event', rankMeaning: 'research-priority-only' }, diagnostics }
 }
 
 /**

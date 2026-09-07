@@ -608,8 +608,25 @@ export function radarCandidates({ market, symbols = [], financials = {}, facts =
  * The stages are checked in the order they occur, and the **first** one that
  * failed is the answer — a mapping that produced nothing because the registry
  * never arrived is a registry finding, not a mapping one.
+ *
+ * ── `partially-fed`, because one name out of eighty-three read as all of them (#178) ──
+ *
+ * The last branch was `fedCount > 0`, so a roster of 83 that produced **one**
+ * usable filing came back `fed` / `the-branch-was-fed`, and the lane header a
+ * later run reads said the market had been looked at. Measured on
+ * `run_73a3e6c41c204f468ee8be8d2923d898`: `fedCount: 1`, 83 excluded, 82 of
+ * them `no-valid-point-in-time-filing` — 82 names that were never fed,
+ * published as a judgement that they did not qualify. That is exactly the
+ * `never-fed` ⇄ `fed-and-genuinely-empty` mixture `PROMPT.md` §3 calls the
+ * worst outcome this branch can produce, arrived at by counting.
+ *
+ * ⛔ **And the correction is not the other silent move.** One fed name is not
+ * nothing either, so `partially-fed` is its own stage rather than a demotion to
+ * `never-fed`, and the counts ride along on the answer, on the diagnostic and
+ * on every lane header: `fedCount` of `candidateCount`. Absence is a count, not
+ * a shrug — ⛔ and never the symbols themselves.
  */
-const FEED_STAGES = ['registry', 'mapping', 'request', 'response', 'normalization', 'fed']
+const FEED_STAGES = ['registry', 'mapping', 'request', 'response', 'normalization', 'partially-fed', 'fed']
 
 export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping = null, responses = [], candidates = null, lanes = null, asOf } = {}) {
   const diagnostics = []
@@ -621,6 +638,15 @@ export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping 
   const cacheStates = {}
   for (const row of requests) cacheStates[row.cacheState ?? 'unreported'] = (cacheStates[row.cacheState ?? 'unreported'] ?? 0) + 1
   const responseRows = Array.isArray(responses) ? responses : []
+  /**
+   * How many names this reading is entitled to divide by (#178). The rows
+   * `radarCandidates` actually built are the honest denominator — a roster of
+   * 83 that only ever addressed 40 filers is 40 candidates, and dividing by 83
+   * would report a join loss twice. The roster is the fallback for a caller
+   * that passed counts without the rows, and `null` when neither is knowable:
+   * ⛔ an unknown denominator answers `null`, never a coverage of 1.
+   */
+  const candidateCount = Array.isArray(candidates?.candidates) ? candidates.candidates.length : rosterCount || null
   const failures = {}
   for (const row of responseRows) {
     const key = row?.feedFailure ?? (row?.status === '000' || row?.usable === true ? null : row?.classification ?? null)
@@ -696,6 +722,16 @@ export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping 
   } else if (!candidates.fedCount) {
     stage = 'normalization'
     cause = 'responses-arrived-but-no-comparable-filing-could-be-built'
+  } else if (candidateCount !== null && candidates.fedCount < candidateCount) {
+    /**
+     * ⚠️ **Counted before the comparable check, for the same reason `fedCount`
+     * is** (#178): *how many names arrived* is an earlier question than *what
+     * the ones that arrived carried*, and the first stage that lost input is
+     * the answer. The one name that did arrive is still reported — as a count,
+     * on `fedCount`, and it is why this is not `never-fed`.
+     */
+    stage = 'partially-fed'
+    cause = 'some-candidates-were-fed-and-the-rest-were-never-fed'
   } else if (!candidates.comparableCount) {
     stage = 'normalization'
     cause = 'filings-built-but-none-carried-a-prior-comparable'
@@ -712,9 +748,19 @@ export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping 
    * with *never fed*, so the two are named on the same object rather than left
    * to be inferred from an absent diagnostic.
    */
-  const verdict = !laneRows.length ? 'unevaluated' : fed && !starvedLanes.length ? 'fed-and-evaluated' : fed ? 'fed-and-genuinely-empty' : 'never-fed'
+  const partial = stage === 'partially-fed'
+  const coverage = candidateCount === null || !finite(candidates?.fedCount) ? null : { fed: candidates.fedCount, of: candidateCount, unfed: candidateCount - candidates.fedCount }
+  const verdict = !laneRows.length ? 'unevaluated' : partial ? 'partially-fed' : fed && !starvedLanes.length ? 'fed-and-evaluated' : fed ? 'fed-and-genuinely-empty' : 'never-fed'
   if (!fed) {
-    diagnostics.push(diagnostic('radar_feed_broken', 'unevaluated', 'The fundamental branch did not receive its input, and this names the stage that lost it rather than reporting starvation alone', 'plan', { market, stage, cause, rosterCount, cacheStates, failures }))
+    diagnostics.push(diagnostic(
+      'radar_feed_broken',
+      'unevaluated',
+      partial
+        ? `The fundamental branch was fed for ${coverage.fed} of ${coverage.of} candidates and the other ${coverage.unfed} were never fed; the fed ones are answerable and the rest must not read as names this run judged`
+        : 'The fundamental branch did not receive its input, and this names the stage that lost it rather than reporting starvation alone',
+      'plan',
+      { market, stage, cause, rosterCount, cacheStates, failures, ...(coverage ? { coverage } : {}) },
+    ))
   }
   if (verdict === 'fed-and-genuinely-empty') {
     diagnostics.push(diagnostic('radar_lane_empty_not_starved', 'info', 'The branch was fed and the lanes still excluded everything; this is an answered question and must not be reported as starvation', 'lanes', { starvedLanes }))
@@ -734,6 +780,13 @@ export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping 
       mappedCount: mapping?.mapped?.length ?? null,
       unmappedCount: mapping?.unmapped?.length ?? null,
       fedCount: candidates?.fedCount ?? null,
+      /**
+       * ⚠️ The denominator `fedCount` was silently promoted without (#178).
+       * `null` is *this reading could not count the candidates*, which is a
+       * third thing and never zero and never «all of them».
+       */
+      candidateCount,
+      coverage,
       comparableCount: candidates?.comparableCount ?? null,
       starvedLanes,
       asOf: asOf ?? null,
