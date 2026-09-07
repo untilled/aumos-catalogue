@@ -169,7 +169,9 @@ closed it from the host side with **no tool and no AMP field added**: a second f
 compared as written bytes with `expiresAt` deliberately excluded) retires the older row as
 `rearmed`. ⚠️ **Identity, not resemblance**, so the one duplicate this section named as the harm —
 the same flow promised at a **different** instant — is untouched and still has no verb; that stays
-`review_superseded`, first-person, reported and not withdrawn. ⬜ **And merged is not shipped**: the
+`review_superseded`, first-person, reported and not withdrawn — and, being the only duplicate left,
+reported with the orphan's `planId` where `standingPlans` names it and with which silence it is
+where it does not (`untilled/aumos-catalogue#202`). ⬜ **And merged is not shipped**: the
 fold landed after `untilled/aumos` `v0.3.32`, so a host older than it still keeps the row, and the
 depth read from `standingPlans` remains something to report rather than a reason to arm less.
 (`untilled/aumos-catalogue#175`)

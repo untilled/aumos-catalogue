@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated/lib/index.mjs'
 import { handleMcpRequest } from '../managers/evidence-gated/lib/mcp-server.mjs'
 import { METHODOLOGY } from '../managers/evidence-gated/lib/constants.mjs'
+import { marketReviewIntent } from '../managers/evidence-gated/lib/schedule.mjs'
 import { MACRO_INDICATORS } from '../managers/evidence-gated/lib/evidence.mjs'
 import { MANAGER_ID } from '../managers/evidence-gated/lib/diagnostics.mjs'
 
@@ -273,6 +274,66 @@ assert.equal(moved.diagnostics.find((row) => row.code === 'review_superseded').s
 const corrupt = run('reconcileArmedReviews', { previous: { ...remembered, armed: [{ flow: 'kr-sleeve', atEpochMs: 1757228400000, atLabel: '2026-09-07 07h00m00s UTC' }] }, sequence })
 assert.ok(has(corrupt, 'armed_instant_mismatch'))
 assert.equal(corrupt.data.nextState, null)
+
+/**
+ * ── #202: the orphan gets an address, and «nameless» stays two facts ────────
+ *
+ * `review_superseded` reported the one duplicate the host does not fold and
+ * named no row. Since aumos#712 folded the identical re-arm at arming time
+ * that is the **only** duplicate left standing — identity is bytes and
+ * `expiresAt` is excluded, so the same promise at a different instant survives
+ * both folds — and no verb withdraws it, so an anonymous report leaves the
+ * reader nowhere to go.
+ */
+const movedSequence = [{ flow: 'kr-sleeve', at: '2026-09-07T07:30:00Z' }]
+const addressed = run('reconcileArmedReviews', { previous: remembered, sequence: movedSequence, standingPlans: standingRows })
+const orphan = addressed.diagnostics.find((row) => row.code === 'review_superseded')
+assert.ok(orphan, 'the duplicate the host does not fold is still reported')
+assert.deepEqual(orphan.details.planIds, ['pln_10c901bd'], 'the older promise is named by its row, matched on this package\'s own marker and the instant')
+assert.deepEqual(orphan.details.unnamedFlows, [])
+assert.equal(has(addressed, 'superseded_address_unreadable'), false)
+assert.equal(has(addressed, 'superseded_address_unnamed'), false, 'every orphan was named, so neither silence is claimed')
+// ⛔ Addressing is a report: the same inputs arm the same thing with and without the field.
+const unaddressed = run('reconcileArmedReviews', { previous: remembered, sequence: movedSequence })
+assert.deepEqual(addressed.data.toArm, unaddressed.data.toArm, 'toArm is the whole sequence whether or not the orphan could be named')
+assert.deepEqual(addressed.data.toArm, movedSequence)
+assert.deepEqual(addressed.data.duplicateFlows, unaddressed.data.duplicateFlows)
+assert.deepEqual(addressed.data.superseded, unaddressed.data.superseded, 'the address rides in the diagnostic, never inside the returned orphan')
+assert.deepEqual(addressed.data.nextState, unaddressed.data.nextState)
+// ⛔ Not handed the field: nothing here could name a row, and that is the contract's silence.
+assert.ok(has(unaddressed, 'superseded_address_unreadable'))
+assert.equal(has(unaddressed, 'superseded_address_unnamed'), false, 'the two silences are exclusive')
+const unreadableOrphan = unaddressed.diagnostics.find((row) => row.code === 'review_superseded')
+assert.deepEqual(unreadableOrphan.details.planIds, [], 'an unnameable orphan carries no id rather than a guessed one')
+assert.deepEqual(unreadableOrphan.details.unnamedFlows, ['kr-sleeve'])
+// ⛔ Handed the field and matching nothing is the other fact: the floor left it out.
+for (const plans of [[], [{ planId: 'pln_other', intent: 'market-review:us-sleeve', trigger: { kind: 'at-time', at: '2026-09-08T20:45:00.000Z' } }]]) {
+  const unmatched = run('reconcileArmedReviews', { previous: remembered, sequence: movedSequence, standingPlans: plans })
+  assert.ok(has(unmatched, 'superseded_address_unnamed'))
+  assert.equal(has(unmatched, 'superseded_address_unreadable'), false)
+  assert.deepEqual(unmatched.diagnostics.find((row) => row.code === 'review_superseded').details.planIds, [])
+  assert.equal(unmatched.data.standingArmsAreUnreadable, false, 'a readable floor with no matching row is still a readable floor')
+}
+// The marker this package writes carries the instant, so an entry with no trigger is still matchable.
+const markerOnly = run('reconcileArmedReviews', {
+  previous: remembered,
+  sequence: movedSequence,
+  standingPlans: [{ planId: 'pln_from_marker', intent: marketReviewIntent('kr-sleeve', '2026-09-07T07:00:00.000Z') }],
+})
+assert.deepEqual(markerOnly.diagnostics.find((row) => row.code === 'review_superseded').details.planIds, ['pln_from_marker'])
+// ⛔ `expiresAt` is the horizon, not the appointment — the field the host's identity check excludes.
+const horizonOnly = run('reconcileArmedReviews', {
+  previous: remembered,
+  sequence: movedSequence,
+  standingPlans: [{ planId: 'pln_horizon', intent: 'market-review:kr-sleeve', expiresAt: '2026-09-07T07:00:00.000Z', trigger: { kind: 'at-time', at: '2026-09-09T07:00:00.000Z' } }],
+})
+assert.deepEqual(horizonOnly.diagnostics.find((row) => row.code === 'review_superseded').details.planIds, [], 'a promise that merely expires at the orphan\'s instant is not the orphan')
+assert.ok(has(horizonOnly, 'superseded_address_unnamed'))
+// No orphan, no address diagnostics at all — this reports a supersede, it does not look for one.
+for (const code of ['superseded_address_unreadable', 'superseded_address_unnamed']) {
+  assert.equal(has(withFloor, code), false, 'nothing was superseded, so no silence about an address is claimed')
+  assert.equal(has(rearmed, code), false)
+}
 
 // #156: the durable rule that caused the duplicates is retracted by the package, not by a run.
 const confirmedWrongRule = {

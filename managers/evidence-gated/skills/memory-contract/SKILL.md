@@ -108,7 +108,9 @@ an identical **promise** at arming time (aumos#704 — `kind`, `subject`, `inten
 at firing time (aumos#593, aumos#624). So a duplicate re-arm costs neither a plan row nor a second
 wake — ⬜ on a host carrying that fold, which landed after aumos `v0.3.32`. What the record still answers, and nothing else can, is whether this instance
 already promised the same flow at a **different** instant — two wakes, two judgements on one book on
-one day (#87) — which is `review_superseded`. A row can be stale in exactly one direction: the
+one day (#87) — which is `review_superseded`, the only duplicate left standing and the one that now
+carries the orphan's `planId` where `standingPlans` names it, and says which silence it is where it
+does not. A row can be stale in exactly one direction: the
 promise behind it may already have fired, lapsed or been replaced without this instance seeing it.
 That is why it decides nothing on its own.
 

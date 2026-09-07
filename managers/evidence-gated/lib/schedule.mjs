@@ -446,11 +446,12 @@ export function resolveWakeFlow({ summary, intent, watchId } = {}) {
  * so a duplicate at the *same* instant never costs a second wake.
  *
  * ⛔ **Report-only is structural, not a promise.** `standingPlans` reaches
- * `standingArms` and reaches nothing else: `toArm`, `duplicateFlows`,
+ * `standingArms` and, since #202, the **address** in `review_superseded`'s
+ * details — and it reaches nothing else: `toArm`, `duplicateFlows`,
  * `superseded` and `nextState` are computed from `previous` and `sequence`
- * alone and cannot narrow when the field arrives full. Anything else would be
- * the *"and therefore skip"* the owner nailed shut, over a floor that cannot
- * carry it.
+ * alone and cannot narrow when the field arrives full. Both readings are
+ * reports; anything else would be the *"and therefore skip"* the owner nailed
+ * shut, over a floor that cannot carry it.
  *
  * ⚠️ **Two absences, and they are different facts.** A `standingPlans` this
  * operation was never handed — the caller did not pass it, or the host is older
@@ -482,7 +483,11 @@ export function resolveWakeFlow({ summary, intent, watchId } = {}) {
  * harm, two `kr-sleeve` reviews half an hour apart, two wakes, two judgements
  * sealed on the same book on the same day. That is `review_superseded`, it is
  * first-person by construction, and it is answerable without reading anything
- * back — which is why it stayed when the read path landed.
+ * back — which is why it stayed when the read path landed. ⚠️ **Since aumos#712
+ * it is also the only duplicate that survives at all**, which is why it stopped
+ * being enough to report it anonymously: the details now carry the orphan's
+ * `planId` where `standingPlans` can be matched to it, and say which of two
+ * silences it is where they cannot (#202).
  *
  * ⚠️ **A manager can arm a WATCH and cannot call for one back.** The grant map
  * publishes `portfolio_read`, `brief_read/write`, `memory_read/write` and
@@ -552,6 +557,66 @@ function armedInstant(row) {
 const armedKey = (row) => {
   const instant = armedInstant(row)
   return instant === null ? null : `${row?.flow}|${instant}`
+}
+
+/** The flow half of the marker, for a `standingPlans` entry that carries no instant in it. */
+const MARKET_REVIEW_FLOW_MARKER = /market-review:([a-z-]+)/
+
+/**
+ * ── The orphan's address (#202) ────────────────────────────────────────────
+ *
+ * `review_superseded` reported *«the same promise stands at a different
+ * instant»* and named no row — and since aumos#712 that is the **only** kind of
+ * duplicate left standing: the arming-time fold compares `kind`, `subject`,
+ * `intent` and `trigger` as written bytes and `expiresAt` is excluded, so an
+ * identical re-arm retires the older row while a *different* instant does not
+ * fold at either time. There is still no verb that withdraws one (aumos#704
+ * closed the identical case and left this one), so the person reading the
+ * diagnostic has to go to PLANS — and an anonymous orphan gives them nowhere
+ * to go.
+ *
+ * `standingPlans` is what makes the address sayable: each entry carries the
+ * `planId` (aumos#690). Matching is on this package's **own** bytes — the
+ * `market-review:<flow>:<at>` marker it wrote into `intent`, which is the one
+ * field that survives the round trip (`marketReviewIntent`) — plus the instant,
+ * read from the host's `trigger.at` and falling back to the marker's own. ⛔
+ * `expiresAt` is not read: it is the horizon, not the appointment, and it is
+ * the field the host's identity check deliberately excludes.
+ *
+ * ⛔ **This is addressing, not narrowing.** The floor is still counted rather
+ * than parsed (#201) — `standingArms` is `standingPlans.length` and nothing
+ * here touches it — and `toArm`, `duplicateFlows`, `superseded` and `nextState`
+ * are still computed from `previous` and `sequence` alone. What the field
+ * reaches now is one more **report**: which row the orphan is.
+ *
+ * ⚠️ **Returning `null` where no entry matches is a fact, not a fallback**, and
+ * the caller is told which of two facts it is — see the two exclusive
+ * diagnostics at the emission site.
+ *
+ * ⛔ **Neither `superseded_address_unreadable` nor `superseded_address_unnamed`
+ * is in `CAUSE_CODE_REGISTRY`**, on the same judgement #201 made for
+ * `standing_arms_are_a_floor`. That table is the vocabulary `mandateExecution`
+ * reads to answer *«why does this book hold no single name?»*, and its three
+ * lanes are a stage that lost an input, a question that refuses both
+ * conclusions, and a gate that ran. Whether a duplicate appointment can be
+ * pointed at is none of those — it is a reporting fact about the schedule, and
+ * a code in that table with no bearing on an empty book is the drift #171 built
+ * the table to end.
+ */
+function orphanPlanId(row, standingPlans) {
+  const instant = armedInstant(row)
+  if (!Array.isArray(standingPlans) || instant === null) return null
+  for (const entry of standingPlans) {
+    if (typeof entry?.planId !== 'string') continue
+    const intent = typeof entry.intent === 'string' ? entry.intent : ''
+    const flow = MARKET_REVIEW_FLOW_MARKER.exec(intent)?.[1]
+    if (flow !== row?.flow) continue
+    const dated = Date.parse(entry?.trigger?.at)
+    const marked = Date.parse(MARKET_REVIEW_MARKER.exec(intent)?.[2])
+    const at = Number.isFinite(dated) ? dated : marked
+    if (Number.isFinite(at) && at === instant) return entry.planId
+  }
+  return null
 }
 
 export function reconcileArmedReviews({ previous = null, sequence = [], journalArmed, armed: misplacedArmed, standingPlans, asOf } = {}) {
@@ -682,7 +747,38 @@ export function reconcileArmedReviews({ previous = null, sequence = [], journalA
    */
   const superseded = previouslyProposed.filter((open) => sequence.some((row) => row.flow === open.flow && armedInstant(row) !== armedInstant(open)))
   if (superseded.length) {
-    diagnostics.push(diagnostic('review_superseded', 'unevaluated', 'This instance already proposed a review for this flow at a different instant, and neither of the host\'s folds reaches it — the arming-time fold takes an identical promise and the firing-time fold takes an identical instant, and this is the same promise at a different instant — so both may fire and the sleeve may be judged twice on one day. `standingPlans` gives the older promise an address and there is still no verb that withdraws it (aumos#704 folded the identical re-arm and left this one); say so in `uncertainty` rather than assuming it replaced itself', 'previous', { superseded }))
+    /**
+     * ⚠️ **The address is carried beside the orphan, never inside it (#202).**
+     * `data.superseded` stays what `previous` and `sequence` alone produce, so
+     * the sentence #201 published — the floor reaches `standingArms` and the
+     * arming answer is computed without it — is still true of every returned
+     * key. What `standingPlans` reaches is this diagnostic's details.
+     *
+     * ⛔ **Ids and keys, never values.** `planIds` names rows and
+     * `unnamedFlows` names dispatch flows; no `intent` prose, no `armedAt`, no
+     * `expiresAt` rides out of here.
+     *
+     * ⚠️ **«No orphan is nameless» and «this host cannot name one» are two
+     * facts**, the same split #201 drew between an unreadable floor and a floor
+     * of zero, and the two codes below are exclusive. Not handed
+     * `standingPlans` — a caller that dropped it, or a host older than
+     * aumos#690 — is `superseded_address_unreadable`: nothing here could name a
+     * row and the silence is the contract's, not the ledger's. Handed the field
+     * and matching nothing is `superseded_address_unnamed`: the floor left that
+     * promise out (it is a floor, so absent from it is not gone) or the row is
+     * one this package's marker does not describe. Collapsing them would let a
+     * run read *"no address"* as *"no orphan"*, which is the shape of every
+     * absence this file has had to re-separate.
+     */
+    const addresses = superseded.map((open) => ({ flow: open.flow, planId: orphanPlanId(open, standingPlans) }))
+    const planIds = addresses.filter((row) => row.planId !== null).map((row) => row.planId)
+    const unnamedFlows = addresses.filter((row) => row.planId === null).map((row) => row.flow)
+    diagnostics.push(diagnostic('review_superseded', 'unevaluated', 'This instance already proposed a review for this flow at a different instant, and neither of the host\'s folds reaches it — the arming-time fold takes an identical promise and the firing-time fold takes an identical instant, and this is the same promise at a different instant — so both may fire and the sleeve may be judged twice on one day. Since aumos#712 folded the identical re-arm this is the **only** duplicate left standing, and there is still no verb that withdraws it (aumos#704); `standingPlans` gives the older promise an address and `planIds` here names it where it could be matched, so `uncertainty` can name the row rather than assuming it replaced itself', 'previous', { superseded, planIds, unnamedFlows }))
+    if (standingArmsAreUnreadable) {
+      diagnostics.push(diagnostic('superseded_address_unreadable', 'info', 'An older promise of this instance stands at a different instant and no `planId` could be named for any of them, because this call was handed no `standingPlans` — the invocation has none (a host older than aumos#690) or the caller dropped it. ⛔ That is a silence about the address, never evidence that the orphan is gone: report the supersede without a row id and say the id was unreadable, and pass the invocation\'s `standingPlans` to make it nameable', 'standingPlans', { orphans: superseded.length }))
+    } else if (unnamedFlows.length) {
+      diagnostics.push(diagnostic('superseded_address_unnamed', 'info', 'An older promise of this instance stands at a different instant and `standingPlans` — which was readable — names no row for it: the list is a floor, so a promise it could not date is left out rather than guessed at, and a row whose `intent` does not carry this package\'s `market-review:<flow>:<at>` marker cannot be matched either. ⛔ Unnamed is not withdrawn and not folded; report the flow and say the row id could not be matched, and never read a missing address as a missing orphan', 'standingPlans', { orphans: superseded.length, named: planIds.length, unnamedFlows }))
+    }
   }
   /**
    * ⚠️ **`armed` is what this instance has promised, not what this run

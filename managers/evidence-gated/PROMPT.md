@@ -959,7 +959,14 @@ What the key is for, now that it does not suppress anything, is the one duplicat
 **not** fold: a second review for the same flow at a **different** instant, which is two wakes and
 two judgements sealed on the same book on the same day. That is `review_superseded`, it is
 `unevaluated`, and it means an older review is still out there and cannot be withdrawn — say so in
-`uncertainty` rather than assuming it replaced itself. `review_already_armed` names a same-instant
+`uncertainty` rather than assuming it replaced itself. ⚠️ **Since the arming-time fold landed it is
+the only duplicate left standing, and it now comes with an address**: where the call was handed
+`standingPlans`, the diagnostic's details carry the orphan's `planId` in `planIds`, so name the row
+in `uncertainty` instead of reporting an anonymous supersede. Where no row could be named the
+details say which silence it is, and neither is evidence the orphan is gone:
+`superseded_address_unreadable` — this call had no `standingPlans` at all — and
+`superseded_address_unnamed`, where the field was read and matched nothing, because the floor left
+that promise out or its `intent` does not carry this package's marker. `review_already_armed` names a same-instant
 repeat: arm it anyway and report it. Write `nextState` back verbatim when it is non-null. It is a
 **first-person** record — what this instance proposed, whose instant has not passed — never a claim
 about what is standing; a run with nothing to arm still writes back its unexpired promises, and a
@@ -981,9 +988,10 @@ guessed at. ⛔ **Absent and empty are two facts.** Where this call was handed n
 the invocation has none, or you dropped it — the answer is `standingArms: null` beside
 `standingArmsAreUnreadable: true` and `armed_state_unreadable`, the number is unknown, and the word
 is **unreadable**, never zero. Where it was handed `[]`, the floor is **0** and that zero is an
-answer: nothing of yours stood that the host could date. ⚠️ The floor reaches `standingArms` and
-reaches nothing else — `toArm`, `duplicateFlows`, `superseded` and `nextState` are computed without
-it — so reading what stands never narrows what you arm.
+answer: nothing of yours stood that the host could date. ⚠️ The floor reaches `standingArms` and the
+orphan's address in `review_superseded` — both reports — and reaches nothing else: `toArm`,
+`duplicateFlows`, `superseded` and `nextState` are computed without it, so reading what stands never
+narrows what you arm.
 
 ⚠️ **The instants in that key are epoch milliseconds, not RFC 3339.** `run/armed-reviews` holds
 future instants by design and `memory_read` refuses a result carrying any *string* timestamp after
