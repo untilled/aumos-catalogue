@@ -974,7 +974,13 @@ Four steps, in order, and `signalPaper` is called once with all of them:
    `paper_state_misplaced`. Empty is valid on a first run and is not a reason to stop; an empty
    answer from a key that was **not** empty is the failure this step names.
 2. Fetch bars for **every** symbol in its `state.openWindows`, and pass them as `rows` — a carried
-   window nobody fetched bars for accrues nothing.
+   window nobody fetched bars for accrues nothing. **One row is one carried window, not one bar**:
+   `{ symbol, signalAt, setup, ruleVersion }` copied from that window, plus `bars` and
+   `benchmarkBars` whose rows are `{ timestamp, close }` — ⛔ `timestamp`, not the `date` that
+   `indicators` and `trendState` also accept, and bars written under `date` come back
+   `forward_base_missing`, which reads as a window the calendar has not reached. The whole row
+   shape is published as `inputContracts.nested.signalPaper`; read it rather than finding it by
+   being refused.
 3. Pass every `openWindow` that `paperAdmission` admitted in this run as `admissions` — the thesis
    calls from `theme-radar` and the `sectorStrength` baseline signals both.
 4. Only if the calculation is not blocked and `nextState` is non-null, write it back **verbatim**. Otherwise retain the prior revision. It is the whole answer: what was

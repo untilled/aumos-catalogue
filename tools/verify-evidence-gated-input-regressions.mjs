@@ -2091,3 +2091,112 @@ assert.ok(
 )
 
 console.log('evidence-gated issue #170 reported-not-gated valuation axis regression tests passed')
+
+/**
+ * ── #183: the paper row's shape is published, and the refusal names the field ──
+ *
+ * `signalPaper: { rows: "array", state: "object", … }` was the whole published
+ * shape of the **only** path to the 30-sample promotion gate, and it is called
+ * on every wake. The measured cost on `run_996380fbdd9a41a5bb3d74f3eca761a2`
+ * was three round trips of guessing — `{symbol, date, close}`, then `signalAt`,
+ * then `setup`/`ruleVersion` — every one of them a `blocked` answer, which is
+ * why this is a documentation defect rather than a silent one.
+ *
+ * ⚠️ **The property is that the published row and the refused row are the same
+ * row.** This file's dominant failure is a shape that is enforced and not said
+ * or said and not enforced, so the loop below drops each published field from a
+ * complete row and requires the two lists to agree: the four the code refuses
+ * are exactly the four published as required, and nothing that is merely
+ * carried is published as though it were.
+ */
+const paperAsOf = '2026-03-01T00:00:00Z'
+const paperBars = (offset = 0) => Array.from({ length: 8 }, (_, index) => ({
+  timestamp: `2026-01-${String(index + 5).padStart(2, '0')}T00:00:00Z`,
+  close: 100 + index + offset,
+  high: 101 + index + offset,
+  low: 99 + index + offset,
+}))
+const paperRow = () => ({
+  symbol: '139260',
+  signalAt: '2026-01-06T00:00:00Z',
+  setup: 'thesis_call',
+  ruleVersion: 'ega-1.0.0',
+  bars: paperBars(),
+  benchmarkBars: paperBars(1),
+})
+const paper = (input) => execute({ operation: 'signalPaper', asOf: paperAsOf, input: { horizons: [5], ...input } })
+const paperContract = execute({ operation: 'inputContracts', asOf: paperAsOf, input: {} }).data.nested.signalPaper
+
+assert.ok(paperContract, 'signalPaper publishes the shapes its key list cannot show')
+assert.deepEqual(
+  Object.keys(paperContract['rows[]']),
+  ['symbol', 'signalAt', 'setup', 'ruleVersion', 'bars', 'benchmarkBars', 'sectorBars'],
+  'the row is published field by field, not as "array"',
+)
+assert.notEqual(paper({ rows: [paperRow()] }).status, 'blocked', 'the published row is the row this operation accepts')
+
+/** Published-as-required and refused-when-absent are the same four fields. */
+const requiredByCode = Object.keys(paperContract['rows[]']).filter((field) => {
+  const { [field]: _dropped, ...row } = paperRow()
+  return paper({ rows: [row] }).status === 'blocked'
+})
+assert.deepEqual(requiredByCode, ['symbol', 'signalAt', 'setup', 'ruleVersion'])
+for (const field of requiredByCode) assert.ok(new RegExp(`\`${field}\``).test(paperContract.rowShape), `rowShape names ${field}`)
+
+/**
+ * ⛔ And the two fields the guessing run added on its third attempt are read by
+ * nothing on a row: publishing them as required because a passing call happened
+ * to carry them is this file's own defect with the arrows reversed. `cohort` is
+ * derived from `setup` and `benchmark` is a series named `benchmarkBars`.
+ */
+for (const carried of [{ cohort: 'llm-research' }, { benchmark: 'KOSPI' }, { date: '2026-01-06', close: 100 }]) {
+  assert.equal(
+    JSON.stringify(paper({ rows: [{ ...paperRow(), ...carried }] })),
+    JSON.stringify(paper({ rows: [paperRow()] })),
+    `${Object.keys(carried).join('/')} on a row changes nothing, and the contract says so rather than requiring it`,
+  )
+}
+assert.ok(/read by nothing here/.test(paperContract.rowShape))
+
+/**
+ * ── The refusal names the field, and carries no value (#183) ───────────────
+ *
+ * `paper_row_metadata_missing` answered at a path of `rows[<i>]` with a
+ * sentence about both fields, so a caller who wrote one of the two could not
+ * tell which half was the complaint. The sibling check on `admissions` already
+ * answered at `admissions[<i>].symbol`.
+ */
+for (const [dropped, expected] of [['symbol', ['symbol']], ['signalAt', ['signalAt']]]) {
+  const { [dropped]: _gone, ...row } = paperRow()
+  const refusal = paper({ rows: [row] }).diagnostics.find((entry) => entry.code === 'paper_row_metadata_missing')
+  assert.equal(refusal.path, `rows[0].${dropped}`, 'the path names the field that is missing')
+  assert.deepEqual(refusal.details.missing, expected)
+  assert.ok(new RegExp(dropped).test(refusal.message))
+}
+const bothMissing = paper({ rows: [{ setup: 'thesis_call', ruleVersion: 'ega-1.0.0', date: '2026-01-06', close: 100 }] })
+const bothRefusal = bothMissing.diagnostics.find((entry) => entry.code === 'paper_row_metadata_missing')
+assert.deepEqual(bothRefusal.details.missing, ['symbol', 'signalAt'])
+assert.deepEqual(Object.keys(bothRefusal.details), ['missing'], 'field names, never the row\'s own values')
+assert.equal(bothMissing.status, 'blocked')
+assert.deepEqual(
+  paper({ rows: [{ ...paperRow(), setup: 'momentum' }] }).diagnostics.find((entry) => entry.code === 'paper_setup_unknown').details.supported,
+  execute({ operation: 'inputContracts', asOf: paperAsOf, input: {} }).data.vocabulary.paperSetups,
+  'and an unknown setup is answered with the closed list it had to match',
+)
+
+/**
+ * ── A bar written under `date` is not a bar this operation can read (#183) ──
+ *
+ * `indicators` and `trendState` accept `date`/`time`/`timestamp`; `forwardOutcome`
+ * — which is what scores a paper row — accepts `timestamp` alone. A whole series
+ * written under `date` scores nothing and the answer is `forward_base_missing`,
+ * *"a last close before signalAt and later bars are required"*, which reads as a
+ * window the calendar has not reached rather than a series nobody could parse.
+ */
+const datedBars = paperBars().map(({ timestamp, ...bar }) => ({ date: timestamp, ...bar }))
+const datedRow = paper({ rows: [{ ...paperRow(), bars: datedBars, benchmarkBars: datedBars }] })
+assert.ok(has(datedRow, 'forward_base_missing'), 'the divergence is real and this is the shape it takes')
+assert.equal(has(paper({ rows: [paperRow()] }), 'forward_base_missing'), false, 'the same bars under `timestamp` score')
+assert.ok(/`timestamp`/.test(paperContract.barShape) && /forward_base_missing/.test(paperContract.barShape))
+
+console.log('evidence-gated issue #183 paper-row shape regression tests passed')
