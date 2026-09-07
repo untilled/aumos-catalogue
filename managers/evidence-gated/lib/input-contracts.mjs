@@ -267,6 +267,7 @@ export const NESTED_CONTRACTS = {
     'facts.<symbol>': 'normalizeSecFacts output for that symbol. US.',
     'documents.<symbol>': 'The CachedDocument array from source_cache_read — { publishedAt, version, normalized: { period, currency, metrics } }. When present it is preferred over the raw vendor rows, because it is what the host already dated.',
     'prices.<symbol>': { status: STRING, close: NUMBER, ma50: NUMBER, ma200: NUMBER, offHigh200: NUMBER, rs20VsBenchmarkPct: NUMBER },
+    'valuations.<symbol>': '{ shares, equity, debt } from the same filing, which upsideRadar turns into the priceToBook and debtToEquity on its valuation axis. ⛔ That axis is **reported and gates nothing** — every row says so as `gates: false`, and the answer repeats it once in `reportedNotGatedAxes`. No registered lane screens on price-to-book, `eligible` and the rank do not read it, and supplying it changes no verdict; it is context for the thesis a surfaced name goes on to get, and valuation as a *judgement* is `thesisValuation` (#170).',
   },
   radarFeedDiagnosis: {
     plan: 'The whole fundamentalsPlan data object; its requests carry the cache states this reads.',

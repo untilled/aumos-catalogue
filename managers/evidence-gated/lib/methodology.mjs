@@ -659,6 +659,8 @@ const RADAR_LANES = {
 }
 
 function radarLaneVerdicts(row, candidate, asOf) {
+  // ⛔ `axes.valuation` is deliberately absent from this line: no registered lane
+  // screens on price-to-book. The row declares that with `gates: false` (#170).
   const { inflection, catalyst, price } = row.axes
   const filingYoy = inflection.operatingIncomeYoy
   const marginDelta = inflection.marginDeltaYoy
@@ -730,11 +732,42 @@ export function upsideRadar({ candidates = [], feed = null, asOf }) {
       ? { status: 'present' }
       : { status: 'unknown', reason: 'no-registered-catalyst-not-proof-of-absence' }
     const expectation = candidate.latestEarnings ? { status: 'recorded', sue: candidate.latestEarnings.sue ?? null, guidanceSurprise: candidate.latestEarnings.guidanceSurprise ?? null } : { status: 'unknown', reason: 'no-point-in-time-event-record' }
+    /**
+     * ⚠️ **This axis is reported and it gates nothing, and it now says so on
+     * every row.** That sentence is the whole of #170 and it is not a placeholder
+     * for wiring that is coming.
+     *
+     * The three lanes are pre-registered technical and event lenses; none of them
+     * asks what a name costs, `eligible` reads `price`, `inflection` and
+     * `catalyst`, and `rankKey` reads two of those. `priceToBook` and
+     * `debtToEquity` rode out on every candidate anyway, and a value that arrives
+     * beside four axes that decide is read as a fifth that decides. #141 is the
+     * same shape from the other side — `parkedLiquidity` arrived on every row and
+     * was read by nothing — and what that fix settled is that a value and the use
+     * a reader infers from it must not be allowed to disagree in silence.
+     *
+     * ⛔ **The answer is not a fourth lane.** Cheap is not a discovery signal
+     * here: the predecessor harness screened on none, valuation in this package
+     * belongs to `thesisValuation`, which prices a thesis that already cleared
+     * discovery, and a lane is a **pre-registration** — a named rule version
+     * registered before any signal accumulated, which is the point of
+     * `RADAR_LANES`. Adding one to spend a computed number would register a lens
+     * backwards, from the data outwards, and pool a new sample into a shelf of
+     * lanes whose versions exist to keep samples apart. If a value lane is ever
+     * wanted it is registered as one, on its own `ruleVersion`, on purpose.
+     *
+     * ⛔ **And it is not deletion either.** The numbers are correct, cheap and
+     * point-in-time, and a run writing a thesis for a name the radar surfaced
+     * reads them as context. What was wrong was never the arithmetic; it was that
+     * nothing on the answer distinguished *context* from *verdict*.
+     */
     const valuation = candidate.valuation?.equity > 0 && (finite(candidate.valuation.shares) || finite(candidate.valuation.debt)) ? {
       status: 'partial',
+      gates: false,
+      role: 'reported-not-gated',
       priceToBook: finite(price.close) && finite(candidate.valuation.shares) ? round(price.close * candidate.valuation.shares / candidate.valuation.equity, 2) : null,
       debtToEquity: finite(candidate.valuation.debt) ? round(candidate.valuation.debt / candidate.valuation.equity, 2) : null,
-    } : { status: 'unknown', reason: 'missing-shares-or-equity-never-zero-filled' }
+    } : { status: 'unknown', gates: false, role: 'reported-not-gated', reason: 'missing-shares-or-equity-never-zero-filled' }
     const eligible = price.status !== 'unknown' && inflection.status !== 'unknown' && (inflection.status === 'improving' || catalyst.status === 'present')
     if (!eligible) diagnostics.push(diagnostic('upside_candidate_unranked', 'info', 'Candidate remains visible but unranked because an axis is missing', `candidates[${index}]`, { asset: candidate.asset }))
     const row = { asset: candidate.asset, market: candidate.market, sector: candidate.sector ?? null, eligible, axes: { inflection, expectation, catalyst, price, valuation }, rankMeaning: 'research-priority-only' }
@@ -802,7 +835,14 @@ export function upsideRadar({ candidates = [], feed = null, asOf }) {
   const starvedLanes = Object.entries(laneCoverage).filter(([, row]) => row.starved).map(([lane]) => lane)
   if (starvedLanes.length && !feedCause) diagnostics.push(diagnostic('radar_starvation_cause_unreported', 'unevaluated', 'A lane starved and no feed reading was supplied, so this run can say that it is unfed but not what stage lost the input; pass radarFeedDiagnosis as feed', 'feed', { starvedLanes }))
   if (feedCause && !starvedLanes.length && feed?.fed === false) diagnostics.push(diagnostic('radar_feed_broken_lanes_passed', 'info', 'The feed reading says the branch was not fully fed while every lane evaluated; the lanes are answerable and the shortfall is still worth reporting', 'feed', { feedStage, feedCause, ...(feedCoverage ? { feedCoverage } : {}) }))
-  return { data: { ranked, unranked: rows.filter((row) => !row.eligible), lanes: laneCoverage, starvedLanes, feed: feedCause ? { stage: feedStage, cause: feedCause, fed: feed?.fed ?? null, coverage: feedCoverage } : null, branch: 'fundamental-and-event', rankMeaning: 'research-priority-only' }, diagnostics }
+  /**
+   * The same sentence the rows carry, once, for a reader holding the whole
+   * answer rather than one row: these axes are computed and no lane, no
+   * `eligible` and no rank reads them. An exemption nobody can see is the same
+   * shape as a value nobody reads (#141), and this is that field for #170.
+   */
+  const reportedNotGatedAxes = ['valuation']
+  return { data: { ranked, unranked: rows.filter((row) => !row.eligible), lanes: laneCoverage, starvedLanes, reportedNotGatedAxes, feed: feedCause ? { stage: feedStage, cause: feedCause, fed: feed?.fed ?? null, coverage: feedCoverage } : null, branch: 'fundamental-and-event', rankMeaning: 'research-priority-only' }, diagnostics }
 }
 
 /**

@@ -2036,3 +2036,58 @@ assert.ok(/passed back here/.test(ledgerContract.receipt), 'the hash cannot be r
 assert.ok(/claim_grade_unstated/.test(ledgerContract.grade))
 
 console.log('evidence-gated issue #176 attestation-propagation regression tests passed')
+
+/**
+ * #170: the radar's `valuation` axis is reported and gates nothing, and the
+ * answer says so.
+ *
+ * It was computed on every candidate and read by no lane, no `eligible` and no
+ * rank — the same shape as #141's `parkedLiquidity`, which arrived on every row
+ * and was read by nothing, from the other side: there a value nobody read was
+ * silently spending a budget, here a value nobody reads is silently read by the
+ * *reader* as a verdict. The property below is what keeps the two halves honest
+ * at once: the numbers move by eight orders of magnitude and every verdict on
+ * the answer is byte-identical, and the axis declares that rather than leaving
+ * it to be noticed.
+ *
+ * ⚠️ The invariance assertion is the one that has to survive a lane being added
+ * later. If a `value-rerating` lane is ever pre-registered, this case is what
+ * says so out loud — it fails, and the declaration below has to change with it.
+ */
+const radarValuationCandidate = (valuation) => ({
+  asset: 'VAL', market: 'us', sector: 'tech',
+  filings: [
+    { periodEnd: '2026-03-31', availableAt: '2026-05-01T00:00:00Z', operatingIncomeYoy: -0.1, marginDeltaYoy: 0.01 },
+    { periodEnd: '2026-06-30', availableAt: '2026-08-01T00:00:00Z', operatingIncomeYoy: 0.4, marginDeltaYoy: 0.02 },
+  ],
+  price: { status: 'confirmed', close: 100, ma50: 110, ma200: 90, offHigh200: -0.1, rs20VsBenchmarkPct: 3 },
+  catalysts: [{ windowStart: '2026-09-01', windowEnd: '2026-10-01' }],
+  valuation,
+})
+const radarValuation = (valuation) => execute({ operation: 'upsideRadar', asOf: '2026-09-05T00:00:00Z', input: { candidates: [radarValuationCandidate(valuation)] } })
+const cheapRadar = radarValuation({ shares: 1, equity: 1_000_000, debt: 0 })
+const dearRadar = radarValuation({ shares: 1_000_000, equity: 1, debt: 900_000 })
+assert.ok(cheapRadar.data.ranked[0].axes.valuation.priceToBook < 1, 'the cheap candidate is priced under book')
+assert.ok(dearRadar.data.ranked[0].axes.valuation.priceToBook > 1_000_000, 'the dear one is priced at a million times it')
+const withoutValuationAxis = (answer) => JSON.stringify(answer.data.ranked.concat(answer.data.unranked).map(({ axes, ...row }) => {
+  const { valuation, ...gatingAxes } = axes
+  return { ...row, gatingAxes }
+}))
+assert.equal(
+  withoutValuationAxis(cheapRadar),
+  withoutValuationAxis(dearRadar),
+  'valuation gates nothing: eligibility, every lane verdict and the rank are identical at book and at a million times book',
+)
+for (const answer of [cheapRadar, dearRadar, radarValuation(undefined)]) {
+  const axis = answer.data.ranked.concat(answer.data.unranked)[0].axes.valuation
+  assert.equal(axis.gates, false, 'the axis declares that it decides nothing — on the unknown branch too, where a silent axis reads as an unmeasured gate')
+  assert.equal(axis.role, 'reported-not-gated')
+  assert.deepEqual(answer.data.reportedNotGatedAxes, ['valuation'], 'and the answer repeats it once for a reader holding the whole answer')
+}
+assert.equal(radarValuation(undefined).data.ranked[0].axes.valuation.status, 'unknown', 'a missing valuation is still never zero-filled')
+assert.ok(
+  /reported and gates nothing/.test(valContracts.nested.radarCandidates['valuations.<symbol>']),
+  'the published input contract says what supplying valuations does and does not do',
+)
+
+console.log('evidence-gated issue #170 reported-not-gated valuation axis regression tests passed')
