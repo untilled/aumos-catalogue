@@ -1235,6 +1235,48 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
    * would be inventing exactly the kind of allocation decision this diagnostic
    * exists to make visible. It asks, in the report, once per run, per label.
    */
+  /**
+   * ── An axis nobody labelled is not an axis under its cap (#173) ───────────
+   *
+   * `concentration_cap_missing` says *nobody declared a cap*. There was no
+   * sentence for the other half — **a cap the investor did declare, applied to
+   * rows that carry no label on that axis** — and the two produce the same
+   * empty exposure map. The run that filed this passed `sectors` in the plural
+   * on its one labelled row: `exposures.sector` came back `{}`, the sector cap
+   * was compared against nothing, and the answer was `status: ok` with an empty
+   * diagnostics array. The shape guard in `input-contracts.mjs` refuses that
+   * spelling now; this is the belt for every other way a label fails to arrive,
+   * including the ordinary one of nobody writing it down.
+   *
+   * ⚠️ **`unevaluated`, never `blocked`.** A label is a claim about a shared
+   * loss path and this package declares none of them itself — refusing a book
+   * for the absence of one would be inventing the classification, which is the
+   * same reason `concentration_factor_label_unexamined` one block down blocks
+   * nothing. What it must not do is stay silent, because silence here reads as
+   * *measured and under the cap*.
+   *
+   * ⚠️ Parked liquidity is excluded for the reason it is excluded from the axes
+   * themselves (#141): it is on no shared loss path, so it has no label to be
+   * missing. Core rows are **not** excluded — they are accumulated onto these
+   * axes and an unlabelled core holding is exactly the weight a sector cap
+   * would want to see.
+   */
+  const labelled = { sector: (row) => typeof row?.sector === 'string' && row.sector.length > 0, theme: (row) => (row?.themes ?? []).length > 0, factor: (row) => (row?.factors ?? []).length > 0 }
+  const axisRows = [...standing, ...proposed].filter((row) => finite(row?.weight) && row.weight >= 0 && row?.parkedLiquidity !== true)
+  const unlabelled = {}
+  for (const [kind, hasLabel] of Object.entries(labelled)) {
+    const rows = axisRows.filter((row) => !hasLabel(row))
+    unlabelled[kind] = { symbols: [...new Set(rows.map((row) => row?.symbol ?? null))], weight: round(rows.reduce((total, row) => total + row.weight, 0)) }
+    if (!rows.length || !finite(caps[kind])) continue
+    diagnostics.push(diagnostic(
+      'concentration_labels_unstated',
+      'unevaluated',
+      `A ${kind} cap is declared and these rows carry no ${kind} label, so their weight was accumulated onto no ${kind} and the cap was applied to less of the book than it holds. Unlabelled is not under the cap`,
+      kind === 'sector' ? 'positions[].sector' : `positions[].${kind}s`,
+      { axis: kind, cap: caps[kind], symbols: unlabelled[kind].symbols, unlabelledWeight: unlabelled[kind].weight },
+    ))
+  }
+
   const factorReviewCap = caps.factor
   if (finite(factorReviewCap) && factorReviewCap > 0) {
     for (const [key, weight] of totals.factor.entries()) {
@@ -1298,6 +1340,13 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
        * finding with only the first half published. ⛔ Reported, never capped —
        * see `mandateExecution` for why a cap here was declined.
        */
+      /**
+       * ⚠️ Published for the reason `parkedLiquidityExcluded` is (#173): a
+       * clean axis and an unlabelled one are the same empty map, and the run
+       * has to be able to say which of the two it is looking at — per axis,
+       * whether or not that axis has a cap to be measured against.
+       */
+      unlabelled,
       parkedLiquidityWeight: bookSplit.parkedLiquidityWeight,
       coreWeight: bookSplit.coreWeight,
       singleNameWeight: bookSplit.singleNameWeight,

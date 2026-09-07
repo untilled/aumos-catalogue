@@ -648,6 +648,14 @@ is returned as `concentration_factor_label_unexamined` for this run to answer, n
 ⛔ **A cap the Mandate does not declare is `unevaluated`, and that is not a pass** — say so in
 `uncertainty` rather than sizing as though the limit were absent.
 
+**Spell the label axes the way the operation reads them, and label the rows.** `sector` is a single
+string; `themes` and `factors` are arrays. `sectors`, `theme` and `factor` come back
+`input_shape_invalid` — they used to be dropped, and a book whose sectors were spelled in the plural
+had its sector cap applied to **no weight at all** while the answer read `status: ok`. ⛔ And a cap
+that is declared over rows carrying no label on that axis is `concentration_labels_unstated` /
+`unevaluated`: an empty axis is *nobody said what this is*, never *measured and under the cap*.
+Label the rows and call it again rather than reporting the empty axis as clean.
+
 ⛔ **The single-name total is the Mandate's as well, and this package ships no constant for it.**
 Call `singleNameBudget` with `mandateCashFloor`, `mandatePositionCap`, the book's `positions` and
 this run's `proposed`: what `cashFloor` leaves is the range the single-name lanes may hold together,

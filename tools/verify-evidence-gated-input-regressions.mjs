@@ -1473,3 +1473,105 @@ assert.deepEqual(
 assert.ok(/closePrice/.test(trendContract.nested.trendState.barShape), 'the vendor shape is named as the one that is refused')
 
 console.log('evidence-gated issue #180 trend-gate bar-validation regression tests passed')
+
+/**
+ * ── #173: the sector axis accumulated empty and the answer said `ok` ────────
+ *
+ * `concentration` reads the sector axis as a **singular string** and the theme
+ * and factor axes as **arrays**. The singular `theme` had been refused since
+ * #147; the plural `sectors` was read by nothing and refused by nothing. The
+ * measured call (run `run_73a3e6c41c204f468ee8be8d2923d898`, asOf
+ * 2026-09-07T01:10:07.572Z) passed `sectors: ["kr-broad-equity"]` beside
+ * `themes` and `factors` that were read, and came back `exposures.sector: {}`,
+ * **no diagnostic**, `status: ok` — a declared sector cap compared against
+ * nothing at all.
+ *
+ * ⛔ The control that makes it a defect rather than a preference: changing that
+ * **one field** to the singular and nothing else fills the axis. The two calls
+ * differ by a spelling, and one of them silently drops a cap.
+ *
+ * That run held a single labelled core ETF and was harmless. The direction is
+ * not: the axis a cap is not applied to is the axis a breach passes on, and a
+ * sector cap only binds a book that holds several single names — the book this
+ * methodology exists to build.
+ */
+const concAsOf = '2026-09-07T01:10:07.572Z'
+const concCaps = { position: 0.2, sector: 0.35, theme: 0.4, factor: 0.15, portfolioHeat: 0.06 }
+const concRun = (input) => execute({ operation: 'concentration', asOf: concAsOf, input })
+const concHas = (answer, code) => answer.diagnostics.some((row) => row.code === code)
+const measuredRow = { symbol: '069500', weight: 0.04352020131413393, core: true, themes: ['kr-market-beta'], factors: ['kr-large-cap-blend'] }
+
+/** ⑴ Control A, verbatim: the plural is refused now instead of being dropped. */
+const pluralSectors = concRun({ positions: [{ ...measuredRow, sectors: ['kr-broad-equity'] }], proposed: [], caps: concCaps, config: {} })
+assert.equal(pluralSectors.status, 'blocked', 'a spelling the operation does not read is refused, never absorbed into an empty axis')
+assert.ok(concHas(pluralSectors, 'input_shape_invalid'))
+assert.equal(pluralSectors.diagnostics.find((row) => row.code === 'input_shape_invalid').path, 'input.positions[0].sectors')
+assert.equal(pluralSectors.data, null, '⛔ and no exposures map is returned at all: an answer computed off a shape that was refused is the defect, not the report of it')
+
+/** ⑵ Control B, verbatim: the singular is what fills the axis, one field apart. */
+const singularSector = concRun({ positions: [{ ...measuredRow, sector: 'kr-broad-equity' }], proposed: [], caps: concCaps, config: {} })
+assert.equal(singularSector.status, 'ok')
+assert.deepEqual(singularSector.data.exposures.sector, { 'kr-broad-equity': 0.0435202 })
+assert.equal(singularSector.diagnostics.length, 0, 'a fully labelled row against declared caps says nothing, which is what a clean axis is allowed to look like')
+
+/** ⑶ The three axes are one rule now; each wrong spelling is named on its own path. */
+for (const [field, value, path] of [
+  ['sectors', ['a'], 'input.positions[0].sectors'],
+  ['theme', 'a', 'input.positions[0].theme'],
+  ['factor', 'a', 'input.positions[0].factor'],
+  ['sector', ['a'], 'input.positions[0].sector'],
+  ['themes', 'a', 'input.positions[0].themes'],
+  ['factors', 'a', 'input.positions[0].factors'],
+]) {
+  const wrong = concRun({ positions: [{ symbol: 'AAA', weight: 0.05, [field]: value }], caps: concCaps })
+  assert.equal(wrong.status, 'blocked', `${field} is refused`)
+  assert.ok(wrong.diagnostics.some((row) => row.code === 'input_shape_invalid' && row.path === path), `${field} is named at ${path}`)
+}
+/** `proposed` is the same shape and is guarded by the same rule. */
+assert.equal(concRun({ positions: [], proposed: [{ symbol: 'AAA', weight: 0.05, sectors: ['a'] }], caps: concCaps }).status, 'blocked')
+
+/**
+ * ⑷ A breach the plural would have hidden. Three names at 0.15 each on one
+ * sector is 0.45 against a 0.35 cap; spelled `sectors` before this fix it was
+ * `status: ok` with an empty sector map and no diagnostic.
+ */
+const breachRows = ['AAA', 'BBB', 'CCC'].map((symbol) => ({ symbol, weight: 0.15, sector: 'semiconductors', themes: ['ai'], factors: ['ai-capex'], stopLossPct: 0.05 }))
+const wideCaps = { ...concCaps, position: 0.5, theme: 0.9, factor: 0.9 }
+const realBreach = concRun({ positions: [breachRows[0]], proposed: breachRows.slice(1), caps: wideCaps })
+assert.deepEqual(realBreach.data.breaches.map((row) => row.kind), ['sector'], 'the sector cap binds')
+assert.equal(realBreach.status, 'blocked')
+assert.equal(concRun({ positions: breachRows.map(({ sector, ...rest }) => ({ ...rest, sectors: [sector] })), caps: wideCaps }).status, 'blocked', 'and the plural spelling of the same book is refused rather than passed')
+
+/**
+ * ⑸ The other half: a cap the investor **did** declare, over rows that carry no
+ * label on that axis. `concentration_cap_missing` said *nobody declared a cap*
+ * and there was no sentence for this, so both produced the same empty map.
+ * ⛔ `unevaluated`, never `blocked` — this package declares no labels of its
+ * own and refusing a book for the absence of one would be inventing the
+ * classification. What it may not do is stay silent.
+ */
+const unlabelled = concRun({ positions: [{ symbol: 'AAA', weight: 0.5, stopLossPct: 0.1 }], caps: concCaps })
+assert.equal(unlabelled.status, 'unevaluated', '«nobody said what this is» is not «measured and under the cap»')
+const stated = unlabelled.diagnostics.filter((row) => row.code === 'concentration_labels_unstated')
+assert.deepEqual(stated.map((row) => row.details.axis), ['sector', 'theme', 'factor'])
+assert.ok(stated.every((row) => row.severity === 'unevaluated' && row.details.symbols.includes('AAA') && row.details.unlabelledWeight === 0.5))
+assert.deepEqual(unlabelled.data.unlabelled.sector, { symbols: ['AAA'], weight: 0.5 })
+/** An axis with no cap is already answered by `concentration_cap_missing`; it is not said twice. */
+const noSectorCap = concRun({ positions: [{ symbol: 'AAA', weight: 0.5, themes: ['ai'], factors: ['ai-capex'] }], caps: { ...concCaps, sector: undefined } })
+assert.ok(concHas(noSectorCap, 'concentration_cap_missing'))
+assert.equal(noSectorCap.diagnostics.some((row) => row.code === 'concentration_labels_unstated'), false)
+/** Parked liquidity is off these axes (#141), so it has no label to be missing. */
+const parked = concRun({ positions: [{ symbol: '153130', weight: 0.27052, parkedLiquidity: true }, { symbol: 'AAA', weight: 0.05, sector: 'index', themes: ['beta'], factors: ['kr-equity-beta'] }], caps: { ...concCaps, position: 0.5 } })
+assert.equal(parked.diagnostics.some((row) => row.code === 'concentration_labels_unstated'), false, 'a cash equivalent is on no shared loss path and is not an unstated label')
+assert.deepEqual(parked.data.unlabelled.sector.symbols, [])
+
+/** ⑹ And the row shape is published, so the plural is not a guess the next caller has to make. */
+const concContract = execute({ operation: 'inputContracts', asOf: concAsOf, input: {} }).data
+assert.ok(concContract.nested.concentration['positions[]'], 'concentration publishes the row shape its key list cannot show')
+assert.equal(concContract.nested.concentration['positions[]'].sector, 'string')
+assert.equal(concContract.nested.concentration['positions[]'].themes, 'array')
+assert.equal(concContract.nested.concentration['positions[]'].factors, 'array')
+assert.ok(/sectors \(plural\)/.test(concContract.nested.concentration.rowShape), 'the refused spelling is named')
+assert.ok(/concentration_labels_unstated/.test(concContract.nested.concentration.rowShape))
+
+console.log('evidence-gated issue #173 concentration label-axis regression tests passed')

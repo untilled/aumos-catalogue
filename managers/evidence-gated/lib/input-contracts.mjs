@@ -184,8 +184,15 @@ export const NESTED_CONTRACTS = {
   exitDiscipline: {
     registration: { stopPct: NUMBER, stopPrice: NUMBER, reviewBy: STRING },
   },
+  /**
+   * ⚠️ `caps` was the whole published nesting, and the row shape is what the
+   * caps are applied *to* (#173). A run that wrote `sectors` was told nothing.
+   */
   concentration: {
     caps: { position: NUMBER, sector: NUMBER, theme: NUMBER, factor: NUMBER, portfolioHeat: NUMBER },
+    'positions[]': { symbol: STRING, weight: NUMBER, core: BOOLEAN, parkedLiquidity: BOOLEAN, stopLossPct: NUMBER, sector: STRING, themes: ARRAY, factors: ARRAY },
+    'proposed[]': 'The same row shape as positions[]. ⚠️ A row for a symbol the book already holds is the target state for that symbol and replaces the holding; it does not stack on it.',
+    rowShape: 'The three label axes are not spelled alike and the difference is read: sector is a single string — a listing has one — while themes and factors are arrays, because a name sits on several shared loss paths. ⛔ sectors (plural), theme (singular) and factor (singular) are refused as input_shape_invalid rather than ignored; before #173 the plural sectors was read by nothing, the sector axis accumulated empty, and its cap applied to no weight while the answer stayed status: ok. ⚠️ A row that carries no label on an axis whose cap is declared is reported as concentration_labels_unstated / unevaluated: unlabelled is not under the cap.',
   },
   crossCheckPrice: {
     config: { priceConflictTolerance: NUMBER },
@@ -541,10 +548,43 @@ function nestedShape(operation, input) {
     if (!INPUT_VOCABULARY.sentinelKinds.includes(row?.kind)) reject(`input.invalidations[${i}].kind`, `Expected ${INPUT_VOCABULARY.sentinelKinds.join(', ')}`)
     if (row?.kind === 'metric' && !INPUT_VOCABULARY.sentinelOperators.includes(row.operator)) reject(`input.invalidations[${i}].operator`, 'Expected above or below')
   })
+  /**
+   * ── The three label axes are one rule, and only one of them was written (#173) ──
+   *
+   * `theme` in the singular was refused here from #147; `sectors` in the plural
+   * was **read by nothing and refused by nothing**, so a row labelled
+   * `sectors: ["kr-broad-equity"]` came back with `exposures.sector: {}`, no
+   * diagnostic, and `status: ok`. The sector cap was not applied and the answer
+   * did not say so — a breach on a book whose sectors are all spelled that way
+   * passes as a clean axis.
+   *
+   * ⛔ **Refused rather than normalised**, which is the direction the singular
+   * `theme` next to it already took and the one this package keeps choosing: a
+   * caller who wrote the wrong spelling wrote it in `researchUniverse`'s output
+   * shape too, and quietly reading their plural would leave the two spellings
+   * both alive with nothing to say which the run meant. The refusal names the
+   * spelling that is read.
+   *
+   * ⚠️ The table is the whole point. `sector` is singular because a listing has
+   * one; `themes` and `factors` are arrays because a name sits on several loss
+   * paths. Writing that asymmetry out three times is how one of the three came
+   * to be unguarded.
+   */
   if (operation === 'concentration') for (const key of ['positions', 'proposed']) {
     if (Array.isArray(input[key])) input[key].forEach((row, i) => {
-      if (row?.theme !== undefined) reject(`input.${key}[${i}].theme`, 'Use themes: an array of theme names')
-      if (row?.themes !== undefined && !Array.isArray(row.themes)) reject(`input.${key}[${i}].themes`, 'Expected an array of theme names')
+      for (const [singular, plural] of [['sector', 'sectors'], ['theme', 'themes'], ['factor', 'factors']]) {
+        const isArrayAxis = singular !== 'sector'
+        const read = isArrayAxis ? plural : singular
+        const wrong = isArrayAxis ? singular : plural
+        if (row?.[wrong] !== undefined) {
+          reject(`input.${key}[${i}].${wrong}`, isArrayAxis
+            ? `Use ${plural}: an array of ${singular} names`
+            : 'Use sector: a single sector name string. A listing has one sector, and the plural is read by nothing — passed here the sector axis is accumulated empty and its cap applies to no weight')
+        }
+        if (row?.[read] === undefined) continue
+        if (isArrayAxis && !Array.isArray(row[read])) reject(`input.${key}[${i}].${read}`, `Expected an array of ${singular} names`)
+        if (!isArrayAxis && typeof row[read] !== 'string') reject(`input.${key}[${i}].${read}`, 'Expected a single sector name string')
+      }
     })
   }
   if (operation === 'exitCheck' && input.price !== undefined && input.price !== null && (typeof input.price !== 'number' || !Number.isFinite(input.price))) reject('input.price', 'Expected a finite scalar price; pass the observation value, not its envelope')
