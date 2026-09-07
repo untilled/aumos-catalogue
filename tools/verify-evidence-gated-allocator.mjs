@@ -3915,16 +3915,23 @@ assert.ok(
 )
 
 /**
- * The other layer of wrapping, and the sentence that asked for it. (#172)
+ * The other layer of wrapping, and the sentence that asked for it. (#172, #204)
  *
  * §1 requires every memory value to carry an envelope — decision and evidence
  * ids, sample and cluster counts, computable metrics, missing fields, a status —
- * and §5 step 1 said to pass *the whole value you read* as `state`. Both cannot
- * hold: `state` accepts five members and refuses every other field by name, so
- * the run that satisfied §1 was refused, took `nextState: null` and kept the
+ * and §5 step 1 said to pass *the whole value you read* as `state`. Both could
+ * not hold: `state` accepted five members and refused every other field by name,
+ * so the run that satisfied §1 was refused, took `nextState: null` and kept the
  * prior revision — the paper track standing still on the only path to the
- * 30-sample gate, once per wake. ⚠️ The refusal is loud, which is why this is a
- * documentation defect: nothing was lost quietly, the run was.
+ * 30-sample gate, once per wake. #199 fixed the sentence; #204 is the owner's
+ * decision on which of the two published readings wins, and it is the loose one,
+ * because three sibling keys already read that way.
+ *
+ * ⚠️ **The risk #199 named when it declined this branch is answered by
+ * structure.** «Wrapped in, wrapped out» would contradict the rule that
+ * `nextState` is written back verbatim — so the assertion below is not only
+ * that the call passes, but that the state it hands back carries no envelope
+ * field at all. The ignoring is on the reading side and nowhere else.
  */
 const envelopedTrack = execute({
   operation: 'signalPaper',
@@ -3938,24 +3945,36 @@ const envelopedTrack = execute({
     admissions: [],
   },
 })
-assert.equal(envelopedTrack.status, 'blocked', 'the §1 envelope around the paper record is refused rather than ignored')
-assert.equal(envelopedTrack.data, null, 'and a refused call offers no nextState, so the track cannot advance on that wake')
+assert.notEqual(envelopedTrack.status, 'blocked', 'the §1 envelope around the paper record is ignored rather than refused')
+assert.ok(envelopedTrack.data, 'so the call answers, and the wake that followed §1 advances the track instead of standing still')
+assert.deepEqual(envelopedTrack.data.nextState.openWindows, [carriedWindow], 'the carried window survives the wrapping')
+assert.equal(envelopedTrack.diagnostics.filter((row) => row.code === 'input_shape_invalid').length, 0)
 assert.deepEqual(
-  envelopedTrack.diagnostics.filter((row) => row.code === 'input_shape_invalid').map((row) => row.path).sort(),
+  envelopedTrack.diagnostics.filter((row) => row.code === 'input_state_envelope_ignored').map((row) => row.path).sort(),
   ['input.state.computableMetrics', 'input.state.decisionIds', 'input.state.evidenceIds', 'input.state.independentDateClusterCount', 'input.state.missingFields', 'input.state.sampleCount', 'input.state.status'].sort(),
-  'every envelope field is named — the two the paper record shares, schemaVersion and updatedAsOf, are not among them',
+  'every ignored field is named — silence would be indistinguishable from the record never having carried it; the two the paper record shares, schemaVersion and updatedAsOf, are read and not among them',
+)
+assert.ok(
+  envelopedTrack.diagnostics.filter((row) => row.code === 'input_state_envelope_ignored').every((row) => row.severity === 'info'),
+  'and `info`, because none of the seven takes any part in the verdict — an ignored envelope field is not an answer this run could not reach',
+)
+/* ⚠️ The property #199 was right to protect: the envelope must not survive into the stored value. */
+assert.deepEqual(
+  Object.keys(envelopedTrack.data.nextState).sort(),
+  ['closed', 'maturedThisRun', 'openWindows', 'schemaVersion', 'updatedAsOf'],
+  'nextState is the five published members and carries no envelope field back, so the wrapped revision is stored unwrapped and «verbatim» stays one rule',
 )
 assert.ok(
   !/whole value you read as `state`/.test(prompt),
-  '§5 no longer asks for the whole stored value as `state`, which is the shape the assertion above refuses',
+  '§5 no longer asks for the whole stored value in the wording #172 filed, which named a shape the operation then refused',
 )
 assert.ok(
-  /paper-state record as `state`/.test(prompt) && /envelope/.test(prompt.slice(prompt.indexOf('Read `learning/paper-cohorts`'))),
-  'it asks for the paper-state members and says which layer is the one that gets refused',
+  /input_state_envelope_ignored/.test(prompt.slice(prompt.indexOf('Read `learning/paper-cohorts`'))),
+  'it says which fields are carried without being read, and how the operation reports them',
 )
 assert.ok(
-  /this key carries no envelope/.test(memorySkill),
-  'and the memory contract says the same thing where the key is described, so the two documents cannot drift apart',
+  /input_state_envelope_ignored/.test(memorySkill) && /any other unrecognised field is\s*\nstill refused by name/.test(memorySkill),
+  'and the memory contract says the same thing where the key is described — both halves, so neither document can drift into promising a blanket acceptance',
 )
 
 /**

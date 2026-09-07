@@ -340,7 +340,7 @@ export const NESTED_CONTRACTS = {
     rowShape: `One row per **carried window**, not per bar: \`symbol\` and \`signalAt\` are copied from the \`state.openWindows\` entry the row is scoring, \`setup\` is one of ${Object.keys(PAPER_SETUP_COHORTS).join(', ')} — also inputContracts.vocabulary.paperSetups — and \`ruleVersion\` is the version the window was judged under, refused when absent or null so that rows from two versions are never pooled. The price history goes in \`bars\`, the benchmark's in \`benchmarkBars\` and the sector's in \`sectorBars\`. ⛔ A bar-shaped row — \`date\` and \`close\` at the top of the row — carries no window: \`date\` and \`close\` are read by nothing here, and so are \`cohort\` (derived from \`setup\`) and \`benchmark\` (the series is \`benchmarkBars\`). ⚠️ Absent \`benchmarkBars\` the row scores no excess and drops out of the aggregate rather than counting as zero.`,
     'rows[].bars[]': { timestamp: STRING, close: NUMBER, high: NUMBER, low: NUMBER },
     barShape: 'The instant is `timestamp` — ⛔ **not** `date` or `time`, which `indicators` and `trendState` do accept — and `close` must be a finite number. A row of bars written under `date` yields no usable bar at all, and the answer is `forward_base_missing` / `unevaluated` on a path of `bars`: *a last close before signalAt and later bars are required*, which reads as a window the calendar has not reached yet rather than a series this operation could not parse. `high` and `low` are optional and fall back to `close` for the excursion.',
-    state: 'The whole value read from `learning/paper-cohorts` — { schemaVersion, updatedAsOf, closed, openWindows, maturedThisRun } — and nothing else; an unknown field in it is `input_shape_invalid`. ⛔ Its `openWindows` passed at the **top level** is `paper_state_misplaced`: read there the track is invisible and the `nextState` this would return is the erasure of it.',
+    state: 'The whole value read from `learning/paper-cohorts`. Five members are read — { schemaVersion, updatedAsOf, closed, openWindows, maturedThisRun } — and the envelope fields PROMPT.md §1 asks of a memory value are carried without being read: each one is named back as `input_state_envelope_ignored` / `info` so that «not there» and «there and not read» stay different facts, and the `nextState` returned is the five members alone, so a record stored wrapped comes back unwrapped. ⛔ Any **other** unknown field is still `input_shape_invalid` / `blocked` — outside the envelope an unrecognised key reads as a misspelled member, and a misspelled `openWindows` is a track this operation cannot see. ⛔ Its `openWindows` passed at the **top level** is `paper_state_misplaced`: read there the track is invisible and the `nextState` this would return is the erasure of it.',
     'admissions[]': { symbol: STRING, setup: STRING, ruleVersion: STRING, signalAt: STRING, benchmark: ANY },
   },
 }
@@ -669,6 +669,59 @@ export function validateInput(operation, input, asOf = undefined) {
   return diagnostics
 }
 
+/** The members `signalPaper` reads out of the carried paper record. */
+export const PAPER_STATE_MEMBERS = Object.freeze(['schemaVersion', 'updatedAsOf', 'closed', 'openWindows', 'maturedThisRun'])
+
+/**
+ * ── The envelope `PROMPT.md` §1 asks of a memory value, ignored here (#204) ──
+ *
+ * §1 requires every accepted memory value to be an object carrying referenced
+ * decision and evidence ids, a sample count, an independent date-cluster count,
+ * computable metrics, missing fields and a status — beside `schemaVersion` and
+ * `updatedAsOf`, which the paper record carries anyway. Until 0.4.49 `state`
+ * refused all seven, one `input_shape_invalid` / `blocked` per key: a run that
+ * followed §1 got `data: null`, no `nextState`, and §5 step 4 held the prior
+ * revision — the paper track standing still once per wake on the only path to
+ * the 30-sample gate. #172 could not fix that in code because the same question
+ * had two published answers: `reconcileArmedReviews`' `previous`,
+ * `refutedMemoryRules`' `patterns` and `watchAlertState`' `previous` all take
+ * the stored record whole and let the extra fields through. #199 wrote the
+ * asymmetry into two documents rather than erasing it; #204 is the owner's
+ * decision to erase it, on the loose side, because three of the four keys were
+ * already there.
+ *
+ * ⚠️ **Ignored is not accepted-and-carried-back.** The risk #199 named when it
+ * declined this branch is real — «wrapped in, wrapped out» would contradict the
+ * rule that `nextState` is written back verbatim — and it is answered by
+ * structure rather than by refusal: `signalPaper` builds `nextState` as a
+ * literal of the five members above, so no field read here can travel into the
+ * value the next run stores. The ignoring lives on the reading side only.
+ *
+ * ⚠️ **Ignored is said out loud, by key name.** «that key was not there» and
+ * «that key was carried and not read» are different facts, and a run that
+ * cannot tell them apart cannot tell whether its own memory shape is the one
+ * this package wants. ⛔ The value is never carried out — the name is the whole
+ * report, the rule this package already follows for `paper_row_metadata_missing`.
+ *
+ * ⛔ **Only this list is ignored, and every other unknown key stays `blocked`.**
+ * The envelope is a shape *this package's own §1 asks for*; an unrecognised key
+ * is more likely a misspelled member, and a misspelled member is the #137
+ * erasure — `openWindow` for `openWindows` reads as a track with no windows and
+ * the `nextState` it returns deletes it. Widening past the envelope would buy
+ * nothing the issue asked for and reopen the one failure this operation was
+ * hardened against.
+ *
+ * ⛔ **Not registered in `CAUSE_CODE_REGISTRY`.** That table is
+ * `mandateExecution`'s vocabulary for *«why does this book hold no single
+ * name?»*, and its three lanes are a stage that lost an input, an answer that
+ * refuses both conclusions, and a gate that ran. An ignored envelope field is
+ * none of them: nothing was lost, nothing is unresolved, no gate ran. Filing it
+ * there would let an accepted shape count as a cause of an empty book.
+ */
+export const MEMORY_ENVELOPE_FIELDS = Object.freeze([
+  'decisionIds', 'evidenceIds', 'sampleCount', 'independentDateClusterCount', 'computableMetrics', 'missingFields', 'status',
+])
+
 /**
  * The checks that are about a nested value rather than a top-level key. Each
  * one is a shape a real run actually sent.
@@ -678,7 +731,20 @@ function nestedShape(operation, input) {
   const reject = (path, message, details = {}) => diagnostics.push(diagnostic('input_shape_invalid', 'blocked', message, path, details))
 
   if (operation === 'signalPaper' && input.state) {
-    for (const key of Object.keys(input.state)) if (!['schemaVersion', 'updatedAsOf', 'closed', 'openWindows', 'maturedThisRun'].includes(key)) reject(`input.state.${key}`, 'Unknown paper state field; retain the previous record')
+    for (const key of Object.keys(input.state)) {
+      if (PAPER_STATE_MEMBERS.includes(key)) continue
+      if (MEMORY_ENVELOPE_FIELDS.includes(key)) {
+        diagnostics.push(diagnostic(
+          'input_state_envelope_ignored',
+          'info',
+          'This is one of the envelope fields PROMPT.md §1 asks of a memory value, and `signalPaper` does not read it: the paper record may be passed back exactly as it was stored. It took no part in this answer, and the `nextState` returned here does not carry it back — that value is the five published members and nothing else, so a key stored wrapped comes back unwrapped',
+          `input.state.${key}`,
+          { operation, members: PAPER_STATE_MEMBERS },
+        ))
+        continue
+      }
+      reject(`input.state.${key}`, `Unknown paper state field; retain the previous record. ⛔ It is not one of the §1 envelope fields either — those are carried and ignored — so this reads as a misspelled member, and a misspelled ${PAPER_STATE_MEMBERS.join('/')} is a track this operation cannot see`, { operation, members: PAPER_STATE_MEMBERS, envelopeFields: MEMORY_ENVELOPE_FIELDS })
+    }
     if (input.state.openWindows !== undefined && !Array.isArray(input.state.openWindows)) reject('input.state.openWindows', 'Expected an array')
     if (input.state.closed !== undefined && (!input.state.closed || typeof input.state.closed !== 'object' || Array.isArray(input.state.closed))) reject('input.state.closed', 'Expected an object')
   }

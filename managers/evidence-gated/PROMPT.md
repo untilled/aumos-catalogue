@@ -175,12 +175,21 @@ fields and one status from `insufficient`, `observing`, `reviewable`, `promoted`
 invalid values.
 
 ⚠️ **A key an operation owns is written as that operation's `nextState`, and carries that shape
-instead.** `learning/paper-cohorts` is the one where the difference bites: `signalPaper` accepts only
-the members published as `inputContracts.nested.signalPaper`'s `state`, refuses every other field by
-name, and returns no `nextState` when it does — so a record wrapped to satisfy the sentence above is
-a paper track that cannot advance (§5 step 1). `run/armed-reviews` and `run/watch-alerts` are the
-same arrangement: their operations write them, and what they write is what those operations read
-back.
+instead.** `learning/paper-cohorts`, `run/armed-reviews` and `run/watch-alerts` are that
+arrangement: their operations write them, and what they write is what those operations read back —
+so what is stored under them is the answer, unwrapped, and not a record about it.
+
+⚠️ **Passing such a record back whole is safe, and the envelope simply does not travel.** All four
+of those readers — `signalPaper`'s `state`, `reconcileArmedReviews`' `previous`,
+`refutedMemoryRules`' `patterns`, `watchAlertState`' `previous` — take the stored value as it was
+read; the envelope fields above are carried and not read, and `signalPaper` names each one back as
+`input_state_envelope_ignored` / `info` so that a field that was never there and a field that was
+ignored stay different facts. ⛔ **Ignored is not carried forward:** every one of those operations
+returns a `nextState` built out of its own published members, so a revision stored wrapped comes
+back unwrapped and step 4's verbatim write leaves it that way. ⛔ And ignoring stops at the envelope
+— any *other* unrecognised field in `signalPaper`'s `state` is still refused by name, because
+outside the envelope an unknown key reads as a misspelled member and a misspelled `openWindows` is a
+track the operation cannot see (§5 step 1).
 
 ### 1b. Pre-flight, before planning any trade
 
@@ -1013,18 +1022,22 @@ make by one run.
 
 Four steps, in order, and `signalPaper` is called once with all of them:
 
-1. Read `learning/paper-cohorts` and pass **the paper-state record as `state`** — the members
-   `inputContracts.nested.signalPaper` publishes under `state`, and nothing else. ⛔ **Not the value
-   wrapped in the envelope §1 asks of a memory value.** `state` reads none of those fields and
-   refuses each one by name: `input_shape_invalid` on `input.state.<field>`, `blocked`, `data:
-   null`, *retain the previous record*. Nothing is lost quietly here — what is lost is the run: a
-   refused call returns no `nextState`, step 4 then holds the prior revision, and a run that follows
-   this step to the letter never advances the only path to the 30-sample gate. ⚠️ **What is stored
-   is the answer, not a record about it** — step 4 writes `nextState` back verbatim, so the value
-   read here is already the shape `state` takes; where an older revision was stored wrapped, pass
-   the paper members out of it and let step 4's write leave the key unwrapped again. ⛔ It is
-   **not** how the neighbouring keys are read — `reconcileArmedReviews`' `previous` and
-   `refutedMemoryRules`' `patterns` do take the stored value whole — so strip here and only here.
+1. Read `learning/paper-cohorts` and pass **the value you read as `state`**. `signalPaper` reads the
+   members `inputContracts.nested.signalPaper` publishes under `state`; if an older revision was
+   stored wrapped in the envelope §1 asks of a memory value, pass it wrapped — those fields are
+   carried and not read, and each one is named back as `input_state_envelope_ignored` / `info`, so
+   that a field this record never had and a field this operation ignored are two separate answers
+   rather than one silence. ⛔ **Ignored is not stored again:** `nextState` is the published members
+   and nothing else, so step 4's verbatim write leaves the key unwrapped from then on. ⚠️ **This is
+   the same reading as the neighbouring keys** — `reconcileArmedReviews`' `previous`,
+   `refutedMemoryRules`' `patterns` and `watchAlertState`' `previous` also take the stored record
+   whole, and one sentence now covers all four. ⛔ **Ignoring stops at the envelope.** Any other
+   unrecognised field in `state` is still `input_shape_invalid` on `input.state.<field>`, `blocked`,
+   `data: null`, *retain the previous record* — outside the envelope an unknown key reads as a
+   misspelled member, and a run that had `openWindow` accepted would be handed a track with no
+   windows and a `nextState` that deletes it. A refused call returns no `nextState`, step 4 then
+   holds the prior revision, and the only path to the 30-sample gate does not advance on that wake:
+   read the published shape rather than finding it by being refused.
    ⛔ Not as a
    top-level `openWindows` — that arrives under a key `signalPaper` does not read, so the track
    looks empty, and the `nextState` it returns then deletes it. That shape is refused with
