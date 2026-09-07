@@ -386,6 +386,23 @@ published under `inputContracts` — and a rule that joins to nothing or to two 
 invents a breach, and never `not-met`, which would report an invalidation as checked and clear on
 evidence nobody supplied.
 
+**And the caps that book is measured against have to reach the axis they name.** Two of the three
+label axes were guarded and one was not. `concentration` reads `sector` as a single string and
+`themes`/`factors` as arrays; the singular `theme` had been refused since #147, and the plural
+`sectors` was read by nothing and refused by nothing. A run that wrote it got `exposures.sector: {}`,
+**no diagnostic**, and `status: ok` — a declared sector cap compared against nothing. The control is
+one field wide: changing that spelling to the singular and nothing else fills the axis. ⛔ The run
+that measured it held one labelled core ETF and was harmless, and the direction is not — the axis a
+cap is not applied to is the axis a breach passes on, and a sector cap only ever binds a book that
+holds several single names. All three spellings are now refused as `input_shape_invalid` rather than
+normalised, because the caller who wrote the wrong one wrote it elsewhere too and a quiet rewrite
+leaves both spellings alive with nothing to say which was meant. **And the other half of the same
+silence:** a cap the investor *did* declare, over rows carrying no label on that axis, produced the
+same empty map as a cap nobody declared. That is `concentration_labels_unstated` / `unevaluated`
+now, naming the symbols and their weight — never `blocked`, because this package declares no labels
+of its own and refusing a book for the absence of one would be inventing the classification. The row
+shape is published under `inputContracts.nested.concentration`, which said only `caps` before.
+
 **Two declared capabilities currently serve nothing.** `thesis:read` and `evidence:read`
 are in the manifest vocabulary, and the current Aumos build maps each to an empty tool
 list, so a run gets no such tool. The prompt reads them *when available* and the manifest

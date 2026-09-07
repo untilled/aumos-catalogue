@@ -25,6 +25,15 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    venue's country are not factors; labelling one turns this cap into a country allocation decision
    the Mandate never made. A label at twice its cap comes back
    `concentration_factor_label_unexamined` — a question to answer in the report, never a block.
+   ⚠️ **The three axes are not spelled alike, and the difference is read.** `sector` is a single
+   string — a listing has one — while `themes` and `factors` are arrays, because a name sits on
+   several shared loss paths. `sectors`, `theme` and `factor` are refused as `input_shape_invalid`;
+   before #173 the plural `sectors` was read by nothing, the sector axis accumulated **empty**, and
+   its cap was compared against no weight while the answer stayed `status: ok`.
+   ⚠️ **And a cap over unlabelled rows is not a cap that passed.** A row carrying no label on an
+   axis whose cap is declared comes back `concentration_labels_unstated` / `unevaluated`, naming the
+   symbols and their weight: an empty axis map is *nobody said what this is*, which is a different
+   fact from *measured and under the cap* and used to look identical to it.
 3. Apply the configured sector, theme and factor caps on top of the Mandate's. Configuration may
    be stricter than the Mandate and never looser. If classification is uncertain, use the more
    conservative applicable bucket and disclose it. ⚠️ **Declare `parkedLiquidity: true` on a row

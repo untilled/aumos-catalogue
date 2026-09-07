@@ -1627,19 +1627,26 @@ assert.equal(
  * measures. (approved 2026-07-10, P4)
  */
 const heatCaps = { position: 0.3, sector: 0.5, theme: 0.5, factor: 0.5, portfolioHeat: 0.06 }
+/**
+ * ⚠️ Every row is labelled on all three axes, and that is not decoration: the
+ * caps above declare a sector, theme and factor limit, and a row carrying no
+ * label on a capped axis is `concentration_labels_unstated` since #173. These
+ * fixtures are about heat, so they say what they are on the other axes rather
+ * than leaving them empty and reading the emptiness as clean.
+ */
 const hotPositions = [
-  { symbol: 'AAA', weight: 0.2, stopLossPct: 0.2 },
-  { symbol: 'BBB', weight: 0.2, stopLossPct: 0.15 },
-  { symbol: 'CORE', weight: 0.4, core: true },
+  { symbol: 'AAA', weight: 0.2, stopLossPct: 0.2, sector: 'semiconductors', themes: ['ai'], factors: ['ai-capex'] },
+  { symbol: 'BBB', weight: 0.2, stopLossPct: 0.15, sector: 'software', themes: ['cloud'], factors: ['saas'] },
+  { symbol: 'CORE', weight: 0.4, core: true, sector: 'index', themes: ['beta'], factors: ['us-equity-beta'] },
 ]
 covers('audit/portfolio-heat')
 const heatOnly = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, caps: heatCaps } })
 assert.equal(heatOnly.data.heat.holdingsOnly, 0.07, 'core DCA carries no stop and contributes no heat')
 assert.ok(heatOnly.diagnostics.some((row) => row.code === 'portfolio_heat_above_cap' && row.severity === 'unevaluated'), 'a book already over on its holdings warns; existing risk is grandfathered')
-const heatAdding = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, proposed: [{ symbol: 'CCC', weight: 0.05, stopLossPct: 0.2 }], caps: heatCaps } })
+const heatAdding = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, proposed: [{ symbol: 'CCC', weight: 0.05, stopLossPct: 0.2, sector: 'utilities', themes: ['power'], factors: ['rates'] }], caps: heatCaps } })
 assert.equal(heatAdding.status, 'blocked', 'adding new non-core risk above the cap is refused, not warned')
 assert.ok(heatAdding.diagnostics.some((row) => row.code === 'portfolio_heat_breach'))
-const heatCool = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'AAA', weight: 0.1, stopLossPct: 0.2 }], proposed: [{ symbol: 'CCC', weight: 0.05, stopLossPct: 0.2 }], caps: heatCaps } })
+const heatCool = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'AAA', weight: 0.1, stopLossPct: 0.2, sector: 'semiconductors', themes: ['ai'], factors: ['ai-capex'] }], proposed: [{ symbol: 'CCC', weight: 0.05, stopLossPct: 0.2, sector: 'utilities', themes: ['power'], factors: ['rates'] }], caps: heatCaps } })
 assert.equal(heatCool.data.heat.withProposed, 0.03)
 assert.equal(heatCool.status, 'ok', 'heat under the cap is not an obstacle')
 assert.ok(
@@ -1647,7 +1654,7 @@ assert.ok(
     .diagnostics.some((row) => row.code === 'portfolio_heat_stop_missing'),
   'a non-core row with no declared stop is unevaluated, never zero risk',
 )
-const heatTrim = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, proposed: [{ symbol: 'AAA', weight: 0.05, stopLossPct: 0.2 }], caps: heatCaps } })
+const heatTrim = execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: hotPositions, proposed: [{ symbol: 'AAA', weight: 0.05, stopLossPct: 0.2, sector: 'semiconductors', themes: ['ai'], factors: ['ai-capex'] }], caps: heatCaps } })
 assert.equal(heatTrim.data.heat.withProposed, 0.04, 'heat reads a proposed row for a held symbol as that holding restated, so a trim lowers measured heat')
 assert.notEqual(heatTrim.status, 'blocked', 'and reducing heat on a book already over the cap is never the thing refused')
 
