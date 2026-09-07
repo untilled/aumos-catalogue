@@ -542,6 +542,18 @@ everything.
 - `post-event-continuation`: a positive surprise inside 30 days whose price has held its
   pre-announcement level.
 
+⛔ **Cheap is not one of them, and the answer says so rather than leaving you to notice.** Each row
+carries a `valuation` axis — `priceToBook`, `debtToEquity`, point-in-time and correct — and **it
+gates nothing**: no lane screens on it, `eligible` and the rank never read it, and a candidate
+priced at book and one priced at a hundred times book come back with identical verdicts. The rows
+declare that as `gates: false` / `role: 'reported-not-gated'` and the answer repeats it once as
+`reportedNotGatedAxes`, because a number arriving beside four axes that decide is read as a fifth
+that decides (#170 — the same shape as #141's unread `parkedLiquidity`, from the other side). Read
+it as context for the thesis a surfaced name goes on to get; valuation as a **judgement** is
+`thesisValuation`. ⚠️ A lane that screens on value would be a **pre-registration** — its own
+`ruleVersion`, registered before the sample — and never something added to spend a number that is
+already being computed.
+
 ⛔ **And feeding it is a step, not an adjective.** The 2026-09-06 run declared its universe, swept
 it, called `upsideRadar` — and all three lanes came back `starved`, 0 included of 13, on
 `no-valid-point-in-time-filing` and `no-event-in-the-last-30-days`. Nothing was wrong with the
