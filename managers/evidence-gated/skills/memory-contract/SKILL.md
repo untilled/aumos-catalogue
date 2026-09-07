@@ -43,8 +43,10 @@ Capacity failure preserves the prior revision and requires explicit roster revie
 For `run/armed-reviews`, `reconcileArmedReviews` persists what **this instance proposed** and whose
 instant has not passed. ⛔ It is not verified against `decisions[].armed` and cannot be: that field
 is past tense, and a review that armed cleanly and one that was never armed produce the same empty
-array (#156, aumos#687). Never hand-write epoch values. What cannot be read must appear in
-uncertainty as **unreadable**, never as a count and never as zero.
+array (#156, aumos#687). Never hand-write epoch values. ⛔ A count taken from this key is never
+published as a count of standing reviews, and never as zero. ⚠️ The reportable count is the
+invocation's `standingPlans` (aumos#690) and only that — as a floor, *at least this many* — and
+where the invocation does not carry it the number appears in uncertainty as **unreadable**.
 The earlier #136 dedupe diagnosis was refuted in #148; the #148 journal cross-check was refuted in
 turn by #156.
 
@@ -53,21 +55,26 @@ turn by #156.
 `run/armed-reviews` holds the flow and instant of the three market reviews this instance last
 armed. ⚠️ **It exists because a manager can arm a WATCH and cannot read one back** — the grant map
 publishes no watch or plan capability at all, not even a declared-but-empty one. WATCHes leave in a
-`DecisionProposal` and there is no return path.
+`DecisionProposal` and no tool returns them. ⚠️ The host does publish a **field** — the
+invocation's `standingPlans`, what stood at `asOf` (aumos#690) — and it is a floor, not a ceiling,
+so it changes what may be reported and never what is armed.
 
 Since #87 that costs more than it did: every wake dispatches one flow, so two `kr-sleeve` reviews
 armed half an hour apart each run the Korean sleeve and each seal a judgement — two rows on the
 same book, on the same day, neither saying which one read the close.
 
 Three rows, and the state written back is **first person**: every review this instance has promised
-whose instant has not passed. ⛔ Not "what is standing" — nothing anywhere answers that, and writing
-it as though it did is what #156 measured. ⛔ Not a copy of this run's sequence either: a run with
+whose instant has not passed. ⛔ Not "what is standing" — this key cannot answer that, and writing
+it as though it did is what #156 measured; the field that does answer it is on the invocation and is
+read there, not mirrored into memory. ⛔ Not a copy of this run's sequence either: a run with
 nothing to arm would then write an empty list over three live promises, and the next run re-arms all
 three. A row leaves when its instant passes, and only then.
 
-⛔ **This key no longer suppresses a re-arm, and it never should have.** Standing promises are
-unreadable, so every judgement re-arms its reviews and the host folds an identical instant per
-instance (aumos#593). What the record still answers, and nothing else can, is whether this instance
+⛔ **This key no longer suppresses a re-arm, and it never should have.** ⚠️ Neither does
+`standingPlans`: a floor establishes what stood, never that what is missing is gone, and the field's
+published description says so itself. Every judgement re-arms its reviews and the host folds an
+identical instant per instance (aumos#593, aumos#624) — a duplicate costs a plan row and never a
+second wake, and no verb withdraws that row (aumos#704). What the record still answers, and nothing else can, is whether this instance
 already promised the same flow at a **different** instant — two wakes, two judgements on one book on
 one day (#87) — which is `review_superseded`. A row can be stale in exactly one direction: the
 promise behind it may already have fired, lapsed or been replaced without this instance seeing it.

@@ -91,8 +91,10 @@ provenance로 보관된다. macro score는 없다: 국면 판단은 한 `asOf`�
 
 패키지는 `skills/memory-contract/SKILL.md`의 안정 키를 쓰며 종목과 Evidence 참조를 담는 제한된
 `coverage/research-index`를 포함한다. 동봉한 KR 74종·US 83종 명부가 재현 가능한 조사 범위이며,
-펀더멘털 캐시는 여전히 호스트 소스 저장소가 필요하다. 예약 메모리는 계산한 계획이 아니라
-저널에서 확인한 실제 무장을 따른다. 값은 스키마
+펀더멘털 캐시는 여전히 호스트 소스 저장소가 필요하다. 예약 메모리는 이 인스턴스가 **약속한** 것 중 시각이 지나지 않은 것이다 —
+실행이 계산한 시퀀스의 사본도 아니고, ⛔ `decisions[].armed`로 검증되지도 않는다(그 필드는 과거형이라
+약속이 서 있는 동안 오히려 기록에서 지운다, #156). `asOf`에 서 있던 것은 invocation의
+`standingPlans`에서 읽고, 행위가 아니라 보고에 쓴다. 값은 스키마
 버전, 갱신 시각, 뒷받침하는 Decision/Evidence id, 표본·독립 클러스터 수, 계산 가능한 지표, 결측
 필드, maturity 상태를 지닌 JSON 객체다. 쓰기는 키를 재사용하며, 집계가 바뀔 때만 새 revision을
 만든다. 과거 replay는 오늘의 head가 아니라 자기 `asOf` 이하의 최신 revision을 읽는다. 비었거나
@@ -190,12 +192,14 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   부르는 데는 턴이 든다. 이제 `PROMPT.md`와 `skills/orchestrate/SKILL.md`는 서빙되는 것만 이름
   대고 그 셋이 도구가 아니라고 잘라 말한다. Aumos가 서빙하기 전까지 자산 주장은 invocation
   페이로드와 Brief로 실행에 닿고, 패키지는 하지 못하는 조회를 하는 척하는 대신 그렇게 말한다. `RunProvenance.unservedTools`가 그 차이를 기록하는 자리다.
-- **매니저는 WATCH를 걸 수는 있고 읽을 수는 없다.** 권한→도구 맵은 `portfolio_read`,
+- **매니저는 WATCH를 걸 수는 있고 그것을 돌려주는 도구는 없다.** 권한→도구 맵은 `portfolio_read`,
   `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request`, `connection_request`를
   내놓고, watch나 plan
   권한은 아예 없다 — `thesis:read`처럼 선언만 되고 빈 목록인 것조차 아니다. WATCH는
-  `DecisionProposal`로 나가기만 하고 돌아오는 길이 없어서, 실행은 자기가 이미 건 검토를 다시
-  거는 중인지 알 수 없다. #87 이후로 그 비용이 커졌다: 웨이크마다 플로우 하나를 디스패치하므로,
+  `DecisionProposal`로 나가기만 하고 그것을 돌려주는 도구가 없다. 호스트가 대신 게시한 것은
+  invocation의 필드 `standingPlans`이고, 그것은 천장이 아니라 바닥이다 — 그래서 실행은 자기가
+  다시 거는 검토를 볼 수는 있어도, **안 보이는** 약속이 사라졌다고는 말할 수 없다.
+  #87 이후로 그 비용이 커졌다: 웨이크마다 플로우 하나를 디스패치하므로,
   30분 간격의 `kr-sleeve` 검토 둘이 각각 한국 슬리브를 돌리고 각각 판단을 봉인한다.
   `run/armed-reviews`와 `reconcileArmedReviews`가 그 다리다 — 매니저가 약속한 것을 적어둔다 —
   그리고 다리일 뿐이다: 사설 메모리는 인스턴스 범위라 새 인스턴스는 눈이 먼 채 시작하고 기록은
@@ -203,11 +207,20 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   ([#97](https://github.com/untilled/aumos-catalogue/issues/97))
   ⛔ **그리고 그 다리가 중복을 막지는 않는다.** `decisions[].armed`는 과거형이다 — 이미 *끝난*
   약속이 어떻게 됐는지를 나른다 — 그래서 그것을 수신증으로 읽은 두 실행이 깨끗이 무장된 것을
-  실패로 판정하고 시장 리뷰 셋을 두 번 더 무장했다. 지금 무엇이 무장돼 있는지는 어디에서도 읽을
-  수 없으므로(`untilled/aumos#690`) 이 패키지는 매 판단마다 무장하고, 같은 instant는 호스트가
-  인스턴스별로 접는다(`untilled/aumos#593`). 기록이 여전히 답하고 접기가 답하지 않는 것은 같은
-  플로우를 **다른** instant로 약속했는가이고, 그것이 정확히 #87의 해악이다.
-  ([#156](https://github.com/untilled/aumos-catalogue/issues/156))
+  실패로 판정하고 시장 리뷰 셋을 두 번 더 무장했다. ⚠️ **지금 무엇이 무장돼 있는지는 이제 답이
+  있다** — `untilled/aumos#690`으로 `ManagerInvocation.standingPlans`가 들어왔고, `asOf`에 서
+  있던 약속을 `planId`·`armedAt`·`armedByDecisionId`·`expiresAt`·`intent`·`trigger`와 함께
+  나른다 — 그리고 그것이 바꾸는 것은 **보고할 수 있는 것**이지 무장하는 것이 아니다: 그 필드는
+  바닥이지 천장이 아니고(시각을 댈 수 없는 약속은 추측하지 않고 빠진다) 그 규칙을 스스로 말한다.
+  그래서 이 패키지는 여전히 매 판단마다 무장하고, 같은 instant는 호스트가 인스턴스별로 접는다
+  (`untilled/aumos#593`, `untilled/aumos#624`). ⚠️ 그 접기는 **발화 시각**의 것이라 중복은 플랜
+  행 하나를 쓰고 두 번째 웨이크를 만들지 않으며, 그 행을 지우는 동사는 없다
+  (`untilled/aumos#704`; PR `untilled/aumos#712`가 접기를 무장 시각으로 옮기지만 아직 머지되지
+  않았다). 기록이 여전히 답하고 접기가 답하지 않는 것은 같은 플로우를 **다른** instant로
+  약속했는가이고, 그것이 정확히 #87의 해악이며, 살아 있는 행 위의 바닥은 그것을 «애초에 안 한
+  약속»과 구별하지 못한다.
+  ([#156](https://github.com/untilled/aumos-catalogue/issues/156),
+  [#175](https://github.com/untilled/aumos-catalogue/issues/175))
   단일종목 분할 진입도 같은 이유로 같은 다리를 탄다: `entryTranchePlan`이 채워지지 않은 각 트랜치를
   무장할 `intent`를 돌려주고, `resolveTrancheWake`가 발화한 plan의 이벤트 summary에서 그 마커를
   다시 읽는다 — 읽을 것이 그것밖에 없기 때문이다.
@@ -286,9 +299,10 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   않았으므로 대조군 밖의 오늘 답은 `hard_stop_unevaluated`이고 **숫자를 지어내지 않는다.** 산문으로
   두면 안 되는 부분은 등록이다 — `watchesToRegister`가 진입이 자기 제안에 복사해 넣을 `price-below`·
   `at-time` 행을 돌려주고, 그것 없는 진입은 `exit_rules_unregistered`, 도래한 스톱을 이 실행이 이행하지
-  않으면 `exit_due_unactioned`이다. ⚠️ 이 패키지는 WATCH를 걸 수는 있어도 되읽을 수 없으므로, 규율은
-  몇 주 전에 걸어둔 WATCH를 믿는 대신 매 실행 진입일에서 다시 계산된다. 그 읽기 경로는 호스트 몫이고
-  `HOST-FOLLOWUPS.md`가 기록한다.
+  않으면 `exit_due_unactioned`이다. ⚠️ `standingPlans`가 `asOf`에 서 있던 무장을 이제 보여 주지만
+  그것은 천장이 아니라 바닥이므로(시각을 댈 수 없는 약속은 추측하지 않고 빠진다), 규율은 여전히
+  몇 주 전에 걸어둔 WATCH를 믿는 대신 매 실행 진입일에서 다시 계산된다. 그 읽기가 무엇을 정하고
+  무엇을 정하지 못하는지는 `HOST-FOLLOWUPS.md`가 기록한다.
   ([#153](https://github.com/untilled/aumos-catalogue/issues/153))
 - **단일종목 총합은 Mandate에서 파생되고, 투자자가 답할 질문이 담긴 상수는 더 이상 남지 않는다.**
   원본은 비코어 단일주를 28%로 묶었다. 그 값은 코어 ETF 목표 50%를 함께 들고 있던 배분의 한 조각이고,
