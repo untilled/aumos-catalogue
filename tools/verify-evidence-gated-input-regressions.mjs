@@ -1575,3 +1575,87 @@ assert.ok(/sectors \(plural\)/.test(concContract.nested.concentration.rowShape),
 assert.ok(/concentration_labels_unstated/.test(concContract.nested.concentration.rowShape))
 
 console.log('evidence-gated issue #173 concentration label-axis regression tests passed')
+
+/**
+ * ── #174: a sleeve budget nobody could pay for, reported as «within budget» ──
+ *
+ * The measured call, byte for byte (run `run_73a3e6c41c204f468ee8be8d2923d898`,
+ * asOf 2026-09-07T01:10:07.572Z). Before this fix it answered `status: ok`,
+ * `withinBriefBudget: true` and **no diagnostic** over a us-sleeve budget of
+ * ~USD 3,979 on a book holding USD 294.02 in idle dollars: `portfolio_read`'s
+ * aggregate `cash` read USD 8,596.10 and 96.6% of it was won.
+ */
+const budgetAsOf = '2026-09-07T01:10:07.572Z'
+const sleeveBudget = (input) => execute({ operation: 'specialistBudget', asOf: budgetAsOf, input })
+const theBook = { managerId: 'evidence-gated', flow: 'us-sleeve', market: 'XNYS', currentSleeveWeight: 0.11370454, sleeveBudgetWeight: 0.26488897, requestedTargetWeight: 0 }
+const procurement = { sleeveCashByCurrency: { KRW: 11_115_231, USD: 294.02 }, portfolioNav: 20_111_198.88, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1352.6 } }
+
+/** ⑴ Silence is no longer a pass: the same call names the key it is waiting for. */
+const unsaid = sleeveBudget(theBook)
+assert.equal(unsaid.status, 'unevaluated', 'a budget whose procurement nobody stated is not «within budget»')
+const waiting = unsaid.diagnostics.find((row) => row.code === 'sleeve_budget_fundability_unevaluated')
+assert.deepEqual(waiting.details.missing, ['sleeveCashByCurrency', 'portfolioNav', 'portfolioNavCurrency'], 'each key is named, because they fail independently')
+assert.equal(unsaid.data.budgetFundableInSleeveCurrency, null, 'null beside withinBriefBudget: true — two different questions, and only one was answered')
+assert.equal(unsaid.data.withinBriefBudget, true, '⛔ the ratio comparison itself is unchanged')
+assert.equal(unsaid.data.sleeveCurrency, 'USD', 'and the currency is derived from the market even when nothing else was supplied')
+
+/** ⑵ The book as it actually stood: the budget is not procurable in USD. */
+const measuredBudget = sleeveBudget({ ...theBook, ...procurement })
+assert.equal(measuredBudget.data.fundableAmount, 294.02, 'the sleeve is paid in USD and this is what the book holds of it')
+assert.equal(measuredBudget.data.budgetFundableInSleeveCurrency, false)
+assert.equal(measuredBudget.data.requestFundableInSleeveCurrency, true, 'this particular request was a decrease and needed nothing')
+assert.equal(measuredBudget.data.fxBasis, 'input.fx.USDKRW', 'the rate is the invocation\'s and the answer says so')
+assert.equal(measuredBudget.data.fxUsed, 1352.6)
+const shortfall = measuredBudget.diagnostics.find((row) => row.code === 'sleeve_budget_not_fundable_in_currency')
+assert.equal(shortfall.severity, 'unevaluated', '⛔ a warning and never a block: converting currency is a legitimate move')
+assert.equal(shortfall.details.subject, 'sleeveBudget')
+assert.equal(shortfall.details.sleeveCurrency, 'USD')
+assert.equal(shortfall.details.requiredAmount, 2247.89, 'the budget headroom priced in the currency it settles in')
+assert.equal(shortfall.details.shortfallAmount, 1953.87, 'and what a sale in the other currency, or an FX conversion, would have to produce')
+assert.equal(measuredBudget.data.allowed, true, 'the operation still allows: this is the investor\'s decision and the allocate flow\'s')
+
+/** ⑶ The binding case the issue names: the first USD buy that reaches past the dollars. */
+const firstBuy = sleeveBudget({ ...theBook, ...procurement, requestedTargetWeight: 0.26 })
+assert.deepEqual(
+  firstBuy.diagnostics.filter((row) => row.code === 'sleeve_budget_not_fundable_in_currency').map((row) => row.details.subject),
+  ['sleeveBudget', 'requestedTarget'],
+  'the budget and the order fail on different days and are reported separately',
+)
+assert.equal(firstBuy.data.requestFundableInSleeveCurrency, false)
+assert.equal(firstBuy.data.withinBriefBudget, true, '⚠️ this is the sentence #174 is about: inside the Brief budget, and not payable')
+
+/** ⑷ A book that does hold the dollars says nothing. */
+const funded = sleeveBudget({ ...theBook, ...procurement, sleeveCashByCurrency: { KRW: 11_115_231, USD: 4000 }, requestedTargetWeight: 0.2 })
+assert.equal(funded.status, 'ok')
+assert.equal(funded.diagnostics.length, 0, 'a procurable budget is not a warning')
+assert.equal(funded.data.budgetFundableInSleeveCurrency, true)
+
+/** ⑸ The KR sleeve is paid in won, and needs no rate at all. */
+const krLeg = sleeveBudget({ ...theBook, flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.8667, sleeveBudgetWeight: 0.4205039, requestedTargetWeight: 0.4, sleeveCashByCurrency: { KRW: 11_115_231, USD: 294.02 }, portfolioNav: 20_111_198.88, portfolioNavCurrency: 'KRW' })
+assert.equal(krLeg.data.sleeveCurrency, 'KRW')
+assert.equal(krLeg.data.fxBasis, 'not-required', 'no conversion, so no rate is missing')
+assert.equal(krLeg.diagnostics.some((row) => row.code === 'sleeve_budget_fundability_unevaluated'), false)
+
+/** ⑹ An emergency exit is not funded — it produces cash — and is not warned about. */
+const urgent = sleeveBudget({ ...theBook, currentSleeveWeight: 0.26, requestedTargetWeight: 0.1, emergencyExit: true })
+assert.equal(urgent.diagnostics.length, 0, 'an exit is asked for no procurement')
+assert.equal(urgent.data.allowed, true)
+
+/** ⑺ The aggregate is refused by name: it is the shape that hid this. */
+const aggregate = sleeveBudget({ ...theBook, ...procurement, sleeveCashByCurrency: 8596.1 })
+assert.equal(aggregate.status, 'blocked')
+assert.ok(aggregate.diagnostics.some((row) => row.code === 'input_shape_invalid' && row.path === 'input.sleeveCashByCurrency'))
+/** ⚠️ And the rows the invocation actually carries are read, not only the object form. */
+const cashRows = sleeveBudget({ ...theBook, ...procurement, sleeveCashByCurrency: [{ currency: 'KRW', amount: 11_115_231 }, { currency: 'USD', amount: 294.02 }] })
+assert.equal(cashRows.data.fundableAmount, 294.02)
+/** A currency with no row is zero of it, which is the finding rather than a gap in it. */
+assert.equal(sleeveBudget({ ...theBook, ...procurement, sleeveCashByCurrency: { KRW: 11_115_231 } }).data.fundableAmount, 0)
+
+/** ⑻ The shape is published, so the next caller does not have to guess it. */
+const budgetContract = execute({ operation: 'inputContracts', asOf: budgetAsOf, input: {} }).data
+assert.equal(budgetContract.contracts.specialistBudget.keys.portfolioNav, 'number')
+assert.ok(/cashByCurrency/.test(budgetContract.nested.specialistBudget.sleeveCashByCurrency))
+assert.ok(/never declared/.test(budgetContract.nested.specialistBudget.sleeveCurrency), 'the currency is derived from the market and the contract says so')
+assert.ok(/carries no currency/.test(budgetContract.nested.specialistBudget.budget), 'and the budget itself stays a ratio — aumos#689')
+
+console.log('evidence-gated issue #174 sleeve-budget procurement regression tests passed')

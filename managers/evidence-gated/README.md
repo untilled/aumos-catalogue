@@ -403,6 +403,26 @@ now, naming the symbols and their weight — never `blocked`, because this packa
 of its own and refusing a book for the absence of one would be inventing the classification. The row
 shape is published under `inputContracts.nested.concentration`, which said only `caps` before.
 
+**And a budget the book cannot pay for is not a budget it is inside.** `specialistBudget` compared
+two portfolio weights and answered `withinBriefBudget`, which on a two-currency book is not the
+question the sleeve asked. The measured call — `us-sleeve`, `XNYS`, current 0.11370454, Brief budget
+0.26488897 — came back `allowed: true`, `withinBriefBudget: true` and **no diagnostic** over a budget
+of roughly USD 3,979 on a book holding USD 294.02 in idle dollars; the difference is reachable only
+by converting won or selling a KR asset. The aggregate is what hid it: `portfolio_read`'s `cash` read
+USD 8,596.10 and **96.6% of it was won**, and the standing `allocate` plan was asking the investor
+about *"idle USD 8,514.73"* that did not exist. The currency goes on the **cash**, not on the budget:
+a limit expressed as a ratio has no currency, because one FX rate scales its numerator and its
+denominator alike, and the host settled that beside this one (aumos#689) — what has a currency is a
+level, and procurement is a level. So the funding currency is derived from the market (`XKRX` → KRW,
+`XNAS`/`XNYS` → USD) and never declared by the caller, the cash is read per currency from
+`portfolio.cashByCurrency`, and the rate is `portfolio.fxRates` with the answer naming where it came
+from — this package sources none of its own. ⚠️ Unfundable is a **warning**: converting currency and
+selling the other sleeve are legitimate moves, and both are `allocate`'s judgement and the investor's
+approval. ⛔ What is not allowed is silence — a call carrying no procurement is
+`sleeve_budget_fundability_unevaluated` / `unevaluated` naming the key it waits for, with
+`budgetFundableInSleeveCurrency: null` beside `withinBriefBudget`, where it used to be `status: ok`
+and an empty diagnostics array.
+
 **Two declared capabilities currently serve nothing.** `thesis:read` and `evidence:read`
 are in the manifest vocabulary, and the current Aumos build maps each to an empty tool
 list, so a run gets no such tool. The prompt reads them *when available* and the manifest

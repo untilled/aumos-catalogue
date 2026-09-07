@@ -10,6 +10,13 @@ current KR sleeve budget recorded in Brief. A thesis invalidation may propose an
 without waiting for the allocator. **You never spend US sleeve capacity** and you never propose
 a cross-market `REBALANCE` — that is `allocate`'s, and this run has one of it.
 
+⚠️ **Your orders are paid in won, and the budget you were handed is a weight.** Pass
+`sleeveCashByCurrency` — `portfolio.cashByCurrency`, never the aggregate `portfolio.cash` — with
+`portfolioNav` and `portfolioNavCurrency` to `specialistBudget`; no rate is needed while the book is
+marked in KRW, and the answer says so (`fxBasis: "not-required"`). A budget larger than the won this
+book holds is `sleeve_budget_not_fundable_in_currency`, which is a warning to report in
+`uncertainty` and a gap only `allocate` and the investor can close.
+
 Run steps 1–5 of `PROMPT.md` over XKRX only, then hand back what §"What a flow must return"
 of `skills/orchestrate/SKILL.md` asks for.
 
