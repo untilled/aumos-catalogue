@@ -995,10 +995,38 @@ assert.ok(feedHas(failedRefresh, 'source_cache_refresh_failed'))
 assert.equal(failedRefresh.status, 'blocked')
 // A fresh cache holding nothing is the vendor's answer, and is neither of the two above.
 assert.ok(feedHas(feedRun('fundamentalsPlan', { ...planInput, cache: cacheFor({ state: 'fresh', documents: [] }, { state: 'fresh', documents: [] }) }), 'source_cache_fresh_and_empty'))
-// The US plan needs no mapping to reach the vendor, and asks for the CIK file only for the cache.
-const usFeedPlan = feedRun('fundamentalsPlan', { market: 'us', symbols: ['DKS'] })
-assert.equal(usFeedPlan.data.requests[0].step, 'ticker-registry')
-assert.equal(usFeedPlan.data.requests.find((row) => row.step === 'facts').path, '/api/xbrl/companyfacts/DKS')
+/**
+ * ── `companyfacts` is keyed by the CIK, not the ticker (#179) ──────────────
+ *
+ * ⛔ **The assertion this replaces asserted the defect.** It read
+ * `path === '/api/xbrl/companyfacts/DKS'` and passed, because the plan really
+ * did paste the roster ticker into the vendor address. Measured 2026-09-07:
+ * `/api/xbrl/companyfacts/INTC` → 404 `NoSuchKey`;
+ * `/api/xbrl/companyfacts/CIK0000050863.json` → 200, 4,311,809 bytes. So the
+ * US branch has the same shape as the KR one — registry first, then the names
+ * whose filer id it supplied — and a name with no CIK is reported rather than
+ * addressed with a ticker.
+ */
+const usUnmapped = feedRun('fundamentalsPlan', { market: 'us', symbols: ['DKS'] })
+assert.equal(usUnmapped.data.requests[0].step, 'ticker-registry')
+assert.equal(usUnmapped.data.requests.find((row) => row.step === 'facts'), undefined, 'a name with no CIK has no address, so no call is planned for it')
+assert.ok(feedHas(usUnmapped, 'corp_code_mapping_pending'), 'and it is named rather than dropped')
+const usFeedPlan = feedRun('fundamentalsPlan', { market: 'us', symbols: ['DKS'], corporationCodes: [{ symbol: 'DKS', cik: 1089063 }], cache: { 'sec-edgar:companyfacts:DKS': { state: 'fresh', documents: [{}] } } })
+const usFacts = usFeedPlan.data.requests.find((row) => row.step === 'facts')
+assert.equal(usFacts.vendorPath, '/api/xbrl/companyfacts/CIK0001089063.json', 'the CIK file name, prefixed, ten-digit zero-padded and .json — never the ticker')
+assert.equal(usFacts.vendorId, '0001089063', 'an unpadded cik_str straight off company_tickers.json is padded here too')
+assert.equal(usFacts.tool, 'source_cache_read')
+assert.ok(!JSON.stringify(usFeedPlan.data.requests).includes('companyfacts/DKS'), 'no planned address carries a ticker')
+// An id that is not a CIK at all is left unmapped and named, never pasted into an address.
+assert.ok(feedHas(feedRun('fundamentalsPlan', { market: 'us', symbols: ['DKS'], corporationCodes: [{ symbol: 'DKS', vendorId: 'DKS' }] }), 'corp_code_mapping_pending'))
+/**
+ * ⚠️ And the diagnosis names the *registry* stage on this side too. It was
+ * gated on `market === 'kr'`, so a US run that never joined its roster reported
+ * `no-fundamental-request-was-planned` — true, and the wrong stage.
+ */
+const usDiagnosis = feedRun('radarFeedDiagnosis', { market: 'us', symbols: ['DKS'], plan: usUnmapped.data, mapping: null })
+assert.equal(usDiagnosis.data.stage, 'registry')
+assert.equal(usDiagnosis.data.cause, 'registry-planned-but-never-read')
 
 /**
  * ⛔ OpenDART reports its own refusals on an HTTP 200, and `013` and `020` are

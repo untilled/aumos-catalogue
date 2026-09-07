@@ -182,7 +182,9 @@ vendor's own filer id (open-dart /api/corpCode.xml for corp_code, sec-edgar
 /files/company_tickers.json for the CIK) → mapCorporationCodes → fundamentalsPlan →
 source_cache_read / source_cache_refresh → dartVendorStatus on every OpenDART response →
 radarCandidates → radarFeedDiagnosis → upsideRadar({candidates, feed}). The registry call is the
-one no run has ever made; without it nothing fetched can be addressed to a filer.
+one no run has ever made; without it nothing fetched can be addressed to a filer — on **both**
+sides (#179): sec-edgar companyfacts is the CIK file name
+(/api/xbrl/companyfacts/CIK{10-digit zero-padded}.json), and the ticker address answers 404.
 The same statements feed sizing (#160): for any name that reaches a thesis, call thesisGapSources
 (is an open expectedUpsidePct / fairValueRange gap unfetched, or does this instrument have no filer
 at all?) and thesisValuation (fairValueRange and expectedUpsidePct off the bear/base/bull targets,

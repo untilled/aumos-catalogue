@@ -309,7 +309,7 @@ export function thesisGapSources({ asset = null, market = null, gaps = [], mappi
     if (instrumentClass === 'single-name-filer') {
       return statementsRead
         ? { gap, fillableBy: source, state: 'source-answered-and-the-value-was-not-derived', instrumentClass, remedy: 'Call thesisValuation with the filings already fetched and the scenario table; the targets are what this methodology means by a fair value' }
-        : { gap, fillableBy: source, state: 'source-exists-and-was-never-called', instrumentClass, remedy: market === 'us' ? 'sec-edgar /api/xbrl/companyfacts/{symbol}, then radarCandidates, then thesisValuation' : 'open-dart /api/corpCode.xml → corp_code → fnlttSinglAcntAll, then radarCandidates, then thesisValuation' }
+        : { gap, fillableBy: source, state: 'source-exists-and-was-never-called', instrumentClass, remedy: market === 'us' ? 'sec-edgar /files/company_tickers.json \u2192 cik_str \u2192 /api/xbrl/companyfacts/CIK{10-digit zero-padded}.json (\u26d4 never the ticker \u2014 that address is a 404), then radarCandidates, then thesisValuation' : 'open-dart /api/corpCode.xml → corp_code → fnlttSinglAcntAll, then radarCandidates, then thesisValuation' }
     }
     return { gap, fillableBy: source, state: 'unclassified-instrument', instrumentClass }
   })

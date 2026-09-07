@@ -77,8 +77,14 @@ curated roster *is* ported (`researchUniverse` answers 74 KR / 83 US at `snapsho
 and the OpenDART route *is* alive (`company.json?corp_code=00126380` → `stock_code 005930`). The
 only missing piece was the **join** — nothing mapped a six-digit listing symbol to the `corp_code`
 every OpenDART route, and the cache's own `vendorId`, is keyed by. `/api/corpCode.xml` was already
-on the allowlist and `parseDartCorpCodes` already read it; no run had asked for it. The US side had
-an even lower barrier — `companyfacts` is keyed by the ticker — and had never been fed either.
+on the allowlist and `parseDartCorpCodes` already read it; no run had asked for it. ⚠️ **The US
+side was recorded here as having "an even lower barrier — `companyfacts` is keyed by the ticker",
+and that was false** (#179): `/api/xbrl/companyfacts/INTC` answers 404 `NoSuchKey`, and the file is
+`/api/xbrl/companyfacts/CIK0000050863.json` — measured 2026-09-07, along with the 200 that
+replaces it at 4,311,809 bytes. US has the **same** barrier, one registry over:
+`/files/company_tickers.json` → `cik_str` (an unpadded integer) → ten-digit zero-pad → the file
+name. It had never been fed either, and while that sentence stood a fed run would still have taken
+83 404s and read them as the vendor holding nothing.
 
 So this revision adds the path rather than another request: `fundamentalsPlan` →
 `mapCorporationCodes` → the two cache tools → `dartVendorStatus` → `radarCandidates` →

@@ -51,7 +51,7 @@ is what makes the wrong turn look right.
 |---|---|---|---|
 | Toss broker connector | — | portfolio, cash, fills, order/approval path | Kernel-owned; never call through either tool |
 | 토스 login | `connection_request` | `/api/v1/candles`, `/prices`, `/orderbook`, `/trades`, `/stocks`, `/stocks/all`, warnings, flows, FX, calendars, rankings, indicators | the host bounds `before`/`until`/`dateTime` at `asOf` for you; a window may come back shorter than asked and never longer |
-| `sec-edgar` | `source_request` | ticker mapping and `/api/xbrl/companyfacts/{symbol}` | each fact unit is available at its `filed` date, not fiscal period end |
+| `sec-edgar` | `source_request` | `/files/company_tickers.json` **first**, then `/api/xbrl/companyfacts/CIK{10-digit zero-padded}.json` — ⛔ the allowlist's `{symbol}` is that **file name**, never a ticker | each fact unit is available at its `filed` date, not fiscal period end |
 | Alpaca login | `connection_request` | bars, news, corporate actions | `end` is filled at `asOf` if you leave it out; snapshots are always current and never canonical replay evidence |
 | `openbb-fmp` | `/api/v1/equity/price/historical` only | optional long history; set `end_date`, record provider and adjustment |
 | `open-dart` | `/api/corpCode.xml`, `/api/company.json`, `/api/list.json`, `/api/fnlttSinglAcntAll.json`, `/api/fnlttSinglAcnt.json` | the **receipt** is the moment: `rcept_no` begins with the receipt date and `rcept_dt` repeats it; a business year is not a disclosure date |
