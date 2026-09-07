@@ -122,10 +122,20 @@ and do not type a roster of bars back in as tool arguments: a model retyping bar
 can hand them back is the most expensive way this package has ever failed to reach a judgement.
 The whole-universe sweep is `research_prepare` over the two recipes this package declares in
 `aumos.json` — **`roster-scan`** and **`opportunity-metrics`** — then `research_job_get` and
-`research_result_get`. Host code runs this package's own `execute()` over the bars the host already
+`research_result_get`. Host code runs this package's own `execute()` over the bars the host
 stores, one process per symbol, and hands back counts and a reference. Everything else — a single
 name, a sizing call, a methodology gate — stays `mcp__evidence-gated-metrics__calculate` in your own
 context, one call per operation.
+
+⚠️ **And the sweep is two steps, in that order: collect the series, then prepare it.**
+`research_prepare` reads what this fund has **already** stored and collects nothing, so a roster
+prepared without the first step comes back with every row saying the price branch was never run.
+The first step is `source_cache_refresh` on **`prices`/`daily`** for each `{market, symbol}` — the
+venue MIC and ⛔ no `vendorId` — which asks the fund's own price sources for the gap and stores it
+where the recipes read. ⛔ **No bar reaches your context on either step**: this is a collection
+order, not a relay, and it is still true that a roster of bars typed back as tool arguments is the
+failure mode. `skills/data-source-contract/SKILL.md` owns the route and
+`skills/candidate-research/SKILL.md` the procedure.
 
 ⚠️ **`sourced`, `evaluated` and `unprepared` are three reports and are never summed.**
 `unprepared` means nothing about those names was readable at this `asOf`: it is **blindness with the
@@ -408,10 +418,15 @@ Forward research is the one crossing: the theme radar examines an axis outside i
 joins the universe as an extension, so a run that skips the radar leaves the boundary permanently
 where it was.
 
-⛔ **The sweep is prepared, not split and not relayed.** It is `research_prepare` over
+⛔ **The sweep is collected and then prepared — not split and not relayed.** It is
+`source_cache_refresh` on `prices`/`daily` across the roster, then `research_prepare` over
 `roster-scan` and `opportunity-metrics`, read back as a summary — not work to split across workers
-and not a roster of bars carried through your context. See §Orchestration above and
-`skills/candidate-research/SKILL.md` for the three calls and the three counts.
+and not a roster of bars carried through your context. ⚠️ A sweep prepared before the series was
+collected answers `scanner_history_insufficient` on every name, and that diagnostic has **three**
+causes — not collected, no price source for the venue, or a name that genuinely has almost no
+history — of which only the last is a finding. See §Orchestration above and
+`skills/candidate-research/SKILL.md` for the two steps, the three calls, the three counts and that
+three-way split.
 
 #### Price patterns — `scan`, `opportunityMetrics`
 

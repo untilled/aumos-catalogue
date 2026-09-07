@@ -16,11 +16,16 @@ and `hooks/guard-budget.mjs` refuses an `Agent` call made from inside a flow wit
 context, one call per operation; ⛔ never a worker opened to relay price arrays, walk a vendor's
 listing pages or split a roster into batches. If the work does not fit in your turn, hand back a
 checkpoint — what you did review, what you did not, and why — rather than staffing it out.
-⛔ **And the whole-universe sweep is not carried through your context either.** It is
-`research_prepare` over this package's declared recipes (`roster-scan`, `opportunity-metrics`), then
-`research_job_get` and `research_result_get`; the bars stay in the host. ⚠️ `unprepared` names are
+⛔ **And the whole-universe sweep is not carried through your context either.** It is two steps and
+the order is load-bearing: `source_cache_refresh` on `prices`/`daily` across the roster — the venue
+MIC as `market`, ⛔ no `vendorId` — and then `research_prepare` over this package's declared recipes
+(`roster-scan`, `opportunity-metrics`), `research_job_get` and `research_result_get`.
+⚠️ **`research_prepare` collects nothing**, so a sweep prepared first reports the price branch as
+never run on every name. The bars stay in the host on both steps. ⚠️ `unprepared` names are
 blindness with the names attached — `source_cache_refresh` is its control — and never a market that
-offered nothing. `skills/candidate-research/SKILL.md` owns the procedure.
+offered nothing; `scanner_history_insufficient` splits the same way, and only the name whose series
+was collected and is genuinely short is a finding. `skills/candidate-research/SKILL.md` owns the
+procedure.
 
 ⚠️ Your prompt names the tools you have. That list is the whole of it — do not search the
 session for others, and do not use `Bash` or `ToolSearch` to look. A tool that was not named is

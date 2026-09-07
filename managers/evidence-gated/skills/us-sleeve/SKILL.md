@@ -198,14 +198,22 @@ through `mcp__evidence-gated-metrics__calculate` — never through `Bash`.
 
 ⛔ **And you dispatch nothing.** One tier: the orchestrator dispatched you and you answer.
 `hooks/guard-budget.mjs` refuses an `Agent` call from inside a flow (`delegation_depth_exceeded`).
-⛔ **And the roster sweep is not relayed either.** It is `research_prepare` over the two recipes
-this package declares — `roster-scan` and `opportunity-metrics` — then `research_job_get` until it
-settles and `research_result_get` for the summary; the bars stay in the host and the row that comes
-back carries no series. ⛔ Never a worker opened to relay bars, walk listing pages or batch the
-roster, and ⛔ never a roster of bars typed back as `calculate` arguments.
-`skills/candidate-research/SKILL.md` owns the procedure and the three counts.
+⛔ **And the roster sweep is not relayed either.** It is two steps, in this order:
+`source_cache_refresh` on **`prices`/`daily`** across the roster — provider `prices`, document
+`daily`, `market` the venue MIC (`XNAS`/`XNYS`, ⛔ never the research market you use for a
+filer) and ⛔ no `vendorId` — and then `research_prepare` over the two recipes this package
+declares (`roster-scan` and `opportunity-metrics`), `research_job_get` until it settles and
+`research_result_get` for the summary. ⚠️ **`research_prepare` collects nothing**, so preparing
+first is a sweep whose every row says the price branch was never run. The bars stay in the host on
+both steps and the row that comes back carries no series. ⛔ Never a worker opened to relay bars,
+walk listing pages or batch the roster, and ⛔ never a roster of bars typed back as `calculate`
+arguments. `skills/candidate-research/SKILL.md` owns the procedure and the three counts and
+`skills/data-source-contract/SKILL.md` the route.
 ⚠️ Read `unprepared` as **blindness, never as an absence of opportunity**: the names come back and
-`source_cache_refresh` is what fixes them. If it does not fit in this turn, persist what you did
+`source_cache_refresh` is what fixes them. ⚠️ And read `scanner_history_insufficient` the same way
+by asking what **your own refresh** answered for that symbol: not collected, or
+`no-source-for-market` — both blindness — against `observed`/`satisfied`, which is the one case
+where the name genuinely has too little history and the only one that is a finding. If it does not fit in this turn, persist what you did
 review with `researchState` and hand back the unreviewed scope with its reason, so the
 orchestrator's `WAIT` can say the data was not prepared rather than that nothing qualified.
 

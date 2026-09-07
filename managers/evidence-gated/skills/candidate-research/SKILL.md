@@ -265,10 +265,12 @@ and without them a roster of 83 that produced one usable filing came back `fed`.
 reviewed» nor «nothing was ever looked at».
 
 `entryQualityGate` needs historical OHLC `bars` (at least 60; 200+ for the long indicators),
-not a `scanHistory` field or prior scan runs. ⚠️ **You do not fetch them for the sweep** — the
-`roster-scan` recipe below runs the gate beside `scan`, over the bars the host already holds, for
-every candidate that named a lens, and hands back `entryQuality` on the row. Relay bars only for a
-single name the roster never covered, and never for a roster.
+not a `scanHistory` field or prior scan runs. ⚠️ **You do not relay them for the sweep** — the
+`roster-scan` recipe below runs the gate beside `scan`, over the bars the host holds, for every
+candidate that named a lens, and hands back `entryQuality` on the row. ⚠️ *Holds* is not *has
+always held*: you ask the host to collect them with `source_cache_refresh` on `prices`/`daily`
+before you prepare, which is the first of the two steps below, and no bar reaches your context on
+either of them. Relay bars only for a single name the roster never covered, and never for a roster.
 
 ## The roster sweep is prepared, not relayed
 
@@ -289,6 +291,46 @@ them in its own process over the inputs it already stores:
 Both call `execute()` from `lib/index.mjs` — **the same function `mcp__evidence-gated-metrics__calculate`
 calls**, with the same `normalizeBars`, the same `LENS_ENVELOPES` thresholds and the same
 diagnostics. The numbers do not change because the caller did.
+
+### First fill the series, then prepare — the sweep reads what this fund already holds
+
+⚠️ **`research_prepare` collects nothing.** It runs this package's arithmetic over the documents
+this fund has **already** stored for each name, so a roster nobody has collected a price series for
+comes back evaluated-with-no-data on every row. That is not a hypothetical: it is what every row
+looked like until `untilled/aumos#734` gave the host a price collector at all.
+
+So the sweep is two steps and this is the first of them. For every `{market, symbol}` on the roster
+you just declared, call
+
+```jsonc
+source_cache_refresh({
+  provider: "prices",           // ⛔ never a vendor name — which one answers is the fund's to decide
+  document: "daily",
+  market: "XKRX",               // ⛔ the venue MIC, not the `kr`/`us` you use for a filer
+  symbol: "005930",
+  asOf                          // this invocation's pin, as always
+  // parameters: { assetClass: "etf" } for an ETF; `days` only to widen a FIRST collection
+})
+```
+
+⛔ **No `vendorId`** — it is refused on this document. `skills/data-source-contract/SKILL.md` owns
+the route, the four answers and the reason each field is shaped that way; read it before the first
+call rather than after the first refusal.
+
+⚠️ **This is cheap on the second pass and that is the design.** The host asks the vendor only for
+the gap between what this fund holds and the newest bar that had closed at your `asOf`, and a
+roster refreshed twice over the same closed bar reaches no vendor at all (`state: 'satisfied'`).
+⛔ So *«a previous run already collected these»* is not a reason to skip this step: the previous run
+was pinned earlier, and the sessions since then are exactly what the gates are being asked about.
+
+⚠️ **Order matters and the failure is silent.** Preparing first and refreshing afterwards produces a
+correctly-shaped result whose every row says the price branch was never run, and reading that as a
+market that offered nothing is the error `untilled/aumos-catalogue#209` is named after. Refresh the
+roster, **then** prepare it.
+
+⚠️ **A name whose refresh you could not complete is `unprepared` in your own report before the host
+ever says so.** Carry those symbols by name into the `uncertainty` entry below with the answer that
+stopped you — `failed`, `no-source-for-market`, or a limit that ended the turn.
 
 ### The three calls, in order
 
@@ -327,6 +369,32 @@ it read the documents and they carried nothing. And a row whose `output.data` is
 `scanner_history_insufficient` / `opportunity_history_insufficient` diagnostic is the third: the
 documents were read and **none of them was a price series**, so the lens sweep was never run for
 that name. Carry the diagnostic — it is the only thing that tells those apart.
+
+### ⚠️ `scanner_history_insufficient` has three causes and only one of them is your fault
+
+The diagnostic says one thing — *fewer than 60 usable bars reached the gate* — and it is emitted
+identically whether nobody collected the series, whether the venue is unpriced on this machine, or
+whether the name genuinely has almost no history. ⛔ **Do not report the three as one**, and ⛔ do
+not repair the diagnostic by widening the roster. This is the same distinction as the three counts
+above, one layer down, and it is answered by **what your own refresh said about that symbol** —
+not by the recipe's output, which cannot tell them apart.
+
+| what your `prices`/`daily` refresh answered for that symbol | how to read the diagnostic | who has the control |
+|---|---|---|
+| you never called it, or the turn ended first | ⛔ **not prepared** — blindness, exactly like `unprepared` | **you**, on this run or the next: call it |
+| `no-source-for-market` | ⛔ **this machine prices no venue for that name** — blindness about a whole venue, not about a company | the **investor**: connect the broker or add a price source. Report it once per venue, not once per name |
+| `failed` | the price source was asked and did not answer — what is stored is behind, not absent | nobody this run; re-ask next run and say so |
+| `observed` or `satisfied` | ⚠️ **the series is as complete as this venue has** and 60 bars is genuinely more than exists | ⛔ **nobody** — this is a fact about the name, and it is the honest verdict |
+
+The last row is the one that is a real finding: a name listed weeks ago, one returning from a long
+halt, or one whose venue simply has not traded it. ⚠️ **It is still not «this name failed a gate».**
+The gate was not evaluated — `severity: 'unevaluated'` says so — so the name is neither a candidate
+nor a rejection; it is a name this methodology cannot judge yet, and it is carried as such.
+
+⚠️ **The `barsRead` / `barsUsed` pair on the row is what makes the last two rows distinguishable at
+all.** `barsRead: 0` after a successful refresh means the documents this fund holds for that name
+carried no series; a small non-zero `barsUsed` means the series exists and is short. Quote the
+number rather than the word.
 
 ### What you do with the names you could not review
 

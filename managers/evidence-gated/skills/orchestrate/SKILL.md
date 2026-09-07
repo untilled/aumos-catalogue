@@ -110,7 +110,9 @@ Your tools are the Aumos gateway's, already attached to this session:
   mcp__aumos__source_request       (a data vendor this machine holds a key for)
   mcp__aumos__connection_request   (a broker login the investor already connected)
   mcp__aumos__source_cache_read    (stored filings for one filer, cut to this asOf)
-  mcp__aumos__source_cache_refresh (collect one document for one filer, by vendor id)
+  mcp__aumos__source_cache_refresh (collect one document — a filing for one filer by vendor id,
+                                    or this fund's own daily bars: provider `prices`, document
+                                    `daily`, the venue MIC as `market`, and no vendorId)
   mcp__aumos__observation_file     (file what you read on the web — URL, publication date and
                                     the source's own words verbatim — and get back the
                                     evidenceId that `evidenceIds` and `consensusRefs` require)
@@ -219,11 +221,20 @@ every filing test. catalystRegister is that producer, every row carries the evid
 was filed under, and its nextState is persisted to research/catalyst-window with numeric instants.
 Do all of that in your own context with calculate — do not open subagents to batch the roster, to
 relay bars, or to walk listing pages; that is refused and the run is charged for it either way.
-Run the whole-universe price sweep through research_prepare over this package's declared recipes
-(roster-scan, opportunity-metrics), then research_job_get and research_result_get; the bars stay in
-the host and never become tool arguments. Report sourced, evaluated and unprepared as three
-separate counts and never their sum, and treat unprepared as blindness with the names attached and
-source_cache_refresh as its fix — never as a market that offered nothing. If the four research
+Collect the price series before you sweep, and in that order: call source_cache_refresh with
+provider `prices`, document `daily`, the venue MIC as market (XKRX/XNAS/XNYS, never kr/us) and no
+vendorId, for every name on the roster. research_prepare collects nothing — it reads what this fund
+already stores — so a roster prepared first answers scanner_history_insufficient on every name and
+that is blindness, not an empty market. Re-running it over the same closed bar reaches no vendor at
+all, so a previous run having collected them is not a reason to skip it.
+Then run the whole-universe price sweep through research_prepare over this package's declared
+recipes (roster-scan, opportunity-metrics), then research_job_get and research_result_get; the bars
+stay in the host on both steps and never become tool arguments. Report sourced, evaluated and
+unprepared as three separate counts and never their sum, and treat unprepared as blindness with the
+names attached and source_cache_refresh as its fix — never as a market that offered nothing.
+scanner_history_insufficient has three causes and only one is a finding: not collected, no price
+source for that venue (the investor's control, reported once per venue), or a name that genuinely
+has too little history. Quote barsRead/barsUsed rather than the word. If the four research
 tools were not named in your grant, say so in uncertainty and do not reopen the relay path.
 skills/candidate-research/SKILL.md owns the procedure.
 Scan holdings' news/disclosures through granted web and installed filing sources every cycle.

@@ -158,9 +158,15 @@ for (const [entrypoint, operation] of [
  * that would say *we read this name's documents and it carried nothing*, a
  * finding about the company — and it is not a failure. It is an evaluated row
  * whose data is null beside the operation's own `unevaluated` diagnostic, which
- * says the price branch was never run for that name. Until a price collector
- * exists in the host this is what **every** row looks like, and
- * `HOST-FOLLOWUPS.md` says so.
+ * says the price branch was never run for that name.
+ *
+ * ⚠️ **It used to be what every row looked like and no longer is.** Before
+ * `untilled/aumos#734` the host collected three filing documents and no price
+ * series, so this was the answer for the whole roster. `prices`/`daily` is now
+ * a route and 0.4.55's instructions call it before preparing — which is why the
+ * case stays here rather than being deleted: it is now the shape of a name that
+ * was *not collected*, and the instructions have to keep telling those apart
+ * from a name whose series was collected and is genuinely short.
  */
 for (const [entrypoint, code] of [
   ['recipes/roster-scan.mjs', 'scanner_history_insufficient'],
@@ -175,6 +181,52 @@ for (const [entrypoint, code] of [
     answered.output.diagnostics.some((row) => row.code === code && row.severity === 'unevaluated'),
     `${entrypoint} reports ${code} / unevaluated — the package's own word for "this was not judged", which is what an investor must not read as "nothing qualified"`,
   )
+}
+
+/**
+ * ⚠️ **The shape the host actually stores: one closed bar per document.**
+ *
+ * The fixture above hands one reading carrying the whole series, which is what a
+ * relayed vendor answer looks like. `prices`/`daily` does not store that —
+ * `untilled/aumos#734` files **one document per bar**, keyed by that bar's own
+ * start, because a series under one key would make every refresh restate the
+ * whole history. So a fed roster arrives here as two hundred readings of one bar
+ * each, and the only thing that turns them back into a series is `scannerInput`
+ * accumulating `normalized.bars` across every reading before normalizing once.
+ *
+ * ⛔ That was never measured — the single-reading fixture passes whether the loop
+ * accumulates or overwrites — and it is the join the whole route now rests on.
+ * The two answers must be identical, because they are the same series.
+ */
+{
+  const perDocument = bars.map((bar) => ({
+    provider: 'prices',
+    documentKey: bar.timestamp,
+    version: 1,
+    publishedAt: new Date(Date.parse(bar.timestamp) + 86_400_000).toISOString(),
+    normalized: { interval: '1d', currency: 'KRW', bars: [bar] },
+  }))
+  // Deliberately out of order: the host reads its rows back by publication and
+  // this package must not depend on that ordering. `normalizeBars` sorts.
+  perDocument.reverse()
+  for (const [entrypoint, operation] of [
+    ['recipes/roster-scan.mjs', 'scan'],
+    ['recipes/opportunity-metrics.mjs', 'opportunityMetrics'],
+  ]) {
+    const split = run(entrypoint, { ...request(bars), recipeId: operation, readings: perDocument })
+    const whole = run(entrypoint, { ...request(bars), recipeId: operation })
+    assert.equal(split.output.documents, bars.length, `${entrypoint} counts one document per bar, which is how the host files a daily series`)
+    assert.equal(split.output.barsUsed, whole.output.barsUsed, `${entrypoint} reads the same number of bars out of one-bar documents as out of one series document`)
+    assert.deepEqual(
+      split.output.data,
+      whole.output.data,
+      `${entrypoint} computes the same row from ${bars.length} one-bar documents as from one document carrying ${bars.length} bars — the fed roster arrives in the first shape and every fixture until now used the second`,
+    )
+    assert.ok(
+      !JSON.stringify(split).includes('"open"'),
+      `${entrypoint} still returns no bar series when it was handed one document per bar`,
+    )
+  }
 }
 
 /** A bar later than the pin never reaches a metric, and the drop is reported. */
@@ -215,4 +267,86 @@ for (const file of ['recipes/request.mjs', 'recipes/roster-scan.mjs', 'recipes/o
   }
 }
 
-console.log('evidence-gated recipes: entrypoints run as processes, compute what calculate computes, and return no bars')
+/**
+ * ── The collection step, and the fact that it is written down before the sweep ──
+ *
+ * `research_prepare` **collects nothing**: it runs a recipe over documents this
+ * fund already stores. So a run told only about the three research calls does
+ * exactly what one measured run did before `untilled/aumos#734` existed at all —
+ * prepares a roster nobody collected a price series for and reads every row's
+ * `scanner_history_insufficient` as a market with no opportunities. The fix is
+ * host-side and shipped; what is checked here is that the **instructions** name
+ * it, because an unfed sweep with a route available is the same wrong answer.
+ *
+ * ⚠️ **Ordering is checked by position rather than by prose.** «Refresh first»
+ * is the whole content of the step — an instruction that mentioned both calls
+ * in the wrong order would read as correct to a skimmer and produce the empty
+ * sweep — so every document that names both must name the collection first.
+ *
+ * ⛔ Not checked: that a run obeys it. Nothing in this repository runs a manager.
+ */
+const INSTRUCTION_FILES = [
+  'PROMPT.md',
+  'skills/orchestrate/SKILL.md',
+  'skills/kr-sleeve/SKILL.md',
+  'skills/us-sleeve/SKILL.md',
+  'skills/candidate-research/SKILL.md',
+  'agents/kr-sleeve.md',
+  'agents/us-sleeve.md',
+  'agents/allocate.md',
+]
+
+for (const file of INSTRUCTION_FILES) {
+  const text = await readFile(new URL(file, packageRoot), 'utf8')
+  // Both halves of the coordinate, in either spelling — `prices`/`daily` when a
+  // document names the route and «provider `prices`, document `daily`» when it
+  // spells out the call. ⛔ Not one regular expression for the punctuation: the
+  // check is that the coordinate is named, not how it is typeset.
+  assert.ok(
+    /\bprices\b/.test(text) && /\bdaily\b/.test(text),
+    `${file} names the prices/daily document; a flow told to prepare a roster and not told to collect its series prepares an unfed one`,
+  )
+  const collect = text.indexOf('prices')
+  const prepare = text.indexOf('research_prepare')
+  assert.ok(prepare !== -1, `${file} still names research_prepare`)
+  assert.ok(
+    collect < prepare,
+    `${file} names the collection before the sweep; the two calls in the other order read as correct and produce a roster whose every row says the price branch was never run`,
+  )
+}
+
+/**
+ * ⛔ **And no document tells a flow to hand `vendorId` or a research market to it.**
+ *
+ * Both are refused by the host on this route — a bar is one venue's record, and
+ * the venue and ticker are already given — and a refusal a document walked a run
+ * into is worse than one it warned about. Checked as text because the refusal
+ * lives in the host and nothing here can provoke it.
+ */
+const routeSkill = await readFile(new URL('skills/data-source-contract/SKILL.md', packageRoot), 'utf8')
+assert.ok(
+  /refused/.test(routeSkill.slice(routeSkill.indexOf('prices'))),
+  'the route document says which fields prices/daily refuses rather than leaving a run to find out',
+)
+
+/**
+ * The three readings of one diagnostic (#209 §8-D).
+ *
+ * `scanner_history_insufficient` is emitted identically whether nobody collected
+ * the series, whether this machine prices no venue for that name, or whether the
+ * name genuinely has almost no history — and only the last is a finding. That is
+ * the same distinction as `sourced`/`evaluated`/`unprepared` one layer down, and
+ * merging them is the error the issue is named after.
+ */
+const researchSkill = await readFile(new URL('skills/candidate-research/SKILL.md', packageRoot), 'utf8')
+const splitAt = researchSkill.indexOf('has three causes')
+assert.notEqual(splitAt, -1, 'candidate-research splits scanner_history_insufficient rather than leaving it one word')
+const insufficient = researchSkill.slice(splitAt)
+for (const answer of ['no-source-for-market', 'satisfied', 'observed', 'barsRead']) {
+  assert.ok(
+    insufficient.includes(answer),
+    `that split is decided by what the refresh answered, and it names ${answer}; a split a run cannot evaluate is prose`,
+  )
+}
+
+console.log('evidence-gated recipes: entrypoints run as processes, compute what calculate computes, return no bars, read a per-document series, and are collected before they are prepared')
