@@ -12,7 +12,18 @@ const NON_MONETARY_UNITS = new Set(['percent', 'ratio', 'count', 'multiple', 'in
  * or index publisher, a regulator. An aggregator restatement is usable evidence
  * but never upgrades to the official reading; it is kept with its gap named.
  */
-const MACRO_INDICATORS = new Set([
+/**
+ * ⚠️ **Exported because the vocabulary was closed and unpublished (#177).**
+ * `inputContracts.vocabulary` publishes `sentinelKinds`, `researchMarkets`,
+ * `paperSetups` and eleven more, and this list — the only thing that decides
+ * whether a macro row is read at all — was not among them. A run that wrote
+ * `{ metric: 'policyRate' }` was answered `indicator-unknown` with a `null`
+ * indicator and `macroLaneAvailable: false`, which reads as *the macro lane has
+ * nothing in it* rather than *this call was spelled in a vocabulary this
+ * operation does not have*. `input-contracts.mjs` projects the array, so there
+ * is no second copy to fall out of step with it.
+ */
+export const MACRO_INDICATORS = Object.freeze([
   'vix',
   'put-call-ratio',
   'sentiment-index',
@@ -24,6 +35,8 @@ const MACRO_INDICATORS = new Set([
   'policy-statement',
   'industry-policy',
 ])
+
+const MACRO_INDICATOR_SET = new Set(MACRO_INDICATORS)
 
 export function validateConsensus(observation, asOf) {
   const diagnostics = []
@@ -159,9 +172,16 @@ export function validateMacroObservations({ observations = [], asOf, webAvailabl
   const unusable = []
   for (const [index, row] of observations.entries()) {
     const at = `observations[${index}]`
-    if (!MACRO_INDICATORS.has(row?.indicator)) {
+    if (!MACRO_INDICATOR_SET.has(row?.indicator)) {
       unusable.push({ indicator: row?.indicator ?? null, reason: 'indicator-unknown' })
-      diagnostics.push(diagnostic('macro_indicator_unknown', 'unevaluated', 'Indicator is outside the declared macro vocabulary', `${at}.indicator`))
+      /** ⚠️ The vocabulary travels with the refusal (#177); it is also published under `inputContracts.vocabulary.macroIndicators`. */
+      diagnostics.push(diagnostic(
+        'macro_indicator_unknown',
+        'unevaluated',
+        'Indicator is outside the declared macro vocabulary; the field is `indicator` and its values are kebab-case',
+        `${at}.indicator`,
+        { indicator: row?.indicator ?? null, supported: [...MACRO_INDICATORS] },
+      ))
       continue
     }
     const observedAt = Date.parse(row?.observedAt)

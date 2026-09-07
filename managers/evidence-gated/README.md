@@ -423,6 +423,32 @@ approval. ⛔ What is not allowed is silence — a call carrying no procurement 
 `budgetFundableInSleeveCurrency: null` beside `withinBriefBudget`, where it used to be `status: ok`
 and an empty diagnostics array.
 
+**Four more calls came back as answers about something else.** (#177) The pattern this package
+records most often — *a wrong input is not refused and comes back looking like a pass* — was measured
+four more times on one run, and the costliest was a **1,338.848×** NAV. `sleeveNav` read a position
+row's `currency` as two facts at once: which sleeve the name belongs to, and which unit `marketValue`
+is counted in. The host's `portfolio_read` marks **every** holding in the book's base currency, so a
+KRW listing on a USD book arrives as a dollar figure with `valueCurrency: "USD"` beside it — a key
+this operation did not read, sitting in a row where a `named` operation's unknown-key report cannot
+see it. USD 4,717.16 went into the won bucket at face value: `krwSleeveNav` **11,119,948.16** against
+a true 17,430,791.23, `status: ok`, no diagnostic. The two facts are separated now rather than a
+spelling being guessed at: `currency` stays the currency the asset quotes in and `valueCurrency`
+states the unit of the mark, converted at the rate this package is **handed** (aumos#689, the same
+rule #174 settled next door), with `marketValueBasis` saying which reading was taken and
+`fxUsed`/`fxBasis` where the rate came from. ⛔ A row whose value cannot be put in its sleeve's
+currency is dropped and named, never counted at face value. The other three are all one shape —
+a field the operation does not read, answered with a verdict. `validateMacro`'s rows are keyed by
+`indicator` and not `metric`, and its ten kebab-case values were the one closed vocabulary
+`inputContracts.vocabulary` did not publish; written under `metric`, every row is unusable and
+`macroLaneAvailable` comes back `false`, which reads as *the policy lane is empty*. `thesisSentinel`
+compares against `level` and reads `value`/`availableAt`; written as `threshold` and
+`observed`/`observedAt` a price 20% through a registered invalidation joined its evidence and came
+back *"Rule and evidence are not comparable"*, making the verdict `watch` instead of `threatened`.
+And `specialistBudget`'s `managerId` is the literal `evidence-gated` — a run that passed its own
+`inst_…`, the id every other surface of the host addresses this manager by, had the whole call
+refused against a contract that said only `managerId: "string"`. All four spellings are
+`input_shape_invalid` rather than dropped, and all four shapes are published.
+
 **Two declared capabilities currently serve nothing.** `thesis:read` and `evidence:read`
 are in the manifest vocabulary, and the current Aumos build maps each to an empty tool
 list, so a run gets no such tool. The prompt reads them *when available* and the manifest

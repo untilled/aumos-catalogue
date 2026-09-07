@@ -1,4 +1,5 @@
-import { diagnostic, readCashByCurrency, MARKET_CURRENCIES } from './diagnostics.mjs'
+import { diagnostic, readCashByCurrency, MARKET_CURRENCIES, MANAGER_ID } from './diagnostics.mjs'
+import { MACRO_INDICATORS } from './evidence.mjs'
 
 export const PAPER_SETUP_COHORTS = {
   thesis_call: 'llm-research', thesis_watch: 'llm-research', thesis_rejected: 'llm-research',
@@ -54,6 +55,25 @@ export const INPUT_VOCABULARY = {
    * `uncited` is a figure with no evidence row behind it at all.
    */
   attestationGrades: ['aumos', 'manager', 'ungraded', 'uncited'],
+  /**
+   * ⚠️ **The closed vocabulary `validateMacro` keys every row by, published
+   * because it was the one closed list this object did not carry** (#177).
+   * The field is `indicator` — not `metric` — and the values are kebab-case.
+   * A run that wrote `{ metric: 'policyRate' }` was answered `indicator: null`
+   * / `indicator-unknown` and `macroLaneAvailable: false`, which reads as *the
+   * macro lane is empty* rather than *this call was spelled in a vocabulary
+   * this operation does not have*. Projected from `evidence.mjs`, never copied.
+   */
+  macroIndicators: [...MACRO_INDICATORS],
+  /**
+   * ⚠️ **The manager id `specialistBudget` accepts, which is a literal and not
+   * an instance id** (#177). One run passed its own `inst_…` — the id every
+   * other surface of the host addresses this manager by — and got
+   * `manager_id_unknown` / `blocked` against a contract that said only
+   * `managerId: "string"`. There has been exactly one since 2026-08-27; the
+   * market roles are flows of it, which is what `dispatchableFlows` lists.
+   */
+  managerIds: [MANAGER_ID],
   managerObservationKind: 'observation',
   managerObservationSource: 'manager:web-research',
   observationExcerptLimit: 64_000,
@@ -151,6 +171,30 @@ export const NESTED_CONTRACTS = {
     'invalidations[]': `{ id, kind, level | operator+level | at, evidenceId }. kind is one of ${['price_below', 'price_above', 'metric', 'time'].join(', ')}; a metric rule also carries metric and operator. ⚠️ id is kept verbatim and is what an evidence row addresses; without one the answer names the rule by position as rule-<index> and says so.`,
     'evidence[]': 'The observation a rule is judged against: { id, value | availableAt, metric, invalidationId }. ⚠️ A row is joined to a rule by one of three keys and never by position — rule.evidenceId → this row\'s id, this row\'s invalidationId → rule.id, or, for a metric rule, this row\'s metric → rule.metric. A rule that joins to nothing, or to more than one row under the same key, answers unevaluated; it is never met, so an invalidation nobody supplied evidence for cannot become a threatened verdict.',
     'priorVerdicts[]': { asOf: STRING, verdict: STRING },
+    /**
+     * ⚠️ The threshold field is `level` and the observation field is `value`
+     * (#177). Both near-misses are refused by name rather than read as absent.
+     */
+    fieldNames: 'The threshold a rule compares against is `level` — never `threshold` — and a time rule\'s instant is `at`. On the evidence row the reading is `value` and its instant is `availableAt` — never `observed` / `observedAt`. ⛔ Written under the near-miss spelling the rule joined, found its evidence, and came back `unevaluated` with "Rule and evidence are not comparable": a real observation past a real level, reported as a rule nobody could judge. Those four spellings are input_shape_invalid, because reading them as absent is how a breach becomes a shrug.',
+  },
+  /**
+   * ⚠️ `observations: "array"` was the whole published shape and the row is
+   * keyed by a closed vocabulary under a field named `indicator` (#177).
+   */
+  validateMacro: {
+    'observations[]': { indicator: STRING, value: NUMBER, observedAt: STRING, sourceUrl: STRING, sourceTier: STRING },
+    indicator: `The field is \`indicator\` and its value is one of ${MACRO_INDICATORS.join(', ')} — also published as inputContracts.vocabulary.macroIndicators. ⛔ \`metric\` is the consensus-evidence vocabulary and is refused here by name: written under it every row is unusable, officialCount is 0 and macroLaneAvailable comes back false, which reads as a macro lane with nothing in it rather than a call this operation could not read.`,
+    sourceTier: 'official — the publisher of record — or anything else, which is retained with its provenance gap named rather than dropped. Absent reads as aggregator.',
+  },
+  /**
+   * ⚠️ `currency` and the currency `marketValue` is counted in are two facts,
+   * and reading one key as both is what put dollars in the won bucket (#177).
+   */
+  sleeveNav: {
+    'cash[]': { currency: STRING, amount: NUMBER },
+    'positions[]': { symbol: STRING, currency: STRING, marketValue: NUMBER, valueCurrency: STRING },
+    valueCurrency: 'The unit `marketValue` is counted in, when it is not the currency the asset quotes in. `portfolio_read` marks every position in the book\'s base currency, so a KRW listing on a USD book arrives as a **dollar** figure — pass `valueCurrency: "USD"` and it is converted into the sleeve at `fx.USDKRW`. ⛔ Absent it reads as the position\'s own `currency`, which is right on a single-currency book and was silently wrong by the rate itself (1,338.848×) on the book that measured this: krwSleeveNav 11,119,948.16 against 17,430,791.23, status ok, no diagnostic. `marketValueBasis` in the answer says which reading was taken.',
+    positionCurrency: 'Always the currency the asset **quotes** in — it is what puts the row in the KR or the US sleeve — and never the currency the book keeps score in. A row key ending in `Currency` that is neither of these two is input_shape_invalid rather than ignored, because a unit read as nothing is added at face value.',
   },
   laneCoverage: {
     'activity.<source>': { attempts: NUMBER, succeeded: 'boolean-or-count' },
@@ -189,6 +233,7 @@ export const NESTED_CONTRACTS = {
     sleeveCashByCurrency: 'This book\'s cash stated per currency — { KRW: 11115231, USD: 294.02 }, or the { currency, amount } rows `portfolio.cashByCurrency` carries. ⛔ Never the aggregate `portfolio.cash`: on the book that measured this it read USD 8,596.10 and 96.6% of it was won. A bare amount is input_shape_invalid, and a currency with no row is read as zero of it rather than as unknown.',
     fx: { USDKRW: NUMBER },
     sleeveCurrency: `Not an input. The sleeve is paid in the currency its market quotes — ${Object.entries(MARKET_CURRENCIES).map(([market, currency]) => `${market} → ${currency}`).join(', ')} — derived from \`market\` and never declared, because a run that could name it could name the wrong one. ⛔ It is neither mandate.constraints.baseCurrency nor portfolio.baseCurrency: those two may disagree and both be right, and neither says what a US buy settles in.`,
+    managerId: `The literal id this package publishes — \`${MANAGER_ID}\`, also in inputContracts.vocabulary.managerIds — and **not** the instance id the host addresses this manager by. An \`inst_…\` is manager_id_unknown / blocked, which is the whole answer refused; \`managerId: "string"\` was all the contract said, and \`skills/deterministic-metrics\` named only the retired pre-2026-08-27 package ids as rejected. ⚠️ It defaults to the published id, so the safe call omits it. The market roles are **flows** of this one manager — \`flow\` carries them — not ids of their own.`,
     budget: 'The budget itself stays a plain weight and carries no currency: one FX rate scales a ratio\'s numerator and denominator alike, so a ratio has none. What has a currency is the cash that pays for it — which is why the shortfall is reported in the sleeve currency while `sleeveBudgetWeight` is not.',
   },
   exitDiscipline: {
@@ -567,9 +612,61 @@ function nestedShape(operation, input) {
     if (input.state.closed !== undefined && (!input.state.closed || typeof input.state.closed !== 'object' || Array.isArray(input.state.closed))) reject('input.state.closed', 'Expected an object')
   }
   if (operation === 'reconcileArmedReviews' && input.previous && !Array.isArray(input.previous.armed)) reject('input.previous.armed', 'Expected the complete stored record with an armed array')
+  /**
+   * ── The threshold is `level` and the reading is `value` (#177) ───────────
+   *
+   * A rule written `{ kind: 'price_below', threshold: 100 }` against evidence
+   * written `{ observed: 80, observedAt: … }` joins, finds its row, and comes
+   * back `unevaluated` — *"Rule and evidence are not comparable"* — because
+   * `finite(rule.level)` and `finite(observation.value)` are both false. A
+   * price 20% through a registered invalidation is reported as a rule nobody
+   * could judge, and the sentinel verdict is `watch` rather than `threatened`.
+   *
+   * ⛔ **Refused rather than aliased**, the direction #173 took next door: the
+   * two spellings both alive would leave nothing to say which one a run meant,
+   * and this operation's whole output is a verdict about whether a thesis is
+   * still standing.
+   */
   if (operation === 'thesisSentinel' && Array.isArray(input.invalidations)) input.invalidations.forEach((row, i) => {
     if (!INPUT_VOCABULARY.sentinelKinds.includes(row?.kind)) reject(`input.invalidations[${i}].kind`, `Expected ${INPUT_VOCABULARY.sentinelKinds.join(', ')}`)
     if (row?.kind === 'metric' && !INPUT_VOCABULARY.sentinelOperators.includes(row.operator)) reject(`input.invalidations[${i}].operator`, 'Expected above or below')
+    if (row?.threshold !== undefined) reject(`input.invalidations[${i}].threshold`, 'Use level: the number a price_below, price_above or metric rule is compared against. A time rule\'s instant is `at`. ⛔ threshold is read by nothing, and a rule written under it joins its evidence and answers unevaluated — a breach reported as a rule nobody could judge')
+  })
+  if (operation === 'thesisSentinel' && Array.isArray(input.evidence)) input.evidence.forEach((row, i) => {
+    if (row?.observed !== undefined) reject(`input.evidence[${i}].observed`, 'Use value: the observation this rule is judged against. ⛔ observed is read by nothing and the rule comes back unevaluated rather than met')
+    if (row?.observedAt !== undefined) reject(`input.evidence[${i}].observedAt`, 'Use availableAt: when this observation became available, which is what a time rule\'s `at` is compared with. ⛔ observedAt is read by nothing')
+  })
+  /**
+   * ── The macro vocabulary, and the field it is keyed by (#177) ────────────
+   *
+   * `metric` is the consensus-evidence spelling one operation over, and a macro
+   * row written under it is unusable: `officialCount` 0 and
+   * `macroLaneAvailable: false`, which is this operation's way of saying *the
+   * policy lane is blocked* — a verdict about the world, produced by a call it
+   * could not read. The vocabulary is published as
+   * `inputContracts.vocabulary.macroIndicators`; the spelling is refused here.
+   */
+  if (operation === 'validateMacro' && Array.isArray(input.observations)) input.observations.forEach((row, i) => {
+    if (row?.metric !== undefined && row?.indicator === undefined) {
+      reject(`input.observations[${i}].metric`, `Use indicator, whose values are kebab-case and closed: ${MACRO_INDICATORS.join(', ')}. ⛔ metric is the consensus-evidence field and is read by nothing here; written under it every row is unusable and macroLaneAvailable comes back false, which reads as an empty macro lane rather than an unreadable call`, { supported: [...MACRO_INDICATORS] })
+    }
+  })
+  /**
+   * ── A unit read as nothing is added at face value (#177) ─────────────────
+   *
+   * `valueCurrency` — the unit `portfolio_read` marks a position in — sat in a
+   * row of a `named` operation, where an unknown key at the top is reported and
+   * one inside a row is not seen at all. Dollars went into the won bucket:
+   * `krwSleeveNav` 11,119,948.16 against 17,430,791.23, `status: ok`. The key
+   * is read now, and any **other** currency-named key on the row is refused
+   * rather than dropped, because dropping one is what this cost.
+   */
+  if (operation === 'sleeveNav' && Array.isArray(input.positions)) input.positions.forEach((row, i) => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return
+    for (const key of Object.keys(row)) {
+      if (key === 'currency' || key === 'valueCurrency' || !/[Cc]urrency$/.test(key)) continue
+      reject(`input.positions[${i}].${key}`, 'A position row states two currencies and no others: `currency`, the currency the asset quotes in and the sleeve it belongs to, and `valueCurrency`, the unit `marketValue` is counted in. ⛔ Any other currency key is not read, and an unread unit is a number added at face value', { key })
+    }
   })
   /**
    * ── The three label axes are one rule, and only one of them was written (#173) ──

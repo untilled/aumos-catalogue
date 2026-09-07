@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated/lib/index.mjs'
 import { handleMcpRequest } from '../managers/evidence-gated/lib/mcp-server.mjs'
 import { METHODOLOGY } from '../managers/evidence-gated/lib/constants.mjs'
+import { MACRO_INDICATORS } from '../managers/evidence-gated/lib/evidence.mjs'
+import { MANAGER_ID } from '../managers/evidence-gated/lib/diagnostics.mjs'
 
 const configSchema = JSON.parse(await readFile(new URL('../managers/evidence-gated/config.schema.json', import.meta.url), 'utf8'))
 
@@ -1659,3 +1661,137 @@ assert.ok(/never declared/.test(budgetContract.nested.specialistBudget.sleeveCur
 assert.ok(/carries no currency/.test(budgetContract.nested.specialistBudget.budget), 'and the budget itself stays a ratio — aumos#689')
 
 console.log('evidence-gated issue #174 sleeve-budget procurement regression tests passed')
+
+/**
+ * ── Issue #177: four more shapes that came back looking like answers ────────
+ *
+ * The pattern this file is named after, measured four more times on
+ * `run_73a3e6c41c204f468ee8be8d2923d898`. Each of the four was answered — a
+ * NAV, a macro verdict, a refusal, a sentinel verdict — and each answer was
+ * about a call the operation had not read.
+ */
+const shapeAsOf = '2026-09-07T01:10:07.572Z'
+const shape = (operation, input) => execute({ operation, asOf: shapeAsOf, input })
+const contract = shape('inputContracts', {}).data
+
+/* ── ⑫ a position's value carries its own currency ────────────────────────── */
+
+/**
+ * The book as `portfolio_read` hands it over: a USD-based book holding two KRW
+ * listings, every `marketValue` marked in the book's base currency with
+ * `valueCurrency` beside it. Before this, `valueCurrency` sat in a row of a
+ * `named` operation — where an unknown key at the top is reported and one
+ * inside a row is not seen at all — and the dollars were added to the won
+ * bucket at face value.
+ */
+const USDKRW = 1338.848
+const navCash = [{ currency: 'KRW', amount: 11_115_231 }, { currency: 'USD', amount: 294.02 }]
+const markedInUsd = [
+  { symbol: '069500', currency: 'KRW', marketValue: 653.73, valueCurrency: 'USD' },
+  { symbol: '153130', currency: 'KRW', marketValue: 4063.43, valueCurrency: 'USD' },
+  { symbol: 'SGOV', currency: 'USD', marketValue: 785.93, valueCurrency: 'USD' },
+]
+const marked = shape('sleeveNav', { cash: navCash, positions: markedInUsd, fx: { USDKRW } })
+assert.equal(marked.status, 'ok')
+assert.equal(marked.data.krwSleeveNav, 17_430_791.23, 'the KRW sleeve is the won the dollars convert to, not the dollars themselves')
+assert.notEqual(marked.data.krwSleeveNav, 11_119_948.16, '⚠️ this is the number the measured run got back with status ok and no diagnostic')
+assert.equal(marked.data.marketValueBasis, 'stated', 'every counted row said what unit it was in')
+assert.equal(marked.data.fxUsed, USDKRW)
+assert.equal(marked.data.fxBasis, 'input.fx.USDKRW', 'the rate is the invocation\'s and the answer says where it came from')
+
+/** ⚠️ Converted by hand and passed in won: the same NAV, which is the cross-check. */
+const converted = shape('sleeveNav', {
+  cash: navCash,
+  positions: markedInUsd.map((row) => ({ symbol: row.symbol, currency: row.currency, marketValue: row.currency === 'KRW' ? row.marketValue * USDKRW : row.marketValue })),
+  fx: { USDKRW },
+})
+assert.equal(converted.data.krwSleeveNav, marked.data.krwSleeveNav, 'stating the unit and converting by hand are the same book')
+assert.equal(converted.data.marketValueBasis, 'assumed-position-currency', 'and the answer says which reading it took')
+assert.equal(converted.data.usdSleeveNav, marked.data.usdSleeveNav)
+
+/** ⛔ A value that cannot be put in its sleeve's currency is dropped and named, never added at face value. */
+const rateless = shape('sleeveNav', { cash: navCash, positions: markedInUsd })
+assert.equal(rateless.data.krwSleeveNav, 11_115_231, 'the two dollar-marked KRW rows are left out rather than counted as won')
+assert.equal(rateless.data.valuedPositionCount, 1)
+assert.equal(rateless.data.fxBasis, null)
+assert.ok(rateless.diagnostics.some((row) => row.code === 'position_value_unevaluated' && row.path === 'fx.USDKRW'))
+const unreadableUnit = shape('sleeveNav', { positions: [{ symbol: '069500', currency: 'KRW', marketValue: 653.73, valueCurrency: 'JPY' }], fx: { USDKRW } })
+assert.equal(unreadableUnit.data.krwSleeveNav, 0)
+assert.ok(unreadableUnit.diagnostics.some((row) => row.code === 'position_value_unevaluated' && row.path === 'positions[0].valueCurrency'))
+
+/** ⛔ Any other currency-named key on the row is refused: an unread unit is a number added at face value. */
+const strayUnit = shape('sleeveNav', { positions: [{ symbol: '069500', currency: 'KRW', marketValue: 653.73, baseCurrency: 'USD' }], fx: { USDKRW } })
+assert.equal(strayUnit.status, 'blocked')
+assert.ok(strayUnit.diagnostics.some((row) => row.code === 'input_shape_invalid' && row.path === 'input.positions[0].baseCurrency'))
+assert.equal(strayUnit.data, null)
+
+/** And the shape is published, so the next caller does not have to guess it. */
+assert.equal(contract.nested.sleeveNav['positions[]'].valueCurrency, 'string')
+assert.ok(/1,338\.848/.test(contract.nested.sleeveNav.valueCurrency), 'the contract names what the assumption cost')
+
+/* ── ⑬ the macro vocabulary, and the field it is keyed by ─────────────────── */
+
+const macroRow = { value: 3, observedAt: '2026-09-01T00:00:00.000Z', sourceUrl: 'https://www.bok.or.kr/', sourceTier: 'official' }
+const misspelled = shape('validateMacro', { observations: [{ ...macroRow, metric: 'policyRate' }], webAvailable: true })
+assert.equal(misspelled.status, 'blocked', '⚠️ `officialCount: 0` / `macroLaneAvailable: false` is a verdict about the world; this call could not be read')
+assert.ok(misspelled.diagnostics.some((row) => row.code === 'input_shape_invalid' && row.path === 'input.observations[0].metric'))
+assert.equal(misspelled.data, null)
+const spelled = shape('validateMacro', { observations: [{ ...macroRow, indicator: 'policy-rate' }], webAvailable: true })
+assert.equal(spelled.status, 'ok')
+assert.equal(spelled.data.officialCount, 1)
+assert.equal(spelled.data.macroLaneAvailable, true)
+
+/** An indicator outside the closed list is still `unevaluated` — and now says what the list is. */
+const unknownIndicator = shape('validateMacro', { observations: [{ ...macroRow, indicator: 'policyRate' }], webAvailable: true })
+assert.equal(unknownIndicator.status, 'unevaluated')
+const refusal = unknownIndicator.diagnostics.find((row) => row.code === 'macro_indicator_unknown')
+assert.deepEqual(refusal.details.supported, MACRO_INDICATORS, 'the vocabulary travels with the refusal')
+
+/** ⚠️ The list is published, projected from the module that owns it rather than copied. */
+assert.deepEqual(contract.vocabulary.macroIndicators, [...MACRO_INDICATORS])
+assert.ok(contract.vocabulary.macroIndicators.includes('policy-rate'))
+assert.equal(contract.nested.validateMacro['observations[]'].indicator, 'string')
+
+/* ── ⑭ the manager id is a literal, not an instance id ────────────────────── */
+
+const withInstanceId = shape('specialistBudget', {
+  managerId: 'inst_6efcc6a0486a42478702a1c247e6d921',
+  flow: 'us-sleeve', market: 'XNAS', currentSleeveWeight: 0.15, sleeveBudgetWeight: 0.2, requestedTargetWeight: 0.18,
+})
+assert.equal(withInstanceId.status, 'blocked')
+const idRefusal = withInstanceId.diagnostics.find((row) => row.code === 'manager_id_unknown')
+assert.deepEqual(idRefusal.details.supported, [MANAGER_ID], 'the accepted value travels with the refusal')
+assert.ok(/not the instance id/.test(idRefusal.message))
+assert.deepEqual(contract.vocabulary.managerIds, [MANAGER_ID], '⚠️ published, because `managerId: "string"` was the whole contract')
+assert.ok(/instance id/.test(contract.nested.specialistBudget.managerId))
+/** ⚠️ Omitting it is the safe call, and stays so. */
+assert.equal(shape('specialistBudget', { flow: 'us-sleeve', market: 'XNAS', currentSleeveWeight: 0.15, sleeveBudgetWeight: 0.2, requestedTargetWeight: 0.18 }).data.managerId, MANAGER_ID)
+
+/* ── ⑮ the threshold is `level` and the reading is `value` ────────────────── */
+
+/**
+ * A price 20% through a registered invalidation. Written under the near-miss
+ * spellings the rule joined its evidence and came back `unevaluated` — *"Rule
+ * and evidence are not comparable"* — and the sentinel verdict was `watch`.
+ */
+const nearMiss = shape('thesisSentinel', {
+  invalidations: [{ id: 'inv-1', kind: 'price_below', threshold: 100, evidenceId: 'ev-1' }],
+  evidence: [{ id: 'ev-1', observed: 80, observedAt: '2026-09-06T00:00:00.000Z' }],
+})
+assert.equal(nearMiss.status, 'blocked')
+assert.equal(nearMiss.data, null, '⛔ never `watch` over a breach nobody could read')
+assert.deepEqual(
+  nearMiss.diagnostics.filter((row) => row.code === 'input_shape_invalid').map((row) => row.path),
+  ['input.invalidations[0].threshold', 'input.evidence[0].observed', 'input.evidence[0].observedAt'],
+  'each near-miss named where it sits',
+)
+const readable = shape('thesisSentinel', {
+  invalidations: [{ id: 'inv-1', kind: 'price_below', level: 100, evidenceId: 'ev-1' }],
+  evidence: [{ id: 'ev-1', value: 80, availableAt: '2026-09-06T00:00:00.000Z' }],
+})
+assert.equal(readable.status, 'ok')
+assert.equal(readable.data.verdict, 'threatened', 'the same breach, spelled in the fields this operation reads')
+assert.ok(/`level`/.test(contract.nested.thesisSentinel.fieldNames))
+assert.ok(/availableAt/.test(contract.nested.thesisSentinel.fieldNames))
+
+console.log('evidence-gated issue #177 input-shape regression tests passed')

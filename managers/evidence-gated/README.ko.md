@@ -385,6 +385,28 @@ USD) 호출자가 선언하지 않으며, 현금은 `portfolio.cashByCurrency`�
 `budgetFundableInSleeveCurrency`가 `withinBriefBudget` 옆에서 `null`이다. 전에는 `status: ok`와 빈
 진단 배열이었다.
 
+**답처럼 보이는 오답 넷이 더 있었다.** (#177) 이 패키지가 가장 자주 기록하는 패턴 — *틀린 입력이
+거절되지 않고 통과처럼 돌아온다* — 을 한 런에서 넷 더 쟀고, 가장 비싼 것은 **1,338.848배** 틀린
+NAV였다. `sleeveNav`는 포지션 행의 `currency`를 두 사실로 동시에 읽고 있었다: 이 이름이 어느 슬리브의
+것인가, 그리고 `marketValue`가 어느 단위로 세어졌는가. 호스트의 `portfolio_read`는 **모든** 보유를 북의
+기준통화로 마크하므로 USD 북의 KRW 종목은 옆에 `valueCurrency: "USD"`를 달고 **달러 숫자**로 도착한다 —
+이 연산이 읽지 않던 키이고, `named` 모드의 미지 키 보고가 **행 안**은 보지 못하는 자리다. USD 4,717.16이
+액면 그대로 원화 버킷에 들어갔다: `krwSleeveNav`가 참값 17,430,791.23에 대해 **11,119,948.16**,
+`status: ok`, 진단 0건. 이제 철자를 추측하는 대신 두 사실을 **가른다** — `currency`는 자산이 호가되는
+통화 그대로이고, `valueCurrency`가 마크의 단위를 말하며, 이 패키지가 **건네받은** 환율로 환산된다
+(aumos#689, #174가 바로 옆에서 정한 같은 규칙). `marketValueBasis`가 어느 읽기였는지를,
+`fxUsed`/`fxBasis`가 환율의 출처를 말한다. ⛔ 자기 슬리브의 통화로 옮길 수 없는 행은 액면으로 더해지지
+않고 **빠지며 이름이 불린다**. 나머지 셋은 한 모양이다 — 연산이 읽지 않는 필드에 판정으로 답한 것.
+`validateMacro`의 행은 `metric`이 아니라 **`indicator`**로 키가 잡히고, 그 kebab-case 열 개는
+`inputContracts.vocabulary`가 게시하지 않던 유일한 닫힌 어휘였다. `metric`으로 쓰면 모든 행이 unusable이
+되고 `macroLaneAvailable`이 `false`로 돌아오는데, 그것은 *정책 레인이 비었다*로 읽힌다.
+`thesisSentinel`은 `level`과 비교하고 `value`/`availableAt`을 읽는다 — `threshold`와
+`observed`/`observedAt`으로 쓰면, 등록된 무효화 조건을 20% 뚫은 가격이 자기 증거와 조인되고도
+*"Rule and evidence are not comparable"*로 돌아와 판정이 `threatened`가 아니라 `watch`가 됐다. 그리고
+`specialistBudget`의 `managerId`는 리터럴 `evidence-gated`다 — 호스트의 다른 모든 면이 이 매니저를
+부르는 그 id, 자기 `inst_…`를 넘긴 런은 `managerId: "string"`만 말하는 계약 앞에서 호출 전체를
+거절당했다. 넷 다 이제 버려지지 않고 `input_shape_invalid`이며, 넷의 형태가 모두 게시된다.
+
 **선언된 권한 둘은 현재 아무것도 서빙하지 않는다.** `thesis:read`와 `evidence:read`는 매니페스트
 어휘에 있고, 현재 Aumos 빌드는 각각을 빈 도구 목록으로 매핑하므로 실행에 그 도구가 생기지 않는다.
 프롬프트가 *가능할 때* 읽는다고 적고 매니페스트가 둘을 `optionalSkills`에 두는 이유가 정확히
