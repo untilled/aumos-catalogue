@@ -265,9 +265,16 @@ fixture asserts the difference so it cannot be undone silently.
   `v0.3.32`, so a host older than that still keeps the row.
   What the record still answers, and neither fold does, is the same flow promised at a **different**
   instant — identity is not resemblance, so that stays two rows — which is #87's harm exactly, and
-  which a floor over live rows cannot distinguish from a promise never made.
+  which a floor over live rows cannot distinguish from a promise never made. ⚠️ **Being the only
+  duplicate left, it stopped being reportable anonymously**: `review_superseded` now carries the
+  orphan's `planId`, matched out of `standingPlans` on this package's own `market-review:<flow>:<at>`
+  marker plus the instant, and where no row can be named it says which silence it is —
+  `superseded_address_unreadable` (the call had no `standingPlans`) or `superseded_address_unnamed`
+  (it had it and matched nothing). ⛔ Neither is evidence the orphan is gone, and neither narrows
+  what is armed.
   ([#156](https://github.com/untilled/aumos-catalogue/issues/156),
-  [#175](https://github.com/untilled/aumos-catalogue/issues/175))
+  [#175](https://github.com/untilled/aumos-catalogue/issues/175),
+  [#202](https://github.com/untilled/aumos-catalogue/issues/202))
   A staged single-name entry rides the same bridge for the same reason: `entryTranchePlan` returns
   the `intent` each unfilled rung is armed with, and `resolveTrancheWake` reads that marker back out
   of the fired plan's event summary, because there is nothing else to read.

@@ -232,8 +232,15 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   기록이 여전히 답하고 어느 접기도 답하지 않는 것은 같은 플로우를 **다른** instant로
   약속했는가이고 — 동일성이지 닮음이 아니라서 그것은 두 행으로 남는다 — 그것이 정확히 #87의
   해악이며, 살아 있는 행 위의 바닥은 그것을 «애초에 안 한 약속»과 구별하지 못한다.
+  ⚠️ **남는 유일한 중복이 되면서 익명으로 보고할 수 없게 됐다**: `review_superseded`가 이제 orphan의
+  `planId`를 싣고, 그것은 이 패키지가 스스로 쓴 `market-review:<flow>:<at>` 마커와 instant로
+  `standingPlans`에서 찾은 것이다. 이름을 못 대면 어느 침묵인지를 말한다 —
+  `superseded_address_unreadable`(이 호출이 `standingPlans`를 못 받았다) ·
+  `superseded_address_unnamed`(받았는데 아무 행도 안 맞았다). ⛔ 어느 쪽도 orphan이 사라졌다는
+  증거가 아니고, 어느 쪽도 무장할 것을 좁히지 않는다.
   ([#156](https://github.com/untilled/aumos-catalogue/issues/156),
-  [#175](https://github.com/untilled/aumos-catalogue/issues/175))
+  [#175](https://github.com/untilled/aumos-catalogue/issues/175),
+  [#202](https://github.com/untilled/aumos-catalogue/issues/202))
   단일종목 분할 진입도 같은 이유로 같은 다리를 탄다: `entryTranchePlan`이 채워지지 않은 각 트랜치를
   무장할 `intent`를 돌려주고, `resolveTrancheWake`가 발화한 plan의 이벤트 summary에서 그 마커를
   다시 읽는다 — 읽을 것이 그것밖에 없기 때문이다.
