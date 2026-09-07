@@ -1,4 +1,4 @@
-import { diagnostic } from './diagnostics.mjs'
+import { diagnostic, readCashByCurrency, MARKET_CURRENCIES } from './diagnostics.mjs'
 
 export const PAPER_SETUP_COHORTS = {
   thesis_call: 'llm-research', thesis_watch: 'llm-research', thesis_rejected: 'llm-research',
@@ -181,6 +181,16 @@ export const NESTED_CONTRACTS = {
     experimentalPositionFloor: 'An object keyed by venue currency — { KRW: 300000, USD: 200 } — never a bare amount; the currency of the position being sized selects the row.',
     fx: { USDKRW: NUMBER },
   },
+  /**
+   * ⚠️ The budget was published as three weights and answered `withinBriefBudget`
+   * over a book whose dollars did not exist (#174).
+   */
+  specialistBudget: {
+    sleeveCashByCurrency: 'This book\'s cash stated per currency — { KRW: 11115231, USD: 294.02 }, or the { currency, amount } rows `portfolio.cashByCurrency` carries. ⛔ Never the aggregate `portfolio.cash`: on the book that measured this it read USD 8,596.10 and 96.6% of it was won. A bare amount is input_shape_invalid, and a currency with no row is read as zero of it rather than as unknown.',
+    fx: { USDKRW: NUMBER },
+    sleeveCurrency: `Not an input. The sleeve is paid in the currency its market quotes — ${Object.entries(MARKET_CURRENCIES).map(([market, currency]) => `${market} → ${currency}`).join(', ')} — derived from \`market\` and never declared, because a run that could name it could name the wrong one. ⛔ It is neither mandate.constraints.baseCurrency nor portfolio.baseCurrency: those two may disagree and both be right, and neither says what a US buy settles in.`,
+    budget: 'The budget itself stays a plain weight and carries no currency: one FX rate scales a ratio\'s numerator and denominator alike, so a ratio has none. What has a currency is the cash that pays for it — which is why the shortfall is reported in the sleeve currency while `sleeveBudgetWeight` is not.',
+  },
   exitDiscipline: {
     registration: { stopPct: NUMBER, stopPrice: NUMBER, reviewBy: STRING },
   },
@@ -275,7 +285,20 @@ export const INPUT_CONTRACTS = {
   mandateExecution: { mode: 'strict', keys: { mandateObjective: STRING, positions: ARRAY, proposed: ARRAY, cashWeight: NUMBER, reportedDiagnostics: ARRAY } },
   newSinglePacing: { mode: 'named', keys: { proposedNewSingles: ARRAY, priorNewSingles: ARRAY, sizingPolicyUpdatedAt: STRING, closedOutcomeCount: NUMBER, reviewReadyClosedOutcomes: NUMBER } },
   entryTranchePlan: { mode: 'named', keys: { symbol: STRING, lens: STRING, maturity: STRING, price: NUMBER, plannedTotalWeight: NUMBER, tranches: ARRAY, execution: OBJECT } },
-  specialistBudget: { mode: 'strict', keys: { managerId: STRING, flow: STRING, market: STRING, currentSleeveWeight: NUMBER, sleeveBudgetWeight: NUMBER, requestedTargetWeight: NUMBER, emergencyExit: BOOLEAN } },
+  /**
+   * ⚠️ The four keys after `emergencyExit` are the procurement side (#174). A
+   * budget is a ratio and has no currency; paying for it is an amount and has
+   * one, and without these the answer is a claim about a budget nobody has
+   * shown can be bought.
+   */
+  specialistBudget: {
+    mode: 'strict',
+    keys: {
+      managerId: STRING, flow: STRING, market: STRING,
+      currentSleeveWeight: NUMBER, sleeveBudgetWeight: NUMBER, requestedTargetWeight: NUMBER, emergencyExit: BOOLEAN,
+      sleeveCashByCurrency: ANY, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
+    },
+  },
   globalAllocation: { mode: 'strict', keys: { targets: ARRAY, availableWeight: NUMBER, currentWeights: OBJECT } },
 
   // ── Coverage, discovery and watches ────────────────────────────────────
@@ -586,6 +609,14 @@ function nestedShape(operation, input) {
         if (!isArrayAxis && typeof row[read] !== 'string') reject(`input.${key}[${i}].${read}`, 'Expected a single sector name string')
       }
     })
+  }
+  /**
+   * ⛔ The aggregate is the shape that hid #174, so the bare amount is refused
+   * by name rather than read as the sleeve's own currency.
+   */
+  if (operation === 'specialistBudget') {
+    const { rejection } = readCashByCurrency(input.sleeveCashByCurrency)
+    if (rejection) reject('input.sleeveCashByCurrency', rejection)
   }
   if (operation === 'exitCheck' && input.price !== undefined && input.price !== null && (typeof input.price !== 'number' || !Number.isFinite(input.price))) reject('input.price', 'Expected a finite scalar price; pass the observation value, not its envelope')
 

@@ -1,4 +1,4 @@
-import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW } from './diagnostics.mjs'
+import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW, MARKET_CURRENCIES, readCashByCurrency, convertCurrency } from './diagnostics.mjs'
 import { causeCodesInLane, REGISTERED_CAUSE_CODES } from './diagnostic-codes.mjs'
 import { METHODOLOGY } from './constants.mjs'
 import { normalizeTriggerKind, variantViewCheck } from './methodology.mjs'
@@ -1605,7 +1605,61 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
   }
 }
 
-export function specialistBudget({ managerId = MANAGER_ID, flow, market, currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight, emergencyExit = false }) {
+/**
+ * ── A budget is a ratio; paying for it is an amount, and amounts have a
+ *    currency (issue #174) ────────────────────────────────────────────────────
+ *
+ * `specialistBudget` compared two portfolio weights and said `withinBriefBudget`,
+ * and on a two-currency book that sentence is not the one the sleeve needed. The
+ * measured call — `us-sleeve`, `XNYS`, current 0.11370454, Brief budget
+ * 0.26488897 — came back `allowed: true`, `withinBriefBudget: true`, **no
+ * diagnostic**, over a budget of roughly USD 3,979 on a book holding
+ * **USD 2,002.01** in the sleeve and **USD 294.02** in idle dollars. The
+ * difference does not exist: it is reachable only by selling a KRW asset or by
+ * converting won, and both of those are `allocate`'s judgement and the
+ * investor's approval, not something a sleeve flow may assume it already has.
+ *
+ * The aggregate is what hid it. `portfolio_read`'s `cash` read USD 8,596.10 and
+ * **96.6% of it was KRW** (11,115,231원 beside USD 294.02); the standing
+ * `allocate` plan on that book was asking about *"idle **USD** 8,514.73"*, and
+ * the escalation's own sentence was therefore false. Expressing a budget purely
+ * as a ratio is what let a currency-blind number describe it.
+ *
+ * ── Why the currency goes on the cash and not on the budget ────────────────
+ *
+ * The host settled the neighbouring question first (aumos#689): a book carries
+ * two base currencies — the one the investor thinks in and the one this mark was
+ * converted into — they may disagree and both be right, and **a limit expressed
+ * as a ratio has no currency at all**, because one FX rate scales its numerator
+ * and its denominator by the same factor. That is exactly true of
+ * `sleeveBudgetWeight`, and it is why `{ value, currency }` on the budget is the
+ * alternative #689 declined and this operation declines too.
+ *
+ * What #689 also says is that **a level belongs to the currency the asset is
+ * quoted in** — and procurement is a level. The sleeve's orders settle on one
+ * venue in one currency, so the funding question has a currency even though the
+ * budget does not, and that currency is `MARKET_CURRENCIES[market]`: derived,
+ * never declared, because a run that could name it could name the wrong one.
+ *
+ * ── What it does, and what it deliberately does not ────────────────────────
+ *
+ * ⚠️ **Unfundable is a warning and never a block.** Converting currency is a
+ * legitimate move and so is selling the other sleeve; what is not legitimate is
+ * a run being told it is inside a budget nobody has shown can be paid. So this
+ * says so, names the shortfall in the sleeve's own currency, and leaves the
+ * decision where it belongs.
+ *
+ * ⛔ **And silence is not a pass.** A call that does not carry the cash, the NAV
+ * and the FX comes back `sleeve_budget_fundability_unevaluated` / `unevaluated`
+ * naming the key it is waiting for, with `budgetFundableInSleeveCurrency: null`
+ * beside `withinBriefBudget`. Before #174 that same call was `status: ok` with
+ * an empty diagnostics array — the shape of this package's dominant failure,
+ * a confident answer to a smaller question than the caller asked.
+ *
+ * ⛔ An emergency exit is not funded, it produces cash: the whole section is
+ * skipped rather than answered with a warning nobody can act on.
+ */
+export function specialistBudget({ managerId = MANAGER_ID, flow, market, currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight, emergencyExit = false, sleeveCashByCurrency, portfolioNav, portfolioNavCurrency, fx }) {
   const diagnostics = []
   if (managerId !== MANAGER_ID) diagnostics.push(diagnostic('manager_id_unknown', 'blocked', 'This package publishes one manager id', 'managerId', { managerId, expected: MANAGER_ID }))
   if (!SLEEVE_FLOW_MARKETS[flow]) diagnostics.push(diagnostic('flow_unknown', 'blocked', 'A sleeve flow is required; the allocator flow does not take a sleeve budget', 'flow', { flow, supported: Object.keys(SLEEVE_FLOW_MARKETS) }))
@@ -1626,7 +1680,131 @@ export function specialistBudget({ managerId = MANAGER_ID, flow, market, current
   const increase = finite(requestedTargetWeight) && finite(currentSleeveWeight) ? requestedTargetWeight - currentSleeveWeight : null
   if (!emergencyExit && finite(requestedTargetWeight) && finite(sleeveBudgetWeight) && requestedTargetWeight > sleeveBudgetWeight) diagnostics.push(diagnostic('specialist_sleeve_budget_exceeded', 'blocked', 'Specialist must ask Global for cross-market budget', 'requestedTargetWeight', { sleeveBudgetWeight }))
   if (emergencyExit && finite(increase) && increase > 0) diagnostics.push(diagnostic('emergency_exit_cannot_increase', 'blocked', 'Emergency invalidation bypass only permits SELL/RESIZE down', 'requestedTargetWeight'))
-  return { data: { managerId, flow: flow ?? null, market, allowed: !diagnostics.some((row) => row.severity === 'blocked'), increaseWeight: round(increase), withinBriefBudget: finite(requestedTargetWeight) && finite(sleeveBudgetWeight) ? requestedTargetWeight <= sleeveBudgetWeight : null, emergencyExit }, diagnostics }
+
+  const funding = sleeveFunding({ market, sleeveCashByCurrency, portfolioNav, portfolioNavCurrency, fx })
+  const judged = !emergencyExit && finite(sleeveBudgetWeight)
+  if (judged && funding.missing.length) {
+    diagnostics.push(diagnostic(
+      'sleeve_budget_fundability_unevaluated',
+      'unevaluated',
+      'A sleeve budget is a ratio and paying for it is an amount: pass the sleeve currency\'s cash as `sleeveCashByCurrency` (portfolio.cashByCurrency), this book\'s `portfolioNav` + `portfolioNavCurrency`, and `fx.USDKRW` from portfolio.fxRates. Without them `withinBriefBudget` is a claim about a budget nobody has shown can be procured',
+      funding.missing[0],
+      { missing: funding.missing, sleeveCurrency: funding.sleeveCurrency },
+    ))
+  }
+  const unfundable = (subject, path, needWeight, needAmount) => diagnostics.push(diagnostic(
+    'sleeve_budget_not_fundable_in_currency',
+    'unevaluated',
+    `The sleeve is paid in ${funding.sleeveCurrency} and this book does not hold that much of it; the difference exists only after an FX conversion or a sale in the other currency, and both are the allocate flow's judgement and the investor's approval`,
+    path,
+    {
+      subject,
+      sleeveCurrency: funding.sleeveCurrency,
+      fundableAmount: round(funding.fundableAmount, 2),
+      fundableWeight: round(funding.fundableWeight),
+      requiredAmount: round(needAmount, 2),
+      shortfallAmount: round(needAmount - funding.fundableAmount, 2),
+      shortfallWeight: round(needWeight - funding.fundableWeight),
+      fxUsed: funding.fxUsed,
+      fxBasis: funding.fxBasis,
+    },
+  ))
+  /**
+   * ⚠️ Two subjects, because they fail on different days. The **budget** is
+   * unfundable the moment Global writes it — that is the measured call, where
+   * the request was `0` and nothing was being bought — and the **request** is
+   * unfundable at the first buy that reaches for the part of it that is not
+   * there. Reporting only the second would have said nothing on the run that
+   * found this; reporting only the first would go quiet on a book whose budget
+   * fits and whose particular order does not.
+   */
+  const fundableBudget = finite(currentSleeveWeight) && finite(funding.fundableWeight) ? currentSleeveWeight + funding.fundableWeight : null
+  if (judged && finite(fundableBudget) && sleeveBudgetWeight > fundableBudget + BUDGET_EPSILON) {
+    unfundable('sleeveBudget', 'sleeveBudgetWeight', sleeveBudgetWeight - currentSleeveWeight, funding.amountOf(sleeveBudgetWeight - currentSleeveWeight))
+  }
+  const requestFundable = !emergencyExit && finite(increase) && finite(funding.fundableWeight)
+    ? increase <= funding.fundableWeight + BUDGET_EPSILON
+    : null
+  if (requestFundable === false) unfundable('requestedTarget', 'requestedTargetWeight', increase, funding.amountOf(increase))
+
+  return {
+    data: {
+      managerId,
+      flow: flow ?? null,
+      market,
+      allowed: !diagnostics.some((row) => row.severity === 'blocked'),
+      increaseWeight: round(increase),
+      withinBriefBudget: finite(requestedTargetWeight) && finite(sleeveBudgetWeight) ? requestedTargetWeight <= sleeveBudgetWeight : null,
+      emergencyExit,
+      /** ⚠️ Derived from the market, never taken from the caller — aumos#689. */
+      sleeveCurrency: funding.sleeveCurrency,
+      sleeveCurrencyBasis: funding.sleeveCurrency ? 'market' : null,
+      /** What this book actually holds in that currency, and the same as a weight. */
+      fundableAmount: round(funding.fundableAmount, 2),
+      fundableWeight: round(funding.fundableWeight),
+      /** The budget that can be reached without converting or selling the other sleeve. */
+      fundableSleeveBudgetWeight: round(fundableBudget),
+      budgetFundableInSleeveCurrency: judged && finite(fundableBudget) ? sleeveBudgetWeight <= fundableBudget + BUDGET_EPSILON : null,
+      requestFundableInSleeveCurrency: requestFundable,
+      /** ⚠️ Where the rate came from; this package never sources one. */
+      fxUsed: funding.fxUsed,
+      fxBasis: funding.fxBasis,
+      units: {
+        increaseWeight: 'portfolio-weight',
+        fundableWeight: 'portfolio-weight',
+        fundableSleeveBudgetWeight: 'portfolio-weight',
+        fundableAmount: 'sleeve-currency-major-units',
+      },
+    },
+    diagnostics,
+  }
+}
+
+const BUDGET_EPSILON = 1e-9
+
+/**
+ * The procurement side of a sleeve budget: what this book holds in the currency
+ * the sleeve's orders settle in, said both as an amount and as a weight.
+ *
+ * ⚠️ **`missing` names the key rather than reporting «cannot judge».** The three
+ * inputs fail independently — a run may carry the cash and not the NAV — and
+ * #158's whole finding is that a caller told only *something is missing* tries
+ * spellings until it gives up.
+ */
+function sleeveFunding({ market, sleeveCashByCurrency, portfolioNav, portfolioNavCurrency, fx }) {
+  const sleeveCurrency = MARKET_CURRENCIES[market] ?? null
+  const { totals } = readCashByCurrency(sleeveCashByCurrency)
+  const navCurrency = typeof portfolioNavCurrency === 'string' && portfolioNavCurrency ? portfolioNavCurrency : null
+  const usdKrw = finite(fx?.USDKRW) && fx.USDKRW > 0 ? fx.USDKRW : null
+  const needsFx = sleeveCurrency !== null && navCurrency !== null && sleeveCurrency !== navCurrency
+  const missing = []
+  if (sleeveCurrency === null) missing.push('market')
+  if (totals === null) missing.push('sleeveCashByCurrency')
+  if (!finite(portfolioNav) || portfolioNav <= 0) missing.push('portfolioNav')
+  if (navCurrency === null) missing.push('portfolioNavCurrency')
+  if (needsFx && usdKrw === null) missing.push('fx.USDKRW')
+  const fxBasis = missing.length ? null : needsFx ? 'input.fx.USDKRW' : 'not-required'
+  if (missing.length) {
+    return { sleeveCurrency, missing, fundableAmount: null, fundableWeight: null, fxUsed: null, fxBasis, amountOf: () => null }
+  }
+  /**
+   * ⚠️ A currency this book holds nothing in is `0`, not «unknown». The cash
+   * reading is complete by construction — it is the whole `cashByCurrency` — so
+   * an absent row is the book saying there are no dollars, which is the finding
+   * rather than a gap in it.
+   */
+  const fundableAmount = totals[sleeveCurrency] ?? 0
+  const inNav = convertCurrency(fundableAmount, sleeveCurrency, navCurrency, usdKrw)
+  return {
+    sleeveCurrency,
+    missing,
+    fundableAmount,
+    fundableWeight: finite(inNav) ? inNav / portfolioNav : null,
+    fxUsed: needsFx ? usdKrw : null,
+    fxBasis,
+    /** A portfolio weight priced in the sleeve's own currency. */
+    amountOf: (weight) => (finite(weight) ? convertCurrency(weight * portfolioNav, navCurrency, sleeveCurrency, usdKrw) : null),
+  }
 }
 
 export function globalAllocation({ targets = [], availableWeight = 1, currentWeights = {} }) {

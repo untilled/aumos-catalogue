@@ -367,6 +367,24 @@ forbidden"*이라고 적어 놓고, 발표 주체가 있든 없든 모든 event�
 부재로 북을 거절하는 것은 분류를 지어내는 일이다. 행 형태는 `inputContracts.nested.concentration`에
 게시된다 — 전에는 `caps`만 말했다.
 
+**그리고 지불할 수 없는 예산은 「예산 내」가 아니다.** `specialistBudget`은 포트폴리오 비중 둘을
+비교해 `withinBriefBudget`을 답했고, 통화가 둘인 북에서 그것은 슬리브가 물은 질문이 아니다. 실측한
+호출 — `us-sleeve`·`XNYS`·현재 0.11370454·브리프 예산 0.26488897 — 은 `allowed: true`,
+`withinBriefBudget: true`, **진단 0건**으로 돌아왔는데, 그 예산 ≈ USD 3,979에 대해 이 북이 든 유휴
+달러는 **USD 294.02**였다. 차액은 원화를 환전하거나 KR 자산을 팔아야만 존재한다. 가린 것은
+**집계값**이다: `portfolio_read`의 `cash`가 USD 8,596.10이었고 그중 **96.6%가 원화**였으며, 서 있던
+`allocate` 플랜은 존재하지 않는 *"유휴 USD 8,514.73"*에 대해 투자자에게 묻고 있었다. 통화는
+**예산이 아니라 현금**에 붙였다: 비율로 표현된 한도에는 통화가 없다 — 하나의 FX가 분자와 분모를 같은
+배율로 스케일하기 때문이고, 호스트가 바로 옆 질문에서 그것을 이미 정했다(aumos#689). 통화를 갖는 것은
+**레벨**이고 조달은 레벨이다. 그래서 조달 통화는 **시장에서 유도되고**(`XKRX` → KRW, `XNAS`·`XNYS` →
+USD) 호출자가 선언하지 않으며, 현금은 `portfolio.cashByCurrency`에서 통화별로 읽고, 환율은
+`portfolio.fxRates`이며 답이 **그 출처를 이름 댄다** — 이 패키지는 환율을 스스로 소싱하지 않는다.
+⚠️ 조달 불가는 **경고**다: 환전도 다른 슬리브 매도도 합법적 선택지이고, 둘 다 `allocate`의 판정이자
+투자자의 승인 사항이다. ⛔ 허용되지 않는 것은 **침묵**이다 — 조달 입력이 없는 호출은 이제 기다리는
+키를 이름 대는 `sleeve_budget_fundability_unevaluated` / `unevaluated`이고
+`budgetFundableInSleeveCurrency`가 `withinBriefBudget` 옆에서 `null`이다. 전에는 `status: ok`와 빈
+진단 배열이었다.
+
 **선언된 권한 둘은 현재 아무것도 서빙하지 않는다.** `thesis:read`와 `evidence:read`는 매니페스트
 어휘에 있고, 현재 Aumos 빌드는 각각을 빈 도구 목록으로 매핑하므로 실행에 그 도구가 생기지 않는다.
 프롬프트가 *가능할 때* 읽는다고 적고 매니페스트가 둘을 `optionalSkills`에 두는 이유가 정확히

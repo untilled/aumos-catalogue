@@ -119,6 +119,24 @@ export const CAUSE_CODE_REGISTRY = Object.freeze([
   { code: 'valuation_gap_is_unfetched_not_unfillable', operation: 'thesisGapSources', module: 'valuation.mjs', lane: 'input-path' },
   { code: 'instrument_class_disputed', operation: 'thesisGapSources', module: 'valuation.mjs', lane: 'unresolved' },
   { code: 'instrument_class_unknown', operation: 'thesisGapSources', module: 'valuation.mjs', lane: 'unresolved' },
+
+  /* ── the budget that could not be paid for (#174) ─────────────────────── */
+  /**
+   * ⚠️ **`unresolved`, and the lane choice is the whole judgement here.**
+   * A sleeve whose budget cannot be procured in the currency it settles in is a
+   * real reason a book holds no single name — and it is neither of the other
+   * two answers. It is not `input-path`: the candidate path is intact, nothing
+   * upstream lost a roster or a filing, and filing it there would promise a fix
+   * that fetching cannot deliver. It is emphatically not `gate-ran`: *the
+   * methodology is working* is a positive claim, and a run that never had the
+   * dollars did not establish it. What it does is forbid the `info` answer,
+   * which is exactly what this lane is for.
+   *
+   * ⛔ Neither row makes the operation say the wiring is at fault, and neither
+   * blocks anything at its own site: converting currency is a legitimate move.
+   */
+  { code: 'sleeve_budget_not_fundable_in_currency', operation: 'specialistBudget', module: 'sizing.mjs', lane: 'unresolved' },
+  { code: 'sleeve_budget_fundability_unevaluated', operation: 'specialistBudget', module: 'sizing.mjs', lane: 'unresolved' },
   /**
    * ⛔ An index ETF publishes no statements, so this gap stays open however
    * well the wiring works — filing it as unfinished wiring would promise a fix

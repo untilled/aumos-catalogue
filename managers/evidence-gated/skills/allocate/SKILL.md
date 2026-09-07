@@ -58,6 +58,24 @@ approves, never because a report noticed their weight. Parked liquidity carries 
 same reason: a ceiling on cash-equivalent weight is a floor under deployment wearing a different
 name.
 
+**A sleeve budget is a (weight, currency) pair.** You write the weights, and the weight is the
+right shape for them — a ratio has no currency, because one FX rate scales its numerator and its
+denominator alike. What has a currency is the cash that pays for them: `XKRX` settles in KRW,
+`XNAS`/`XNYS` in USD, and residual cash is **not** currency-neutral. ⛔ Read
+`portfolio.cashByCurrency`, never the aggregate `portfolio.cash`: on the book that measured #174 the
+aggregate read USD 8,596.10 and 96.6% of it was won, a us-sleeve budget of 0.26488897 ≈ USD 3,979
+stood over USD 294.02 of idle dollars, and this flow's own standing plan was asking the investor
+about *"idle USD 8,514.73"* — an escalation whose sentence was false because the budget had been
+expressed as a ratio and nothing else.
+
+So a budget you write is a budget you have shown can be procured, or a budget you say cannot be.
+`specialistBudget` reports `sleeve_budget_not_fundable_in_currency` when the sleeve cannot pay for
+its own budget in the currency it settles in, and it is a **warning** rather than a block for the
+reason it lands here: the two moves that close the gap — converting currency, or selling in the
+other sleeve — are yours to propose and the investor's to approve. ⚠️ A budget written without
+either the funding or the escalation is the one shape that is not allowed, because the sleeve flow
+reading it back cannot tell the difference.
+
 Re-arm the Global review at the next sourced 08:00 Asia/Seoul after both available closes.
 
 A cross-market move is one `REBALANCE` naming every position it touches. `targetWeight` is

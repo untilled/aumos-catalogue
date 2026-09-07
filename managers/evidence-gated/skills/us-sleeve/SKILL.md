@@ -18,6 +18,15 @@ this package's and its config's. Declare `parkedLiquidity: true` on the row and 
 it stays on `maxPositionWeight` exactly as before. **You never spend KR sleeve capacity**
 and you never propose a cross-market `REBALANCE`.
 
+⚠️ **Your budget is a weight and your orders are paid in dollars, and those are two facts.** Pass
+`sleeveCashByCurrency` — `portfolio.cashByCurrency`, never the aggregate `portfolio.cash` — with
+`portfolioNav`, `portfolioNavCurrency` and `fx.USDKRW` to `specialistBudget`. A recorded budget can
+be larger than the dollars this book holds: on the run that found #174 the budget was 0.26488897 ≈
+USD 3,979 against USD 294.02 of idle dollars, and `withinBriefBudget: true` said nothing about it.
+⛔ The gap is closed by an FX conversion or a sale in the KR sleeve, and **both are `allocate`'s and
+the investor's** — report `sleeve_budget_not_fundable_in_currency` in `uncertainty` and size to what
+is procurable, rather than proposing a buy the book cannot settle.
+
 Run steps 1–5 of `PROMPT.md` over XNAS/XNYS only, then hand back what §"What a flow must
 return" of `skills/orchestrate/SKILL.md` asks for.
 

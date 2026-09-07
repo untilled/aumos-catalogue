@@ -132,7 +132,13 @@ a flow that had to read the invocation itself would be a second reader of the sa
 **`events` is also where the wake is** — a fired `at-time` WATCH arrives there with the id it
 was armed under, and that id is what §Orchestration resolves into a flow. A run that dispatches
 before reading it has already decided to run all three.
-Use `portfolio_read`, `brief_read` and `memory_read`. ⛔ **`thesis_read`, `evidence_read` and
+Use `portfolio_read`, `brief_read` and `memory_read`. ⚠️ **Read `portfolio.cashByCurrency` and
+`portfolio.fxRates`, not the aggregate `cash` alone.** The aggregate is converted into one
+denominator and says nothing about what can be paid in which currency: on the book that measured
+#174 it read USD 8,596.10 and **96.6% of it was won**, and a standing `allocate` plan was asking
+about *"idle USD 8,514.73"* that did not exist. The FX in the snapshot is the rate this book was
+marked with — sourcing another one from a vendor is marking against a number nothing else in the
+invocation agrees with, and on that run the vendor answered 403. ⛔ **`thesis_read`, `evidence_read` and
 `manager_memory_read` are not tools, and a run that goes looking for them spends turns finding
 nothing.** The first two name capabilities the AMP vocabulary declares and that no build serves
 (`ARCHITECTURE.md` argues it); the third is a spelling no build has ever had — private memory is
@@ -655,6 +661,20 @@ had its sector cap applied to **no weight at all** while the answer read `status
 that is declared over rows carrying no label on that axis is `concentration_labels_unstated` /
 `unevaluated`: an empty axis is *nobody said what this is*, never *measured and under the cap*.
 Label the rows and call it again rather than reporting the empty axis as clean.
+
+**A sleeve budget is a (weight, currency) pair, and only the weight is written down.** The ratio
+itself has no currency — one FX rate scales its numerator and its denominator by the same factor —
+but the cash that pays for it does, and it is the currency the sleeve's market quotes: `XKRX` settles
+in KRW, `XNAS`/`XNYS` in USD. So call `specialistBudget` with the procurement side as well as the
+weights: `sleeveCashByCurrency` from `portfolio.cashByCurrency`, `portfolioNav` with
+`portfolioNavCurrency`, and `fx.USDKRW` from `portfolio.fxRates`. ⛔ **Without them
+`withinBriefBudget: true` is a claim about a budget nobody has shown can be bought** — it is
+`sleeve_budget_fundability_unevaluated` / `unevaluated` now, and `budgetFundableInSleeveCurrency`
+comes back `null` rather than reading as a pass. A budget or an order larger than the cash held in
+that currency is `sleeve_budget_not_fundable_in_currency`: ⚠️ a **warning**, because converting
+currency and selling the other sleeve are both legitimate — and both are `allocate`'s judgement and
+the investor's approval, never something a sleeve flow may assume it already has. Say the shortfall
+in `uncertainty` and let `allocate` answer it.
 
 ⛔ **The single-name total is the Mandate's as well, and this package ships no constant for it.**
 Call `singleNameBudget` with `mandateCashFloor`, `mandatePositionCap`, the book's `positions` and
