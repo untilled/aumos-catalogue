@@ -58,7 +58,13 @@ been fed. Do these in order and report each one:
    the host cache's `vendorId` are keyed by `corp_code`; the roster is keyed by the six-digit
    listing symbol. ⛔ **This is the call the run never made**, and without it nothing below can be
    addressed to a filer. Parse with `parseDartCorpCodes`. If the ZIP cannot be decompressed, read
-   `corp_code` and `stock_code` off `list.json` rows instead — `mapCorporationCodes` takes either.
+   `corp_code` and `stock_code` off `list.json` rows for names already on the roster —
+   `mapCorporationCodes` takes either — ⛔ **and that is the end of it.** Do not walk the disclosure
+   listing page by page to rebuild the registry, and do not open a worker to do it: report the
+   unmapped names, let `radarFeedDiagnosis` name the `registry` stage, run the price branch, and say
+   in `uncertainty` that the fundamental branch was **unfed rather than empty**. The decode this is
+   waiting on is the host's (`HOST-FOLLOWUPS.md`), and a run that staffs its way around a broken
+   vendor route spends the whole judgement on the workaround.
 3. **`mapCorporationCodes`** — join the registry onto the roster. Report the unmapped names; a
    name with no `corp_code` is a name this run cannot ask about, not a name that failed a test.
 4. **`fundamentalsPlan`** — it returns the ordered calls with the host cache state already read.
@@ -180,6 +186,13 @@ not judge, because X was not served* is a good answer here. Going to find X is n
 
 ⛔ `bin/evidence-gated-metrics` is the operator/CI interface. In a run, the calculation goes
 through `mcp__evidence-gated-metrics__calculate` — never through `Bash`.
+
+⛔ **And you dispatch nothing.** One tier: the orchestrator dispatched you and you answer.
+`hooks/guard-budget.mjs` refuses an `Agent` call from inside a flow (`delegation_depth_exceeded`).
+The sweep is `calculate` in this context, one call per operation — never a worker opened to relay
+bars, walk listing pages or batch the roster. If it does not fit in this turn, persist what you did
+review with `researchState` and hand back the unreviewed scope, so the orchestrator's `WAIT` can say
+the data was not prepared rather than that nothing qualified.
 
 ## What is different about this market
 

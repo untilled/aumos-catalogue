@@ -124,6 +124,15 @@ jobs:
       # of those bytes to disagree with.
       - run: npm run check:allocator
 
+      # The ceiling on how much of a run may be spent delegating (#209 §8-D).
+      # `hooks/guard-submit.mjs` limits who may submit and nothing limited how
+      # much may be dispatched — one run opened 29 subagents, three tiers deep,
+      # and submitted no judgement. This runs the hook as a process, with real
+      # `PreToolUse` payloads, and reads the roster out of `agents/` so that a
+      # flow added there moves the guard with it rather than leaving a second
+      # list to go stale.
+      - run: npm run check:delegation
+
       # ── Last, and that position is the point ──────────────────────────────
       #
       # The pair to `check:index`, and a different question: `check:index` asks

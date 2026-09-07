@@ -256,7 +256,9 @@ flowchart TB
 절반이다 — 어떤 상태를 누가 소유하는지, 데이터·설치 계약, 메모리 계약, 스킬, 그리고 원본 Python
 하네스와의 parity 검사. `MIGRATION.md`는 레거시 실행파일 65개와 그 처리를 기록하고,
 `IMPLEMENTATION.md`는 빌드 체크리스트를, `CONFORMANCE.md`는 이 저장소에서 도는 검사와 설치된
-런타임이 필요한 릴리스 게이트를 분리한다.
+런타임이 필요한 릴리스 게이트를 분리한다. `INCIDENTS.md`는 `PROMPT.md`의 각 규칙이 무엇에 대고
+측정됐는지 — 실패한 실행과 그것이 낸 숫자 — 를 담는다. 프롬프트 자체가 한 번에 읽히는 실행 계약으로
+남을 수 있는 이유다.
 
 **펀더멘털 발굴 분기는 이제 호스트 소스 저장소에서 먹는다 — 새로 생긴 것이다.**
 `source-cache:read` / `source-cache:write`(Aumos 0.3.30)가 OpenDART·SEC 공시를 종목별로 보관하고

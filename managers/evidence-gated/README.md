@@ -282,7 +282,9 @@ this package — who owns which piece of state, the data and installation contra
 memory contract, the skills, and the parity check against the original Python harness.
 `MIGRATION.md` records all 65 legacy executables and their disposition; `IMPLEMENTATION.md`
 tracks the build checklist and `CONFORMANCE.md` separates checks that run in this
-repository from release gates that need an installed runtime.
+repository from release gates that need an installed runtime. `INCIDENTS.md` holds what each rule in
+`PROMPT.md` was measured against — the run that failed and the number it produced — so that the
+prompt itself can stay an execution contract a run reads in one pass.
 
 **The fundamental discovery branch is fed from host source storage, and this is new.**
 `source-cache:read` / `source-cache:write` (Aumos 0.3.30) hold OpenDART and SEC filings per filer,

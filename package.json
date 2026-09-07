@@ -19,6 +19,7 @@
     "check:provenance": "node tools/check-provenance.mjs",
     "check:allocator": "node tools/verify-evidence-gated-allocator.mjs",
     "check:diagnostic-codes": "node tools/verify-evidence-gated-diagnostic-codes.mjs",
+    "check:delegation": "node tools/verify-evidence-gated-delegation-budget.mjs",
     "check:legacy-parity": "node tools/legacy-parity.mjs"
   },
   "dependencies": {

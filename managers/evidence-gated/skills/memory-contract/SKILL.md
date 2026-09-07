@@ -78,6 +78,15 @@ invocation's `standingPlans` (aumos#690) and only that — pass it to the same c
 The earlier #136 dedupe diagnosis was refuted in #148; the #148 journal cross-check was refuted in
 turn by #156.
 
+⛔ **Three parameter names, and each wrong one is refused rather than ignored** (moved here from
+`PROMPT.md` §4). The stored value goes in as `previous` and the invocation's field goes in as
+`standingPlans`: passing the arms at the top level as `armed` reads as `previous: null` and is refused
+with `armed_state_misplaced`, so the record is lost rather than carried; passing `journalArmed` builds
+a receipt out of a field that answers a different question and is refused with
+`armed_journal_not_a_receipt`. A state written back smaller than the promises it was built from is
+`armed_state_lost`, and a blocked calculation has no writable `nextState` at all.
+`review_already_armed` names a same-instant repeat: arm it anyway and report it.
+
 ### The key that stands in for a read path
 
 `run/armed-reviews` holds the flow and instant of the three market reviews this instance last
@@ -199,6 +208,17 @@ asymmetry cost until 0.4.49. ⛔ Ignoring stops at the envelope: any other unrec
 still refused by name, `blocked`, *retain the previous record*, because outside the envelope an
 unknown key reads as a misspelled member and a misspelled `openWindows` is a track this operation
 cannot see.
+
+⛔ **And the two places the run skeleton can put this key's inputs in the wrong slot are refused by
+name rather than read as an empty track** (moved here from `PROMPT.md` §5, which now points at this
+section). A top-level `openWindows` instead of `state.openWindows` arrives under a key `signalPaper`
+does not read — the track looks empty and the `nextState` it returns then deletes it — and that shape
+answers `paper_state_misplaced`. And one row of `rows` is **one carried window, not one bar**:
+`{ symbol, signalAt, setup, ruleVersion }` copied from that window plus `bars` and `benchmarkBars`
+whose rows are `{ timestamp, close }` — ⛔ `timestamp`, not the `date` that `indicators` and
+`trendState` also accept, because bars written under `date` come back `forward_base_missing`, which
+reads as a window the calendar has not reached. Empty is valid on a first run; an empty answer from a
+key that was **not** empty is the failure this names.
 
 ⚠️ **What it costs, and what it does not.** Private memory is namespaced by manager instance, so
 this track is invisible to any other manager on the same book. That is a worse home than a shared

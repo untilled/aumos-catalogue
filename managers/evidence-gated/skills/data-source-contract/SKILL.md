@@ -137,8 +137,10 @@ For every response:
 
 Three OpenDART behaviours change what a response means. `corpCode.xml` answers with a ZIP archive,
 relayed as sent — `parseDartCorpCodes` reads the decompressed text, and where a run cannot
-decompress it, `corp_code` and `stock_code` come off `list.json` rows instead; `mapCorporationCodes`
-takes either. ⛔ **That registry is not optional and it is not a fallback**: every OpenDART route,
+decompress it, `corp_code` and `stock_code` come off `list.json` rows for roster names instead;
+`mapCorporationCodes` takes either. ⛔ **That fallback is one bounded read and not a licence to
+harvest**: a run that cannot address a filer reports it and runs the price branch, and it never
+walks the disclosure listing page by page — nor opens a worker to — to rebuild the registry by hand. ⛔ **That registry is not optional and it is not a fallback**: every OpenDART route,
 and the host cache's `vendorId`, is keyed by `corp_code`, the curated roster is keyed by the
 six-digit listing symbol, and the call that joins them had never been made until #146.
 Errors arrive with HTTP 200 and a `status` field, so `020` (quota exceeded) must be read as *we
