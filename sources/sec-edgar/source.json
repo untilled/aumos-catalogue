@@ -1,9 +1,9 @@
 {
   "spec": "SourceSpec/1",
   "id": "sec-edgar",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "vendor": "sec-edgar",
-  "caveat": "SEC EDGAR's own endpoints, relayed unread. `companyfacts` is the whole XBRL history of a filer — every us-gaap tag it has ever reported, each with its own filing dates in the vendor's fields. Nothing here is bounded by asOf and nothing is dated by Aumos: reading the dates out of the document is the caller's work. SEC requires a contactable caller, which is what the credential is.",
+  "caveat": "SEC EDGAR's own endpoints, relayed unread. The `{symbol}` segment of `companyfacts` is a filename and not a ticker: it must be `CIK` + the ten-digit zero-padded CIK + `.json` (`CIK0000050863.json`), and a ticker there answers 404. So `/files/company_tickers.json` is a precondition of this path and not only a mapping table; its `cik_str` is an integer the caller pads. `companyfacts` is a filer's whole XBRL history; nothing here is bounded by asOf and nothing is dated by Aumos, so reading the filing dates out is the caller's work. SEC requires a contactable caller; that is the credential.",
   "hosts": ["www.sec.gov", "data.sec.gov"],
   "headers": {
     "accept": "application/json"

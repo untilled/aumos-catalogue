@@ -43,8 +43,16 @@ SEC는 모든 호출자가 자신을 밝히도록 요구하며, 그러지 않으
 
 | 에이전트가 물을 수 있는 것 | 받는 것 |
 |---|---|
-| `/files/company_tickers.json` | SEC의 티커→CIK 표 전체 |
-| `/api/xbrl/companyfacts/{CIK……….json}` | SEC가 그 공시기업에 대해 보유한 모든 XBRL 사실 |
+| `/files/company_tickers.json` | SEC의 티커→CIK 표 전체 — 선택이 아니라 첫 번째 호출입니다 |
+| `/api/xbrl/companyfacts/CIK{10자리}.json` | SEC가 그 공시기업에 대해 보유한 모든 XBRL 사실 |
+
+에이전트에게 게시되는 allowlist 표기는 `/api/xbrl/companyfacts/{symbol}`이고, 거기의
+**`{symbol}`은 티커가 아니라 파일명입니다.** `SourceSpec/1`의 자리표시자는 하나뿐이며 모든
+문서에서 그 철자로 적힙니다. 이 엔드포인트에서 그 자리에 들어가는 것은 `CIK` + 10자리
+zero-padded CIK + `.json`, 즉 `INTC`가 아니라 `CIK0000050863.json`입니다. 티커를 넣으면
+`404 NoSuchKey`가 답하는데, 그것은 *SEC가 이 공시기업에 대해 가진 것이 없다*처럼 읽히지만
+그런 뜻이 아닙니다. 그래서 위의 레지스트리 호출은 편의가 아니라 사실 조회의 **전제조건**이고,
+그것이 돌려주는 `cik_str`은 정수(`50863`)라 호출자가 직접 10자리로 패딩합니다.
 
 그 차이는 작지 않고, 이것이 존재하는 이유이기도 합니다: `fundamentals` 포트는 **한 기간에 대한
 일곱 개 지표**로 답하며, 그것은 문서에 적힌 규칙이 고르고 날짜를 붙인 값들입니다. 같은
