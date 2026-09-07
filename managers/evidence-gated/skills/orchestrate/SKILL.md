@@ -111,6 +111,9 @@ Your tools are the Aumos gateway's, already attached to this session:
   mcp__aumos__connection_request   (a broker login the investor already connected)
   mcp__aumos__source_cache_read    (stored filings for one filer, cut to this asOf)
   mcp__aumos__source_cache_refresh (collect one document for one filer, by vendor id)
+  mcp__aumos__observation_file     (file what you read on the web — URL, publication date and
+                                    the source's own words verbatim — and get back the
+                                    evidenceId that `evidenceIds` and `consensusRefs` require)
 and this package's own server:
   mcp__evidence-gated-metrics__calculate
 and, when this session was served them, the CLI's own web research:
@@ -146,6 +149,23 @@ three documents left it: it reported *no web lane* and produced no forward thesi
 ⛔ That is not a licence to search. Web research is a research instrument, never a way to
 discover tools — `Bash` and `ToolSearch` stay out of a flow's hands for the reason measured
 above, and a flow whose prompt does not name a web tool still reports its absence.
+
+⛔ **And `observation_file` is the other half of that lane. Leaving it off shut the 20% lane
+by construction** (#182, aumos#692). The web tools let a flow *read*; this one is the only route
+by which a reading becomes an `evidenceId`, and `variantViewCheck`'s `consensusRefs` requirement
+takes an input that exists on the web and in no filing and on no exchange feed. So a flow told
+about `WebSearch` and not about this tool can find the consensus figure and can never cite it —
+and by `agents/*.md`'s own rule it reports the absence rather than going to look, which is
+exactly what happened. Measured 2026-09-07, run `run_996380fbdd9a41a5bb3d74f3eca761a2`: the
+`us-sleeve` flow reported `observation_file_not_granted` in `uncertainty` and submitted **zero**
+filings rather than invent an excerpt — the right call — and `effectivePositionCap` read back
+`variantView.satisfied: []`, `missing: ["thesisComplete","variantView","consensusRefs",
+"challengeCleared"]`, `mainLaneOpen: false`, declared cap **0.20 sized at 0.01**. ⚠️ This is not
+the web tools' rule read again: those are the CLI's and you say whether the session holds them,
+while this one is the gateway's and `tools/list` answers for it — name it when it is there, and
+when it is not, say so, because a flow that is not told is a flow whose whole market runs under
+the control arm. ⛔ It is not a licence either: the excerpt is the source's own words or the row
+is worthless, and `skills/{kr,us}-sleeve/SKILL.md` step 10 carries the rest of the contract.
 
 ⚠️ **The two are not interchangeable and the difference is the credential.** `source_request`
 reaches a vendor this machine has a key filed for; `connection_request` reaches one the investor

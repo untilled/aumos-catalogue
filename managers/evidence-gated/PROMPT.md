@@ -107,6 +107,13 @@ question. That skill carries the list and the measurement behind it. ⚠️ **`W
 `WebFetch` belong on that list when this session holds them**: they are the CLI's rather than
 the gateway's, so a flow not told about them reports the web lane missing while it is attached —
 which closes theme radar, the one discovery branch §3 does not call a control arm.
+⚠️ **`observation_file` belongs on that list too, and it is the gateway's** (#182). The web tools
+let a flow read; that one is the only route by which what it read becomes an `evidenceId`, and
+`consensusRefs` — the one `variantViewCheck` requirement whose input is nowhere but the web — is
+unfillable without it. A flow told to research and not told how to file finds the figure, reports
+`observation_file_not_granted`, and its whole market runs under the 1% control arm while the
+investor's declared 20% stands unreachable. Measured 2026-09-07,
+run `run_996380fbdd9a41a5bb3d74f3eca761a2`.
 
 ⛔ **Only you call `decision_submit`, and exactly once.** A flow that submitted would seal a
 judgement the other two never saw, and the second submission of a run is refused — so a flow
