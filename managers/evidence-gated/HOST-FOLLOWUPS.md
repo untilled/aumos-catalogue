@@ -125,9 +125,17 @@ while six were ARMED.
 
 0.4.26 removes the reading entirely. `journalArmed` is refused with `armed_journal_not_a_receipt`
 rather than ignored; nothing suppresses a re-arm; `nextState` is a first-person record of what this
-instance proposed and whose instant has not passed; `standingArms` is `null` beside
-`standingArmsAreUnreadable: true` so the count can never be published as zero. The one duplicate the
+instance proposed and whose instant has not passed. The one duplicate the
 host does not fold — the same flow promised at a **different** instant — is `review_superseded`.
+⚠️ **`standingArms` was `null` for one release longer than it had to be.** 0.4.26 hard-coded it
+beside `standingArmsAreUnreadable: true` so the count could never be published as zero, which was
+true of *that operation's inputs* and stopped being the only option once `standingPlans` shipped:
+the operation is `strict`, so a run that followed §4 and handed the field over had the whole
+calculation refused as an unknown key. 0.4.50 takes it as a **report-only** parameter and answers
+`standingArms: { atLeast, basis }` — a floor whose own shape says so — while `toArm`,
+`duplicateFlows`, `superseded` and `nextState` are computed without it. ⛔ Not handed the field is
+still `null` / unreadable; handed `[]` is a floor of **0**, and the two are different facts.
+(`untilled/aumos-catalogue#201`)
 
 ✅ **The contract half is settled.** `untilled/aumos#691` keeps the field name and meaning
 (a rename would fail silently on the consumer side, and a fourth `fate` value would restore the
