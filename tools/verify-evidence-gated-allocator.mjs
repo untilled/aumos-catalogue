@@ -3915,6 +3915,50 @@ assert.ok(
 )
 
 /**
+ * The other layer of wrapping, and the sentence that asked for it. (#172)
+ *
+ * §1 requires every memory value to carry an envelope — decision and evidence
+ * ids, sample and cluster counts, computable metrics, missing fields, a status —
+ * and §5 step 1 said to pass *the whole value you read* as `state`. Both cannot
+ * hold: `state` accepts five members and refuses every other field by name, so
+ * the run that satisfied §1 was refused, took `nextState: null` and kept the
+ * prior revision — the paper track standing still on the only path to the
+ * 30-sample gate, once per wake. ⚠️ The refusal is loud, which is why this is a
+ * documentation defect: nothing was lost quietly, the run was.
+ */
+const envelopedTrack = execute({
+  operation: 'signalPaper',
+  asOf: paperAsOf,
+  input: {
+    state: {
+      schemaVersion: 2, updatedAsOf: '2026-09-04T00:00:00.000Z', openWindows: [carriedWindow], closed: {}, maturedThisRun: [],
+      decisionIds: [], evidenceIds: [], sampleCount: 0, independentDateClusterCount: 0, computableMetrics: {}, missingFields: [], status: 'insufficient',
+    },
+    rows: [],
+    admissions: [],
+  },
+})
+assert.equal(envelopedTrack.status, 'blocked', 'the §1 envelope around the paper record is refused rather than ignored')
+assert.equal(envelopedTrack.data, null, 'and a refused call offers no nextState, so the track cannot advance on that wake')
+assert.deepEqual(
+  envelopedTrack.diagnostics.filter((row) => row.code === 'input_shape_invalid').map((row) => row.path).sort(),
+  ['input.state.computableMetrics', 'input.state.decisionIds', 'input.state.evidenceIds', 'input.state.independentDateClusterCount', 'input.state.missingFields', 'input.state.sampleCount', 'input.state.status'].sort(),
+  'every envelope field is named — the two the paper record shares, schemaVersion and updatedAsOf, are not among them',
+)
+assert.ok(
+  !/whole value you read as `state`/.test(prompt),
+  '§5 no longer asks for the whole stored value as `state`, which is the shape the assertion above refuses',
+)
+assert.ok(
+  /paper-state record as `state`/.test(prompt) && /envelope/.test(prompt.slice(prompt.indexOf('Read `learning/paper-cohorts`'))),
+  'it asks for the paper-state members and says which layer is the one that gets refused',
+)
+assert.ok(
+  /this key carries no envelope/.test(memorySkill),
+  'and the memory contract says the same thing where the key is described, so the two documents cannot drift apart',
+)
+
+/**
  * ⚠️ **The general rule, and it is why these two were fixed together.** A
  * `nextState` smaller than the collection it was built from is a loss of record,
  * and both prompts say to write that state back verbatim. Reading the input

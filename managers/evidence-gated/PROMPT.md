@@ -174,6 +174,14 @@ decision/evidence ids, sample count, independent date-cluster count, computable 
 fields and one status from `insufficient`, `observing`, `reviewable`, `promoted`. Ignore and diagnose
 invalid values.
 
+⚠️ **A key an operation owns is written as that operation's `nextState`, and carries that shape
+instead.** `learning/paper-cohorts` is the one where the difference bites: `signalPaper` accepts only
+the members published as `inputContracts.nested.signalPaper`'s `state`, refuses every other field by
+name, and returns no `nextState` when it does — so a record wrapped to satisfy the sentence above is
+a paper track that cannot advance (§5 step 1). `run/armed-reviews` and `run/watch-alerts` are the
+same arrangement: their operations write them, and what they write is what those operations read
+back.
+
 ### 1b. Pre-flight, before planning any trade
 
 Nine things are checked before a candidate is considered, and the order is the point: each one is
@@ -999,7 +1007,19 @@ make by one run.
 
 Four steps, in order, and `signalPaper` is called once with all of them:
 
-1. Read `learning/paper-cohorts` and pass **the whole value you read as `state`**. ⛔ Not as a
+1. Read `learning/paper-cohorts` and pass **the paper-state record as `state`** — the members
+   `inputContracts.nested.signalPaper` publishes under `state`, and nothing else. ⛔ **Not the value
+   wrapped in the envelope §1 asks of a memory value.** `state` reads none of those fields and
+   refuses each one by name: `input_shape_invalid` on `input.state.<field>`, `blocked`, `data:
+   null`, *retain the previous record*. Nothing is lost quietly here — what is lost is the run: a
+   refused call returns no `nextState`, step 4 then holds the prior revision, and a run that follows
+   this step to the letter never advances the only path to the 30-sample gate. ⚠️ **What is stored
+   is the answer, not a record about it** — step 4 writes `nextState` back verbatim, so the value
+   read here is already the shape `state` takes; where an older revision was stored wrapped, pass
+   the paper members out of it and let step 4's write leave the key unwrapped again. ⛔ It is
+   **not** how the neighbouring keys are read — `reconcileArmedReviews`' `previous` and
+   `refutedMemoryRules`' `patterns` do take the stored value whole — so strip here and only here.
+   ⛔ Not as a
    top-level `openWindows` — that arrives under a key `signalPaper` does not read, so the track
    looks empty, and the `nextState` it returns then deletes it. That shape is refused with
    `paper_state_misplaced`. Empty is valid on a first run and is not a reason to stop; an empty
