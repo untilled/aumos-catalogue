@@ -441,15 +441,22 @@ export function resolveWakeFlow({ summary, intent, watchId } = {}) {
  * `wake/engine.ts` folds the same instant per instance (aumos#593, aumos#624),
  * so a duplicate at the *same* instant never costs a second wake.
  *
- * ⚠️ **It does cost a plan row, and that is aumos#704.** The fold is a
- * firing-time fold, so the duplicate row stands in the ledger with no verb that
- * withdraws it. ⬜ `untilled/aumos` PR 712 is open and unmerged and moves the
- * fold to arming time (`rearmed`); until it ships the depth is something to
- * report, from `standingPlans`, and never a reason to arm less.
+ * ⚠️ **Nor does it cost a plan row any more — aumos#704 landed.** That fold was
+ * a firing-time fold, so a duplicate row used to stand in the ledger with no
+ * verb that withdrew it; aumos PR 712 moved a second fold to **arming** time,
+ * inside the transaction that seals the judgement and over the same list
+ * `standingPlans` showed the run, so re-arming an identical promise retires the
+ * older row as `rearmed` instead of adding to it. ⚠️ **Identity, not
+ * resemblance**: the host compares `kind`, `subject`, `intent` and `trigger` as
+ * written bytes and parses none of them, and `expiresAt` is excluded — so a
+ * fresh horizon folds and a *different* instant does not. ⬜ Merged is not
+ * shipped (it landed after aumos v0.3.32), which is one more reason the depth is
+ * something to report, from `standingPlans`, and never a reason to arm less.
  *
  * ⛔ **So this operation suppresses nothing, and that is the honest answer to
- * "then what stops a duplicate".** Nothing here does. The host's fold does, and
- * only for an identical instant. What this key still answers is the question
+ * "then what stops a duplicate".** Nothing here does. The host's two folds do —
+ * an identical promise at arming time, an identical instant at firing time —
+ * and neither reaches a *different* instant. What this key still answers is the question
  * folding does not touch and the journal cannot reach: **did this instance
  * already promise this flow a review at a *different* instant** — #87's real
  * harm, two `kr-sleeve` reviews half an hour apart, two wakes, two judgements
@@ -586,14 +593,15 @@ export function reconcileArmedReviews({ previous = null, sequence = [], journalA
    * answer the question, and the two runs that trusted it armed the same
    * reviews a second and third time. The host's rule is *arm at every
    * judgement*; `wake/engine.ts` folds an identical instant per instance
-   * (aumos#593), so the duplicate costs plan rows and never a second wake.
+   * (aumos#593) and `recordDecision` folds an identical promise at arming time
+   * (aumos#704), so the duplicate costs neither a plan row nor a second wake.
    * `duplicateFlows` still names them, because a run that silently re-arms
    * three reviews it already promised has nothing to put in `uncertainty`.
    */
   const duplicates = sequence.filter((row) => previouslyProposed.some((open) => open.flow === row.flow && armedInstant(open) === armedInstant(row))).map((row) => row.flow)
   const toArm = [...sequence]
   if (duplicates.length) {
-    diagnostics.push(diagnostic('review_already_armed', 'info', 'This instance already proposed a review for this flow at this instant. Arm it again anyway — the published rule is to re-arm at every judgement and the host folds the same instant per instance, so it cannot produce a second wake — and say in `uncertainty` that it was re-armed, reporting the depth from `standingPlans` where the invocation carries it and as unreadable where it does not', 'sequence', { flows: duplicates }))
+    diagnostics.push(diagnostic('review_already_armed', 'info', 'This instance already proposed a review for this flow at this instant. Arm it again anyway — the published rule is to re-arm at every judgement, and the host folds an identical promise at arming time (aumos#704) and the same instant per instance at firing time, so on a host carrying that fold it neither adds a plan row nor produces a second wake — and say in `uncertainty` that it was re-armed, reporting the depth from `standingPlans` where the invocation carries it and as unreadable where it does not', 'sequence', { flows: duplicates }))
   }
   /**
    * ⚠️ **The one duplicate the host does not fold.** A second review at a
@@ -605,7 +613,7 @@ export function reconcileArmedReviews({ previous = null, sequence = [], journalA
    */
   const superseded = previouslyProposed.filter((open) => sequence.some((row) => row.flow === open.flow && armedInstant(row) !== armedInstant(open)))
   if (superseded.length) {
-    diagnostics.push(diagnostic('review_superseded', 'unevaluated', 'This instance already proposed a review for this flow at a different instant, and the host folds only identical instants — so both may fire and the sleeve may be judged twice on one day. `standingPlans` gives the older promise an address and there is still no verb that withdraws one (aumos#704); say so in `uncertainty` rather than assuming it replaced itself', 'previous', { superseded }))
+    diagnostics.push(diagnostic('review_superseded', 'unevaluated', 'This instance already proposed a review for this flow at a different instant, and neither of the host\'s folds reaches it — the arming-time fold takes an identical promise and the firing-time fold takes an identical instant, and this is the same promise at a different instant — so both may fire and the sleeve may be judged twice on one day. `standingPlans` gives the older promise an address and there is still no verb that withdraws it (aumos#704 folded the identical re-arm and left this one); say so in `uncertainty` rather than assuming it replaced itself', 'previous', { superseded }))
   }
   /**
    * ⚠️ **`armed` is what this instance has promised, not what this run

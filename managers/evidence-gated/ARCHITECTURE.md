@@ -249,13 +249,18 @@ fixture asserts the difference so it cannot be undone silently.
   stood at `asOf` with `planId`, `armedAt`, `armedByDecisionId`, `expiresAt`, `intent` and
   `trigger` — and it changes what may be **reported**, not what is armed: it is a floor, a promise
   it cannot date is left out rather than guessed at, and the field publishes that rule about itself.
-  So this package still arms at every judgement and the host folds identical instants per instance
-  (`untilled/aumos#593`, `untilled/aumos#624`). ⚠️ That fold is a **firing-time** fold, so a
-  duplicate costs a plan row and never a second wake, and no verb withdraws the row
-  (`untilled/aumos#704`; PR `untilled/aumos#712`, open and unmerged, moves the fold to arming time).
-  What the record still answers, and folding does not, is the same flow promised at a **different**
-  instant — which is #87's harm exactly, and which a floor over live rows cannot distinguish from a
-  promise never made.
+  So this package still arms at every judgement and the host folds. ⚠️ **There are two folds now,
+  and the ledger one landed second.** Firing time folds an identical instant per instance
+  (`untilled/aumos#593`, `untilled/aumos#624`), which was never enough on its own — the duplicate
+  row stayed and nothing withdrew it, which is what `untilled/aumos#704` measured 3 / 3 / 2 deep in
+  this book. PR `untilled/aumos#712` closed it from the host side with no tool and no AMP field
+  added: arming time folds an identical **promise** — `kind`, `subject`, `intent` and `trigger`
+  compared as written bytes, `expiresAt` deliberately excluded — inside the transaction that seals
+  the judgement, retiring the older row as `rearmed`. ⬜ Merged is not shipped: it landed after
+  `v0.3.32`, so a host older than that still keeps the row.
+  What the record still answers, and neither fold does, is the same flow promised at a **different**
+  instant — identity is not resemblance, so that stays two rows — which is #87's harm exactly, and
+  which a floor over live rows cannot distinguish from a promise never made.
   ([#156](https://github.com/untilled/aumos-catalogue/issues/156),
   [#175](https://github.com/untilled/aumos-catalogue/issues/175))
   A staged single-name entry rides the same bridge for the same reason: `entryTranchePlan` returns
