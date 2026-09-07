@@ -109,7 +109,7 @@ historical OHLC bars, not previous scan runs. Fetching sufficient dated bars per
 on the first run; a durable scan-history database is not required for that gate. §3 of `PROMPT.md`
 carried the same misreading and no longer does.
 
-## Authoritative WATCH reads (#97, #148, #156 — open as `untilled/aumos#690`)
+## Authoritative WATCH reads (#97, #148, #156 — `untilled/aumos#690` landed)
 
 ⚠️ **This section asked for the face, and then the package went ahead and built one out of a
 field that does not carry it.** #148 had `reconcileArmedReviews` take `journalArmed`, normalized
@@ -132,16 +132,28 @@ host does not fold — the same flow promised at a **different** instant — is 
 ✅ **The contract half is settled.** `untilled/aumos#691` keeps the field name and meaning
 (a rename would fail silently on the consumer side, and a fourth `fate` value would restore the
 “permission to stop” #622 refused), and states the invariant in the field's published
-`description` and in `AMP_MANAGER_INSTRUCTIONS`: nothing tells a manager what it currently has
-armed; re-arm at every judgement; the host folds identical instants per instance (#593).
+`description` and in `AMP_MANAGER_INSTRUCTIONS`: `decisions[].armed` is not an arming receipt;
+re-arm at every judgement; the host folds identical instants per instance (#593).
 
-⬜ **The face this section asked for is now open as `untilled/aumos#690`.** A decision journal
-proves submission but cannot prove an arm remains active after early firing, cancellation or
-replacement. The host still needs an asOf-aware read of active plans/watches — id, owner/flow,
-trigger instant, status, originating decision, fire/cancel history. ⚠️ The hard half is the
-**shape**, not the data: a list of live promises reads as permission to stop re-arming, which is
-exactly what #622 refused, so #690 weighs a narrow per-intent question and an audit-only face
-against publishing the list. Until it lands the package discloses the gap and re-arms every run.
+✅ **The face this section asked for landed as `untilled/aumos#690`.** `ManagerInvocation.standingPlans`
+carries the watches and plans that stood at `asOf` over this book, armed by this manager, each with
+`planId`, `armedAt`, `armedByDecisionId`, `expiresAt`, `intent` and `trigger` — including ones armed
+by a judgement too old for the `history.recentDecisions` window. Measured on
+`run_73a3e6c41c204f468ee8be8d2923d898`: twelve rows, matching row-for-row and depth-for-depth the
+table the previous run had read straight out of `plans`, with exactly the one instant that had
+passed absent from it. ⚠️ **The shape question #622 raised was answered by bounding the field, not
+by withholding it**: it is a **floor and not a ceiling** — a promise with no instant to date it by is
+left out rather than guessed at, so one missing from the list may still be standing — and the field's
+own `description` says in as many words that no reading of it licenses skipping an arm. The package
+therefore reports from it and arms exactly as before; `PROMPT.md` §4 carries that split.
+
+⬜ **What is still missing is a verb, not a read.** A promise wrongly armed cannot be withdrawn:
+the wake-time fold (#593, #624) keeps a duplicate from producing a second wake and leaves the plan
+**row** standing, which is `untilled/aumos#704`. This book stands 3 / 3 / 2 deep on three review
+intents for that reason. `untilled/aumos` PR **712 is open and unmerged** and moves the fold to
+arming time — an identical promise (`kind`, `subject`, `intent`, `trigger`) retires the older row as
+`rearmed` — which closes it from the host side with no tool and no AMP field added.
+(`untilled/aumos-catalogue#175`)
 
 The #136 claim that correctly supplied `previous.armed` never deduped was refuted in #148; #148's
 own conclusion that the journal is authoritative about arming was refuted in #156. Do not carry
@@ -246,9 +258,11 @@ no equivalent.
 forbids exactly this shape — *"a gate that must execute"* and a hidden portfolio database — and a
 per-position stop table would be both. So the discipline is **re-derived from the entry date every
 run** rather than read back from state, which is correct but pays for the missing read path twice:
-a WATCH armed at entry cannot be confirmed still active, and the same #97 gap that costs duplicate
-scheduling costs an unverifiable stop here. The host still needs the asOf-aware read of active
-plans/watches described above; until it exists, the package discloses that the arm is unverified
+a WATCH armed at entry could not be seen at all, and the same #97 gap that cost duplicate
+scheduling cost an unverifiable stop here. ⚠️ **`standingPlans` closed the seeing half and not the
+verifying half** — the read is a floor, so a stop present in it did stand at `asOf` while one absent
+from it may still be standing, and «absent» is therefore not a finding. So the discipline is still
+re-derived from the entry date every run, and the package still discloses that the arm is unverified
 rather than assuming it stands.
 
 ⚠️ **The stop distance itself waits on the investor, not the host.** `mandate.constraints.maxDrawdown`

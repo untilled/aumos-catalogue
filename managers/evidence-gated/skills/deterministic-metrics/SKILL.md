@@ -180,7 +180,7 @@ carry, and the 2026-09-06 run never asked for it.
 | `nextReviewSequence` | the three flows' reviews in order, owned by one manager, each with the `intent` it must be armed with and the `{ cron, timeZone }` `rule` that goes beside `at` on the trigger. The rule draws the calendar forward and wakes nothing; `at` is still the whole schedule, and a review whose buffer crosses local midnight returns `rule: null` |
 | `resolveWakeFlow` | which flow a fired plan's event summary was armed for — `null` for a wake this manager did not arm |
 | `resolveTrancheWake` | whether a fired plan's event summary is a rung of an unfinished staged entry, and which one |
-| `reconcileArmedReviews` | the reviews to arm — every one of them, because nothing can be read back to suppress a re-arm — plus which of them this instance has already promised at this instant, and which flow it promised at a **different** instant, which is the one duplicate the host does not fold |
+| `reconcileArmedReviews` | the reviews to arm — every one of them, because the published rule is to re-arm at every judgement and nothing this operation is handed could suppress one anyway — plus which of them this instance has already promised at this instant, and which flow it promised at a **different** instant, which is the one duplicate the host does not fold |
 | `earningsCheckpoint` | BMO/AMC/date-only → an at-time checkpoint |
 | `boundedRetry` | the bounded retry after a wake found nothing published |
 | `classifyScheduledWake` | why this run woke |

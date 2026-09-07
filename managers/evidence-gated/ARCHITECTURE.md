@@ -105,7 +105,10 @@ kept as provenance. There is no macro score: a regime call is a Brief judgement 
 The package uses the stable keys documented in `skills/memory-contract/SKILL.md`, including a
 bounded `coverage/research-index` of names and Evidence references. Bundled KR 74 / US 83 rosters
 provide a reproducible research scope; host source storage is still needed for a fundamental cache.
-Confirmed journal arms, not planned sequences, govern the review-memory record. Values
+The review-memory record is what this instance **proposed** and whose instant has not passed —
+never a copy of a run's planned sequence, and ⛔ never gated on `decisions[].armed`, which is past
+tense and drops a promise from the record precisely while it still stands (#156). What stood at
+`asOf` is read from the invocation's `standingPlans` instead, and reported rather than acted on. Values
 are JSON objects with schema version, update instant, supporting Decision/Evidence ids,
 sample/independent cluster counts, computable metrics, missing fields and maturity status.
 Writes reuse a key and create a new revision only when an aggregate changes. A historical
@@ -220,12 +223,14 @@ fixture asserts the difference so it cannot be undone silently.
   tools. Until Aumos serves them, asset claims reach a run through the invocation payload and
   through Brief, and the package says so rather than implying a lookup it cannot make.
   `RunProvenance.unservedTools` is where a run records the difference.
-- **A manager can arm a WATCH and cannot read one back.** The grant map publishes
+- **A manager can arm a WATCH and cannot call for one back.** The grant map publishes
   `portfolio_read`, `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request` and
   `connection_request`,
   and carries no watch or plan capability at all — not even a declared-but-empty one like
-  `thesis:read`. WATCHes leave in a `DecisionProposal` and there is no return path, so a run cannot
-  tell whether it is arming a review it already armed. Since #87 that costs more than it did: every
+  `thesis:read`. WATCHes leave in a `DecisionProposal` and no tool returns them; what the host
+  publishes instead is a field on the invocation, `standingPlans`, and it is a floor rather than a
+  ceiling — so a run can see promises it is re-arming and still cannot establish that one it does
+  **not** see is gone. Since #87 that costs more than it did: every
   wake dispatches one flow, so two `kr-sleeve` reviews half an hour apart each run the Korean
   sleeve and each seal a judgement. `run/armed-reviews` and `reconcileArmedReviews` are the bridge
   — the manager writes down what it promised — and a bridge is what they are: private memory is
@@ -234,11 +239,20 @@ fixture asserts the difference so it cannot be undone silently.
   ([#97](https://github.com/untilled/aumos-catalogue/issues/97))
   ⛔ **And the bridge does not carry a dedupe.** `decisions[].armed` is past tense — what became of
   promises that have *ended* — so reading it as a receipt made two runs judge a clean arm a failed
-  one and re-arm three market reviews twice over. Nothing anywhere answers what is currently armed
-  (`untilled/aumos#690`), so this package arms at every judgement and the host folds identical
-  instants per instance (`untilled/aumos#593`). What the record still answers, and folding does not,
-  is the same flow promised at a **different** instant — which is #87's harm exactly.
-  ([#156](https://github.com/untilled/aumos-catalogue/issues/156))
+  one and re-arm three market reviews twice over. ⚠️ **What is currently armed is answered now** —
+  `ManagerInvocation.standingPlans` landed for `untilled/aumos#690` and carries the promises that
+  stood at `asOf` with `planId`, `armedAt`, `armedByDecisionId`, `expiresAt`, `intent` and
+  `trigger` — and it changes what may be **reported**, not what is armed: it is a floor, a promise
+  it cannot date is left out rather than guessed at, and the field publishes that rule about itself.
+  So this package still arms at every judgement and the host folds identical instants per instance
+  (`untilled/aumos#593`, `untilled/aumos#624`). ⚠️ That fold is a **firing-time** fold, so a
+  duplicate costs a plan row and never a second wake, and no verb withdraws the row
+  (`untilled/aumos#704`; PR `untilled/aumos#712`, open and unmerged, moves the fold to arming time).
+  What the record still answers, and folding does not, is the same flow promised at a **different**
+  instant — which is #87's harm exactly, and which a floor over live rows cannot distinguish from a
+  promise never made.
+  ([#156](https://github.com/untilled/aumos-catalogue/issues/156),
+  [#175](https://github.com/untilled/aumos-catalogue/issues/175))
   A staged single-name entry rides the same bridge for the same reason: `entryTranchePlan` returns
   the `intent` each unfilled rung is armed with, and `resolveTrancheWake` reads that marker back out
   of the fired plan's event summary, because there is nothing else to read.
@@ -330,9 +344,10 @@ fixture asserts the difference so it cannot be undone silently.
   invented for it**. Registration is the part that must not be prose: `watchesToRegister`
   returns the `price-below` and `at-time` rows an entry copies into its own proposal, an entry
   without them is `exit_rules_unregistered`, and a due stop this run does not act on is
-  `exit_due_unactioned`. ⚠️ The package can arm a WATCH and cannot read one back, so the
-  discipline is re-derived from the entry date every run rather than trusted to a WATCH armed
-  weeks ago; that read path is the host's and is recorded in `HOST-FOLLOWUPS.md`.
+  `exit_due_unactioned`. ⚠️ `standingPlans` now shows the arms that stood at `asOf`, and it is a
+  floor rather than a ceiling — a promise it cannot date is left out rather than guessed at — so
+  the discipline is still re-derived from the entry date every run rather than trusted to a WATCH
+  armed weeks ago; `HOST-FOLLOWUPS.md` records what that read does and does not settle.
   ([#153](https://github.com/untilled/aumos-catalogue/issues/153))
 - **The single-name total is derived from the Mandate, and no constant is left that answers an
   investor's question.** The source capped non-core singles at 28%; that number belonged to an

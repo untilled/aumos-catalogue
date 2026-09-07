@@ -53,7 +53,7 @@ export const REFUTED_MEMORY_RULES = [
      */
     claimPattern: /journal wins|decisions\[\]\.armed|recentDecisions\[\]\.armed|armed-reviews-memory-claims/i,
     refutedClaim: 'When `run/armed-reviews` and the host journal disagree, the journal wins.',
-    correction: '`decisions[].armed` is past tense: it carries what became of promises that have already fired, lapsed or been replaced, and there is no value in it for one that is still standing. A review that armed cleanly and one that was never armed produce the same empty array, so the journal cannot settle a disagreement about what is armed and never could. The observation behind this rule was real — memory did claim arms the journal did not show — and the inference from it was wrong. Nothing in AMP answers what is currently armed (aumos#690); re-arm at every judgement and let the host fold identical instants (aumos#593).',
+    correction: '`decisions[].armed` is past tense: it carries what became of promises that have already fired, lapsed or been replaced, and there is no value in it for one that is still standing. A review that armed cleanly and one that was never armed produce the same empty array, so the journal cannot settle a disagreement about what is armed and never could. The observation behind this rule was real — memory did claim arms the journal did not show — and the inference from it was wrong. What is currently armed is answered by `standingPlans` on the invocation and by nothing else (aumos#690), and that field is a floor rather than a ceiling and publishes the same rule about itself: re-arm at every judgement and let the host fold identical instants (aumos#593).',
     supersededBy: 'armed-state-is-unreadable-and-re-arming-is-the-answer',
   },
   /**

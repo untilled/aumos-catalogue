@@ -133,7 +133,11 @@ Thesis, Brief and WATCH, which are the investor's records rather than a message 
 
 ### 1. Establish scope and state
 
-Read `task`, `portfolio`, `mandate`, `events`, `asOf`, `language` and config from the invocation.
+Read `task`, `portfolio`, `mandate`, `events`, `standingPlans`, `asOf`, `language` and config from
+the invocation. **`standingPlans` is the promises of yours that stood at `asOf`** — read it for what
+it is, a floor under what you are holding open and the only place a count of standing reviews may
+be reported from (§4). ⛔ It is not an input to `reconcileArmedReviews` and not a licence to arm
+less; §4 says why both.
 Do this **before** dispatching anything: `asOf` and `language` are what every flow is handed, and
 a flow that had to read the invocation itself would be a second reader of the same document.
 **`events` is also where the wake is** — a fired `at-time` WATCH arrives there with the id it
@@ -848,21 +852,43 @@ closes. **Pass the invocation's config to `nextReviewSequence`** — `schedule.k
 and `usCloseBufferMinutes` are the investor's, and a run that omits them silently substitutes the
 package's own defaults for a number the install screen said was theirs. Never add 24 hours or reuse a fixed UTC close across DST, holidays or early closes.
 
-⛔ **Nothing tells you what you currently have armed, and you may not infer it.** `decisions[].armed`
-is **past tense** — *what became of what you armed* — and `fate` is `fired | replaced | lapsed` with
+⛔ **`decisions[].armed` is not an arming receipt, and you may not infer an arm from it.** It is
+**past tense** — *what became of what you armed* — and `fate` is `fired | replaced | lapsed` with
 no value for a promise still standing. A review that armed cleanly and one that was never armed
 produce **the same empty array**, so an empty `armed[]` is not evidence of a failed arm. One
 judgement in this book armed four plans and only the one that had already TRIGGERED appeared in its
-`armed[]`; the three still standing were absent, exactly as designed. There is no other face either:
-the runtime publishes no watch or plan capability, and an authoritative standing-promise read is
-open as `untilled/aumos#690` and does not exist yet. **So the answer is: re-arm at every judgement.**
-The host folds the same instant per instance (`untilled/aumos#593`), so re-arming what is already
-standing costs plan rows and never a second wake.
+`armed[]`; the three still standing were absent, exactly as designed.
 
-⚠️ **Therefore nothing in this package suppresses a re-arm, and it is worth being plain about
-that.** Two consecutive runs read `armed: []` as *"the arm failed"*, re-armed the same three market
-reviews, and left three intents standing 3 / 3 / 2 deep. What made that possible was not the
-duplicate: it was believing the journal had answered.
+⚠️ **What stands is shown to you — in a different field, in a different tense.** The invocation
+carries `standingPlans`: the watches and plans of yours that stood at your `asOf` over this book,
+each with `planId`, `armedAt`, `armedByDecisionId`, `expiresAt`, `intent` and `trigger`, including
+ones armed by a judgement too old for the `history.recentDecisions` window. `untilled/aumos#690`
+asked for that face and it **landed** — the sentence that stood here, *"nothing tells you what you
+currently have armed"*, was true when it was written and is false now. ⚠️ **It is at most what
+stood, never exactly:** a promise the investor cancelled carries no instant to date it by and is
+left out rather than guessed at, so one missing from the list may still be standing. An absent
+`standingPlans` means this host does not answer the question at all; an empty array means nothing of
+yours stood that it could date.
+
+⛔ **None of that is permission to skip an arm.** The rule is unchanged, positive, and published in
+the field's own `description` and in `AMP_MANAGER_INSTRUCTIONS`: **re-arm at every judgement,
+including a WAIT.** A floor is not a ceiling, so no reading of `standingPlans` establishes that a
+review you would otherwise arm is already covered. And the failure shape this book has recorded four
+times over is exactly this one — a run replacing an explicit operation instruction with its own
+field reading, then writing the conclusion into durable memory. One run here did that on the strength
+of this field and armed **nothing**; three reviews happened to be standing, which is luck and not a
+method. `reconcileArmedReviews` returns the whole sequence in `toArm` and suppresses nothing.
+
+⚠️ **What re-arming costs today is plan rows, and that cost is the host's to remove.** The fold the
+host has is a **firing-time** fold — one wake per instance per instant (`untilled/aumos#593`,
+`untilled/aumos#624`) — so a duplicate never produces a second wake and the plan **row** stays,
+with no verb that withdraws one (`untilled/aumos#704`). Two consecutive runs that read `armed: []`
+as *"the arm failed"* left three intents standing 3 / 3 / 2 deep, and what made that possible was
+not the duplicate: it was believing the journal had answered. ⬜ `untilled/aumos` PR **712 is open
+and not merged**; it moves the fold to **arming** time, so re-arming an identical promise — same
+`kind`, `subject`, `intent` and `trigger` — retires the older row as `rearmed` instead of adding to
+it. Until that ships, the depth is something to **report** from `standingPlans`, never a reason to
+arm less.
 
 **Reconcile before you arm.** Read `run/armed-reviews` and pass **the whole value you read as
 `previous`**, the sequence as `sequence`, to `reconcileArmedReviews`; arm everything it returns in
@@ -883,11 +909,19 @@ about what is standing; a run with nothing to arm still writes back its unexpire
 state smaller than the promises it was built from is refused with `armed_state_lost`. A blocked
 calculation has no writable `nextState`.
 
-⛔ **Never report a count of standing reviews, and never report it as zero.** `reconcileArmedReviews`
-returns `standingArms: null` with `standingArmsAreUnreadable: true` and says the same thing in
-`armed_state_unreadable`. A Brief that told the investor *"standing market reviews: 0"* while six
-were ARMED is what this sentence exists to prevent: where the number is unknown, the Brief and
-`uncertainty` say **unreadable**, and may say how many this instance proposed.
+⛔ **Never report a count of standing reviews out of `reconcileArmedReviews`, and never report zero
+out of it.** That operation's only inputs are this instance's own memory and the sequence it is
+about to arm, so it returns `standingArms: null` beside `standingArmsAreUnreadable: true` and says
+the same thing in `armed_state_unreadable` — and all three are statements about **that operation's
+input**, never about the run. A Brief that told the investor *"standing market reviews: 0"* while
+six were ARMED is what this sentence exists to prevent.
+
+⚠️ **The count itself is reportable — from `standingPlans`, and only from there.** When the
+invocation carries it, the Brief and `uncertainty` may say how many of this manager's promises stood
+at `asOf`, attributed to that field and to its floor: *at least this many*, because a promise with
+no instant to date it by is left out rather than guessed at. When the invocation does not carry it,
+the number is unknown and the word is **unreadable**, never zero. `previouslyProposed` stays what
+this instance proposed and is never presented as what stands.
 
 ⚠️ **The instants in that key are epoch milliseconds, not RFC 3339.** `run/armed-reviews` holds
 future instants by design and `memory_read` refuses a result carrying any *string* timestamp after
