@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   LEDGER_TTL_MS,
@@ -173,6 +175,25 @@ const other = spawnSync(process.execPath, [hook], {
   encoding: 'utf8',
 })
 assert.equal(other.status, 0, 'the ledger is keyed by session, so one run cannot spend another run’s budget')
+
+/**
+ * ⚠️ **The roster, and the whole guard, over a path that is not the real one.**
+ * `node <path>` leaves `argv[1]` as typed and `import.meta.url` is always the
+ * real path, so the entry-point comparison has to resolve symlinks — and when it
+ * did not, running this hook out of a copy under `/tmp` (which is
+ * `/private/tmp`) allowed an undeclared `general-purpose` dispatch with exit 0
+ * and no message. Silent, which is the one failure this file is here to refuse.
+ */
+const linkDir = mkdtempSync(join(tmpdir(), 'evidence-gated-hooklink-'))
+const linked = join(linkDir, 'guard-budget.mjs')
+symlinkSync(hook, linked)
+const throughLink = spawnSync(process.execPath, [linked], {
+  input: JSON.stringify({ session_id: `${session}-link`, tool_name: 'Agent', tool_input: { subagent_type: 'general-purpose' } }),
+  encoding: 'utf8',
+})
+assert.equal(throughLink.status, 2, 'the guard runs when its own path is reached through a symlink')
+assert.match(throughLink.stderr, /delegation_flow_undeclared/, 'and the roster is read relative to the real file, not to argv[1]')
+rmSync(linkDir, { recursive: true, force: true })
 
 // A host that sends no session id keeps depth and the roster and loses the count.
 const sessionless = spawnSync(process.execPath, [hook], {

@@ -74,7 +74,7 @@
  * prevent; the cost is a process per tool call, and the first thing it does is
  * decide it has nothing to say.
  */
-import { appendFileSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { appendFileSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -260,6 +260,30 @@ function main() {
   })
 }
 
-// Importable for the checker, executable for the CLI. `process.stdin` is not
-// touched on import, so reading this file costs nothing.
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
+/**
+ * Importable for the checker, executable for the CLI. `process.stdin` is not
+ * touched on import, so reading this file costs nothing.
+ *
+ * ⚠️ **The comparison resolves symlinks, and the first draft did not.** `node
+ * <path>` leaves `argv[1]` exactly as it was typed while `import.meta.url` is
+ * always the real path, so on macOS — where `/tmp` is `/private/tmp` and `/var`
+ * is `/private/var` — a string comparison was false and **the whole guard did
+ * nothing, exit 0, silently**. Measured by running this file out of a copy under
+ * `/tmp`: an undeclared `general-purpose` dispatch was allowed. That is the
+ * failure mode this file's header says a matcher would have, arriving by
+ * another road, so it is checked by a process test over a symlinked path
+ * (`tools/verify-evidence-gated-delegation-budget.mjs`).
+ */
+function invokedDirectly() {
+  const self = fileURLToPath(import.meta.url)
+  const argv = process.argv[1]
+  if (typeof argv !== 'string' || argv === '') return false
+  if (argv === self) return true
+  try {
+    return realpathSync(argv) === realpathSync(self)
+  } catch {
+    return false
+  }
+}
+
+if (invokedDirectly()) main()
