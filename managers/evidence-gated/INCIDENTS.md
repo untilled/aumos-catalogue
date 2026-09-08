@@ -70,6 +70,25 @@ The prose path survives as one reported fallback, because the judgement that arm
 older than the `history.recentDecisions` window; `HOST-FOLLOWUPS.md` states what has to be true
 before it is deleted.
 
+**No flow had ever dispatched (#221).** Measured 2026-09-08, run
+`run_c7ad46eea03840bf84ae7a8822ed02c3`, version 0.4.60: `hooks/guard-budget.mjs` built its roster
+out of the stems of `agents/*.md` and compared with string equality, and the host enumerates a
+plugin's agents as `<plugin>:<name>`. So `Agent(subagent_type: "evidence-gated:us-sleeve")` — the
+only name the CLI offers — was refused by the hook as `delegation_flow_undeclared`, and
+`Agent(subagent_type: "us-sleeve")` — the only name the hook accepted — was refused by the CLI as
+*Agent type not found*. A two-sided deadlock with no value in between: every wake and every manual
+run since the guard landed ran **orchestrator-alone**, and `agents/*.md` and the three sleeve skills
+were never loaded once. The guard's own message named the working exit (*"do the work here"*), so
+the run degraded safely and said so in `uncertainty` — the failure was that the designed topology
+was unreachable, not that anything unsafe happened. `canonicalFlow()` resolves both spellings to the
+stem and checks the prefix against this package's manifest id, so another plugin's worker sharing
+one of our names is still refused.
+
+⚠️ **The premise was written down and still went stale.** The comment on `declaredFlows()` said the
+stem *"is what `subagent_type` takes"* — true when written, and nothing re-read it when the host
+changed. `hooks/guard-submit.mjs` was checked in the same pass and is unaffected: it discriminates
+on the *presence* of `agent_id`, never on a name.
+
 **A flow that is not told its tools goes looking.** Measured 2026-08-27: a flow dispatched without
 its tool list spent its whole turn discovering the session, reached for `Bash`, and the run ended
 `awaiting-input` with no judgement. Measured 2026-09-01: a run reported the gap itself, having been
