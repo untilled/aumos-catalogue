@@ -261,6 +261,23 @@ arming time now. ⬜ Merged is not shipped — a host older than that release st
 which is why the depth read from `standingPlans` is something to report and never a reason to arm
 less.
 
+**The key `researchState` writes could not be read back by `researchState`** (#222). It is the only
+writer of `coverage/research-index`, and its validator required an array `rows` on `previous` — while
+every run up to 0.4.60 hand-wrote the key with descriptive fields (`extensions`,
+`universeProvenance`, `usMapping`, `laneStateThisRun`, …) and no `rows` at all. So the key was
+**self-locked**: the first malformed write made it permanently unreadable by its owner, and the
+checkpoint `hooks/guard-budget.mjs` and §Orchestration prescribe for a run that stopped at a limit —
+*«persist the roster you did review with `researchState`»* — could not be produced. The reporting run
+(`run_c7ad46eea03840bf84ae7a8822ed02c3`) was in exactly that situation and spent four round trips on
+it: the stored value, an abridged copy of it, and `{}` all answered `research_state_invalid` /
+blocked at `path: previous`. A missing shape degrades now and a point-in-time violation still
+refuses — a `schemaVersion` that is present and not `1`, and an `updatedAsOf` that parses and is
+after `asOf`, because an index written by a later run can hold only past-dated rows and still leak
+that run's judgement backwards, which the per-row date check cannot see. ⚠️ And the row contract was
+enforced without being published: `observations[]` requires `symbol`, `market`, `observedAt` and a
+non-empty `evidenceIds`, and omitting `observedAt` cost that run one more round trip.
+`inputContracts.nested.researchState` publishes it.
+
 ## The paper track (§5)
 
 **A track passed under the wrong key looks like a cold start.** `state.openWindows` is where
