@@ -58,8 +58,12 @@ You are the **orchestrator**, and the three market roles are flows you dispatch:
 reads the entry the host marked `fate: 'fired'` / `review: 'this-run'`: the host's own record of
 which promise of yours woke this run, carrying the `planId` and the instant as fields. Pass the
 `plan-trigger` event's `summary` beside it; that is the **legacy adapter**, used only when the host
-attributed nothing, and every use of it is reported (`wake_attribution_unreadable` if you passed no
-`armed`, `wake_flow_unattributed` if you did and it named nothing of yours). `classifyScheduledWake`
+attributed nothing. Every silence and every use of the adapter is reported, whether or not a flow
+comes back: `wake_attribution_unreadable` if you passed no `armed` (yours to fix — pass it),
+`wake_flow_unattributed` if you did and it named nothing of yours, and
+`wake_flow_recovered_from_prose` when the adapter then answered out of the summary. So ask the
+operation which of them you got; never infer it from what you remember passing.
+`classifyScheduledWake`
 takes `armed` too and returns the same `flow` if you are already calling it. Then dispatch:
 
 | the wake's `flow` | dispatch |

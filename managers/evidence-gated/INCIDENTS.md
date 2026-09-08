@@ -89,6 +89,20 @@ stem *"is what `subagent_type` takes"* — true when written, and nothing re-rea
 changed. `hooks/guard-submit.mjs` was checked in the same pass and is unaffected: it discriminates
 on the *presence* of `agent_id`, never on a name.
 
+**The two flowless wakes were the same observation (#223).** `resolveWakeFlow` reported the legacy
+adapter by name — and only after the adapter had decoded a marker, so the two wakes that reach it
+most often reported nothing. Measured 2026-09-08, run `run_c7ad46eea03840bf84ae7a8822ed02c3` at
+0.4.60: `armed` flattened to three rows, all `fate: 'fired'` / `review: 'no-judgement'`, answered
+`data: null` with `diagnostics: []`; no input at all answered `data: null` with `diagnostics: []`;
+a synthetic `review: 'this-run'` row resolved correctly. The reader was fine and the reporting was
+absent. The failure direction is safe — `null` dispatches every flow, a superset of what fired — but
+the two states are fixed differently: unreadable is the run's own omission, unattributed is the host
+attributing elsewhere and means the prose adapter is now load-bearing. So that run inferred which
+one it was from what it remembered passing and recorded the inference as the operation's answer. The
+two codes fire ahead of the fall-through now, and `wake_flow_recovered_from_prose` is the receipt
+for the adapter itself — the half of the promise that had no producer at all, and the only one of
+the three that counts *uses* of it.
+
 **A flow that is not told its tools goes looking.** Measured 2026-08-27: a flow dispatched without
 its tool list spent its whole turn discovering the session, reached for `Bash`, and the run ended
 `awaiting-input` with no judgement. Measured 2026-09-01: a run reported the gap itself, having been
