@@ -58,7 +58,7 @@
 import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
-import { sleeveNav, targetWeight, experimentalCeiling, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
+import { sleeveNav, targetWeight, minimumExecutableWeight, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { proposalDisclosure } from './proposal.mjs'
 import { executionRecord } from './execution-record.mjs'
 import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
@@ -261,26 +261,35 @@ export const OPERATIONS = {
       sectorHeadroom: NUMBER, themeHeadroom: NUMBER, maturityStatus: STRING, researchGate: STRING, challengeVerdict: STRING,
       /** ⛔ No `uncertainty` / `risks` / `effectiveConstraints`: this weight is a function of numbers alone (#212 ②). */
       lane: STRING, thesis: OBJECT, evidenceSamples: ARRAY, promotion: OBJECT,
-      experimentalPositionCeiling: NUMBER, experimentalPositionCeilingMax: NUMBER, experimentalPositionFloor: OBJECT,
+      /** The risk budget under the Mandate's cap (#226). */
+      mandateMaxDrawdown: NUMBER, heldPortfolioHeat: NUMBER, stopLossPct: NUMBER,
+      minimumExecutablePosition: OBJECT, experimentalPositionFloor: OBJECT,
       positionCurrency: STRING, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
     },
-    describe: 'desired portfolio weight under maturity and caps',
+    describe: 'the weight the quarter-Kelly arithmetic asks for, under the Mandate\'s cap and the risk budget beneath it',
     run: (input, asOf) => targetWeight({ ...input, asOf }),
   },
-  experimentalCeiling: {
+  /**
+   * ⚠️ **This was `experimentalCeiling` until #226.** It answered the ratio, the
+   * bound the venue amount could lift it to, and the amount itself; the first
+   * two were the maturity lane and are gone, so what is left is the amount and
+   * the operation is named for it.
+   */
+  minimumExecutableWeight: {
     group: 'sizing',
     surface: 'published',
     mode: 'strict',
     keys: {
-      experimentalPositionCeiling: NUMBER, experimentalPositionCeilingMax: NUMBER, experimentalPositionFloor: OBJECT,
+      minimumExecutablePosition: OBJECT, experimentalPositionFloor: OBJECT,
       positionCurrency: STRING, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
     },
     nested: {
-      experimentalPositionFloor: 'An object keyed by venue currency — { KRW: 300000, USD: 200 } — never a bare amount; the currency of the position being sized selects the row.',
+      minimumExecutablePosition: 'An object keyed by venue currency — { KRW: 300000, USD: 200 } — never a bare amount; the currency of the position being sized selects the row.',
+      experimentalPositionFloor: 'The pre-#226 spelling of `minimumExecutablePosition`; it is still read, and a run that uses it is told the key was renamed.',
       fx: { USDKRW: NUMBER },
     },
-    describe: 'the ceiling an unpromoted lens is held to — the ratio or the venue\'s minimum executable amount, whichever is larger, bounded',
-    run: experimentalCeiling,
+    describe: 'the smallest position worth opening in this venue, as a weight of this book — ⛔ a floor that refuses, never a target that lifts',
+    run: minimumExecutableWeight,
   },
   /**
    * ⚠️ **`uncertainty`, `risks` and `effectiveConstraints` are gone from this
@@ -299,10 +308,11 @@ export const OPERATIONS = {
     keys: {
       mandatePositionCap: NUMBER, maturityStatus: STRING, lane: STRING, thesis: OBJECT, challengeVerdict: STRING,
       evidenceSamples: ARRAY, promotion: OBJECT,
-      experimentalPositionCeiling: NUMBER, experimentalPositionCeilingMax: NUMBER, experimentalPositionFloor: OBJECT,
+      mandateMaxDrawdown: NUMBER, heldPortfolioHeat: NUMBER, stopLossPct: NUMBER,
+      minimumExecutablePosition: OBJECT, experimentalPositionFloor: OBJECT,
       positionCurrency: STRING, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
     },
-    describe: 'the cap the investor declared against the cap that actually binds, what reduced it, and what lifts it — plus the venue floor that sits above the control arm\'s single-name cell',
+    describe: 'the cap the investor declared against the cap that actually binds, the risk budget beneath it, whether a checked variant view lets a position exist at all, and the venue minimum compared against the cap',
     run: (input, asOf) => effectivePositionCap({ ...input, asOf }),
   },
   /** The assembled proposal, and the obligations the sizing handed over. (#212 ②) */
@@ -323,7 +333,7 @@ export const OPERATIONS = {
   singleNameBudget: {
     group: 'sizing',
     surface: 'published',
-    mode: 'named', keys: { mandateCashFloor: NUMBER, mandatePositionCap: NUMBER, positions: ARRAY, proposed: ARRAY, controlArmWeight: NUMBER },
+    mode: 'named', keys: { mandateCashFloor: NUMBER, mandatePositionCap: NUMBER, positions: ARRAY, proposed: ARRAY },
     describe: 'what the Mandate\'s own two numbers leave the single-name lanes to hold — `cashFloor` sets the range, `maxPositionWeight` the per name — and what is left of it',
     run: singleNameBudget,
   },
@@ -753,8 +763,8 @@ export const OPERATIONS = {
   controlArmLane: {
     group: 'learning',
     surface: 'published',
-    mode: 'named', keys: { positions: ARRAY, proposed: ARRAY, experimentTotalRemainingWeight: NUMBER },
-    describe: 'the bounded lane whose product is closed outcomes, and which may never be expanded on its own result',
+    mode: 'named', keys: { positions: ARRAY, proposed: ARRAY },
+    describe: 'the lens lane whose product is closed outcomes — its exit registration and concurrency bound, and the prohibition on expanding it on its own result. ⛔ Its size caps were removed in #226',
     run: controlArmLane,
   },
   verdictReport: {

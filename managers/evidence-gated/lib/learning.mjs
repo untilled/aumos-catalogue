@@ -8,9 +8,14 @@ import { METHODOLOGY } from './constants.mjs'
  * The promotion gate wants 30 samples, 10 independent date clusters and 3
  * regimes. `evidence-gates` says a sample is a closed Decision with a forward
  * outcome. Both are right, and together they were a deadlock: the only thing
- * that could fill the gate was a real fill, real fills are capped at the
+ * that could fill the gate was a real fill, real fills were capped at the
  * experimental ceiling, and reaching three regimes at that rate takes years.
  * The gate was decoration.
+ *
+ * ⚠️ **#226 removed one half of that deadlock from both ends.** The ceiling is
+ * gone, so a real fill is a real position; and the gate no longer decides a
+ * size, so it can no longer be decoration for a limit. Three regimes still turn
+ * on the calendar, which is why the paper track below still has a job.
  *
  * The methodology this is ported from had already solved that, and the
  * solution is the part that did not come across. Its plan (approved
@@ -678,6 +683,30 @@ export function verdictReport({ paper = {}, cohort = 'llm-research', shadow = {}
  * positions — 40 trading days or −8%, whichever comes first — is how that gate
  * starts moving. A loss is a valid output.
  *
+ * ── ⛔ The size caps are gone; the role is not (issue #226) ────────────────
+ *
+ * `singleMaxWeight` 1% and `laneTotalMaxWeight` 6% were removed on 2026-09-08
+ * by the investor's decision, with `control_arm_single_cap`,
+ * `control_arm_lane_cap` and `control_arm_exceeds_experiment_total`. Measured:
+ * `variantViewCheck` stood at 0/4 for want of a `consensusRefs` collection
+ * procedure, so **every** candidate fell here and was flattened to 1% — USD
+ * 149.37 on a USD 14,937.07 book, under the USD 200 minimum ticket. The
+ * deadlock the lane was built to break was the deadlock the lane was causing.
+ *
+ * ⚠️ **Everything that made it a control arm survives.** `role`, `purpose`,
+ * `expansionProhibited`, the registered exit discipline, the concurrency bound,
+ * and `verdictReport`'s refusal to promote a control arm however well it did.
+ * The measurement moved rather than stopped: the Aumos decision ledger records
+ * every judgement with its lens and its forward return, so *«a price pattern is
+ * a control arm and not a strategy»* is answered from realised outcomes instead
+ * of from a size limit standing in for one.
+ *
+ * ⛔ **`expansionProhibited` matters more now, not less.** When a control arm
+ * performs well the temptation is to expand it, and expanding it destroys the
+ * control. With no cap holding the lane down, that sentence is the only thing
+ * holding it — and it is a sentence about *promotion*, which is a separate
+ * proposal that must first say what replaces the control.
+ *
  * ⛔ `expansionProhibited` is the part that has to be code. When a control arm
  * performs well the temptation is to expand it, and expanding it destroys the
  * control — after which no edge claim can be verified against anything. A good
@@ -687,7 +716,7 @@ export function verdictReport({ paper = {}, cohort = 'llm-research', shadow = {}
  */
 const CONTROL_ARM = METHODOLOGY.controlArm
 
-export function controlArmLane({ positions = [], proposed = [], experimentTotalRemainingWeight = null } = {}) {
+export function controlArmLane({ positions = [], proposed = [] } = {}) {
   const diagnostics = []
   const rows = [...positions, ...proposed]
   let total = 0
@@ -698,9 +727,6 @@ export function controlArmLane({ positions = [], proposed = [], experimentTotalR
       continue
     }
     total += row.weight
-    if (row.weight > CONTROL_ARM.singleMaxWeight) {
-      diagnostics.push(diagnostic('control_arm_single_cap', 'blocked', 'The control arm buys 1% positions; a bigger one is the main lane and owes a variant view', `${where}.weight`, { weight: row.weight, cap: CONTROL_ARM.singleMaxWeight }))
-    }
     /**
      * The exit discipline is the lane's product. Registering it is what turns
      * "we will review this" into a WATCH `exitCheck` is already looking at, so
@@ -719,17 +745,8 @@ export function controlArmLane({ positions = [], proposed = [], experimentTotalR
       diagnostics.push(diagnostic('control_arm_exit_unregistered', 'blocked', 'A control-arm entry registers its time stop and hard stop before it is an entry; closed outcomes are what this lane is for', `${where}.exitRegistered`, { timeStopTradingDays: CONTROL_ARM.timeStopTradingDays, hardStopPct: CONTROL_ARM.hardStopPct }))
     }
   }
-  if (total > CONTROL_ARM.laneTotalMaxWeight) {
-    diagnostics.push(diagnostic('control_arm_lane_cap', 'blocked', 'The control arm is capped as a whole, not only per name', 'proposed', { total: round(total), cap: CONTROL_ARM.laneTotalMaxWeight }))
-  }
   if (rows.length > CONTROL_ARM.maxConcurrentPositions) {
     diagnostics.push(diagnostic('control_arm_concurrency', 'blocked', 'The control arm holds a bounded number of positions at once', 'proposed', { held: rows.length, maximum: CONTROL_ARM.maxConcurrentPositions }))
-  }
-  /**
-   * It spends inside the experimental total; it is not an extra allowance.
-   */
-  if (finite(experimentTotalRemainingWeight) && total > experimentTotalRemainingWeight) {
-    diagnostics.push(diagnostic('control_arm_exceeds_experiment_total', 'blocked', 'The control arm spends inside the experimental total rather than beside it', 'experimentTotalRemainingWeight', { total: round(total), remaining: experimentTotalRemainingWeight }))
   }
   return {
     data: {
@@ -738,9 +755,16 @@ export function controlArmLane({ positions = [], proposed = [], experimentTotalR
       role: 'control-arm',
       purpose: 'produce-closed-outcomes-not-returns',
       expansionProhibited: true,
-      countsAgainstExperimentTotal: true,
-      variantViewRequired: false,
-      variantViewNote: 'Waived only because the size is bounded at 1% — a candidate that does have a variant view belongs in the main lane, where it can be sized.',
+      /**
+       * ⚠️ **`true` since #226, and it is the opposite of what it was.** The
+       * variant view was waived here *because* the size was bounded at 1%; the
+       * bound is gone, so the waiver has nothing left to stand on and
+       * `effectivePositionCap` refuses an unchecked candidate outright rather
+       * than sizing it small. A price-pattern lens is still what tags this lane
+       * — it is no longer what excuses it from the evidence gate.
+       */
+      variantViewRequired: true,
+      variantViewNote: 'The waiver was paid for by the 1% bound, and #226 removed the bound. Every real-money position owes a checked variant view; the lens is what this lane tags, not what it exempts.',
       admitted: !diagnostics.some((row) => row.severity === 'blocked'),
     },
     diagnostics,

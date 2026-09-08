@@ -177,11 +177,34 @@ export function validateThesis(input) {
  * names the investor actually made money on were in that lane.
  *
  * The port kept the 1% lane and lost the other one: §4's lens-maturity ceiling
- * was applied to *both*, so a candidate with a variant view was held to
- * `experimentalCeiling` — 1.345% on this book — exactly like a mechanical one.
+ * was applied to *both*, so a candidate with a variant view was held to the
+ * experimental ceiling — 1.345% on that book — exactly like a mechanical one.
  * ⛔ **Restoring the second lane is not a relaxation of a gate; it is moving a
- * gate off the lane it was never written for.** Nothing here lowers
- * `promotionGate`, nothing here touches the control arm's 1% / 6%, and
+ * gate off the lane it was never written for.**
+ *
+ * ── ⚠️ It stopped being a size switch (issue #226, 2026-09-08) ────────────
+ *
+ * Both lanes' caps are gone. This check no longer decides *how large*; it
+ * decides *whether there is a position at all* — `effectivePositionCap` raises
+ * `variant_view_required_for_position`, `blocked`, and `targetWeight` returns
+ * `null`. The investor's own words for the alternative: a candidate without a
+ * checked variant view should not be proposed, rather than proposed twenty
+ * times smaller.
+ *
+ * ⛔ **This is not a new bar.** `challengeCleared` is one of the four
+ * requirements below and `targetWeight` has always returned `null` without it.
+ * What changed is that the other three are held to the same standard as the one
+ * that was already fatal — the asymmetry #226 names, where an evidence gate was
+ * doubling as a dial.
+ *
+ * ⚠️ **Which makes the collection procedure the binding work, not the cap.**
+ * Measured on `run_c7ad46eea03840bf84ae7a8822ed02c3`: `consensusRefs` had no
+ * collection procedure, so this check stood at 0/4 and every candidate fell to
+ * a lane that then refused it at USD 149.37. Under #226 the same 0/4 refuses
+ * the candidate outright and says which requirement is outstanding, which is
+ * the honest form of the same answer and the one a person can act on.
+ *
+ * ⛔ Nothing here lowers `promotionGate`, and
  * `controlArmLane.expansionProhibited` still stands: a control-arm *result* is
  * never an argument for size anywhere.
  *

@@ -81,23 +81,25 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    has no ceiling here, because a ceiling on cash-equivalent weight is a floor under deployment by
    another name. ⛔ And it is not a sell signal.
 
-4. Apply evidence maturity **to the lane it belongs to**. ⚠️ The §4 ceiling is the *control arm's*:
-   the source methodology waived the variant view there in exchange for 1% a name, and required one
-   in the main lane, where a name could be sized to the investor's own cap. Call `variantViewCheck`
-   — or pass the candidate's `thesis` and `challengeVerdict` straight to `effectivePositionCap`,
-   which calls it — and it is satisfied only by checked inputs: a complete thesis carrying
-   `variantView`, a dated and sourced `consensusRefs` row, and a cleared challenge. Satisfied, the
-   ceiling does not apply and the Mandate's `maxPositionWeight` plus every concentration cap are
-   what bind. Unsatisfied, nothing changes from what this section already said, and the run is told
-   which requirement is missing (`variant_view_unverified`); asking for `lane: 'main'` without one
-   is `main_lane_requires_variant_view` and never a way past it. ⚠️ Read `requirementReport` rather
+4. **A checked variant view is what makes a position possible — it is not what makes it large.**
+   ⛔ **The maturity lane was removed on 2026-09-08 (#226)**: there is no experimental ceiling, no
+   1% control-arm cell, and no size a failed evidence gate falls to. Call `variantViewCheck` — or
+   pass the candidate's `thesis` and `challengeVerdict` straight to `effectivePositionCap`, which
+   calls it — and it is satisfied only by checked inputs: a complete thesis carrying `variantView`,
+   a dated and sourced `consensusRefs` row, and a cleared challenge. Satisfied, the Mandate's
+   `maxPositionWeight`, the risk budget and every concentration cap are what bind. **Unsatisfied,
+   there is no position**: `variant_view_required_for_position` / `blocked`, and `targetWeight`
+   answers `null`. ⚠️ That is the resolution of the choice #226 left open — an evidence gate that
+   sizes twenty times smaller is a dial, and the honest answer to *"we have not established this"*
+   is not a smaller trade. ⛔ It is not a new bar either: `challengeCleared` is one of the four and
+   has always been fatal on its own. ⚠️ Read `requirementReport` rather
    than `missing` alone (#160): `missing: ["thesisComplete"]` is what three-of-four looks like, and
    the two thesis fields usually holding it — `expectedUpsidePct`, `fairValueRange` — are derived by
    `thesisValuation` from the scenario table, so on a filer the shortfall is an unmade fetch and
-   `thesisGapSources` says so. ⛔ The control arm's 1% / 6% are the
-   source's approved numbers and are not touched, `promotionGate` is not lowered, and a thesis
-   resting on the mechanical cohort is `control_arm_evidence_cited` / `blocked`. ⚠️ **And a main
-   lane opened on a consensus row you filed yourself says so at the approval point** (#692):
+   `thesisGapSources` says so. ⛔ `promotionGate` is not lowered — it reports a lens's record and
+   gates no size (`promotion.gatesSize: false`) — and a thesis resting on the mechanical cohort is
+   `control_arm_evidence_cited` / `blocked`. ⚠️ **And a position opened on a consensus row you
+   filed yourself says so at the approval point** (#692):
    `observation_file` is the only route a web reading has into `evidenceIds`, the row is graded as
    your testimony, and `effectivePositionCap` returns `main_lane_rests_on_manager_attestation` on
    `disclosures`, with the source URLs. Carry that code verbatim in one `rationale.risks` entry and
@@ -106,31 +108,33 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    `main_lane_attestation_undisclosed` / `blocked`. ⛔ It reduces no cap and waives no requirement;
    it refuses opening the lane **quietly**. ⚠️ What total the
    single-name lanes may reach *together* is an open question this revision does not answer.
-   Where the ceiling does apply: `insufficient` and `observing` lenses are capped at the experimental
-   ceiling; `reviewable` is still not promoted and cannot expand solely because its sample threshold
-   was reached. ⚠️ **That ceiling is not the package's experimental ratio alone.** A ratio says nothing
-   about whether the order it permits can be placed: 1% of a 10,095,751 KRW book is 100,958 KRW,
-   which is three shares of a 33,050 KRW name, and a three-share position cannot be scaled into,
-   trimmed, or made to express conviction. So the effective ceiling is the larger of that ratio and
-   `experimentalPositionFloor` — the smallest position worth opening in **that venue's** currency —
-   bounded by the package's ceiling maximum. Call `experimentalCeiling` for it rather than
-   deriving it; `targetWeight` applies the same rule and reports which of the three bound. ⚠️ The
-   ratio and its bound are package constants — only the floor is configured, because what makes an
-   order unexecutable is a fact about a venue.
-   ⛔ When the floor does not fit inside the band the operation says `experimental_floor_unreachable`
-   and the honest answer is that this book cannot run a real-money controlled experiment in that
-   market — not a position rounded up to the cap.
+   ⛔ **Maturity caps nothing (#226).** `insufficient`, `observing` and `reviewable` are sized by
+   the same arithmetic `promoted` is; the experimental ceiling and the control arm's 1% cell were
+   removed on 2026-09-08 by the investor's decision, and the learning temperament moved to the Aumos
+   decision ledger and its Forward Track Record. `maturityStatus` travels for attribution and
+   `targetWeight` reads it for nothing.
+   ⚠️ **What did not move is that a position has to be executable.** `minimumExecutablePosition` —
+   the smallest position worth opening in **that venue's** currency — is what
+   `minimumExecutableWeight` answers, because 1% of a 10,095,751 KRW book is 100,958 KRW, which is
+   three shares of a 33,050 KRW name, and a three-share position cannot be scaled into, trimmed or
+   made to express conviction. ⛔ **It refuses; it never lifts.** A weight below it comes back
+   `minimum_executable_not_met` / `blocked` from `targetWeight` — do not round the position up to
+   the minimum, because then the size measures the rounding and not the idea.
 4a. **Say what the investor's declared cap became.** Call `effectivePositionCap` with
-   `mandatePositionCap`, `maturityStatus`, the `lane` (`control-arm` or `main`) and the same NAV and
-   floor inputs `experimentalCeiling` takes. ⛔ **Do not pass `uncertainty`, `risks` or
-   `effectiveConstraints`** — they are not read here since #212 ② and a call carrying them answers
-   `input_key_unread`. This operation is arithmetic; step 4e is what reads the proposal.
-   It returns `declaredCap`, `effectiveCap`, which of the three limits bound — the Mandate, the
-   lens-maturity ceiling, the control arm's single-name cell — and `unlocksAt`. ⚠️ **This is the
-   asymmetry #151 closed.** A cap nobody declared has been reported every run since the beginning as
-   `concentration_cap_missing`; a cap somebody *did* declare and did not get was reported nowhere.
-   A book on an insufficient lens ran at a twentieth of a declared 0.20 and no output said so.
-   ⛔ A proposal sized under a reduced cap carries the code `position_cap_reduced_by_maturity`
+   `mandatePositionCap`, the candidate's `thesis` and `challengeVerdict`, the risk inputs
+   (`mandateMaxDrawdown`, `heldPortfolioHeat`, this entry's `stopLossPct`) and the same NAV and
+   `minimumExecutablePosition` inputs `minimumExecutableWeight` takes. ⛔ **Do not pass
+   `uncertainty`, `risks` or `effectiveConstraints`** — they are not read here since #212 ② and a
+   call carrying them answers `input_key_unread`. This operation is arithmetic; step 4e is what
+   reads the proposal.
+   It returns `declaredCap`, `effectiveCap`, which of the two limits bound — the Mandate, or the
+   risk budget `(maxDrawdown − heldPortfolioHeat) / |stopLossPct|` beneath it — and `unlocksAt`.
+   ⛔ **It also decides whether there is a position at all**: a candidate without a checked variant
+   view is `variant_view_required_for_position` / `blocked`, not a smaller weight (#226).
+   ⚠️ **This is the asymmetry #151 closed.** A cap nobody declared has been reported every run since
+   the beginning as `concentration_cap_missing`; a cap somebody *did* declare and did not get was
+   reported nowhere.
+   ⛔ A proposal sized under a reduced cap carries the code `position_cap_reduced_below_declared`
    **verbatim** in one `uncertainty` entry **and** this operation's `effectiveConstraints` array
    copied into `DecisionProposal.effectiveConstraints` verbatim, or step 4e comes back
    `position_cap_reduction_undisclosed` / `blocked` — the proposal, never the run. The two halves
@@ -144,10 +148,11 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    is not a claim that nothing bound, because the host draws nothing for an absent row. ⛔ Nothing here raises a cap, and a run that reads it
    as licence to has read it backwards: the disclosure exists precisely so the small number can
    stand without being a secret.
-   ⚠️ `experimental_floor_exceeds_cap` is the second thing it answers: the venue floor above the
-   control arm's 1% cell, which closes the lane to every name at every price. The diagnostic carries
-   the NAV that resolves it. Read the three floor codes outermost-first — `experimental_floor_unreachable`,
-   then `experimental_floor_exceeds_cap`, then #149's `experimental_ladder_unreachable`.
+   ⚠️ `minimum_executable_exceeds_cap` is the second thing it answers: the venue minimum above the
+   cap that actually binds, which closes the book to every name at every price. The diagnostic
+   carries the NAV that resolves it. ⛔ `experimental_floor_unreachable` and
+   `experimental_floor_exceeds_cap` are gone with the band and the cell they measured (#226); read
+   `minimum_executable_exceeds_cap` first and then #149's `experimental_ladder_unreachable`.
 4b. **Check the cash the plan leaves, against the floor the investor declared.** Call
    `effectiveCashFloor` with `mandateCashFloor` — the Mandate's `cashFloor`; this package holds no
    copy of it since #153, when `coreDca.reserveFloorWeight` was removed for being a second,
@@ -171,15 +176,19 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    *"no limit"*; there is no package constant behind it to fall back on, and that is the point —
    after #133 and #153 no sizing constant here answers a question the investor is asked. ⚠️ **A
    budget is not a target.** `remainingWeight` is what the Mandate permits, never what the book
-   should hold. Pass `controlArmWeight` and hand the returned `controlArmRemainingWeight` to
-   `controlArmLane` as `experimentTotalRemainingWeight` — the control arm spends inside this budget
-   rather than beside it.
+   should hold. ⛔ **The control arm has no budget of its own since #226** —
+   `controlArmWeight`, `controlArmRemainingWeight` and `experimentTotalRemainingWeight` are gone
+   with the 6% lane total they fed. Every single name, whichever lens found it, spends inside this
+   one budget.
 4d. **Every entry registers how it will be closed.** Call `exitDiscipline` for the candidate and
    copy `watchesToRegister` into the same proposal as the BUY; without a stop and a review date the
    entry is `exit_rules_unregistered` / `blocked`. The stop distance is the control arm's approved
    −8% in that lane and derived from the Mandate's `maxDrawdown` in every other, so a large position
-   carries a tighter stop than a 1% one — the two lanes holding different numbers is the rule
-   working, not an inconsistency. `skills/evidence-gates` carries the rest.
+   carries a tighter stop than a small one — the two lanes holding different numbers is the rule
+   working, not an inconsistency. ⚠️ **That same stop is an input to sizing now (#226)**: hand it to
+   `effectivePositionCap` as `stopLossPct` and the risk budget
+   `(maxDrawdown − heldPortfolioHeat) / |stopLossPct|` is what holds the position under the
+   Mandate's cap. `skills/evidence-gates` carries the rest.
 4e. **Judge the disclosures once the proposal exists — `proposalDisclosure`.** Hand it the
    `disclosures` array 4a returned (or `targetWeight`'s, which is the same array) **verbatim** and
    the assembled `DecisionProposal`. It answers `disclosed` and, for each obligation, which fields
@@ -298,7 +307,7 @@ bound for a fact that stops mattering at the closing bell.
 | Two correlated holdings breach theme cap and cash must rise | `REBALANCE` with multiple non-negative `targets` |
 
 When OpenDART is unavailable, a new Korean single-name fundamental BUY remains unable-to-judge
-`WAIT` even if the price example looks attractive. When only evidence maturity is low but every
-research input is complete, a controlled experiment may use at most the experimental ceiling — the
-ratio or the venue's minimum executable amount, whichever is larger, and never above
-the package's ceiling maximum.
+`WAIT` even if the price example looks attractive. ⛔ **Low evidence maturity caps nothing since
+#226**: when every research input is complete the position is whatever the quarter-Kelly arithmetic
+asks for, under the Mandate's cap and the risk budget beneath it — and never below the venue's
+minimum executable amount, where it is refused rather than rounded up.

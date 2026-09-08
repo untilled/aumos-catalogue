@@ -214,7 +214,7 @@ export const moneyAmount = at((value, path) => {
  *
  * `portfolio_read` carries `cashByCurrency` as `{ currency, amount }` rows,
  * `sleeveNav` was written against those rows, and this package's other
- * per-currency input — `experimentalPositionFloor` — is an object keyed by
+ * per-currency input — `minimumExecutablePosition` — is an object keyed by
  * currency. The internal type is the **object**, because that is what every
  * reader actually asks of it (*"how much of this one currency"*) and the rows
  * answer it only after being summed.

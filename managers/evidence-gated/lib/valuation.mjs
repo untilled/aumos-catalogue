@@ -11,11 +11,16 @@ import { diagnostic, finite, round } from './diagnostics.mjs'
  *   `variantViewCheck` → `satisfied: [variantView, consensusRefs,
  *   challengeCleared]`, `missing: [thesisComplete]`, and the thesis gaps that
  *   produced it are `catalysts`, `invalidationTriggers`, **`expectedUpsidePct`
- *   and `fairValueRange`** — whereupon `effectivePositionCap` turns a declared
+ *   and `fairValueRange`** — whereupon `effectivePositionCap` turned a declared
  *   `0.2` into an effective `0.01`, a `reductionMultiple` of **20**.
  *
- * ⇒ Three of four requirements were met. The main lane is not shut; it has
+ * ⇒ Three of four requirements were met. The main lane was not shut; it had
  * never once been opened.
+ *
+ * ⚠️ **Since #226 the same shortfall costs the position rather than 95% of
+ * it** — `variant_view_required_for_position` / `blocked` — which makes these
+ * two derivable fields the difference between a proposal and none, and this
+ * operation the thing that closes it.
  *
  * ── ⚠️ Where the fair value comes from, and where it does not ──────────────
  *

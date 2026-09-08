@@ -387,82 +387,177 @@ assert.equal(has(whole, 'audit_decision_window_unstated'), false)
 assert.equal(has(whole, 'audit_decision_window_truncated'), false)
 assert.equal(whole.data.issues.find((row) => row.code === 'audit_position_untracked').explanationReadable, true, 'the whole journal was supplied, so the finding is a fact this run read')
 
-// #149: DKS's capped USD 200 cannot fund three whole-share rungs.
-const ceiling = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', experimentalPositionFloor: { USD: 200, KRW: 300000 }, positionCurrency: 'USD' })
-const weight = ceiling.data.experimentalCeiling
+// #149: a USD 200-scale position cannot fund three whole-share rungs of a $139 name.
+const minimumUsd = run('minimumExecutableWeight', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', minimumExecutablePosition: { USD: 200, KRW: 300000 }, positionCurrency: 'USD' })
+const weight = minimumUsd.data.minimumWeight
+assert.equal(weight, 0.01345312, 'USD 200 against a USD 14,866.44 book, the arithmetic #121 measured')
 const plan = { symbol: 'DKS', lens: 'mean-reversion', maturity: 'insufficient', price: 139.15, plannedTotalWeight: weight, execution: { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'USD', lotSize: 1 }, tranches: [{ weight: weight / 3, condition: { kind: 'immediate' } }, { weight: weight / 3, condition: { kind: 'price-below', threshold: 130 } }, { weight: weight / 3, condition: { kind: 'price-below', threshold: 120 } }] }
 assert.ok(has(run('entryTranchePlan', plan), 'experimental_ladder_unreachable'))
 assert.equal(has(run('entryTranchePlan', { ...plan, price: 50 }), 'experimental_ladder_unreachable'), false)
 assert.ok(has(run('entryTranchePlan', { ...plan, execution: null }), 'experimental_ladder_unevaluated'))
 assert.equal(has(run('entryTranchePlan', { ...plan, execution: { ...plan.execution, lotSize: 0.01 } }), 'experimental_ladder_unreachable'), false)
+
 /**
- * #151: the declared cap and the operative cap, on the book that reported it.
+ * ── #226: the lane that made the position impossible, and what sizes now ────
  *
- * Every number here is the reported run's: NAV USD 14,866.44, a USD 200 venue
- * floor, `experimentalCeiling` 0.01345312 binding on that floor, a control arm
- * that then holds a single name to 0.01, and a Mandate that declared 0.20.
+ * Every number here is `run_c7ad46eea03840bf84ae7a8822ed02c3`'s, asOf
+ * 2026-09-08: NAV **USD 14,937.07**, USDKRW **1,340**, a USD 200 minimum
+ * ticket, and a Mandate declaring `maxPositionWeight` 0.20, `cashFloor` 0.10
+ * and `maxDrawdown` 0.06.
+ *
+ * ⛔ **The measured «before» is the chain the issue names**, and it is asserted
+ * here as *arithmetic that this package can no longer produce*:
+ *
+ *     variantViewCheck 0/4 → forced control arm → flat 1% with no floor lift
+ *     → USD 149.37 < the USD 200 minimum ticket → no single name at any price
+ *
+ * The «after» is below: the venue minimum is 1.338951% of this book, the
+ * Mandate's cap is 20%, the risk budget under it is computed, and the weight
+ * comes out of the quarter-Kelly arithmetic between them.
  */
-const issueBook = { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', experimentalPositionFloor: { USD: 200, KRW: 300000 }, positionCurrency: 'USD' }
-const capOf = (extra = {}) => run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.2, maturityStatus: 'insufficient', lane: 'control-arm', ...extra })
-const declaredVersusEffective = capOf({ promotion: { samples: 0, regimes: 0, clusters: 0 } })
-assert.equal(declaredVersusEffective.data.declaredCap, 0.2)
-assert.equal(declaredVersusEffective.data.effectiveCap, 0.01)
-assert.equal(declaredVersusEffective.data.reducedToFraction, 0.05)
-assert.equal(declaredVersusEffective.data.binding, 'control-arm-lane')
-assert.equal(declaredVersusEffective.data.reason, 'lens_insufficient')
-assert.equal(declaredVersusEffective.data.unlocksAt, 'promotionGate')
-assert.deepEqual(declaredVersusEffective.data.promotion.required, { samples: 30, regimes: 3, clusters: 10 })
-assert.deepEqual(declaredVersusEffective.data.promotion.observed, { samples: 0, regimes: 0, clusters: 0 })
-assert.ok(has(declaredVersusEffective, 'position_cap_reduced_by_maturity'))
-const reduction = declaredVersusEffective.diagnostics.find((row) => row.code === 'position_cap_reduced_by_maturity')
-assert.equal(reduction.severity, 'unevaluated')
-assert.equal(reduction.details.reductionMultiple, 20)
-assert.deepEqual(reduction.details.limits.map((row) => row.source), ['mandate', 'lens-maturity', 'control-arm-lane'])
-// The ceiling alone is not the whole reduction; the lane cap is the part that binds.
-assert.ok(reduction.details.limits.some((row) => row.source === 'lens-maturity' && row.weight === 0.01345312))
-
-const promotedAgainstMandate = run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.2, maturityStatus: 'promoted', uncertainty: [] })
+const measuredBook = { portfolioNav: 14937.07, portfolioNavCurrency: 'USD', minimumExecutablePosition: { USD: 200, KRW: 300000 }, positionCurrency: 'USD', fx: { USDKRW: 1340 } }
+const measuredMinimum = run('minimumExecutableWeight', measuredBook)
+assert.equal(measuredMinimum.data.minimumWeight, 0.01338951, 'the USD 200 ticket as a weight of the measured book')
+assert.equal(run('minimumExecutableWeight', { ...measuredBook, positionCurrency: 'KRW' }).data.minimumWeight, 0.01498825, 'and the KRW 300,000 ticket crossed at the book’s own USDKRW')
+// ⛔ The 1% cell that refused it is not computable any more: there is no lane weight to read.
+assert.equal(METHODOLOGY.controlArm.singleMaxWeight, undefined, 'the control arm has no single-name size cap since #226')
+assert.equal(METHODOLOGY.controlArm.laneTotalMaxWeight, undefined, 'nor a lane total')
+assert.equal(METHODOLOGY.experimentalPositionCeiling, undefined, 'nor a maturity ceiling')
+assert.equal(METHODOLOGY.experimentalPositionCeilingMax, undefined, 'nor a bound the venue amount could lift one to')
 
 /**
- * The row the fund-settings screen draws (untilled/aumos#681, issue #679).
- * `effectiveConstraintSchema` is a strictObject, so the field names are the
- * host's and a methodology name would be refused there.
+ * The variant view. It was a twentyfold size switch; it is a gate on whether a
+ * position exists at all, and the four requirements are byte-for-byte the ones
+ * #153 wrote.
  */
+const consensusRef = { metric: 'consensusTargetPrice', value: 250000, sourceUrl: 'https://example.invalid/consensus', publishedAt: '2026-08-20T00:00:00Z', capturedAt: '2026-08-21T00:00:00Z' }
+const mainLaneThesis = {
+  thesisId: 'th-035420', asset: '035420', createdAt: '2026-08-21T00:00:00Z', coreClaim: 'search monetization inflection', horizonEnd: '2027-03-31T00:00:00Z',
+  evidenceStatus: 'complete', variantView: 'the market prices the ad cycle and not the cloud contribution',
+  consensusRefs: [consensusRef],
+  catalysts: [{ event: 'Q3 result', windowStart: '2026-10-20T00:00:00Z', windowEnd: '2026-11-10T00:00:00Z' }],
+  invalidationTriggers: [{ kind: 'price-below', level: 150000, checkBy: '2026-12-31T00:00:00Z' }],
+  expectedUpsidePct: 32, fairValueRange: { low: 230000, high: 280000 },
+}
+const checked = { thesis: mainLaneThesis, challengeVerdict: 'cleared' }
+const issueBook = { ...measuredBook }
+const capOf = (extra = {}) => run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.2, maturityStatus: 'insufficient', ...checked, ...extra })
+
+// An unchecked candidate is refused rather than sized small — the decision #226 left open, resolved.
+const unchecked = run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.2, maturityStatus: 'insufficient' })
+assert.ok(has(unchecked, 'variant_view_required_for_position'))
+const laneRefusal = unchecked.diagnostics.find((row) => row.code === 'variant_view_required_for_position')
+assert.equal(laneRefusal.severity, 'blocked', 'blocked, not a smaller weight: an evidence gate is not a dial')
+assert.deepEqual(laneRefusal.details.missing, ['thesisComplete', 'variantView', 'consensusRefs', 'challengeCleared'])
+assert.equal(laneRefusal.details.requirementReport.length, 4, 'and which one binds is nameable (#160)')
+assert.ok(has(unchecked, 'variant_view_unverified'))
+// ⛔ It is the fourth quarter of a gate that already blocked: `challengeCleared` alone was always fatal.
+const onlyChallengeMissing = run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.2, thesis: mainLaneThesis, challengeVerdict: 'conditional_watch' })
+assert.deepEqual(onlyChallengeMissing.diagnostics.find((row) => row.code === 'variant_view_required_for_position').details.missing, ['challengeCleared'])
+// Every requirement is load-bearing, and every failure is the same refusal rather than a smaller lane.
+for (const [label, extra] of [
+  ['no variant view statement', { thesis: { ...mainLaneThesis, variantView: '' } }],
+  ['no dated consensus citation', { thesis: { ...mainLaneThesis, consensusRefs: [] } }],
+  ['a citation published after it was captured', { thesis: { ...mainLaneThesis, consensusRefs: [{ ...consensusRef, publishedAt: '2026-08-22T00:00:00Z' }] } }],
+  ['a citation published after asOf', { thesis: { ...mainLaneThesis, consensusRefs: [{ ...consensusRef, publishedAt: '2027-01-01T00:00:00Z', capturedAt: '2027-01-02T00:00:00Z' }] } }],
+  ['an incomplete thesis', { thesis: { ...mainLaneThesis, evidenceStatus: 'incomplete' } }],
+  ['a conditional challenge verdict', { challengeVerdict: 'conditional_watch' }],
+  ['no thesis at all', { thesis: undefined }],
+]) {
+  const fallen = capOf(extra)
+  assert.equal(fallen.data.variantViewVerified, false, `${label} is not a variant view`)
+  assert.equal(fallen.data.resolvedLane, 'control-arm', `${label} carries the control-arm lens tag`)
+  assert.ok(has(fallen, 'variant_view_required_for_position'), `${label} refuses the position`)
+  assert.equal(fallen.data.effectiveCap, 0.2, `${label} is not sized smaller — the cap is untouched and the position is refused`)
+}
+// The control arm's own record may not buy a position on a variant view.
+const citingTheArm = capOf({ evidenceSamples: [{ setup: 'mean_reversion', cohort: 'mechanical-baseline' }] })
+assert.ok(has(citingTheArm, 'control_arm_evidence_cited'))
+assert.equal(citingTheArm.diagnostics.find((row) => row.code === 'control_arm_evidence_cited').severity, 'blocked')
+assert.equal(citingTheArm.data.variantViewVerified, false)
+// The research cohort's own record is not the control arm's.
+assert.equal(capOf({ evidenceSamples: [{ setup: 'thesis_call' }] }).data.variantViewVerified, true)
+// The promotion gate is not lowered by any of this — it simply gates nothing.
+assert.deepEqual(METHODOLOGY.promotionGate, { samples: 30, regimes: 3, clusters: 10 })
+assert.equal(capOf().data.promotion.gatesSize, false)
+
+/**
+ * The Mandate is the ceiling and the risk budget is what sits under it. ⛔ The
+ * cap is never lowered for maturity, for a lens or for a lane.
+ */
+const mandateOnly = capOf()
+assert.equal(mandateOnly.data.declaredCap, 0.2)
+assert.equal(mandateOnly.data.effectiveCap, 0.2)
+assert.equal(mandateOnly.data.binding, 'mandate')
+assert.equal(mandateOnly.data.reduced, false)
+assert.deepEqual(mandateOnly.data.limits.map((row) => row.source), ['mandate'])
+assert.deepEqual(mandateOnly.data.effectiveConstraints, [], 'a cap that was not reduced draws no row')
+assert.equal(mandateOnly.data.variantViewVerified, true)
+assert.equal(mandateOnly.data.resolvedLane, 'main')
+// ⛔ An undeclared risk budget is unevaluated, never a pass.
+assert.ok(has(mandateOnly, 'position_risk_budget_unevaluated'))
+assert.equal(mandateOnly.diagnostics.find((row) => row.code === 'position_risk_budget_unevaluated').severity, 'unevaluated')
+assert.equal(mandateOnly.data.riskBudget.weight, null)
+// Declared, and it binds: 0.06 of drawdown with 0.045 already held is 0.015 of headroom at a −8% stop.
+const budgeted = capOf({ mandateMaxDrawdown: 0.06, heldPortfolioHeat: 0.045, stopLossPct: -0.08 })
+assert.equal(budgeted.data.riskBudget.weight, 0.1875)
+assert.equal(budgeted.data.effectiveCap, 0.1875)
+assert.equal(budgeted.data.binding, 'risk-budget')
+assert.equal(budgeted.data.reason, 'risk_budget')
+assert.equal(budgeted.data.unlocksAt, 'portfolioHeat')
+assert.equal(budgeted.data.reduced, true)
+assert.equal(has(budgeted, 'position_risk_budget_unevaluated'), false)
+// On an empty book the same stop leaves more headroom than the Mandate allows, so the Mandate binds.
+const roomy = capOf({ mandateMaxDrawdown: 0.06, stopLossPct: -0.08 })
+assert.equal(roomy.data.riskBudget.weight, 0.75)
+assert.equal(roomy.data.effectiveCap, 0.2)
+assert.equal(roomy.data.binding, 'mandate')
+assert.equal(roomy.data.reduced, false)
+
+/**
+ * The disclosure. The row the fund-settings screen draws
+ * (untilled/aumos#681, issue #679) — `effectiveConstraintSchema` is a
+ * strictObject, so the field names are the host's and a methodology name would
+ * be refused there. ⚠️ The code is `position_cap_reduced_below_declared` since
+ * #226: maturity is not what reduces a cap any more, so the old token named a
+ * rule that no longer exists.
+ */
+const declaredVersusEffective = budgeted
 const constraints = declaredVersusEffective.data.effectiveConstraints
+assert.ok(has(declaredVersusEffective, 'position_cap_reduced_below_declared'))
+const reduction = declaredVersusEffective.diagnostics.find((row) => row.code === 'position_cap_reduced_below_declared')
+assert.equal(reduction.severity, 'unevaluated')
+assert.equal(reduction.details.reductionMultiple, 1.0667)
+assert.deepEqual(reduction.details.limits.map((row) => row.source), ['mandate', 'risk-budget'])
 assert.deepEqual(constraints, [{
   field: 'maxPositionWeight',
   declared: 0.2,
-  effective: 0.01,
-  reason: 'lens_insufficient',
-  unlocks: 'promotionGate: samples 0/30 \u00b7 regimes 0/3 \u00b7 clusters 0/10',
+  effective: 0.1875,
+  reason: 'risk_budget',
+  unlocks: 'portfolioHeat: maxDrawdown 0.06 · held 0.045 · stop 0.08',
 }])
 assert.deepEqual(Object.keys(constraints[0]).sort(), ['declared', 'effective', 'field', 'reason', 'unlocks'], 'no key the host schema does not carry')
 // `declared` is echoed from this run's mandate rather than pinned to one book.
-assert.equal(capOf({ mandatePositionCap: 0.1 }).data.effectiveConstraints[0].declared, 0.1)
-// No inequality, no row — and an unpromoted lens whose ceiling clears the Mandate emits nothing.
-assert.deepEqual(run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.005, maturityStatus: 'insufficient', lane: 'control-arm' }).data.effectiveConstraints, [])
-assert.deepEqual(promotedAgainstMandate.data.effectiveConstraints, [])
+assert.equal(capOf({ mandatePositionCap: 0.3, mandateMaxDrawdown: 0.06, heldPortfolioHeat: 0.045, stopLossPct: -0.08 }).data.effectiveConstraints[0].declared, 0.3)
+// No inequality, no row.
+assert.deepEqual(roomy.data.effectiveConstraints, [])
 // Only the axis this methodology actually narrows is named.
 assert.deepEqual([...new Set(constraints.map((row) => row.field))], ['maxPositionWeight'])
+// ⛔ The retired token has no producer left anywhere in this package.
+assert.equal(has(declaredVersusEffective, 'position_cap_reduced_by_maturity'), false)
 
 /**
  * ── #212 ②: the calculation says what must be disclosed; another operation
  * says whether it was ─────────────────────────────────────────────────────
- *
- * ⚠️ **The obligation is a structured row now, not a prose read.**
- * `effectivePositionCap` used to scan `uncertainty` for a substring and push
- * `blocked`, which `targetWeight` turns into `targetWeight: null` — so a
- * reworded sentence moved a position weight. The row below is what replaced
- * the scan, and `proposalDisclosure` is what refuses silence.
  */
-assert.deepEqual(declaredVersusEffective.data.disclosures.map((row) => row.code), ['position_cap_reduced_by_maturity'])
+assert.deepEqual(declaredVersusEffective.data.disclosures.map((row) => row.code), ['position_cap_reduced_below_declared'])
 const capDisclosure = declaredVersusEffective.data.disclosures[0]
 assert.deepEqual(capDisclosure.fields, ['uncertainty', 'effectiveConstraints'], 'both halves, and they are different readers')
 assert.equal(capDisclosure.undisclosedCode, 'position_cap_reduction_undisclosed', 'the refusal keeps the code it always had')
 assert.deepEqual(capDisclosure.expect.effectiveConstraints, constraints, 'and it carries the row to copy, so the check has something exact to compare')
-assert.deepEqual(capDisclosure.details, { declared: 0.2, effective: 0.01 })
+assert.deepEqual(capDisclosure.details, { declared: 0.2, effective: 0.1875 })
 // A cap that was not reduced owes the proposal nothing.
-assert.deepEqual(promotedAgainstMandate.data.disclosures, [])
+assert.deepEqual(roomy.data.disclosures, [])
 
 // ⛔ The arithmetic no longer reads any of the three prose fields, and says so.
 for (const field of ['uncertainty', 'risks', 'effectiveConstraints']) {
@@ -479,20 +574,20 @@ const disclosureOf = (proposal) => run('proposalDisclosure', { disclosures: capD
 assert.equal(disclosureOf().data.disclosed, null, 'a call made before the proposal exists leaves the disclosure unjudged')
 assert.equal(has(disclosureOf(), 'position_cap_reduction_undisclosed'), false)
 assert.ok(has(disclosureOf({ uncertainty: ['the sweep found one candidate'] }), 'position_cap_reduction_undisclosed'))
-assert.equal(has(disclosureOf({ uncertainty: ['position_cap_reduced_by_maturity: 0.20 declared, 0.01 operative'], effectiveConstraints: constraints }), 'position_cap_reduction_undisclosed'), false)
+assert.equal(has(disclosureOf({ uncertainty: ['position_cap_reduced_below_declared: 0.20 declared, 0.1875 operative'], effectiveConstraints: constraints }), 'position_cap_reduction_undisclosed'), false)
 // Prose without the machine-readable row is still an undisclosed reduction.
-const proseOnly = disclosureOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: [] })
+const proseOnly = disclosureOf({ uncertainty: ['position_cap_reduced_below_declared'], effectiveConstraints: [] })
 assert.ok(has(proseOnly, 'position_cap_reduction_undisclosed'))
 assert.deepEqual(proseOnly.diagnostics.find((row) => row.code === 'position_cap_reduction_undisclosed').details.missing, ['effectiveConstraints'])
 // And the row without the prose is the same silence from the other side.
 assert.deepEqual(disclosureOf({ uncertainty: [], effectiveConstraints: constraints }).diagnostics.find((row) => row.code === 'position_cap_reduction_undisclosed').details.missing, ['uncertainty'])
 // Both halves carried, and the run is clear.
-const bothHalves = disclosureOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: constraints })
+const bothHalves = disclosureOf({ uncertainty: ['position_cap_reduced_below_declared'], effectiveConstraints: constraints })
 assert.equal(has(bothHalves, 'position_cap_reduction_undisclosed'), false)
 assert.equal(bothHalves.data.disclosed, true)
-assert.deepEqual(bothHalves.data.required, ['position_cap_reduced_by_maturity'])
+assert.deepEqual(bothHalves.data.required, ['position_cap_reduced_below_declared'])
 // A row naming another number is not this reduction.
-assert.ok(has(disclosureOf({ uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: [{ ...constraints[0], effective: 0.2 }] }), 'position_cap_reduction_undisclosed'))
+assert.ok(has(disclosureOf({ uncertainty: ['position_cap_reduced_below_declared'], effectiveConstraints: [{ ...constraints[0], effective: 0.2 }] }), 'position_cap_reduction_undisclosed'))
 // An absent `disclosures` array is not an empty one: nothing was judged and nothing is claimed.
 const noObligation = run('proposalDisclosure', { proposal: { uncertainty: [] } })
 assert.equal(noObligation.data.disclosed, null)
@@ -501,27 +596,23 @@ assert.equal(run('proposalDisclosure', { disclosures: [], proposal: { uncertaint
 
 /**
  * ── The invariant this issue is about: prose cannot move a number (#212 ②) ──
- *
- * Every field the arithmetic used to read, varied across the shapes that used
- * to change the answer — absent, empty, silent prose, the token, the wrong
- * number — against the two operations that produce a size. ⛔ If any of these
- * ever differ again, the calculator is reading sentences.
  */
 const proseShapes = [
   {},
   { uncertainty: [], risks: [], effectiveConstraints: [] },
   { uncertainty: ['the sweep found one candidate'], risks: ['idiosyncratic single-name risk'] },
-  { uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: constraints },
-  { uncertainty: ['position_cap_reduced_by_maturity'], effectiveConstraints: [{ ...constraints[0], effective: 0.2 }] },
+  { uncertainty: ['position_cap_reduced_below_declared'], effectiveConstraints: constraints },
+  { uncertainty: ['position_cap_reduced_below_declared'], effectiveConstraints: [{ ...constraints[0], effective: 0.2 }] },
   { risks: ['main_lane_rests_on_manager_attestation'], uncertainty: ['main_lane_rests_on_manager_attestation'] },
 ]
-const numericKeys = ['declaredCap', 'effectiveCap', 'binding', 'reduced', 'reducedToFraction', 'reason', 'unlocksAt', 'resolvedLane', 'mainLaneOpen', 'ceilingApplies', 'effectiveConstraints']
-const capBaseline = capOf()
-const sizedInput = { ...issueBook, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'insufficient', researchGate: 'passed', challengeVerdict: 'cleared' }
+const numericKeys = ['declaredCap', 'effectiveCap', 'binding', 'reduced', 'reducedToFraction', 'reason', 'unlocksAt', 'resolvedLane', 'variantViewVerified', 'effectiveConstraints']
+const riskInputs = { mandateMaxDrawdown: 0.06, heldPortfolioHeat: 0.045, stopLossPct: -0.08 }
+const capBaseline = capOf(riskInputs)
+const sizedInput = { ...issueBook, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'insufficient', researchGate: 'passed', challengeVerdict: 'cleared', thesis: mainLaneThesis, ...riskInputs }
 const weightBaseline = run('targetWeight', sizedInput)
 for (const shape of proseShapes) {
   const label = JSON.stringify(shape)
-  const capAnswer = capOf(shape)
+  const capAnswer = capOf({ ...riskInputs, ...shape })
   for (const key of numericKeys) {
     assert.deepEqual(capAnswer.data[key], capBaseline.data[key], `effectivePositionCap.${key} is unmoved by ${label}`)
   }
@@ -535,123 +626,130 @@ for (const shape of proseShapes) {
 assert.equal(capBaseline.data.reduced, true)
 assert.equal(weightBaseline.data.positionCapReduced, true)
 
-// A promoted lens is held to the Mandate alone, so there is nothing to disclose.
-const promoted = promotedAgainstMandate
-assert.equal(promoted.data.effectiveCap, 0.2)
-assert.equal(promoted.data.reduced, false)
-assert.equal(has(promoted, 'position_cap_reduced_by_maturity'), false)
-assert.equal(has(promoted, 'experimental_floor_exceeds_cap'), false)
-// An undeclared cap is reported under the code it always had, and no ratio is invented.
-const undeclared = run('effectivePositionCap', { ...issueBook, maturityStatus: 'insufficient' })
+// An undeclared cap is reported under the code it always had.
+const undeclared = run('effectivePositionCap', { ...issueBook, maturityStatus: 'insufficient', ...checked })
 assert.ok(has(undeclared, 'concentration_inputs_missing'))
 assert.equal(undeclared.data.reduced, false)
 
-// The floor sits above the control arm's single-name cell: no US name enters at any price.
-assert.ok(has(declaredVersusEffective, 'experimental_floor_exceeds_cap'))
-const conflict = declaredVersusEffective.diagnostics.find((row) => row.code === 'experimental_floor_exceeds_cap')
-assert.equal(conflict.severity, 'unevaluated')
-assert.equal(conflict.details.laneCellAmount, 148.66)
-assert.equal(conflict.details.floorAmount, 200)
-assert.equal(conflict.details.resolvesAtNav, 20000, 'the NAV that resolves it is stated, not rediscovered every run')
-// At that NAV the floor is exactly the cell and the conflict is gone.
-assert.equal(has(capOf({ portfolioNav: 20000 }), 'experimental_floor_exceeds_cap'), false)
+/**
+ * ── The venue minimum refuses; it never lifts (#121, #226) ────────────────
+ *
+ * ⛔ `experimental_floor_exceeds_cap` compared the minimum against the control
+ * arm's 1% cell and is deleted with the cell. What replaced it compares against
+ * the cap that actually binds — and on the measured book USD 200 is 1.34% of a
+ * 20% cap, so it does not fire at all. That is the fix: the position the
+ * arithmetic asks for is above the minimum ticket, where before it was below.
+ */
+assert.equal(has(declaredVersusEffective, 'experimental_floor_exceeds_cap'), false, 'the code is gone with the cell it measured')
+assert.equal(has(declaredVersusEffective, 'minimum_executable_exceeds_cap'), false, 'and the minimum sits far under the cap that replaced it')
+assert.equal(declaredVersusEffective.data.minimumVersusCap.exceeds, false)
+assert.equal(declaredVersusEffective.data.minimumVersusCap.capAmount, 2800.7, '18.75% of the measured book, against a USD 200 ticket')
+// A book small enough for the minimum to exceed its own cap is still told so.
+const tinyBook = run('effectivePositionCap', { ...issueBook, portfolioNav: 5000, mandatePositionCap: 0.02, maturityStatus: 'insufficient', ...checked })
+assert.ok(has(tinyBook, 'minimum_executable_exceeds_cap'))
+const tiny = tinyBook.diagnostics.find((row) => row.code === 'minimum_executable_exceeds_cap')
+assert.equal(tiny.severity, 'unevaluated')
+assert.equal(tiny.details.capAmount, 100)
+assert.equal(tiny.details.minimumAmount, 200)
+assert.equal(tiny.details.resolvesAtNav, 10000, 'the NAV that resolves it is stated, not rediscovered every run')
 // #149's ladder code is a different question and does not answer this one.
 assert.equal(has(declaredVersusEffective, 'experimental_ladder_unreachable'), false)
-assert.equal(has(run('entryTranchePlan', plan), 'experimental_floor_exceeds_cap'), false)
-
-// targetWeight carries the same two numbers rather than a second copy of the arithmetic.
-const sized = run('targetWeight', { ...issueBook, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'insufficient', researchGate: 'passed', challengeVerdict: 'cleared' })
-assert.equal(sized.data.declaredPositionCap, 0.2)
-assert.equal(sized.data.effectivePositionCap, 0.01345312)
-assert.equal(sized.data.positionCapReduced, true)
-assert.equal(sized.data.positionCapUnlocksAt, 'promotionGate')
-assert.ok(has(sized, 'position_cap_reduced_by_maturity'))
-assert.equal(sized.data.targetWeight, 0.01345312)
-assert.deepEqual(sized.data.effectiveConstraints, [{ field: 'maxPositionWeight', declared: 0.2, effective: 0.01345312, reason: 'lens_insufficient', unlocks: 'promotionGate: samples 30 \u00b7 regimes 3 \u00b7 clusters 10' }])
+assert.equal(has(run('entryTranchePlan', plan), 'minimum_executable_exceeds_cap'), false)
 
 /**
- * #153: the main lane, the control arm, and the floor the investor declared.
+ * ── The weight comes out of the arithmetic, and 20% is above it (#226) ─────
  *
- * The same book as #151 — NAV USD 14,866.44, 57% of it cash, a USD 200 venue
- * floor, a Mandate declaring `maxPositionWeight` 0.20 and `cashFloor` 0.10 —
- * and the source methodology's own approved control-arm numbers, 1% a name and
- * 6% a lane, which nothing below moves.
+ * ⚠️ This is the assertion the issue asks for by name: *«never automatically
+ * 20%».* The old `rawWeight` was `(expected / |downside|) × conviction`, which
+ * exceeds 1.0 at any reward-risk of 2 above half conviction, so every candidate
+ * that reached a cap was sized at it. The quarter-Kelly arithmetic answers a
+ * weight instead, and the Mandate is the ceiling above it.
  */
-const consensusRef = { metric: 'consensusTargetPrice', value: 250000, sourceUrl: 'https://example.invalid/consensus', publishedAt: '2026-08-20T00:00:00Z', capturedAt: '2026-08-21T00:00:00Z' }
-const mainLaneThesis = {
-  thesisId: 'th-035420', asset: '035420', createdAt: '2026-08-21T00:00:00Z', coreClaim: 'search monetization inflection', horizonEnd: '2027-03-31T00:00:00Z',
-  evidenceStatus: 'complete', variantView: 'the market prices the ad cycle and not the cloud contribution',
-  consensusRefs: [consensusRef],
-  catalysts: [{ event: 'Q3 result', windowStart: '2026-10-20T00:00:00Z', windowEnd: '2026-11-10T00:00:00Z' }],
-  invalidationTriggers: [{ kind: 'price-below', level: 150000, checkBy: '2026-12-31T00:00:00Z' }],
-  expectedUpsidePct: 32, fairValueRange: { low: 230000, high: 280000 },
-}
-const laneOf = (extra = {}) => run('effectivePositionCap', { ...issueBook, mandatePositionCap: 0.2, maturityStatus: 'insufficient', ...extra })
+const sizedShape = { ...issueBook, mandatePositionCap: 0.2, researchGate: 'passed', challengeVerdict: 'cleared', thesis: mainLaneThesis, maturityStatus: 'insufficient' }
+const kogasLike = run('targetWeight', { ...sizedShape, expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.35 })
+assert.equal(kogasLike.data.sizing.mode, 'quarter-kelly')
+assert.equal(kogasLike.data.sizing.kellyFraction, 0.25)
+assert.equal(kogasLike.data.sizing.rewardRisk, 2.08333333)
+assert.equal(kogasLike.data.targetWeight, 0.07916667)
+assert.equal(kogasLike.data.bindingCap, 0.2, 'the Mandate is the ceiling and it is not what answered')
+assert.ok(kogasLike.data.targetWeight < kogasLike.data.bindingCap, '⛔ the cap is never the answer by default')
+assert.ok(kogasLike.data.targetWeight > measuredMinimum.data.minimumWeight, 'and it is above the USD 200 minimum ticket — USD 1,182 against the USD 149.37 the lane produced')
+// The same inputs at a lower conviction: the arithmetic shrinks the position rather than a lane doing it.
+assert.equal(run('targetWeight', { ...sizedShape, expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.33 }).data.targetWeight, 0.0175)
+// A non-positive edge is zero, not a token position.
+const noEdge = run('targetWeight', { ...sizedShape, expectedActiveReturn: 0.1, downsideReturn: -0.12, conviction: 0.3 })
+assert.ok(has(noEdge, 'position_edge_not_positive'))
+assert.equal(noEdge.data.targetWeight, 0)
+// A weight the arithmetic put under the venue minimum is refused, never rounded up to it.
+const belowTicket = run('targetWeight', { ...sizedShape, expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.328 })
+assert.ok(belowTicket.data.rawWeight > 0 && belowTicket.data.rawWeight < measuredMinimum.data.minimumWeight)
+assert.ok(has(belowTicket, 'minimum_executable_not_met'))
+assert.equal(belowTicket.diagnostics.find((row) => row.code === 'minimum_executable_not_met').severity, 'blocked')
+assert.equal(belowTicket.data.targetWeight, null, '⛔ refused rather than lifted to the floor — the direction #226 insists on')
+// An unchecked variant view produces no weight at all.
+const uncheckedWeight = run('targetWeight', { ...issueBook, mandatePositionCap: 0.2, researchGate: 'passed', challengeVerdict: 'cleared', expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.35 })
+assert.ok(has(uncheckedWeight, 'variant_view_required_for_position'))
+assert.equal(uncheckedWeight.data.targetWeight, null)
+// `maturityStatus` sizes nothing: the four values answer identically.
+const byMaturity = ['insufficient', 'observing', 'reviewable', 'promoted'].map((maturityStatus) =>
+  run('targetWeight', { ...sizedShape, maturityStatus, expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.35 }).data.targetWeight)
+assert.deepEqual(byMaturity, [0.07916667, 0.07916667, 0.07916667, 0.07916667], '⛔ maturity is an attribution label and no longer a size multiplier')
+// And its absence is no longer a diagnostic, because nothing reads it.
+assert.equal(has(run('targetWeight', { ...sizedShape, maturityStatus: undefined, expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.35 }), 'maturity_status_invalid'), false)
+assert.ok(has(run('targetWeight', { ...sizedShape, maturityStatus: 'graduated', expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.35 }), 'maturity_status_invalid'))
+// Sector headroom still binds — nothing here is an exemption from concentration.
+assert.equal(run('targetWeight', { ...sizedShape, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, sectorHeadroom: 0.04 }).data.targetWeight, 0.04)
+// The risk budget binds through `targetWeight` too, and the disclosure travels with it.
+const budgetedWeight = run('targetWeight', { ...sizedShape, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, ...riskInputs })
+assert.equal(budgetedWeight.data.effectivePositionCap, 0.1875)
+assert.equal(budgetedWeight.data.targetWeight, 0.1875)
+assert.equal(budgetedWeight.data.positionCapUnlocksAt, 'portfolioHeat')
+assert.deepEqual(budgetedWeight.data.disclosures.map((row) => row.code), ['position_cap_reduced_below_declared'])
 
-// A checked variant view is sized by the Mandate, not by the maturity ceiling.
-const mainLane = laneOf({ lane: 'main', thesis: mainLaneThesis, challengeVerdict: 'cleared' })
-assert.equal(mainLane.data.variantView.verified, true)
-assert.deepEqual(mainLane.data.variantView.missing, [])
-assert.equal(mainLane.data.resolvedLane, 'main')
-assert.equal(mainLane.data.ceilingApplies, false)
-assert.equal(mainLane.data.effectiveCap, 0.2)
-assert.equal(mainLane.data.reduced, false)
-assert.equal(mainLane.data.reason, null)
-assert.deepEqual(mainLane.data.effectiveConstraints, [], 'a cap that was not reduced draws no row')
-assert.equal(has(mainLane, 'position_cap_reduced_by_maturity'), false)
-assert.equal(has(mainLane, 'experimental_floor_exceeds_cap'), false, 'the control arm cell is not this candidate cell')
-// The Mandate still governs the lane it opened.
-assert.equal(laneOf({ lane: 'main', thesis: mainLaneThesis, challengeVerdict: 'cleared', mandatePositionCap: 0.05 }).data.effectiveCap, 0.05)
+/**
+ * ── The old config key still reads, and says it was renamed (#226) ─────────
+ */
+const oldKey = run('minimumExecutableWeight', { portfolioNav: 14937.07, portfolioNavCurrency: 'USD', experimentalPositionFloor: { USD: 200, KRW: 300000 }, positionCurrency: 'USD' })
+assert.equal(oldKey.data.minimumWeight, 0.01338951, 'the same number under the pre-#226 spelling')
+assert.equal(oldKey.data.keyRead, 'experimentalPositionFloor')
+assert.ok(has(oldKey, 'minimum_executable_key_renamed'))
+assert.equal(oldKey.diagnostics.find((row) => row.code === 'minimum_executable_key_renamed').severity, 'info', 'a rename is not a refusal')
+assert.equal(has(measuredMinimum, 'minimum_executable_key_renamed'), false)
+// An undeclared minimum is unjudged rather than absent, and there is no ratio left to fall back on.
+assert.ok(has(run('minimumExecutableWeight', { portfolioNav: 14937.07, portfolioNavCurrency: 'USD', positionCurrency: 'USD' }), 'minimum_executable_unevaluated'))
+assert.equal(run('minimumExecutableWeight', { portfolioNav: 14937.07, portfolioNavCurrency: 'USD', positionCurrency: 'USD' }).data.minimumWeight, null)
+// A bare amount names no venue and is refused by the published contract.
+assert.ok(has(run('minimumExecutableWeight', { portfolioNav: 14937.07, portfolioNavCurrency: 'USD', positionCurrency: 'KRW', minimumExecutablePosition: 300000 }), 'input_shape_invalid'))
 
-// Every requirement is load-bearing, and each failure falls to the control arm rather than through.
-for (const [label, extra] of [
-  ['no variant view statement', { thesis: { ...mainLaneThesis, variantView: '' } }],
-  ['no dated consensus citation', { thesis: { ...mainLaneThesis, consensusRefs: [] } }],
-  ['a citation published after it was captured', { thesis: { ...mainLaneThesis, consensusRefs: [{ ...consensusRef, publishedAt: '2026-08-22T00:00:00Z' }] } }],
-  ['a citation published after asOf', { thesis: { ...mainLaneThesis, consensusRefs: [{ ...consensusRef, publishedAt: '2027-01-01T00:00:00Z', capturedAt: '2027-01-02T00:00:00Z' }] } }],
-  ['an incomplete thesis', { thesis: { ...mainLaneThesis, evidenceStatus: 'incomplete' } }],
-  ['a conditional challenge verdict', { challengeVerdict: 'conditional_watch' }],
-  ['no thesis at all', { thesis: undefined }],
-]) {
-  const fallen = laneOf({ lane: 'main', thesis: mainLaneThesis, challengeVerdict: 'cleared', ...extra })
-  assert.equal(fallen.data.variantView.verified, false, `${label} is not a variant view`)
-  assert.equal(fallen.data.resolvedLane, 'control-arm', `${label} falls to the control arm`)
-  assert.equal(fallen.data.effectiveCap, 0.01345312, `${label} is held to the experimental ceiling`)
-  assert.ok(has(fallen, 'variant_view_unverified'))
-  assert.ok(has(fallen, 'main_lane_requires_variant_view'), 'asking for the lane is not a way into it')
-}
-
-// The control arm's approved numbers are untouched, and an explicit request for it is honoured.
-assert.equal(METHODOLOGY.controlArm.singleMaxWeight, 0.01)
-assert.equal(METHODOLOGY.controlArm.laneTotalMaxWeight, 0.06)
-const armWithView = laneOf({ lane: 'control-arm', thesis: mainLaneThesis, challengeVerdict: 'cleared' })
-assert.equal(armWithView.data.effectiveCap, 0.01, 'a request for the bounded lane is never overridden into a larger one')
-assert.equal(armWithView.data.resolvedLane, 'control-arm')
-assert.deepEqual(run('controlArmLane', { proposed: [{ symbol: 'M1', weight: 0.02, exitRegistered: true }] }).data.limits.singleMaxWeight, 0.01)
-
-// The promotion gate is not lowered by any of this.
-assert.deepEqual(METHODOLOGY.promotionGate, { samples: 30, regimes: 3, clusters: 10 })
-
-// The control arm's own record may not buy size in the main lane.
-const citingTheArm = laneOf({ lane: 'main', thesis: mainLaneThesis, challengeVerdict: 'cleared', evidenceSamples: [{ setup: 'mean_reversion', cohort: 'mechanical-baseline' }] })
-assert.ok(has(citingTheArm, 'control_arm_evidence_cited'))
-assert.equal(citingTheArm.diagnostics.find((row) => row.code === 'control_arm_evidence_cited').severity, 'blocked')
-assert.equal(citingTheArm.data.variantView.verified, false)
-assert.equal(citingTheArm.data.effectiveCap, 0.01345312)
-// The research cohort's own record is not the control arm's.
-assert.equal(laneOf({ lane: 'main', thesis: mainLaneThesis, challengeVerdict: 'cleared', evidenceSamples: [{ setup: 'thesis_call' }] }).data.variantView.verified, true)
-
-// Nothing about an unverified candidate changed: #151's numbers still stand exactly.
-assert.equal(capOf({ promotion: { samples: 0, regimes: 0, clusters: 0 } }).data.effectiveCap, 0.01)
-assert.equal(run('targetWeight', { ...issueBook, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'insufficient', researchGate: 'passed', challengeVerdict: 'cleared' }).data.targetWeight, 0.01345312)
-// and a verified one is sized by the Mandate all the way through `targetWeight`.
-const sizedOnMainLane = run('targetWeight', { ...issueBook, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'insufficient', researchGate: 'passed', challengeVerdict: 'cleared', lane: 'main', thesis: mainLaneThesis })
-assert.equal(sizedOnMainLane.data.variantViewVerified, true)
-assert.equal(sizedOnMainLane.data.experimentalCeilingApplies, false)
-assert.equal(sizedOnMainLane.data.targetWeight, 0.2)
-assert.deepEqual(sizedOnMainLane.data.effectiveConstraints, [])
-// Sector headroom still binds it — the lane is not an exemption from concentration.
-assert.equal(run('targetWeight', { ...issueBook, expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, sectorHeadroom: 0.04, maturityStatus: 'insufficient', researchGate: 'passed', challengeVerdict: 'cleared', lane: 'main', thesis: mainLaneThesis }).data.targetWeight, 0.04)
+/**
+ * ── `policyLint` does not stand in the way of this revision (#226 ⚠️2) ─────
+ *
+ * It judges *configuration* changes a run proposes, and the removed values were
+ * `METHODOLOGY` constants it never saw. The one config key involved was
+ * renamed, not moved: same number, same venue. ⚠️ Its declared direction is
+ * reversed, and that is the honest reading — the minimum refuses now instead of
+ * lifting a ceiling, so a larger one is the stricter manager and lowering it is
+ * the relaxation `policyLint` exists to refuse.
+ */
+const unchangedFloor = run('policyLint', {
+  current: { minimumExecutablePosition: { KRW: 300000, USD: 200 } },
+  proposed: { minimumExecutablePosition: { KRW: 300000, USD: 200 } },
+})
+assert.equal(unchangedFloor.data.changeCount, 0, 'a rename with the same value is not a threshold change')
+assert.equal(unchangedFloor.data.accepted, true)
+const loweredFloor = run('policyLint', {
+  current: { minimumExecutablePosition: { KRW: 300000, USD: 200 } },
+  proposed: { minimumExecutablePosition: { KRW: 300000, USD: 100 } },
+  provenance: { 'minimumExecutablePosition.USD': { approvedBy: 'investor', approvedAt: '2026-09-08T00:00:00Z' } },
+})
+assert.ok(has(loweredFloor, 'policy_auto_relax'), 'lowering the minimum is a run relaxing its own refusal')
+const raisedFloor = run('policyLint', {
+  current: { minimumExecutablePosition: { KRW: 300000, USD: 200 } },
+  proposed: { minimumExecutablePosition: { KRW: 300000, USD: 300 } },
+  provenance: { 'minimumExecutablePosition.USD': { approvedBy: 'investor', approvedAt: '2026-09-08T00:00:00Z' } },
+})
+assert.equal(raisedFloor.data.accepted, true)
+assert.equal(raisedFloor.data.changes[0].effect, 'stricter')
 
 /**
  * The cash floor: the investor declared 0.10 in fund settings and the package
@@ -726,9 +824,10 @@ assert.equal(over.diagnostics.find((row) => row.code === 'single_name_budget_exc
 const carriedOver = budget({ positions: [{ symbol: 'A', weight: 0.95 }] })
 assert.ok(has(carriedOver, 'single_name_budget_carried'))
 assert.equal(has(carriedOver, 'single_name_budget_exceeded'), false, 'a trim is never the thing refused')
-// The control arm spends inside the budget rather than beside it.
-assert.equal(budget({ controlArmWeight: 0.02 }).data.controlArmRemainingWeight, 0.04)
-assert.equal(budget({ controlArmWeight: 0.02 }).data.controlArmLaneTotalMaxWeight, 0.06)
+// ⛔ The control arm has no budget of its own since #226: every single name spends inside this one.
+assert.equal(budget({}).data.controlArmRemainingWeight, undefined)
+assert.equal(budget({}).data.controlArmLaneTotalMaxWeight, undefined)
+assert.ok(has(budget({ controlArmWeight: 0.02 }), 'input_key_unread'), 'and a run that still declares the lane weight is told nothing reads it')
 
 /**
  * The exit discipline. `time_stop_reached` reads the entry date and nothing
@@ -856,7 +955,7 @@ for (const [operation, contract] of Object.entries(contracts.contracts)) {
   assert.ok(['strict', 'named', 'open'].includes(contract.mode), `${operation} declares what an unknown key costs`)
   assert.deepEqual(Object.keys(contract.keys), contracts.keys[operation], 'the published key list is the contract it came from')
 }
-for (const operation of ['nextReviewSequence', 'coverage', 'specialistBudget', 'experimentalCeiling', 'exitDiscipline', 'laneCoverage', 'harnessAudit']) {
+for (const operation of ['nextReviewSequence', 'coverage', 'specialistBudget', 'minimumExecutableWeight', 'exitDiscipline', 'laneCoverage', 'harnessAudit']) {
   assert.ok(contracts.guarded.includes(operation), `${operation} is a gate and refuses a key it does not read`)
 }
 // The nested shapes a key list cannot show are published too — both of the two that cost a run.
@@ -972,31 +1071,32 @@ assert.equal(budgetDiagnostic.path, 'sleeveBudgetWeight', 'the path names the ke
 assert.equal(run('specialistBudget', { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.18, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02 }).data.withinBriefBudget, true)
 
 /**
- * `experimentalCeiling`'s KRW leg, which returned `floorAmount: null`,
- * `binding: 'ratio'`, status `ok` and no diagnostic at all. The floor is
- * declared **per venue currency** and the leg had passed a bare amount; the
- * arithmetic it wanted was KRW 300,000 → 0.0149, a floor binding.
+ * #158: the KRW leg, which returned `floorAmount: null`, `binding: 'ratio'`,
+ * status `ok` and no diagnostic at all. The minimum is declared **per venue
+ * currency** and the leg had passed a bare amount; the arithmetic it wanted was
+ * KRW 300,000 → 0.0149. ⚠️ The operation is `minimumExecutableWeight` since
+ * #226 and there is no ratio left to fall back to, which makes the silent-pass
+ * shape this issue is about structurally unreachable — the case is kept because
+ * the per-venue shape is what it was really about.
  */
-const bareFloor = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'KRW', experimentalPositionFloor: 300000, usdKrw: 1352.5 })
-assert.equal(bareFloor.status, 'blocked', 'a bare amount names no venue, and answering it with the ratio is the silent pass this issue is about')
+const bareFloor = run('minimumExecutableWeight', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'KRW', minimumExecutablePosition: 300000, usdKrw: 1352.5 })
+assert.equal(bareFloor.status, 'blocked', 'a bare amount names no venue, and answering it with a number computed from defaults is the silent pass this issue is about')
 assert.deepEqual(
   bareFloor.diagnostics.filter((row) => row.code === 'input_shape_invalid').map((row) => row.path).sort(),
-  ['input.experimentalPositionFloor', 'input.usdKrw'],
-  'both halves of the KRW leg are named: the floor is a per-currency map and the rate is fx.USDKRW',
+  ['input.minimumExecutablePosition', 'input.usdKrw'],
+  'both halves of the KRW leg are named: the minimum is a per-currency map and the rate is fx.USDKRW',
 )
-// Declared per venue, with the rate where the contract says it is, the leg binds on the floor.
-const krwLeg = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'KRW', experimentalPositionFloor: { USD: 200, KRW: 300000 }, fx: { USDKRW: 1352.5 } })
-assert.equal(krwLeg.data.binding, 'floor')
-assert.equal(krwLeg.data.floorAmount, 300000)
-assert.equal(krwLeg.data.floorWeight, 0.01492028, '300,000 / 1352.5 / 14,866.44')
+// Declared per venue, with the rate where the contract says it is, the leg answers.
+const krwLeg = run('minimumExecutableWeight', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'KRW', minimumExecutablePosition: { USD: 200, KRW: 300000 }, fx: { USDKRW: 1352.5 } })
+assert.equal(krwLeg.data.minimumAmount, 300000)
+assert.equal(krwLeg.data.minimumWeight, 0.01492028, '300,000 / 1352.5 / 14,866.44')
 // The USD leg is unchanged, and it is the one that always worked.
-const usdLeg = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'USD', experimentalPositionFloor: { USD: 200, KRW: 300000 } })
-assert.equal(usdLeg.data.binding, 'floor')
-assert.equal(usdLeg.data.floorWeight, 0.01345312)
-// No floor declared at all is the ratio alone, said out loud rather than implied.
-const ratioOnly = run('experimentalCeiling', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'USD' })
-assert.equal(ratioOnly.data.binding, 'ratio')
-assert.ok(has(ratioOnly, 'experimental_floor_unevaluated'))
+const usdLeg = run('minimumExecutableWeight', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'USD', minimumExecutablePosition: { USD: 200, KRW: 300000 } })
+assert.equal(usdLeg.data.minimumWeight, 0.01345312)
+// No minimum declared at all is unjudged, said out loud rather than implied.
+const ratioOnly = run('minimumExecutableWeight', { portfolioNav: 14866.44, portfolioNavCurrency: 'USD', positionCurrency: 'USD' })
+assert.equal(ratioOnly.data.minimumWeight, null)
+assert.ok(has(ratioOnly, 'minimum_executable_unevaluated'))
 
 /**
  * ── #158 ⑷: the block the documents promised, fired where entries are ──────
@@ -1556,7 +1656,13 @@ for (const requirement of ['variantView', 'consensusRefs', 'challengeCleared']) 
 }
 assert.ok(measured.data.requirementReport.every((row) => typeof row.checkedBy === 'string' && row.checkedBy.length))
 
-/** The cap arithmetic the issue measured, unchanged, and now saying why. */
+/**
+ * The same candidate at the sizing door. ⚠️ **#226 changed what one missing
+ * requirement costs, and it is no longer a cap.** Three of four met used to buy
+ * a twentyfold reduction, sized and submitted; it now refuses the position and
+ * names the one that binds — `blocked`, so `targetWeight` returns `null` and
+ * nothing is proposed at 1% instead.
+ */
 const cap = valRun('effectivePositionCap', {
   mandatePositionCap: 0.2,
   maturityStatus: 'insufficient',
@@ -1565,21 +1671,16 @@ const cap = valRun('effectivePositionCap', {
   thesis: measuredThesis,
   challengeVerdict: 'cleared',
 })
-assert.equal(cap.data.effectiveCap, 0.01)
-assert.equal(cap.data.mainLaneOpen, false)
+assert.equal(cap.data.effectiveCap, 0.2, '⛔ the declared cap is not lowered — the position is refused instead')
+assert.equal(cap.data.variantViewVerified, false)
 assert.equal(cap.data.resolvedLane, 'control-arm')
-const capReduction = cap.diagnostics.find((row) => row.code === 'position_cap_reduced_by_maturity')
-assert.equal(capReduction.details.declared, 0.2)
-assert.equal(capReduction.details.effective, 0.01)
-assert.equal(capReduction.details.reductionMultiple, 20)
-assert.equal(capReduction.details.reason, 'lens_insufficient')
-// ⛔ The reason a twentyfold reduction binds is now readable one requirement at a time.
-assert.equal(capReduction.details.mainLane.satisfiedCount, 3)
-assert.equal(capReduction.details.mainLane.requirementCount, 4)
-assert.deepEqual(capReduction.details.mainLane.missing, ['thesisComplete'])
-assert.equal(capReduction.details.mainLane.requirementReport.find((row) => row.requirement === 'thesisComplete').gaps.length, 4)
-assert.ok(valHas(cap, 'main_lane_requires_variant_view'))
-assert.ok(cap.diagnostics.find((row) => row.code === 'main_lane_requires_variant_view').details.requirementReport)
+assert.equal(valHas(cap, 'position_cap_reduced_by_maturity'), false, 'the retired token has no producer')
+const capRefusal = cap.diagnostics.find((row) => row.code === 'variant_view_required_for_position')
+assert.equal(capRefusal.severity, 'blocked')
+// ⛔ Which requirement binds is readable one requirement at a time, exactly as #160 asked.
+assert.deepEqual(capRefusal.details.missing, ['thesisComplete'])
+assert.deepEqual(capRefusal.details.satisfied, ['variantView', 'consensusRefs', 'challengeCleared'])
+assert.equal(capRefusal.details.requirementReport.find((row) => row.requirement === 'thesisComplete').gaps.length, 4)
 
 /**
  * ── The derivation, and where it comes from ────────────────────────────────

@@ -12,12 +12,18 @@ Most of what looks like an opportunity on a screen is just a screen. This manage
 scanner score as a reason to **research** something, never as a reason to buy it. Before
 it proposes a new position it wants a claim that could be proved wrong, an explanation of
 *why* the thing is cheap, an argument that it beats simply buying the index instead, and
-an adversarial review that tried to knock the case down. And it sizes by track record
-rather than by confidence: until this *kind* of judgement has accumulated enough
-independent forward evidence, the most it will propose is a small controlled experiment — small,
-but never so small that it cannot be executed: the experimental ceiling is a percentage of the book
-*or* the smallest position worth opening on that exchange, whichever is larger, and on a book too
-small for either it says so rather than proposing an order that a tick and a fee would swallow.
+an adversarial review that tried to knock the case down. And it sizes from the arithmetic
+rather than from confidence: a position is quarter Kelly on the candidate's own expected and
+downside return, held under a risk budget derived from the declared `maxDrawdown`, with the
+declared `maxPositionWeight` as the ceiling above that — ⛔ never the answer by default.
+A position that comes out below the smallest order worth placing on that exchange is refused
+rather than rounded up to it, because a size the arithmetic did not ask for measures the
+rounding and not the idea.
+⚠️ **A separate shrunken "experimental lane" was removed on 2026-09-08** at the investor's
+direction (#226): this manager is attached to a real broker, every order passes a person's
+approval and every judgement lands in an append-only ledger beside its forward return, so the
+buying *is* the measurement. What it does not do is buy without a case: a candidate with no
+checked variant view is not proposed at all.
 It covers Korea and the US in one manager, and returns exactly one proposal per run.
 
 It is a **port** of the methodology and validation loop of `morethanmin/trading-harness` —
@@ -243,11 +249,14 @@ WAIT that says which one.
   ⚠️ **Most candidates land in the control arm, and that is the normal state.** The scanners
   find price patterns, which are public information, and a price pattern is not a variant
   view. "Not established" is never treated as established: a missing citation, an
-  unfinished thesis or a conditional challenge verdict all fall to the control arm
-  (`variant_view_unverified`), and the manager says on every run it applies which cap is
-  operating and why (`position_cap_reduced_by_maturity`).
-  **Promotion is still measured in years, not weeks.** Where the maturity ceiling does bind,
-  a lens is promoted on 30 closed outcomes, 10 independent date clusters and **3 distinct
+  unfinished thesis or a conditional challenge verdict means **no position**
+  (`variant_view_required_for_position`), and the manager says on every run which cap is
+  operating and why (`position_cap_reduced_below_declared`).
+  ⚠️ **Since #226 that gate refuses rather than shrinks.** It used to size such a candidate
+  twenty times smaller and submit it; an evidence gate that doubles as a size dial is neither
+  honest about the evidence nor honest about the size.
+  **Promotion is still measured in years, not weeks — and it no longer gates a size.**
+  A lens is promoted on 30 closed outcomes, 10 independent date clusters and **3 distinct
   market regimes**. The first two respond to finding more candidates; the third does not — a
   regime turns on the calendar, so three of them is a multi-year wait no rate of activity
   shortens. If you want a manager that will put 20% of your book into one conviction name
