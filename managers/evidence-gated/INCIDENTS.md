@@ -70,6 +70,39 @@ The prose path survives as one reported fallback, because the judgement that arm
 older than the `history.recentDecisions` window; `HOST-FOLLOWUPS.md` states what has to be true
 before it is deleted.
 
+**No flow had ever dispatched (#221).** Measured 2026-09-08, run
+`run_c7ad46eea03840bf84ae7a8822ed02c3`, version 0.4.60: `hooks/guard-budget.mjs` built its roster
+out of the stems of `agents/*.md` and compared with string equality, and the host enumerates a
+plugin's agents as `<plugin>:<name>`. So `Agent(subagent_type: "evidence-gated:us-sleeve")` — the
+only name the CLI offers — was refused by the hook as `delegation_flow_undeclared`, and
+`Agent(subagent_type: "us-sleeve")` — the only name the hook accepted — was refused by the CLI as
+*Agent type not found*. A two-sided deadlock with no value in between: every wake and every manual
+run since the guard landed ran **orchestrator-alone**, and `agents/*.md` and the three sleeve skills
+were never loaded once. The guard's own message named the working exit (*"do the work here"*), so
+the run degraded safely and said so in `uncertainty` — the failure was that the designed topology
+was unreachable, not that anything unsafe happened. `canonicalFlow()` resolves both spellings to the
+stem and checks the prefix against this package's manifest id, so another plugin's worker sharing
+one of our names is still refused.
+
+⚠️ **The premise was written down and still went stale.** The comment on `declaredFlows()` said the
+stem *"is what `subagent_type` takes"* — true when written, and nothing re-read it when the host
+changed. `hooks/guard-submit.mjs` was checked in the same pass and is unaffected: it discriminates
+on the *presence* of `agent_id`, never on a name.
+
+**The two flowless wakes were the same observation (#223).** `resolveWakeFlow` reported the legacy
+adapter by name — and only after the adapter had decoded a marker, so the two wakes that reach it
+most often reported nothing. Measured 2026-09-08, run `run_c7ad46eea03840bf84ae7a8822ed02c3` at
+0.4.60: `armed` flattened to three rows, all `fate: 'fired'` / `review: 'no-judgement'`, answered
+`data: null` with `diagnostics: []`; no input at all answered `data: null` with `diagnostics: []`;
+a synthetic `review: 'this-run'` row resolved correctly. The reader was fine and the reporting was
+absent. The failure direction is safe — `null` dispatches every flow, a superset of what fired — but
+the two states are fixed differently: unreadable is the run's own omission, unattributed is the host
+attributing elsewhere and means the prose adapter is now load-bearing. So that run inferred which
+one it was from what it remembered passing and recorded the inference as the operation's answer. The
+two codes fire ahead of the fall-through now, and `wake_flow_recovered_from_prose` is the receipt
+for the adapter itself — the half of the promise that had no producer at all, and the only one of
+the three that counts *uses* of it.
+
 **A flow that is not told its tools goes looking.** Measured 2026-08-27: a flow dispatched without
 its tool list spent its whole turn discovering the session, reached for `Bash`, and the run ended
 `awaiting-input` with no judgement. Measured 2026-09-01: a run reported the gap itself, having been
@@ -281,6 +314,23 @@ us 3, allocate 2, growing monotonically with no path to remove them. `untilled/a
 arming time now. ⬜ Merged is not shipped — a host older than that release still keeps the duplicate,
 which is why the depth read from `standingPlans` is something to report and never a reason to arm
 less.
+
+**The key `researchState` writes could not be read back by `researchState`** (#222). It is the only
+writer of `coverage/research-index`, and its validator required an array `rows` on `previous` — while
+every run up to 0.4.60 hand-wrote the key with descriptive fields (`extensions`,
+`universeProvenance`, `usMapping`, `laneStateThisRun`, …) and no `rows` at all. So the key was
+**self-locked**: the first malformed write made it permanently unreadable by its owner, and the
+checkpoint `hooks/guard-budget.mjs` and §Orchestration prescribe for a run that stopped at a limit —
+*«persist the roster you did review with `researchState`»* — could not be produced. The reporting run
+(`run_c7ad46eea03840bf84ae7a8822ed02c3`) was in exactly that situation and spent four round trips on
+it: the stored value, an abridged copy of it, and `{}` all answered `research_state_invalid` /
+blocked at `path: previous`. A missing shape degrades now and a point-in-time violation still
+refuses — a `schemaVersion` that is present and not `1`, and an `updatedAsOf` that parses and is
+after `asOf`, because an index written by a later run can hold only past-dated rows and still leak
+that run's judgement backwards, which the per-row date check cannot see. ⚠️ And the row contract was
+enforced without being published: `observations[]` requires `symbol`, `market`, `observedAt` and a
+non-empty `evidenceIds`, and omitting `observedAt` cost that run one more round trip.
+`inputContracts.nested.researchState` publishes it.
 
 ## The paper track (§5)
 

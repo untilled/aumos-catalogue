@@ -1141,7 +1141,7 @@ export const OPERATIONS = {
     group: 'schedule',
     surface: 'published',
     mode: 'named', keys: { armed: ARRAY, summary: STRING, intent: STRING },
-    describe: 'which flow opened this run, from the host\'s own record: hand it `armed` — the `armed` entries of `history.recentDecisions`, flattened — and the entry the host marked `fate: \'fired\'` / `review: \'this-run\'` answers with the flow, the `planId` and the instant the host recorded. `basis` says which channel answered. ⛔ An empty `armed` is not a failed arm: it means the host attributed nothing, and the flow falls back to the event `summary` through the legacy adapter, reported by name (`wake_flow_unattributed`, or `wake_attribution_unreadable` when no `armed` was handed over). `null` for a wake this manager did not arm, and `null` with `wake_flow_ambiguous` when the host folded two flows into one wake',
+    describe: 'which flow opened this run, from the host\'s own record: hand it `armed` — the `armed` entries of `history.recentDecisions`, flattened — and the entry the host marked `fate: \'fired\'` / `review: \'this-run\'` answers with the flow, the `planId` and the instant the host recorded. `basis` says which channel answered. ⛔ An empty `armed` is not a failed arm: it means the host attributed nothing, and the flow falls back to the event `summary` through the legacy adapter. Every silence and every fallback is named, whether or not a flow comes back: `wake_attribution_unreadable` when no `armed` was handed over (yours to fix, by passing it), `wake_flow_unattributed` when it was handed over and named nothing of yours, and `wake_flow_recovered_from_prose` when the legacy adapter then answered. `null` for a wake this manager did not arm, and `null` with `wake_flow_ambiguous` when the host folded two flows into one wake',
     run: resolveWakeFlow,
   },
   resolveTrancheWake: {
@@ -1168,12 +1168,26 @@ export const OPERATIONS = {
     describe: 'the reviews to arm — every one of them, because the published rule is to re-arm at every judgement and nothing this operation is handed could suppress one anyway — plus which of them this instance has already promised at this instant, and which flow it promised at a **different** instant, which is the one duplicate the host does not fold — reported with that older promise\'s `planId` where `standingPlans` names it, and with which silence it is where it does not. Hand it the invocation\'s `standingPlans` and it also reports `standingArms: { atLeast }`, the floor of what stood at `asOf` — report-only, and absent from it means unreadable while `[]` means a floor of zero',
     run: (input, asOf) => reconcileArmedReviews({ ...input, asOf }),
   },
+  /**
+   * ⚠️ `observations: "array"` was the whole published shape, and every row is
+   * refused unless it carries **four** fields (#222). A run that omitted
+   * `observedAt` was answered `research_observation_invalid` / blocked with no
+   * way to read what was missing from the contract, and spent a round trip on
+   * it. The `previous` sentence is the other half of the same issue: the value
+   * this operation *writes* to `coverage/research-index` was not readable back
+   * as `previous`, and the key was self-locked by its first malformed write.
+   */
   researchState: {
     group: 'sizing',
     surface: 'published',
     canonical: researchMarket('observations[].market', 'previous.rows[].market'),
     mode: 'strict', keys: { previous: OBJECT, observations: ARRAY },
-    describe: 'bounded research roster and Evidence references; no source payload cache',
+    nested: {
+      'observations[]': { symbol: STRING, market: STRING, observedAt: STRING, evidenceIds: ARRAY, sector: STRING, extension: BOOLEAN },
+      observationRow: 'Four fields are **required** and a row missing any one of them is `research_observation_invalid` / blocked rather than dropped: `symbol` (a compact identifier, ≤ 32 chars), `market` (`kr` or `us` — also published as inputContracts.vocabulary.researchMarkets, and the MIC is folded onto it at the one input boundary), `observedAt` (parseable and **not after** `asOf`) and a **non-empty** `evidenceIds` array of strings. `sector` (≤ 80 chars) and `extension` are optional and are the only other fields kept; anything else on the row is dropped, so a reason written onto a row is a reason silently lost.',
+      previous: 'The whole value read from `coverage/research-index`, handed back unchanged. ⚠️ A stored value with **no `rows`** is not refused — it reads as an empty index, and the answer says so in `previousRead` (`absent` / `rows` / `no-rows`). Descriptive fields written beside `rows` by earlier runs are permitted, are reported by name in `previousExtraKeys`, and are **not** carried into `nextState` — a run that wants them keeps writing them itself. ⛔ Two things are still refused: a `schemaVersion` that is present and is not `1` (an unknown writer, whose rows this code may misread), and an `updatedAsOf` that parses and is **after** `asOf` (an index written by a later run, which the per-row date check cannot catch).',
+    },
+    describe: 'bounded research roster and Evidence references; no source payload cache. Rows require symbol, market, observedAt and non-empty evidenceIds. `previous` is the stored value as read — one with no `rows` is an empty index, not a refusal',
     run: (input, asOf) => researchState({ ...input, asOf }),
   },
   researchUniverse: {

@@ -100,9 +100,19 @@ const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 /**
  * The declared flows, read from `agents/` rather than listed here.
  *
- * The name is the file's stem, which is what `subagent_type` takes and what
- * `agents/<name>.md` declares in its own front matter. Reading the directory is
- * what keeps this from becoming a second roster.
+ * The name is the file's stem, which is what `agents/<name>.md` declares in its
+ * own front matter. Reading the directory is what keeps this from becoming a
+ * second roster.
+ *
+ * ⚠️ **The stem is not what `subagent_type` takes, and believing it was made
+ * this whole topology unreachable** (`untilled/aumos-catalogue#221`). The host
+ * namespaces a plugin's agents as `<plugin>:<name>`, so the only value the CLI
+ * accepts is `evidence-gated:us-sleeve` while the only value this roster matched
+ * was `us-sleeve` — a two-sided deadlock in which **no flow had ever
+ * dispatched**: every wake, and every manual run, ran orchestrator-alone and
+ * `agents/*.md` and the three sleeve skills were never loaded. The bridge is
+ * `canonicalFlow()` below; this function stays the roster and nothing else, so
+ * that adding a flow is still adding a file.
  */
 export function declaredFlows(root = packageRoot) {
   try {
@@ -113,6 +123,50 @@ export function declaredFlows(root = packageRoot) {
   } catch {
     return []
   }
+}
+
+/**
+ * The namespace the host prefixes this package's agents with — this package's
+ * own id, read from the manifest beside `agents/` rather than spelled here.
+ *
+ * `null` means the manifest could not be read, and `canonicalFlow()` treats that
+ * as *no prefix to check against* rather than as *refuse everything*: the roster
+ * still refuses every name whose stem is not a declared flow, which is the
+ * property that matters, and refusing on an unreadable manifest would take the
+ * package down for a reason that has nothing to do with the dispatch.
+ */
+export function pluginNamespace(root = packageRoot) {
+  try {
+    const id = JSON.parse(readFileSync(join(root, 'aumos.json'), 'utf8'))?.id
+    return typeof id === 'string' && id !== '' ? id : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The declared flow a requested `subagent_type` names, or `null` if it names
+ * none. Both spellings the two sides of #221 wanted resolve to the stem:
+ *
+ *     us-sleeve                 → us-sleeve   (the front matter's own name)
+ *     evidence-gated:us-sleeve  → us-sleeve   (what the CLI enumerates)
+ *     general-purpose           → null        (undeclared, as before)
+ *     someone-else:us-sleeve    → null        (declared name, someone else's worker)
+ *
+ * ⚠️ **The prefix is checked rather than discarded.** Accepting an arbitrary
+ * prefix would have been one line shorter and would have let a *different*
+ * plugin's agent through on the strength of sharing a name with one of ours — a
+ * worker with none of this package's skills, markets or prohibitions, which is
+ * the exact class of worker the roster exists to refuse. Checking costs a
+ * manifest read of a file that already sits beside `agents/`.
+ */
+export function canonicalFlow(requested, { flows, namespace = null }) {
+  if (flows.includes(requested)) return requested
+  const cut = requested.lastIndexOf(':')
+  if (cut === -1) return null
+  if (namespace !== null && requested.slice(0, cut) !== namespace) return null
+  const stem = requested.slice(cut + 1)
+  return flows.includes(stem) ? stem : null
 }
 
 /** `Agent`, `Task`, and whatever either is called behind an `mcp__` prefix. */
@@ -130,7 +184,7 @@ export function isDispatch(toolName) {
  * the message says so — telling it instead that the roster is closed invites it
  * to retry the same tier with a declared name.
  */
-export function judgeDispatch({ payload, spent = [], flows }) {
+export function judgeDispatch({ payload, spent = [], flows, namespace = null }) {
   const tool = typeof payload?.tool_name === 'string' ? payload.tool_name : ''
   if (!isDispatch(tool)) return null
 
@@ -164,18 +218,26 @@ export function judgeDispatch({ payload, spent = [], flows }) {
   // An unreadable shape is allowed through, per the doctrine above.
   if (requested === '') return null
 
-  if (!flows.includes(requested)) {
+  // Either spelling of a declared flow answers here; see `canonicalFlow()`.
+  const flow = canonicalFlow(requested, { flows, namespace })
+  if (flow === null) {
+    const roster = namespace === null ? flows.join(', ') : flows.map((name) => `${namespace}:${name}`).join(', ')
     return {
       code: 'delegation_flow_undeclared',
       message:
-        `\`${requested}\` is not a flow this manager declares. The roster is ${flows.join(', ')} — ` +
-        'one agent file each, each naming the skill that carries its rules. A worker outside it has ' +
+        `\`${requested}\` is not a flow this manager declares. The roster is ${roster} — ` +
+        'one agent file each, each naming the skill that carries its rules (the bare stem is accepted ' +
+        'too, and no other prefix is). A worker outside it has ' +
         'no skill, no market and no rule about what it may not do, and 28 of the 29 subagents in the ' +
         'run that measured this were exactly that. Dispatch a declared flow, or do the work here.',
     }
   }
 
-  const forThisFlow = spent.filter((row) => row === requested).length
+  // ⚠️ The ledger is counted in canonical names, never in the spelling that was
+  // typed: a run that dispatched `us-sleeve` once and `evidence-gated:us-sleeve`
+  // once would otherwise be two flows of one each, and the per-flow ceiling
+  // would never be reached.
+  const forThisFlow = spent.filter((row) => (canonicalFlow(row, { flows, namespace }) ?? row) === flow).length
   if (forThisFlow >= MAX_DISPATCHES_PER_FLOW) {
     return {
       code: 'delegation_budget_exhausted',
@@ -242,7 +304,9 @@ function main() {
     // does not send the field.
     const path = session === null ? null : ledgerPath(session)
     const spent = path === null ? [] : readLedger(path)
-    const verdict = judgeDispatch({ payload, spent, flows: declaredFlows() })
+    const flows = declaredFlows()
+    const namespace = pluginNamespace()
+    const verdict = judgeDispatch({ payload, spent, flows, namespace })
 
     if (verdict !== null) {
       process.stderr.write(`${verdict.message}\nCarry \`${verdict.code}\` verbatim in one \`uncertainty\` entry.\n`)
@@ -250,8 +314,14 @@ function main() {
     }
 
     if (path !== null) {
+      // The canonical name, so the count survives a run that spells one flow two
+      // ways. A row this cannot canonicalise is written as it arrived; a payload
+      // with no name at all writes the blank line `readLedger` drops, which is
+      // what it did before and is the same «allowed through, not counted».
+      const asked = typeof payload?.tool_input?.subagent_type === 'string' ? payload.tool_input.subagent_type : ''
+      const row = asked === '' ? '' : (canonicalFlow(asked, { flows, namespace }) ?? asked)
       try {
-        appendFileSync(path, `${payload?.tool_input?.subagent_type ?? ''}\n`)
+        appendFileSync(path, `${row}\n`)
       } catch {
         /* An unwritable tmpdir loses the count and keeps depth and the roster. */
       }

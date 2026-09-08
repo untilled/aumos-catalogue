@@ -36,9 +36,13 @@ plan raises carries `eventId`, `kind`, `subject`, `occurredAt`, `detectedAt`, `s
 summary as `<what fired> — watching for: <the intent>`, and reading the flow out of that
 sentence was the only channel this package had. It still works — the judgement that armed a
 review can be older than the `history.recentDecisions` window, and then the host's attribution
-is genuinely absent — but it is a **legacy adapter**, and every use of it is reported:
+is genuinely absent — but it is a **legacy adapter**, and every use of it is reported.
+`wake_flow_recovered_from_prose` is the adapter's own receipt: it fires when, and only when, the
+flow came out of the summary. Beside it, the reason the host was not the answer —
 `wake_attribution_unreadable` when no `armed` was passed (fix it by passing the field),
-`wake_flow_unattributed` when it was passed and named nothing of yours. Arm the `intent`
+`wake_flow_unattributed` when it was passed and named nothing of yours — and those two fire even
+when no flow comes back at all, so ⛔ you never have to infer which case you are in from what you
+remember passing. Arm the `intent`
 `nextReviewSequence` returns, verbatim, so that channel keeps working.
 
 ⛔ **Two things `resolveWakeFlow` will not do.** It will not read an empty `armed` as a failed

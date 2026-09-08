@@ -2700,6 +2700,81 @@ for (const reportedDiagnostics of executionProseShapes) {
 console.log('evidence-gated issue #212 ④ execution-state regression tests passed')
 
 /**
+ * ── #222: the key `researchState` writes is the key it can read back ───────
+ *
+ * `coverage/research-index` was **self-locked**. `researchState` is its only
+ * writer, and the validator required an array `rows` on `previous` — while
+ * every run up to 0.4.60 hand-wrote the key with descriptive fields and no
+ * `rows`. So the first malformed write made the key permanently unreadable by
+ * its own owner, and the checkpoint `hooks/guard-budget.mjs` and `PROMPT.md`
+ * §Orchestration prescribe for a run that stopped at a limit — *«persist the
+ * roster you did review with `researchState` to `coverage/research-index`»* —
+ * could not be produced. Four calls in the reporting run, four refusals.
+ *
+ * The two halves are asserted separately below, because they are different
+ * claims: a **missing shape** now degrades, and a **point-in-time violation**
+ * still refuses. The negative controls are the ones that would catch a fix that
+ * simply deleted the validator.
+ */
+const researchAsOf = '2026-09-08T03:01:37.490Z'
+const researchRun = (input) => execute({ operation: 'researchState', asOf: researchAsOf, input })
+const researchRow = { symbol: 'DKS', market: 'us', observedAt: '2026-09-04T00:00:00Z', evidenceIds: ['ev-dks'] }
+
+/** The value that was actually stored — descriptive siblings, no `rows`. It is an empty index now. */
+const legacyStored = { extensions: [], universeProvenance: 'bundled-74-kr', usMapping: {}, laneStateThisRun: 'kr-sleeve', blockingDefectsFound: [], note: 'hand-written' }
+const fromLegacy = researchRun({ previous: legacyStored, observations: [researchRow] })
+assert.equal(fromLegacy.status, 'ok', 'a stored value with no rows must not refuse the operation that wrote it')
+assert.equal(fromLegacy.data.previousRead, 'no-rows')
+assert.deepEqual(fromLegacy.data.nextState.rows.map((row) => row.symbol), ['DKS'], 'the run\'s own observations are the whole index when nothing was carried')
+assert.equal(fromLegacy.data.nextState.schemaVersion, 1)
+assert.equal(fromLegacy.data.nextState.updatedAsOf, researchAsOf)
+assert.deepEqual(fromLegacy.data.previousExtraKeys, ['blockingDefectsFound', 'extensions', 'laneStateThisRun', 'note', 'universeProvenance', 'usMapping'], 'the siblings are reported by name, not dropped in silence')
+assert.equal(fromLegacy.data.nextState.extensions, undefined, '⛔ and never copied into nextState — the 60 KB budget measures rows')
+
+/** The empty object the reporting run also tried, and the absent case, read the same way. */
+assert.equal(researchRun({ previous: {}, observations: [researchRow] }).data.previousRead, 'no-rows')
+assert.equal(researchRun({ observations: [researchRow] }).data.previousRead, 'absent')
+
+/** A value **with** rows round-trips, and the descriptive siblings may sit beside them. */
+const canonical = researchRun({ observations: [researchRow] }).data.nextState
+const roundTrip = researchRun({ previous: { ...canonical, universeProvenance: 'bundled-83-us' } })
+assert.equal(roundTrip.data.previousRead, 'rows')
+assert.deepEqual(roundTrip.data.nextState.rows, canonical.rows, 'the roster carried forward unchanged')
+assert.deepEqual(roundTrip.data.previousExtraKeys, ['universeProvenance'])
+
+/** ⛔ Negative control: `updatedAsOf` after `asOf` is still refused — the per-row check cannot see it. */
+const fromFuture = researchRun({ previous: { schemaVersion: 1, updatedAsOf: '2099-01-01T00:00:00Z', rows: [researchRow] } })
+assert.equal(fromFuture.status, 'blocked', 'an index written by a later run may hold only past-dated rows and still leak that run\'s judgement backwards')
+assert.equal(fromFuture.data, null)
+assert.ok(has(fromFuture, 'research_state_invalid'))
+
+/** ⛔ Negative control: a `schemaVersion` this code does not know is still refused; an absent one is not. */
+assert.equal(researchRun({ previous: { schemaVersion: 2, updatedAsOf: researchAsOf, rows: [] } }).status, 'blocked')
+assert.ok(has(researchRun({ previous: { schemaVersion: 2, updatedAsOf: researchAsOf, rows: [] } }), 'research_state_invalid'))
+assert.equal(researchRun({ previous: { updatedAsOf: researchAsOf, rows: [researchRow] } }).data.previousRead, 'rows', 'no schemaVersion is a pre-#222 write, not an unknown writer')
+assert.equal(researchRun({ previous: { schemaVersion: 1, rows: [researchRow] } }).data.previousRead, 'rows', 'nothing reads updatedAsOf — every row is dated and checked one by one')
+
+/** ⛔ Negative control: each of the four required row fields, dropped one at a time. */
+for (const field of ['symbol', 'market', 'observedAt', 'evidenceIds']) {
+  const { [field]: _dropped, ...incomplete } = researchRow
+  const answer = researchRun({ observations: [incomplete] })
+  assert.equal(answer.status, 'blocked', `a row without ${field} is refused`)
+  assert.ok(answer.diagnostics.some((row) => row.code === 'research_observation_invalid'), `${field} is reported as research_observation_invalid`)
+  assert.equal(answer.data.nextState, null)
+}
+/** ⚠️ And an **empty** `evidenceIds` is the same refusal — a row citing nothing is not a reviewed name. */
+assert.ok(has(researchRun({ observations: [{ ...researchRow, evidenceIds: [] }] }), 'research_observation_invalid'))
+
+/** The published contract now says all of that — the round trip the reporting run could not read. */
+const researchContract = execute({ operation: 'inputContracts', asOf: researchAsOf, input: {} }).data.nested.researchState
+assert.ok(researchContract, 'researchState publishes nested shapes')
+assert.deepEqual(researchContract['observations[]'], { symbol: 'string', market: 'string', observedAt: 'string', evidenceIds: 'array', sector: 'string', extension: 'boolean' })
+for (const field of ['symbol', 'market', 'observedAt', 'evidenceIds']) assert.ok(researchContract.observationRow.includes(field), `${field} is named in the published row sentence`)
+assert.ok(researchContract.previous.includes('previousRead'), 'the published sentence says how a value with no rows is read')
+
+console.log('evidence-gated issue #222 research-index regression tests passed')
+
+/**
  * ── #224: the bar whose shape was valid and whose data was wrong ────────────
  *
  * `/api/v1/candles`'s `before` is **inclusive**, and a Toss daily bar is
