@@ -18,47 +18,64 @@
  * named after, and the classification table could not tell the two apart because
  * **no input to it counted anything.**
  *
- * ── What replaced it ───────────────────────────────────────────────────────
+ * ── ⚠️ Who counts what, and why it moved (`untilled/aumos#743` §B) ──────────
  *
- * `untilled/aumos#724` and `#730` gave the host a research job and a research
- * result that count. `research_job_get` carries `counts` — `total`, `pending`,
- * `evaluated`, `unprepared`, `failed` — and the symbols behind each;
- * `research_result_get` carries a settled `summary` — `sourced`, `evaluated`,
- * `unprepared`, `failed`, `unpreparedSymbols`, `failedSymbols`. This operation
- * reads those, exactly as the host wrote them, and answers three facts:
+ * `untilled/aumos#724` gave the host a research job and a research result that
+ * count, and this operation read both. #743 §B took half of that away, and took
+ * the right half: `research_result_get` is gone, and with it a settled summary
+ * carrying `sourced` and `unprepared`. Those two said *this fund held readable
+ * documents for this name*, which is a judgement about documents that only the
+ * domain reading them makes — a common executor making it was the app holding an
+ * investment opinion, and this package is the one that has to hold it.
+ *
+ * So the counting is split, and each half is counted where it is known:
+ *
+ * | fact | who says it | how it arrives |
+ * |---|---|---|
+ * | how many items, how many left, how many answered, how many could not | the host | `task_get`'s `counts` — `total`, `pending`, `done`, `failed` |
+ * | how many had anything to read | **this package's recipe** | `sourced` on each answer, written by `recipes/request.mjs` |
+ * | how many the recipe computed something for | this package | `data !== null` on each answer |
+ * | how many cleared the gates | this package's own fold | `eligibleSymbols` |
+ *
+ * ⚠️ **The recipe answers are FILES now, and the manager reads them back.** One
+ * per item, at `<outputPath>/<itemId>.json`, and `files_read` is the route. So
+ * `rows` is what this operation is handed where a settled `result` used to be —
+ * and the shift is not cosmetic: a count that used to be asserted by the host is
+ * now derived from the answers themselves, which is a count a reader can check.
+ *
+ * ── The three facts this answers, unchanged ────────────────────────────────
  *
  *   1. `dataPreparation` — did the roster get prepared, and how far.
  *   2. `candidateEvaluation` — did the recipe answer for anything.
  *   3. `eligibleCount` — how many of the answers cleared this package's gates.
  *
- * ⛔ **The three counts are three reports and are never summed** — the host's own
- * rule, kept verbatim here because folding `unprepared` into `evaluated` is the
- * mistake, one layer up, that #209 asks to design out.
+ * ⛔ **The counts are reports and are never summed** — kept verbatim from the
+ * host's own rule, because folding `unprepared` into `evaluated` is the mistake,
+ * one layer up, that #209 asks to design out.
  *
- * ── ⛔ `sourced` is absent from the `items` basis, and that is the host's rule ─
+ * ── ⛔ `sourced` is absent from the `run` basis, and for its original reason ─
  *
- * A settled summary derives `sourced` as *items − gaps*, which is only true once
- * every item has been attempted. Deriving it mid-flight counts *not looked at
- * yet* as *sourced*, and the number falls as the job progresses — a count that
- * goes down is a count a reader stops trusting. So the field simply is not there
- * on an unsettled job, the way `services/kernel-host/src/research-counts.ts`
- * leaves it out.
+ * It is derived from the answers, so it is only as complete as the answers read
+ * back. Deriving it from `done` mid-flight counts *not looked at yet* as
+ * *sourced*, and a count that falls as a job progresses is a count a reader
+ * stops trusting. So on a run whose files have not been read it simply is not
+ * there, exactly as it was not there on an unsettled job before.
  *
  * ── ⚠️ `eligibleCount` is this package's number and not the host's ──────────
  *
  * Eligibility is a methodology verdict — which of the recipe's answers cleared
  * the lens envelopes, the evidence gates and the challenge — so no host field
  * carries it and none should. It arrives here as **`eligibleSymbols`**, the names
- * the run's own fold (`opportunityUniverse` over the result rows, then the
- * evidence gates) arrived at, and the count is derived from them rather than
- * typed. A number a run can type is a number a run can invent; a list of names
- * is checkable and its length is arithmetic.
+ * the run's own fold (`opportunityUniverse` over the answers, then the evidence
+ * gates) arrived at, and the count is derived from them rather than typed. A
+ * number a run can type is a number a run can invent; a list of names is
+ * checkable and its length is arithmetic.
  *
  * ⛔ **Absent is `null`, and `[]` is `0`.** «Nobody folded the rows» and «the
  * rows were folded and nothing cleared» are different facts and the second is a
- * measurement. That is the same three-way split the host's `basis` keeps
- * (`result` · `items` · `none`, where `none` is *not* zero) and the same rule
- * `cash_floor_unevaluated` has always followed here.
+ * measurement. That is the same three-way split `basis` keeps (`rows` · `run` ·
+ * `none`, where `none` is *not* zero) and the same rule `cash_floor_unevaluated`
+ * has always followed here.
  *
  * ⛔ **Nothing in this file reads a diagnostic.** Diagnostics stay exactly where
  * they were and keep saying **why** — which stage lost which input — and this
@@ -67,17 +84,33 @@
  */
 import { diagnostic } from './diagnostics.mjs'
 
-/** ⚠️ `unevaluated` is «no record», `unprepared` is «the record says nothing was readable». */
+/** ⚠️ `unevaluated` is «no record», `unprepared` is «the answers say nothing was readable». */
 export const DATA_PREPARATION_STATES = Object.freeze(['prepared', 'partial', 'unprepared', 'unsettled', 'unevaluated'])
 
 /** The same three-way split one field over: absent, in flight, measured. */
 export const CANDIDATE_EVALUATION_STATES = Object.freeze(['evaluated', 'none', 'unsettled', 'unevaluated'])
 
-/** The host's own word for where a count came from — `none` is not zero. */
-export const EXECUTION_RECORD_BASES = Object.freeze(['result', 'items', 'none'])
+/**
+ * Where the counts came from — and ⛔ `none` is not zero.
+ *
+ * ⚠️ **The three moved with the tools and kept their split** (`untilled/aumos#743` §B).
+ * `result` was *the host settled a summary* and is gone with `research_result_get`;
+ * `rows` is *this run read the answers back out of its own folder*, which is
+ * where preparation is measurable now. `items` became `run` for the same reason
+ * the tool did: what the host counts is a task run's items and not a roster.
+ */
+export const EXECUTION_RECORD_BASES = Object.freeze(['rows', 'run', 'none'])
 
 /** `named` — a list was folded, whatever its length. `unreported` — nobody folded. */
 export const ELIGIBLE_BASES = Object.freeze(['named', 'unreported'])
+
+/**
+ * A task run that has stopped, whichever way it stopped.
+ *
+ * ⛔ `cancelled` and `failed` are terminal too. What this word decides is only
+ * whether more items may still arrive, and none may in any of the four.
+ */
+const TERMINAL_STATES = new Set(['completed', 'partial', 'failed', 'cancelled'])
 
 const wholeNumber = (value) => typeof value === 'number' && Number.isInteger(value) && value >= 0
 
@@ -86,85 +119,157 @@ const symbolList = (value) => (Array.isArray(value)
   : null)
 
 /**
- * The settled summary, whichever of the two tools carried it.
+ * What one recipe answer is called, on the roster the reader knows.
  *
- * ⚠️ **`research_prepare` carries one too, on a cache hit.** `cached: true`
- * comes back with `summary` and no job to poll, so a run that never called
- * `research_job_get` still has a settled record — and reading only `result`
- * would tell that run it had prepared nothing.
+ * ⚠️ The item id is a **coordinate** (`XKRX:005930`) because that is what makes
+ * the host hand the recipe this fund's documents; the roster is spoken in bare
+ * symbols. The answer carries both, so the symbol is preferred and the id is
+ * split as the fallback — `itemCoordinate`'s rule, one process over.
  */
-function settledSummary(prepared, result) {
-  const fromResult = result?.summary
-  if (fromResult && typeof fromResult === 'object') return { summary: fromResult, resultRef: typeof result?.resultRef === 'string' ? result.resultRef : null }
-  const fromPrepared = prepared?.summary
-  if (fromPrepared && typeof fromPrepared === 'object') return { summary: fromPrepared, resultRef: typeof prepared?.resultRef === 'string' ? prepared.resultRef : null }
+function rowName(row) {
+  const symbol = row?.symbol
+  if (typeof symbol === 'string' && symbol.length > 0 && symbol.length <= 32) return symbol
+  const id = row?.itemId
+  if (typeof id !== 'string' || id.length === 0) return null
+  const cut = id.lastIndexOf(':')
+  const name = cut > 0 && cut < id.length - 1 ? id.slice(cut + 1) : id
+  return name.length <= 32 ? name : null
+}
+
+/**
+ * The counts this package derives from the answers it read back.
+ *
+ * ⚠️ **Derived and never asserted.** Every number here is `rows.filter(...).length`
+ * over answers written by `recipes/request.mjs`, so a reader who has the folder
+ * can recompute all of them. That is the difference #743 §B bought: the host
+ * used to assert `sourced` and this run used to repeat it.
+ *
+ * ⛔ **A row that is not an object is counted as unreadable rather than skipped.**
+ * Dropping it would shrink the denominator and quietly turn a folder half of
+ * which could not be parsed into a fully prepared roster.
+ */
+function readRows(rows) {
+  const unreadable = []
+  const sourced = []
+  const unprepared = []
+  let evaluated = 0
+  for (const row of rows) {
+    if (row === null || typeof row !== 'object' || Array.isArray(row)) {
+      unreadable.push(row)
+      continue
+    }
+    const name = rowName(row)
+    if (row.sourced === true) {
+      if (name !== null) sourced.push(name)
+      if (row.data !== null && row.data !== undefined) evaluated += 1
+    } else if (row.sourced === false) {
+      if (name !== null) unprepared.push(name)
+    } else {
+      unreadable.push(row)
+    }
+  }
+  return {
+    unreadable,
+    sourced: sourced.length,
+    unprepared: unprepared.length,
+    evaluated,
+    unpreparedSymbols: [...new Set(unprepared)],
+  }
+}
+
+/**
+ * The host's counts, from whichever of the two answers carried them.
+ *
+ * ⚠️ **`task_start` carries them on a cache hit.** `cached: true` comes back
+ * with `counts` and no run to poll, so a run that never called `task_get` still
+ * has them — and reading only the poll would tell that run it had prepared
+ * nothing. It is the same accommodation `research_prepare` needed, under the new
+ * name, and it is why `started` is a parameter at all.
+ */
+function hostCounts(started, run) {
+  const fromRun = run?.counts
+  if (fromRun && typeof fromRun === 'object') return { counts: fromRun, state: typeof run?.state === 'string' ? run.state : null, from: 'run' }
+  const fromStarted = started?.counts
+  if (fromStarted && typeof fromStarted === 'object') return { counts: fromStarted, state: typeof started?.status === 'string' ? started.status : null, from: 'started' }
   return null
 }
 
-export function executionRecord({ prepared = null, job = null, result = null, eligibleSymbols = undefined } = {}) {
+export function executionRecord({ started = null, run = null, rows = undefined, eligibleSymbols = undefined } = {}) {
   const diagnostics = []
-  const settled = settledSummary(prepared, result)
-  const counts = job?.counts
+  const host = hostCounts(started, run)
+  const handedRows = rows === undefined || rows === null ? null : Array.isArray(rows) ? rows : undefined
+
+  if (handedRows === undefined) {
+    diagnostics.push(diagnostic(
+      'research_record_unreadable',
+      'unevaluated',
+      '`rows` is the list of recipe answers this run read back out of its own folder with `files_read`, one per item. A value that is not an array records nothing about what was prepared. ⛔ Absent is a different fact and is allowed: it says the answers were not read, and the record says so',
+      'rows',
+      { rows },
+    ))
+  }
 
   let basis = 'none'
-  /** ⛔ `sourced` stays `null` unless a settled summary named it — see the header. */
-  let read = { total: null, pending: null, sourced: null, evaluated: null, unprepared: null, failed: null }
+  /** ⛔ The derived four stay `null` unless the answers were read — see the header. */
+  let read = { total: null, pending: null, done: null, failed: null, rowsRead: null, sourced: null, unprepared: null, evaluated: null }
   let unpreparedSymbols = []
   let failedSymbols = []
   let pendingSymbols = []
 
-  if (settled !== null) {
-    const summary = settled.summary
-    if (!['sourced', 'evaluated', 'unprepared', 'failed'].every((key) => wholeNumber(summary[key]))) {
+  if (host !== null) {
+    const counts = host.counts
+    if (!['total', 'pending', 'done', 'failed'].every((key) => wholeNumber(counts[key]))) {
       diagnostics.push(diagnostic(
         'research_record_unreadable',
         'unevaluated',
-        'A research summary carries `sourced`, `evaluated`, `unprepared` and `failed` as whole counts; this one does not, so nothing about this run’s preparation can be recorded from it. ⛔ Hand back what `research_result_get` returned, verbatim — a paraphrase of it is not a record',
-        'result.summary',
-        { summary },
-      ))
-    } else {
-      basis = 'result'
-      read = {
-        total: summary.sourced + summary.unprepared,
-        pending: 0,
-        sourced: summary.sourced,
-        evaluated: summary.evaluated,
-        unprepared: summary.unprepared,
-        failed: summary.failed,
-      }
-      unpreparedSymbols = symbolList(summary.unpreparedSymbols) ?? []
-      failedSymbols = symbolList(summary.failedSymbols) ?? []
-    }
-  } else if (counts && typeof counts === 'object') {
-    if (!['total', 'pending', 'evaluated', 'unprepared', 'failed'].every((key) => wholeNumber(counts[key]))) {
-      diagnostics.push(diagnostic(
-        'research_record_unreadable',
-        'unevaluated',
-        'A research job carries `total`, `pending`, `evaluated`, `unprepared` and `failed` as whole counts; this one does not. ⛔ Hand back what `research_job_get` returned, verbatim',
-        'job.counts',
+        'A task run carries `total`, `pending`, `done` and `failed` as whole counts; this one does not. ⛔ Hand back what `task_get` returned, verbatim — a paraphrase of it is not a record',
+        'run.counts',
         { counts },
       ))
     } else {
-      basis = 'items'
-      read = { total: counts.total, pending: counts.pending, sourced: null, evaluated: counts.evaluated, unprepared: counts.unprepared, failed: counts.failed }
-      unpreparedSymbols = symbolList(job?.unpreparedSymbols) ?? []
-      failedSymbols = symbolList((job?.failures ?? []).map((row) => row?.symbol)) ?? []
-      pendingSymbols = symbolList(job?.pendingSymbols) ?? []
+      const settled = host.state !== null && TERMINAL_STATES.has(host.state)
+      const derived = handedRows === null || handedRows === undefined ? null : readRows(handedRows)
+      basis = settled && derived !== null ? 'rows' : 'run'
+      read = {
+        total: counts.total,
+        pending: counts.pending,
+        done: counts.done,
+        failed: counts.failed,
+        rowsRead: derived === null ? null : handedRows.length,
+        sourced: basis === 'rows' ? derived.sourced : null,
+        unprepared: basis === 'rows' ? derived.unprepared : null,
+        evaluated: basis === 'rows' ? derived.evaluated : null,
+      }
+      if (basis === 'rows') unpreparedSymbols = symbolList(derived.unpreparedSymbols) ?? []
+      failedSymbols = symbolList((run?.failures ?? []).map((row) => rowName(row))) ?? []
+      pendingSymbols = symbolList((run?.pendingItems ?? []).map((id) => rowName({ itemId: id }))) ?? []
+      if (basis === 'rows' && derived.unreadable.length > 0) {
+        diagnostics.push(diagnostic(
+          'research_record_unreadable',
+          'unevaluated',
+          'Some of the answers read back do not carry `sourced` as a boolean, so whether this fund held anything readable for those names is unknown and they are counted in neither column. ⛔ Hand back the recipe answers as `files_read` returned them — a paraphrase drops the one field the starvation diagnosis rests on',
+          'rows',
+          { unreadable: derived.unreadable.length, rowsRead: handedRows.length },
+        ))
+      }
     }
   }
 
   /**
-   * ⛔ **`unsettled` rather than `in-flight`.** A cancelled job also has item
-   * rows and no result, and calling that «in flight» would say a job is running
-   * that has stopped. What both share is the only thing this operation needs:
-   * no settled result exists, so these counts are *so far* and not an answer.
+   * ⛔ **`unsettled` rather than `in-flight`.** A cancelled run also has item
+   * rows and no answers read back, and calling that «in flight» would say a run
+   * is going that has stopped. What both share is the only thing this operation
+   * needs: preparation has not been measured, so these counts are *so far* and
+   * not an answer. ⚠️ Since #743 §B a **settled** run whose files nobody read is
+   * the same word for the same reason — the answers are on disk and unread, and
+   * a record that called that «prepared» would be asserting the state nobody
+   * counted, which is exactly what #212 ④ removed.
    */
   const dataPreparation = basis === 'none'
     ? 'unevaluated'
-    : basis === 'items'
+    : basis === 'run'
       ? 'unsettled'
-      : read.evaluated === 0
+      : read.sourced === 0
         ? 'unprepared'
         : read.unprepared > 0 || read.failed > 0
           ? 'partial'
@@ -172,7 +277,7 @@ export function executionRecord({ prepared = null, job = null, result = null, el
 
   const candidateEvaluation = basis === 'none'
     ? 'unevaluated'
-    : basis === 'items'
+    : basis === 'run'
       ? 'unsettled'
       : read.evaluated > 0
         ? 'evaluated'
@@ -194,23 +299,23 @@ export function executionRecord({ prepared = null, job = null, result = null, el
     diagnostics.push(diagnostic(
       'research_record_absent',
       'unevaluated',
-      'Nothing about this run’s data preparation was handed over, so whether the roster was prepared, whether the recipe answered and how many names cleared the gates are all unknown. ⛔ That is not «the roster offered nothing»: call `research_prepare`, poll `research_job_get`, read `research_result_get` and hand back what they returned',
-      'result',
+      'Nothing about this run’s data preparation was handed over, so whether the roster was prepared, whether the recipe answered and how many names cleared the gates are all unknown. ⛔ That is not «the roster offered nothing»: call `task_start`, poll `task_get`, read the answer files with `files_read` and hand back what they returned',
+      'run',
     ))
   } else if (dataPreparation === 'unsettled') {
     diagnostics.push(diagnostic(
       'research_roster_unsettled',
       'unevaluated',
-      'A research job exists and no result does yet, so these counts are what has settled so far and not an answer. ⛔ `sourced` is deliberately absent here: the settled summary derives it as items minus gaps, and deriving it mid-flight counts a name nobody has reached yet as a name this fund can read',
-      'job',
-      { pending: read.pending, total: read.total, pendingSymbols },
+      'The task run has not settled, or its answers were not read back, so these counts are what the host has done so far and not a measurement of what was prepared. ⛔ `sourced` is deliberately absent here: it is derived from the answers themselves, and deriving it from `done` counts a name nobody has reached yet as a name this fund can read. The control is `files_read` over `<outputPath>/<itemId>.json`',
+      'run',
+      { pending: read.pending, total: read.total, pendingSymbols, rowsRead: read.rowsRead },
     ))
   } else if (dataPreparation === 'unprepared') {
     diagnostics.push(diagnostic(
       'research_roster_unprepared',
       'unevaluated',
       'The recipe answered for no name on this roster: every one of them had nothing readable at this pin. ⛔ Read it as blindness and never as an absence of opportunity — the control that fixes it is `source_cache_refresh` on the named symbols',
-      'result.summary',
+      'rows',
       { unprepared: read.unprepared, unpreparedSymbols, failed: read.failed, failedSymbols },
     ))
   } else if (dataPreparation === 'partial') {
@@ -218,7 +323,7 @@ export function executionRecord({ prepared = null, job = null, result = null, el
       'research_roster_partially_prepared',
       'unevaluated',
       'Some names on this roster had nothing readable at this pin, or were there and could not be read. The rest are an answer you can use; the named ones are names this run is blind about, and a verdict over the whole roster is not established while they stand',
-      'result.summary',
+      'rows',
       { unprepared: read.unprepared, unpreparedSymbols, failed: read.failed, failedSymbols },
     ))
   }
@@ -247,12 +352,13 @@ export function executionRecord({ prepared = null, job = null, result = null, el
       eligibleBasis: eligible === null ? 'unreported' : 'named',
       eligibleSymbols: eligible ?? [],
       eligibleBases: ELIGIBLE_BASES,
-      /** The host's counts, as the host wrote them. Never summed into a coverage number. */
+      /** The host's four, as the host wrote them; the rest derived from the answers. Never summed. */
       counts: read,
       unpreparedSymbols,
       failedSymbols,
       pendingSymbols,
-      resultRef: settled?.resultRef ?? null,
+      /** Where the answers are, so a reader can go and check the counts above. */
+      outputPath: typeof run?.outputPath === 'string' ? run.outputPath : typeof started?.outputPath === 'string' ? started.outputPath : null,
       /** ⛔ Nothing here was read off a diagnostic; that is the whole point of #212 ④. */
       inferredFromDiagnostics: false,
       countsAreNeverSummed: true,

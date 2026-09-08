@@ -69,7 +69,7 @@ too quickly.
 date or a filing trigger and an expiry — rather than prose that disappears.
 
 **Size follows evidence, not conviction.** Closed outcomes update each lens's maturity and
-calibration in the instance's private memory. Low maturity permits a small controlled
+calibration in the instance's own private folder. Low maturity permits a small controlled
 experiment when every research gate is complete; it never licenses confident sizing. And
 calibration cannot promote or rewrite a methodology on its own — that takes a reviewed
 package or config change.
@@ -370,13 +370,27 @@ reached through the check #171 added to stop a different one.
 
 `untilled/aumos#724` and `#730` gave the host a research job and a research result that **count**, so
 `executionRecord` reads them and answers three facts: `dataPreparation`, `candidateEvaluation` and
-`eligibleCount`. The first two are the host's own counts (`sourced`, `evaluated`, `unprepared`,
-`failed` — ⛔ three reports and never summed, the host's rule kept verbatim); the third is this
-package's, derived from `eligibleSymbols`, the names the run's own fold arrived at, because a number
+`eligibleCount`. ⚠️ **`untilled/aumos#743` then took half of the counting away, and took the right
+half.** `research_result_get` is gone — the sweep is `task_start`/`task_get`/`task_cancel` now, and
+each recipe answer is a **file** the run reads back with `files_read` — and with the settled summary
+went its `sourced` and `unprepared`. Those two said *this fund held readable documents for this
+name*, which is a judgement about documents that only the domain reading them makes; a common
+executor making it was the app holding an investment opinion, and this package is the one that has to
+hold it. So each half is counted where it is known: the host says how many items there are, how many
+are left, how many answered and how many could not (`task_get`'s `total`, `pending`, `done`,
+`failed`), the recipe writes `sourced` — *was I handed any document at all* — onto each answer, and
+`executionRecord` derives `sourced`/`unprepared`/`evaluated` from the answers this run actually read.
+⛔ Still **three reports and never summed**, the host's rule kept verbatim. `eligibleCount` is
+unchanged and is this package's, derived from `eligibleSymbols`, the names the run's own fold arrived
+at, because a number
 a run can type is a number a run can invent. ⛔ **Absent is `null` and `[]` is `0`** — the same
-three-way split the host's own `basis` keeps, where `none` is not zero — and a record this operation
-did not produce is refused as `execution_record_unreadable` rather than read, because an object
-asserting `dataPreparation: 'prepared'` is the same inference wearing the new field's name.
+three-way split `basis` keeps, where `none` is not zero, and its three words moved with the tools
+(`rows` · `run` · `none`, where `rows` is *this run read its own answers back*) — and a record this
+operation did not produce is refused as `execution_record_unreadable` rather than read, because an
+object asserting `dataPreparation: 'prepared'` is the same inference wearing the new field's name.
+⚠️ **A settled task run whose answer files were never read is `unsettled`, not `prepared`**: finishing
+is the host's fact and preparing is this package's, and a count derived from answers is only as
+complete as the answers read.
 
 What was deleted, and what replaced each piece:
 
@@ -388,7 +402,7 @@ What was deleted, and what replaced each piece:
 | `!recognisedCodes.length` as the guard against an unknown code reaching the positive answer (#171) | ⛔ structural: the answer needs a counted record, so no code can grant it. The observation survives as `mandate_execution_codes_unrecognised` / `info` — said, never silent |
 
 ⚠️ **What the diagnostics still do is withdraw the answer, and that is the safe direction.** An
-`input-path` code names a stage that lost an input the research job cannot see — the corp-code join
+`input-path` code names a stage that lost an input the task run cannot see — the corp-code join
 is not the price sweep — and it outranks the record; an `unresolved` code forbids the positive answer
 without claiming the wiring is at fault. Reading a reason to *decline* a claim is the opposite of
 reading one to grant it. ⛔ And the three absences never collapse: `'unevaluated'` is «no record»,
@@ -499,20 +513,44 @@ And `specialistBudget`'s `managerId` is the literal `evidence-gated` — a run t
 refused against a contract that said only `managerId: "string"`. All four spellings are
 `input_shape_invalid` rather than dropped, and all four shapes are published.
 
-**Two declared capabilities currently serve nothing.** `thesis:read` and `evidence:read`
-are in the manifest vocabulary, and the current Aumos build maps each to an empty tool
-list, so a run gets no such tool. The prompt reads them *when available* and the manifest
-lists them under `optionalSkills` for exactly that reason. Until Aumos serves them, asset
-claims reach a run through the invocation payload and through the book's briefs, and the
-package says so rather than implying a lookup it cannot make.
+**A capability's name and a tool's name are two vocabularies, and this paragraph used to confuse
+them.** It read *"two declared capabilities currently serve nothing"* about `thesis:read` and
+`evidence:read`, and that stopped being true: both are served, under spellings this package had never
+written — `thesis_list`/`thesis_get` and `evidence_get`/`evidence_search`. ⛔ What no build has ever
+served is `thesis_read` and `evidence_read`, which were names, not capabilities. The manifest lists
+the tools it wants under `optionalSkills` for that reason, and where a session does not hold the
+served pair, asset claims reach a run through the invocation payload and through the book's shared
+folder — the package says so rather than implying a lookup it cannot make.
 
-**The paper track lives in instance-private memory, because nothing else can hold it.** A
+**The paper track lives in this instance's own private folder, because nothing else can hold it.** A
 paper call has no order and no fill, so it is not a Decision. Two consequences follow and
 neither is hidden: another manager on the same book cannot see this evidence, and a new
 manager instance starts the track over. A shared record would be the right home; this is
 the one the runtime serves. What does *not* start it over is a model swap, a config edit
-or an in-place package update — the row is keyed by manager instance alone, so the d60
+or an in-place package update — the folder is keyed by manager instance alone, so the d60
 window survives all three, and only deleting the manager resets it.
+
+**What this manager remembers is a folder now, and three things it used to get for free are its own
+to keep.** `untilled/aumos#743` deleted `memory_read`/`memory_write` and `brief_read`/`brief_write`
+and replaced them with two folders: this instance's private one, read and written through
+`files_list`/`files_read`/`files_write`, and the book's shared one — what a Brief was — through the
+`fund_files_*` six. ⚠️ **Nothing an investor chose moved**: the same records under the same names,
+the same isolation, the same ownership split, and the same refusal to keep a hidden portfolio
+database there. What did move is who keeps the guarantees. A write used to append a revision and
+nothing could be lost; a file is replaced, so where the earlier value has to stay readable this
+package writes a **dated file beside** the current one. A read used to answer the newest revision
+visible at the run's `asOf`; a read answers the bytes on disk, so the value's own `updatedAsOf` is
+the only point-in-time signal and a historical replay can only read a snapshot frozen for that run.
+And two writers used to be held apart by the append; they are held apart by a compare-and-swap on
+the hash that was read. `engines.aumos` therefore requires `>=0.4.0`. ⚠️ **That floor is unlike the
+five before it.** Those moved because a capability an older build does not know refuses the whole
+manifest, and this package drops out of that build's catalogue with nobody told. No capability moved
+here — the tools behind capabilities this package already declared were renamed — so an older build
+does not refuse anything: it serves a grant whose tool names nothing calls, and the run reports them
+absent and submits a WAIT it could have avoided. That is quieter than a refusal, which is why the
+floor is stated rather than left to chance. ⛔ This package does not copy its own older records across —
+Aumos exports them once, host-side, and a package writing them too would be a second writer racing
+the first over paths it does not own.
 
 **Provenance.** Ported from `morethanmin/trading-harness` at the commit recorded in the
 manifest. No credentials, account or position data, caches, backups, personal thesis text,

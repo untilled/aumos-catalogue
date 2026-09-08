@@ -1528,10 +1528,16 @@ export const CAUSE_UNRESOLVED_CODES = causeCodesInLane('unresolved')
  * added to stop a different one.
  *
  * ⛔ **So the positive claim is now earned by a count and never by a string.**
- * `executionRecord` reads the host's own research job and result (`aumos#724`,
- * `#730`) and this operation requires all three of its facts:
- * `dataPreparation: 'prepared'`, `candidateEvaluation: 'evaluated'` and
- * `eligibleCount === 0`. The pairing is written out in `README.md`.
+ * `executionRecord` reads the host's own task run (`aumos#724`, `#730`,
+ * generalised by `aumos#743` §B) **and the recipe answers the run read back out
+ * of its own folder** — the host counts items and the answers carry `sourced`,
+ * because how many names a fund held anything readable for is a judgement about
+ * documents that only the party reading them makes. This operation requires all
+ * three of the record's facts: `dataPreparation: 'prepared'`,
+ * `candidateEvaluation: 'evaluated'` and `eligibleCount === 0`. ⚠️ A settled run
+ * whose answer files nobody opened is `unsettled` and earns nothing, which is
+ * this same rule one layer down: finishing is the host's fact and preparing is
+ * the package's. The pairing is written out in `README.md`.
  *
  * ⚠️ **What the diagnostics still do is withdraw it**, which is the safe
  * direction and is not state inference: an `input-path` code names a stage that

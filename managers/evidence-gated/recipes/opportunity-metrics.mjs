@@ -8,8 +8,8 @@
  *
  * ⚠️ **The ranking is not here.** `opportunityUniverse` folds the roster into
  * sector cohorts and percentiles, and one recipe process sees one symbol; that
- * fold stays a `calculate` call, over the metric rows read back with
- * `research_result_get`. Those rows carry no bars, so relaying them costs a page
+ * fold stays a `calculate` call, over the metric rows read back from the answer
+ * files with `files_read`. Those rows carry no bars, so relaying them costs a page
  * of numbers rather than a roster of series — which is the whole shape of this
  * change: the heavy input never leaves the host, the light output does.
  *

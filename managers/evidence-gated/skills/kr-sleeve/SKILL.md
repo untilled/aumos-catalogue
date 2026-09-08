@@ -99,7 +99,8 @@ been fed. Do these in order and report each one:
      its positive answer rather than granting one, which since `#212` ④ is what a reported code can do.
    - **Persist `nextState` verbatim to `research/catalyst-window`.** ⚠️ Its instants are
      **numbers** on purpose: a catalyst window ends after `asOf` by construction, and a string
-     timestamp later than `asOf` is the one shape `memory_read` refuses. Do not rewrite them.
+     timestamp later than `asOf` was the one shape `memory_read` refused; the encoding is this
+     package's canon now (`skills/memory-contract/SKILL.md`). Do not rewrite them.
      ⛔ Event records are not persisted and must not be — `sue`, `day1ExcessPct` and
      `preAnnouncementClose` are numbers copied off a vendor answer, which
      `skills/memory-contract/SKILL.md` forbids. Re-read them each run.
@@ -194,9 +195,11 @@ through `mcp__evidence-gated-metrics__calculate` — never through `Bash`.
 ⛔ **And the roster sweep is not relayed either.** It is two steps, in this order:
 `source_cache_refresh` on **`prices`/`daily`** across the roster — provider `prices`, document
 `daily`, `market` the venue MIC (`XKRX`, ⛔ never the research market you use for a
-filer) and ⛔ no `vendorId` — and then `research_prepare` over the two recipes this package
-declares (`roster-scan` and `opportunity-metrics`), `research_job_get` until it settles and
-`research_result_get` for the summary. ⚠️ **`research_prepare` collects nothing**, so preparing
+filer) and ⛔ no `vendorId` — and then `task_start` over the two recipes this package
+declares (`roster-scan` and `opportunity-metrics`), each item id the store coordinate
+`XKRX:<symbol>` and `outputPath` `scans/<asOf date>/<recipeId>`; `task_get` until it settles, then
+`files_read` on `<outputPath>/<itemId>.json` for each answer.
+⚠️ **`task_start` collects nothing**, so preparing
 first is a sweep whose every row says the price branch was never run. The bars stay in the host on
 both steps and the row that comes back carries no series. ⛔ Never a worker opened to relay bars,
 walk listing pages or batch the roster, and ⛔ never a roster of bars typed back as `calculate`

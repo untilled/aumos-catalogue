@@ -659,7 +659,7 @@ for (const [group, checks] of Object.entries(groupCoverage.groups)) assert.ok(ch
  */
 covers('audit/package-boundary-scan', 'owner-cutover/no-order-code')
 assert.equal(manifest.network.mode, 'deny', 'manager package cannot access the network directly')
-assert.equal(manifest.engines.aumos, '>=0.3.34', 'runtime requires the current invocation and package-MCP contracts, and — since untilled/aumos#724 and #726 — an Aumos whose capability enum has `research:prepare` and `research:read` in it and whose manifest parser reads `recipes`, which is the release that lets this package hand its own `scan` and `opportunityMetrics` to host code instead of relaying a roster of daily bars back as tool arguments (#209 §8-D): one measured run spent ~1.91M characters of `calculate` input and 29 subagents doing exactly that and submitted no judgement. ⚠️ **Measured rather than assumed**: neither host pull request was merged when this line was written and `v0.3.33` is the current tag, so the floor is the next release, `0.3.34`. ⚠️ The floor has now moved for the **fifth** time for the same reason, and the reason has not changed once: `capabilities[].kind` is a closed enum, so a value an older build does not know is not an unknown key that gets stripped — the **whole manifest** is refused and this package drops out of that build\'s catalogue with nobody told. ⚠️ `recipes` is the opposite and is not why the floor moved: it is a **top-level** key, and `managerPackageManifestSchema` strips top-level keys it does not know, so an older build reads the rest of this document unchanged and merely has no name for the computation. It was `>=0.3.32` because of untilled/aumos#693 and `observation:file`, the release that gave `variantViewCheck`\'s `consensusRefs` requirement a supply route at all (#692); `>=0.3.30` because of untilled/aumos#671 and #683 and `source-cache:read`/`:write`, which gave `upsideRadar` somewhere to be fed from (#146); `>=0.3.18` because of untilled/aumos#576 and `connection:passthrough`; `>=0.3.17` because of untilled/aumos#540 and an Aumos that reads `schedule` as a **list** — a known key of the wrong shape, refused whole, which #233 measured. The `rule` floor this line used to state is gone with the field: nothing reads a plan\'s `rule` any more, and AMP still accepts it precisely so an older-schema package is not refused')
+assert.equal(manifest.engines.aumos, '>=0.4.0', 'runtime requires the current invocation and package-MCP contracts, and — since untilled/aumos#743 — an Aumos that serves the twelve file tools (`files_*` over this instance\'s own folder, `fund_files_*` over the book\'s shared one) and the three task tools (`task_start`, `task_get`, `task_cancel`). ⚠️ **This floor is unlike the five before it, and the difference is which half of the manifest moves.** The earlier five moved because `capabilities[].kind` is a closed enum and a value an older build does not know refuses the **whole manifest** — this package drops out of that build\'s catalogue with nobody told. This one moves because the tools behind capabilities this package already declares were **renamed and one of them deleted**: `memory_read`/`memory_write`, `brief_read`/`brief_write`, `research_prepare`, `research_job_get`, `research_job_cancel` and `research_result_get` are gone, and every instruction surface here now names their replacements. ⛔ So the failure on an older build is not a refused manifest but a **served grant whose tool names nothing calls** — a run that reads its own folder through tools that host never built, reports them absent in `uncertainty`, and submits a WAIT it could have avoided. That is quieter than a refusal and is the reason the floor is stated rather than left to chance. ⚠️ **Measured rather than assumed is not available here**: the four host pull requests (#743 slices A–D) were unmerged when this line was written and `v0.3.34` is the current tag, so `>=0.4.0` is the floor this package asserts and the release that carries those slices has to match it. ⛔ Publishing before it does is what this assertion exists to make loud. The earlier floors and their reasons, unchanged: `>=0.3.34` for untilled/aumos#724 and #726 and `research:prepare`/`research:read` with a manifest parser that reads `recipes`; `>=0.3.32` for untilled/aumos#693 and `observation:file`, the release that gave `variantViewCheck`\'s `consensusRefs` requirement a supply route at all (#692); `>=0.3.30` for untilled/aumos#671 and #683 and `source-cache:read`/`:write`, which gave `upsideRadar` somewhere to be fed from (#146); `>=0.3.18` for untilled/aumos#576 and `connection:passthrough`; `>=0.3.17` for untilled/aumos#540 and an Aumos that reads `schedule` as a **list** — a known key of the wrong shape, refused whole, which #233 measured. ⚠️ `recipes` is still the opposite and is still not why any floor moved: it is a **top-level** key, and `managerPackageManifestSchema` strips top-level keys it does not know.')
 assert.equal(manifest.capabilities.some((row) => /order|broker|database/i.test(row.kind)), false, 'manager package declares no order/broker/database capability')
 /**
  * ⚠️ **Two assertions stood here and the collection split retired them.**
@@ -2198,14 +2198,22 @@ assert.equal(wiringUnfinished.diagnostics.some((row) => row.severity === 'blocke
  * deleted: the code says a gate refused **one** name and says nothing about
  * whether the roster was prepared, so a run blind across its whole universe
  * earned *the methodology is working* by refusing one candidate. What earns it
- * now is `executionRecord` over the host's own research result — a prepared
- * roster, an answered recipe and nought eligible.
+ * now is `executionRecord` over a settled task run and the recipe answers this
+ * run read back out of its own folder — a prepared roster, an answered recipe
+ * and nought eligible.
+ *
+ * ⚠️ **Two halves since `untilled/aumos#743` §B.** The host counts items; how
+ * many names this fund held anything readable for is a judgement about
+ * documents, so the recipe writes `sourced` onto its own answer and the record
+ * derives the count from the answers rather than repeating a number the host
+ * asserted.
  */
 const preparedRoster = execute({
   operation: 'executionRecord',
   asOf: methodology.asOf,
   input: {
-    result: { resultRef: 'res_september', summary: { sourced: 74, evaluated: 74, unprepared: 0, failed: 0, unpreparedSymbols: [], failedSymbols: [] } },
+    run: { taskRunId: 'trun_september', state: 'completed', outputPath: 'scans/2026-09/roster-scan', pendingItems: [], outputs: [], failures: [], counts: { total: 74, pending: 0, done: 74, failed: 0 } },
+    rows: Array.from({ length: 74 }, (_, index) => ({ itemId: `XKRX:sym${index}`, symbol: `sym${index}`, sourced: true, data: { scored: true } })),
     eligibleSymbols: [],
   },
 })

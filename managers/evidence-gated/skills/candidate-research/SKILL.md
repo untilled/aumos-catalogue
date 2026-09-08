@@ -294,7 +294,7 @@ diagnostics. The numbers do not change because the caller did.
 
 ### First fill the series, then prepare — the sweep reads what this fund already holds
 
-⚠️ **`research_prepare` collects nothing.** It runs this package's arithmetic over the documents
+⚠️ **`task_start` collects nothing.** It runs this package's arithmetic over the documents
 this fund has **already** stored for each name, so a roster nobody has collected a price series for
 comes back evaluated-with-no-data on every row. That is not a hypothetical: it is what every row
 looked like until `untilled/aumos#734` gave the host a price collector at all.
@@ -328,33 +328,67 @@ correctly-shaped result whose every row says the price branch was never run, and
 market that offered nothing is the error `untilled/aumos-catalogue#209` is named after. Refresh the
 roster, **then** prepare it.
 
-⚠️ **A name whose refresh you could not complete is `unprepared` in your own report before the host
-ever says so.** Carry those symbols by name into the `uncertainty` entry below with the answer that
+⚠️ **A name whose refresh you could not complete is `unprepared` in your own report before anything
+else says so.** Carry those symbols by name into the `uncertainty` entry below with the answer that
 stopped you — `failed`, `no-source-for-market`, or a limit that ended the turn.
 
-### The three calls, in order
+### The three calls, in order — and the third one reads files
 
-1. `research_prepare({ recipeId, universe, parameters, asOf })`. The `universe` is the roster you
-   declared — `{ market, symbol }` rows, **names and nothing else**. `parameters` carries what the
-   sweep cannot derive and you can: `held` and `pending` as short symbol lists, and `sectors` as a
-   symbol→label map for `opportunity-metrics`. ⛔ **Bars never go in `parameters`.** They would be
-   the same 1.91M characters with one more process in the way.
-   The answer is immediate: either `cached: true` with a `resultRef`, or a `jobId`.
-2. `research_job_get({ jobId })` until it settles. `completed` and `partial` both carry a
-   `resultRef`; `failed` carries none, because nothing was evaluated.
-3. `research_result_get({ resultRef })` — **the summary is the default and it is bounded whatever
-   the roster's size.** Ask for detail by naming `symbols`, narrow it with `fields`, page it with
-   `limit`/`cursor`. There is no flag that means «give me everything», and you should not want one:
-   the rows you fold with `opportunityUniverse` are metric rows, and metric rows carry no bars.
+⚠️ **The answers are FILES since `untilled/aumos#743`.** One per name, written by the host into your
+own folder, and that is the whole point of the route: a roster of metric rows never becomes a tool
+result at all, and you read exactly the ones you want.
 
-### The three counts are three reports and are never added together
+1. `task_start({ recipeId, items, parameters, outputPath, asOf })`. `items` is the roster you
+   declared — one row per name, **names and nothing else**:
 
-| count | what it says | what it does **not** say |
-|---|---|---|
-| `sourced` | this fund held readable documents for that many of your names | nothing about whether any of them carried a price |
-| `evaluated` | the recipe answered for that many | ⚠️ an answer of *these documents carried nothing* **is** an evaluation and is counted here |
-| `unprepared` | that many had **nothing readable at your `asOf`** | ⛔ **not** «no opportunity there» |
-| `failed` | something was there and could not be read | neither of the two above — the reason is named per symbol |
+   ```jsonc
+   items: [{ id: "XKRX:005930", input: { symbol: "005930", market: "XKRX" } }]
+   ```
+
+   ⚠️ **The `id` must be the coordinate this fund files documents under** — `<MIC>:<symbol>` — because
+   that equality is what makes the host hand the recipe this fund's stored documents for that name.
+   An id of your own invention is accepted and the recipe is handed **nothing**, which is
+   `untilled/aumos-catalogue#209`'s failure bought back for the price of a prettier string. The
+   `input` carries this package's own spelling and the host never reads it.
+
+   `outputPath` is the folder the answers land in, relative to your own folder:
+   **`scans/<asOf's calendar day>/<recipeId>`**. ⚠️ It is part of the cache identity, so asking for the
+   same computation into a different folder runs it again — use the same path across a run's two
+   recipes and across a retry.
+
+   `parameters` carries what the sweep cannot derive and you can: `held` and `pending` as short
+   symbol lists, and `sectors` as a symbol→label map for `opportunity-metrics`. ⛔ **Bars never go in
+   `parameters`.** They would be the same 1.91M characters with one more process in the way.
+
+   The answer is immediate: either `cached: true` with counts and the folder already filled, or a
+   `taskRunId` to poll.
+2. `task_get({ taskRunId })` until it settles — `completed`, `partial`, `failed` or `cancelled`. It
+   carries the item counts, the folder, what is still pending by name, every answer with **the file
+   it is in**, and every failure with its `kind` (`network` will be retried, `parse` will not read
+   any better next time).
+3. `files_read({ path: "<outputPath>/<itemId>.json" })` for each answer you want. ⚠️ **Read them —
+   finishing is not preparing.** A settled run whose files you never opened is `unsettled` to
+   `executionRecord`, and rightly: the host counted items and only the answers say what this fund
+   could actually read. ⛔ There is no call that hands you the whole roster at once and you should
+   not want one; `files_list` over the folder tells you what is there, and the rows you fold with
+   `opportunityUniverse` are metric rows you read one by one.
+
+### The counts are reports and are never added together — and you count three of them
+
+⚠️ **The split moved with the tools** (`untilled/aumos#743` §B). The host counts **items** and stopped
+counting how many names this fund held anything readable for, because that was a judgement about
+documents that only the party reading them makes. That party is this package, and each answer file
+carries **`sourced`** so it can be counted.
+
+| count | who says it | what it says | what it does **not** say |
+|---|---|---|---|
+| `total` · `pending` · `done` · `failed` | `task_get` | how many items there are, how many are not attempted, how many answered, how many could not | nothing at all about documents |
+| `sourced` | **the answer file** | this fund held readable documents for that name | nothing about whether any of them carried a price |
+| `evaluated` | **the answer file** | the recipe computed something (`data` is not `null`) | ⚠️ an answer of *these documents carried nothing* **is** an evaluation and is counted here |
+| `unprepared` | **derived** — a `sourced: false` answer | that name had **nothing readable at your `asOf`** | ⛔ **not** «no opportunity there» |
+
+⛔ **Do not type these numbers.** Hand the answers to `executionRecord` as `rows` and it derives all
+of them, so what the record says is checkable against the folder it names.
 
 ⛔ **`unprepared` is blindness and is reported as blindness.** It means either that nobody ever
 collected those names or that everything collected was captured after the instant you are judging;
@@ -363,9 +397,9 @@ names. Reporting an `unprepared` roster as a market that offered nothing is the 
 reporting `never-fed` as `fed-and-genuinely-empty`, one layer up, and it is the error this whole
 issue is named after.
 
-⚠️ **A row's `state` and a row's `output` are two different sentences.** `state: 'gap'` is the
-host's: nothing about that symbol was readable. An `output` carrying `empty: true` is the recipe's:
-it read the documents and they carried nothing. And a row whose `output.data` is `null` beside a
+⚠️ **A row's `sourced` and a row's `data` are two different sentences.** `sourced: false` is *nothing
+about that name was readable at all*. An answer carrying `empty: true` is *the documents were read and
+they carried nothing*. And a row whose `data` is `null` beside a
 `scanner_history_insufficient` / `opportunity_history_insufficient` diagnostic is the third: the
 documents were read and **none of them was a price series**, so the lens sweep was never run for
 that name. Carry the diagnostic — it is the only thing that tells those apart.
@@ -398,8 +432,8 @@ number rather than the word.
 
 ### What you do with the names you could not review
 
-⛔ **Not a silence, and not a new memory key.** Persist the roster you *did* review with
-`researchState` to `coverage/research-index` (`skills/memory-contract/SKILL.md` owns that key),
+⛔ **Not a silence, and not a new path.** Persist the roster you *did* review with
+`researchState` to `state/coverage/research-index.json` (`skills/memory-contract/SKILL.md` owns it),
 name the unreviewed names and **why** — `unprepared`, `failed` with its kind, or a delegation
 refusal code verbatim — in one `uncertainty` entry, and arm the revisit as a WATCH/plan the way
 this page already requires for a conditionally rejected candidate. A `WAIT` whose data was never
@@ -408,9 +442,11 @@ invariant 5 asks you to tell them apart.
 
 ### When the tools are not served
 
-⚠️ `research_prepare` and its three siblings are **optional skills**, so a host that predates them
-serves none of them. That is an absence to report in `uncertainty`, exactly like any other — say
-which of the four was not named and that the mechanical sweep was therefore not prepared. ⛔ It is
+⚠️ `task_start`, `task_get`, `task_cancel` and the file tools are **optional skills**, so a host that
+predates them serves none of them. That is an absence to report in `uncertainty`, exactly like any
+other — say which was not named and that the mechanical sweep was therefore not prepared. ⚠️ The file
+tools are the ones to check first: without them there is nowhere for an answer to land, so a served
+`task_start` and an unserved `files_read` is a sweep that runs and cannot be read. ⛔ It is
 not licence to reopen the relay path: a roster's bars typed back as tool arguments is the failure
 mode, not the fallback. A single name that the sweep could not cover may still be evaluated through
 `calculate` with its own bars.

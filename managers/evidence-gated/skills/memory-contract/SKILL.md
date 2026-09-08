@@ -1,38 +1,78 @@
 ---
 name: memory-contract
-description: Read and append instance-private learning revisions safely, including empty, malformed and historical-asOf behavior.
+description: Read and write the instance-private learning record as files, including empty, malformed and historical-asOf behavior.
 ---
 
 # Manager memory contract
 
-Private manager memory is a compact, append-only learning index for this **manager instance**. It
-is not a hidden portfolio database and not a source cache.
+This manager instance's private record is a compact learning index kept as **files in its own
+folder**. It is not a hidden portfolio database and not a source cache.
 
-## Stable keys
+## What changed, and what did not (`untilled/aumos#743`)
+
+`memory_read` and `memory_write` are gone. The record is a folder now — `files_list`, `files_read`,
+`files_write`, `files_mkdir`, `files_move`, `files_remove` — and `brief_read`/`brief_write` became
+the book's shared folder under the `fund_files_*` six.
+
+⚠️ **The keys did not change; they became paths.** Every stable key below is that key with `state/`
+in front and `.json` behind, so a run reads and writes the same seventeen records it always did.
+⛔ **The bounds did not change either** — what may be stored, what may not, the 200-row and 60 KB
+ceilings, the isolation, the ownership split in `PROMPT.md` invariant 4. A folder is a bigger address
+space and not a bigger licence, and a record that would have been refused as a key is refused as a
+path.
+
+⚠️ **Three properties the runtime used to keep are now this package's to keep, and each is named
+where it bites:**
+
+| property | who kept it | how it is kept now |
+|---|---|---|
+| a write appends a revision, history survives | the runtime | a **dated file beside** the stable path, written only where history is the point (§Write) |
+| a read is a revision visible at `asOf` | the runtime | ⛔ nothing. A read answers the file as it is **now**; the value's own `updatedAsOf` is the only point-in-time signal (§Read) |
+| two writers cannot silently overwrite | the runtime | `expectedHash` on every write (§Write) |
+
+⛔ **The lifetime is unchanged and is still the instance's** — the folder outlives the model, the
+CLI vendor, an in-place package update and a config change, no other manager including a second
+install of this package can read it, and deleting the manager is what ends it.
+
+## Stable paths
 
 Use only:
 
-- `migration/schema-version`
-- `run/theme-radar-last`
-- `run/watch-alerts`
-- `run/armed-reviews`
-- `learning/evidence-maturity`
-- `learning/closed-decision-summary`
-- `calibration/mean-reversion`
-- `calibration/trend-pullback`
-- `calibration/quality-pullback`
-- `calibration/inflection`
-- `calibration/post-event-continuation`
-- `calibration/core-dca`
-- `failures/repeated-patterns`
-- `coverage/universe-state`
-- `coverage/research-index`
-- `research/catalyst-window`
-- `learning/paper-cohorts`
+- `state/migration/schema-version.json`
+- `state/run/theme-radar-last.json`
+- `state/run/watch-alerts.json`
+- `state/run/armed-reviews.json`
+- `state/learning/evidence-maturity.json`
+- `state/learning/closed-decision-summary.json`
+- `state/calibration/mean-reversion.json`
+- `state/calibration/trend-pullback.json`
+- `state/calibration/quality-pullback.json`
+- `state/calibration/inflection.json`
+- `state/calibration/post-event-continuation.json`
+- `state/calibration/core-dca.json`
+- `state/failures/repeated-patterns.json`
+- `state/coverage/universe-state.json`
+- `state/coverage/research-index.json`
+- `state/research/catalyst-window.json`
+- `state/learning/paper-cohorts.json`
 
-Do not generate a key per run, asset or date.
+Do not generate a path per run, asset or date — with the one exception §Write names, which is a
+dated **sibling** and never a dated stable path.
 
-`coverage/research-index` is a bounded exception for a research roster, not source caching.
+⚠️ **`files_list` over `state/` with `recursive: true` is one call and answers what is actually
+there**, with each file's size and hash. Read it first: it is how a first run learns the folder is
+empty without seventeen separate refusals, and it is where the `hash` each write needs comes from.
+
+⛔ **The other two folders are not this record.** `scans/` holds the recipe answers the host writes
+and is read, never hand-written; `proposals/` holds what this run assembled. Neither is a learning
+key and neither is read as one.
+
+⚠️ **Below, a record is named by its bare key** — `run/armed-reviews`, `coverage/research-index` —
+because what those sections are about is the record and not its address. The address is always that
+key under `state/` with `.json` behind it.
+
+`state/coverage/research-index.json` is a bounded exception for a research roster, not source
+caching.
 Use `researchState({previous, observations})` and persist only a non-null `nextState`.
 
 ⚠️ **The canonical shape of this key is `{schemaVersion: 1, updatedAsOf, rows[]}` — what
@@ -59,8 +99,8 @@ Refetch filing data from installed sources each run until the host provides quer
 storage; an Evidence id is a reference, not a promise that its payload can be read back.
 Capacity failure preserves the prior revision and requires explicit roster review.
 
-⚠️ **A name the mechanical sweep could not review goes here, and nowhere new.** When
-`research_result_get` reports a symbol `unprepared` or `failed`, or a delegation refusal cut the
+⚠️ **A name the mechanical sweep could not review goes here, and nowhere new.** When an answer file
+reports `sourced: false`, or `task_get` reports the item `failed`, or a delegation refusal cut the
 turn short, persist the roster you *did* review with `researchState`, name the rest **with the
 reason** — `unprepared`, `failed` with its `kind`, or the refusal code verbatim — in one
 `uncertainty` entry, and arm the revisit condition as a WATCH/plan the way
@@ -80,13 +120,18 @@ only a non-null `nextState`. It carries at most 200 rows of symbol, market, an e
 window, the observation date and up to eight Evidence ids — no prices, no filing numbers, no
 positions.
 
-⚠️ **Its instants are numbers, for the same reason `run/armed-reviews`' are.** A catalyst window
-ends after `asOf` by construction, and `memory_read` refuses a payload carrying a **string**
-timestamp later than `asOf` — the better this key were filled the more certainly it would be
-refused. `windowStartEpochMs`, `windowEndEpochMs` and `observedAtEpochMs` are what the operation
-writes; `catalystRegister` reads either that or the RFC 3339 rows a caller hands it, and the map it
-returns to `radarCandidates` is RFC 3339 because that is what `Date.parse` is given there. Write
-`nextState` verbatim and do not re-encode it.
+⚠️ **Its instants are numbers, for the same reason `run/armed-reviews`' are — and the reason has
+changed shape.** A catalyst window ends after `asOf` by construction, and `memory_read` refused a
+payload carrying a **string** timestamp later than `asOf`, so the better this key was filled the more
+certainly it was refused. ⚠️ **That guard does not reach a file**: `files_read` hands back the
+document as one opaque string and the outgoing scan is anchored, so a whole JSON body is not a
+timestamp and nothing in it is walked. The encoding stays anyway, and the reason is now this
+package's own rather than an accommodation: `windowStartEpochMs`, `windowEndEpochMs` and
+`observedAtEpochMs` are what the operation writes, every reader in this package reads them, and
+re-encoding a stored record to celebrate a lifted restriction is a migration with no benefit and a
+readable-history cost. `catalystRegister` reads either that or the RFC 3339 rows a caller hands it,
+and the map it returns to `radarCandidates` is RFC 3339 because that is what `Date.parse` is given
+there. Write `nextState` verbatim and do not re-encode it.
 
 ⛔ **Event records are not persisted, and that is this contract rather than an omission.** `sue`,
 `day1ExcessPct` and `preAnnouncementClose` are numbers copied off a vendor's answer, which the Write
@@ -158,18 +203,25 @@ That is why it decides nothing on its own.
 { "schemaVersion": 2, "updatedAsOf": "…", "armed": [{ "flow": "kr-sleeve", "atEpochMs": 1788735600000 }] }
 ```
 
-⚠️ **`atEpochMs`, not RFC 3339, and this is the canonical shape.** `memory_read` refuses a result
+⚠️ **`atEpochMs`, not RFC 3339, and this is the canonical shape.** `memory_read` refused a result
 carrying any **string** timestamp later than `asOf` — `post-as-of-timestamp` — and this key holds
 future instants by construction, so the better it was filled the more certainly it was refused.
 Measured on `run_3a48eaaa505241d5af94fb490d7c23c6`: three armed rows, three violations, the read
-refused; and because the refusal is per read rather than per key, the run's first keyless
+refused; and because the refusal was per read rather than per key, the run's first keyless
 `memory_read` died with it and twelve keys had to be fetched one at a time. Only an empty key came
 back cleanly.
 
-The guard walks strings, so the instant is written as a number. The meaning is identical and the
-key becomes readable. `reconcileArmedReviews` writes this shape and reads either it or the RFC 3339
-rows an earlier version wrote. ⛔ It is not agreement with the rule — a key whose whole content is
-scheduled is a shape the guard has no good answer for, and that half is `untilled/aumos`'s.
+⚠️ **`untilled/aumos#743` ended that, and by moving the record rather than by relaxing the rule.**
+`files_read` answers the document as one opaque string; the outgoing scan is anchored, so a JSON body
+is not a timestamp and its leaves are never walked. The refusal this encoding was built against
+cannot fire on a file — which also means the keyless-read collapse cannot recur, because a folder is
+listed and read by path rather than fetched as one payload of every key at once.
+
+⛔ **The encoding stays, and it is this package's canon now rather than an accommodation.** The
+meaning was always identical, every reader in this package reads it, and rewriting seventeen stored
+records to celebrate a lifted restriction buys nothing and risks a history no reader can parse.
+`reconcileArmedReviews` writes this shape and reads either it or the RFC 3339 rows an earlier version
+wrote.
 
 ⚠️ **`toArm` keeps RFC 3339.** It leaves in a `DecisionProposal`, where AMP takes strings and this
 guard does not run. Only what is written back to memory changes shape.
@@ -184,14 +236,16 @@ diverge. The fix is a read path and it is not this package's to publish. (#97)
 wobbles across its level. It holds a `session` label and the `sessionKey`s that already alerted in
 **that** session, and when the session rolls the list is replaced rather than appended to.
 
-⚠️ **The label is `session-YYYY-MM-DD`, and the prefix is load-bearing.** The field held a bare
-date until 0.4.18, and a bare date is a timestamp to the host: the pattern `memory_read` matches
-deliberately includes the date-only form, because SEC's `filed` is written that way and *"some time
-on the 5th"* can be later than an `asOf` earlier in the 5th — so a date-only value is compared
-against the **end** of the day it names. Every session date this manager writes is on or after
+⚠️ **The label is `session-YYYY-MM-DD`, and the prefix was load-bearing.** The field held a bare
+date until 0.4.18, and a bare date was a timestamp to the host: the pattern `memory_read` matched
+deliberately included the date-only form, because SEC's `filed` is written that way and *"some time
+on the 5th"* can be later than an `asOf` earlier in the 5th — so a date-only value was compared
+against the **end** of the day it named. Every session date this manager writes is on or after
 `asOf`'s UTC date, so all three flows were refused, and the key survived only by never having been
-written. ⛔ Not epoch milliseconds: this field answers *which session*, not *which instant*, and a
-number would claim a moment it does not have. `sessionKey` already had this shape.
+written. ⚠️ **That guard no longer reaches this record** (`untilled/aumos#743`, above), and the prefix
+stays for the reason the epoch encoding does: it costs nothing, every reader here expects it, and it
+still says *which session* rather than *which instant*. ⛔ Not epoch milliseconds: a number would
+claim a moment this field does not have. `sessionKey` already had this shape.
 
 That bound is the whole design. A key that accumulated every alert ever raised would be the
 ledger this document forbids two sections up, and it would grow without limit for a fact that
@@ -285,9 +339,17 @@ rather than a row list, and is matched as one value.
 
 ## Read
 
-Read with invocation `asOf`. The runtime must return only revisions visible to this exact instance
-at that instant. Treat no result as valid merely because it parses. Each value must be a JSON
-object containing:
+`files_list` over `state/` first, then `files_read` for each path you need — and carry the `hash` each
+listing gives you, because it is what a later write compares against.
+
+⛔ **A read is NOT pinned, and this is the one property the move gave away.** `memory_read` returned
+the latest revision at or before `asOf`; a file has no revisions, so `files_read` answers the bytes
+that are on disk now. The tool's own description says so. So the point-in-time check that the runtime
+used to make is **yours**, and it is the check this section already described: a value whose
+`updatedAsOf` is after invocation `asOf` is skipped and diagnosed, exactly as a future revision always
+was. ⚠️ In practice only one writer per instance exists — you — so the value later than `asOf` is one
+a later run wrote, and reading it would be reading your own future. Treat no result as valid merely
+because it parses. Each value must be a JSON object containing:
 
 ```json
 {
@@ -305,13 +367,32 @@ object containing:
 
 Additional key-specific fields are allowed. Reject a future `updatedAsOf`, unsupported
 `schemaVersion`, wrong types, unknown status, or untraceable aggregate. Record a diagnostic and
-continue as empty for that key. Empty memory on the first run is valid.
+continue as empty for that path. ⚠️ **`no-such-file` is that same empty**, not a failure: an absent
+file is an empty learning state and a first run has seventeen of them.
 
 ## Write
 
 Write only after a meaningful value changed: a new closed sample, calibration metric, repeated
-failure, coverage state or radar completion. Reuse the stable key; the gateway appends a revision and
-must not overwrite history. Preserve referenced ids, missingness and status. Never store:
+failure, coverage state or radar completion. Reuse the stable path. Preserve referenced ids,
+missingness and status.
+
+⚠️ **Pass `expectedHash` on every write** — the `hash` you read for that path, or `null` where you
+read nothing there. It is what the appended revision used to give for free: a write over bytes that
+moved since you read them is refused `revision-conflict`, and the answer is to read what is actually
+there and decide again. ⛔ Never retry the same bytes over a conflict; that is the overwrite the
+check exists to stop.
+
+⚠️ **History is now a decision, and it is made per record.** `memory_write` appended a revision and
+nothing could be lost. A file is replaced. So where the predecessor has to stay readable — a
+calibration series whose trend is the point, a coverage roster a later run must be able to diff —
+write a **dated sibling** first (`state/calibration/mean-reversion.2026-09-08.json`) and then the
+stable path. ⛔ Do not date the stable path itself: every reader in this package names it, and a
+folder of dated files with no current one is a record nothing can read.
+⛔ **Do not write a dated sibling for every record on every run.** Most of these paths are a current
+aggregate whose predecessor nothing reads — `run/watch-alerts` is replaced when the session rolls by
+design — and a folder that grew a file per run per key would be the ledger three sections up forbids.
+
+Never store:
 
 - active Thesis/invalidation or raw Evidence body;
 - portfolio-wide Brief content;
@@ -339,12 +420,28 @@ failure in diagnostics/uncertainty and still submit one valid proposal.
 
 Public installs begin empty. A private authored instance may import aggregate state once after assets,
 briefs, evidence and watches are migrated to their canonical stores. Write
-`migration/schema-version`; refuse a second bootstrap when it exists. Never ship bootstrap data.
+`state/migration/schema-version.json`; refuse a second bootstrap when it exists. Never ship bootstrap
+data.
+
+⚠️ **This package does not migrate its own pre-`#743` records and must not try.** Those rows are the
+host's to move — Aumos exports what `memory_write` and `brief_write` stored into these folders as a
+one-time step — and a package that also copied them would be a second writer racing the first over
+paths it does not own. ⛔ So an empty `state/` is read as an empty learning state and never as a
+failed migration: it is the correct reading on a fresh install, and on an existing one the records
+arrive under the same names without this package doing anything.
 
 ## Isolation expectations
 
-Another manager instance cannot read this memory, and another manager on the same book can read
-shared Brief revisions but not these keys. ⚠️ **A model swap is not another instance** — the row is
-keyed by instance alone, so memory written under one model is read back under the next. Deleting
-the manager is what ends it. Reads and writes must appear in MCP audit and Evidence. Historical
-replay must select the latest revision at or before replay `asOf`, never the current head.
+Another manager instance cannot read this folder, and another manager on the same book can read the
+shared `book/` folder but not these paths. ⚠️ **A model swap is not another instance** — the folder is
+keyed by instance alone, so what was written under one model is read back under the next; so are a
+CLI vendor change, an in-place package update and a config change. Deleting the manager is what ends
+it, and a reinstall is a new instance that starts blind. Reads and writes appear in MCP audit and
+Evidence.
+
+⛔ **Historical replay cannot read this folder as it was.** A working folder is the latest state and
+has no history to select from, and the host says so rather than pretending: what a past replay can
+read is a snapshot frozen for that run, and where there is none the answer is *not supported*. ⚠️ That
+is a real loss against `memory_read`, which selected the latest revision at or before replay `asOf`.
+It is why a record whose past matters is written as a dated sibling above — those files are the only
+history that survives, and they survive because they are addressed rather than versioned.

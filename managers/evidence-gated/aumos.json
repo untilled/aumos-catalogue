@@ -3,7 +3,7 @@
   "id": "evidence-gated",
   "publisher": "aumos",
   "name": "Evidence-Gated Allocator",
-  "version": "0.4.64",
+  "version": "0.5.0",
   "description": "One evidence-gated methodology run as three market flows: a Korean sleeve, a US sleeve, and the allocator that sets their budgets and proposes the cross-market rebalance. The flows are subagents of one manager; only the orchestrator submits.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
@@ -50,7 +50,7 @@
     "notice": "./NOTICE.md"
   },
   "engines": {
-    "aumos": ">=0.3.34"
+    "aumos": ">=0.4.0"
   },
   "ampVersion": 1,
   "contributes": {
@@ -93,19 +93,19 @@
     },
     {
       "kind": "brief:read",
-      "reason": "Book-wide regime, sector and entry-hold conclusions are read separately from asset theses."
+      "reason": "Book-wide regime, sector and entry-hold conclusions are read separately from asset theses. Since `untilled/aumos#743` this is the fund's shared FOLDER — `fund_files_list` and `fund_files_read` over `book/` — which every manager installed on this book can read."
     },
     {
       "kind": "brief:write",
-      "reason": "A changed portfolio-wide conclusion is recorded as a revision rather than hidden in private memory."
+      "reason": "A changed portfolio-wide conclusion is written where the next manager on this book will find it rather than hidden in this instance's own folder. ⚠️ It is a file now and not a keyed revision: this package keeps its own history by writing a dated file beside the current one, because the runtime no longer keeps one for it."
     },
     {
       "kind": "manager-memory:read",
-      "reason": "This instance reads lens sample counts, calibration and repeated failure patterns from earlier runs."
+      "reason": "This instance reads lens sample counts, calibration, repeated failure patterns and the recipe answers of its own sweeps from earlier runs — its private folder, through `files_list` and `files_read`. No other manager, including a second install of this package, can read it."
     },
     {
       "kind": "manager-memory:write",
-      "reason": "Meaningful new closed outcomes and coverage changes create append-only revisions to stable learning keys."
+      "reason": "Meaningful new closed outcomes and coverage changes are written to stable paths in this instance's private folder, and the whole-universe sweep writes one answer file per name there. ⚠️ Compare-and-swap on the hash read is what keeps a concurrent writer from silently overwriting; the runtime no longer appends a revision on this package's behalf."
     },
     {
       "kind": "source:passthrough",
@@ -129,11 +129,11 @@
     },
     {
       "kind": "research:prepare",
-      "reason": "The whole-universe mechanical sweep is this package's own arithmetic run by host code over stored inputs, one process per symbol, instead of a model relaying a roster of daily bars back as tool arguments. `recipes` names the two computations; this is the permission to ask for one and to cancel a job that is no longer wanted."
+      "reason": "The whole-universe mechanical sweep is this package's own arithmetic run by host code over stored inputs, one process per name, instead of a model relaying a roster of daily bars back as tool arguments. `recipes` names the two computations; this is the permission to ask for one (`task_start`) and to cancel a run that is no longer wanted (`task_cancel`). ⚠️ The spelling of this capability is the AMP vocabulary's and does not move with the tool names — a renamed enum member stops every published manifest parsing."
     },
     {
       "kind": "research:read",
-      "reason": "A prepared roster is read as a summary and then by named symbol and field. The three counts are read apart — how many had readable documents, how many the recipe answered for, and how many had nothing readable at this asOf — because the last of those is blindness to be reported and never an absence of opportunity."
+      "reason": "How far a sweep got — `task_get`'s item counts and the names behind each. ⚠️ The answers themselves are FILES and are read with `files_read`, which is the whole point of writing them there. The counts are read apart and never summed, and how many names this fund held anything readable for is derived from the answers' own `sourced` rather than asserted by the host: the last of those is blindness to be reported and never an absence of opportunity."
     },
     {
       "kind": "connection:passthrough",
@@ -150,20 +150,29 @@
       "connection_request"
     ],
     "optionalSkills": [
-      "research_prepare",
-      "research_job_get",
-      "research_job_cancel",
-      "research_result_get",
+      "task_start",
+      "task_get",
+      "task_cancel",
+      "files_list",
+      "files_read",
+      "files_write",
+      "files_mkdir",
+      "files_move",
+      "files_remove",
+      "fund_files_list",
+      "fund_files_read",
+      "fund_files_write",
+      "fund_files_mkdir",
+      "fund_files_move",
+      "fund_files_remove",
       "source_cache_read",
       "source_cache_refresh",
       "observation_file",
       "portfolio_read",
-      "thesis_read",
-      "evidence_read",
-      "brief_read",
-      "brief_write",
-      "memory_read",
-      "memory_write"
+      "thesis_list",
+      "thesis_get",
+      "evidence_get",
+      "evidence_search"
     ]
   },
   "network": {

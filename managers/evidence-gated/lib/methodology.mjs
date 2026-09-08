@@ -799,16 +799,19 @@ export function validateMemory({ value, asOf, expectedSchemaVersion = 1 }) {
  *
  * It answered *which revision may this run read* by filtering rows on
  * `instanceId`, `key`, `writtenAsOf <= asOf` — and on `model`. Every one of
- * those four is the host's answer already: `memory_read` namespaces private
- * memory by manager **instance** and refuses another instance's by name
+ * those four is the host's answer already: private memory is namespaced by
+ * manager **instance** and another instance's is refused by name
  * (`cross-namespace-private-memory`), and the run's `asOf` pin governs what a
  * payload may carry. So this was a second answer to a question that already had
  * one, and a second answer is only ever as good as the day it was written.
+ * ⚠️ Since aumos#743 the record is a folder read with `files_read` and the
+ * namespace is the folder, which is the same answer under a wider address.
  *
  * ⚠️ **It had already drifted, and in the direction that loses memory.** The
- * host keys `manager_memory` by instance **alone** — a model or vendor swap, an
- * in-place package update and a config change all keep the row, which is what
- * `MEMORY_LIFETIME` on `memory_read`/`memory_write` promises and what
+ * host keys the private record by instance **alone** — a model or vendor swap,
+ * an in-place package update and a config change all keep it, which is what
+ * `MEMORY_LIFETIME` on `memory_read`/`memory_write` promised, what the file
+ * tools' own descriptions promise since aumos#743, and what
  * `skills/memory-contract/SKILL.md` §Isolation tells a run to expect. The
  * `row.model === model` clause said the opposite: measured on
  * `fixtures/memory-contract.json`, swapping the model on the same instance

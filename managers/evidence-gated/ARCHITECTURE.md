@@ -12,18 +12,23 @@ how memory works, which skills exist, and how the port is held to the original.
 |---|---|---|
 | live positions, cash, fills | Portfolio / Toss broker connector | weight and available cash |
 | asset claim | Thesis | stance and testable invalidation |
-| portfolio-wide conclusion | Brief | regime, sector view, new-entry hold |
+| portfolio-wide conclusion | Brief — the book's shared folder, `book/` | regime, sector view, new-entry hold |
 | raw research | Evidence | vendor price, filing, news payload |
 | revisit commitment | WATCH / plan | price, date, filing trigger and expiry |
-| learning aggregate | private manager memory | lens samples, calibration, repeated failures |
+| learning aggregate | this instance's private folder, `state/` | lens samples, calibration, repeated failures |
 | actual judgement/outcome | Decision journal / Forward Track Record | BUY/WAIT/SELL and forward result |
 | permanent rule | package version / config | approved threshold or method change |
 
-Private memory never contains active theses, raw evidence bodies, shared Brief content,
-executable gates, orders/fills, copied stale source data or self-approved rule changes.
-Briefs are readable by other managers on the same book; private memory is scoped to this
+⚠️ **Both stores became folders in `untilled/aumos#743`**, and neither the ownership split above nor
+the bound below moved with them: the private record is `files_list`/`files_read`/`files_write` over
+this instance's own folder where it was `memory_read`/`memory_write`, and the book's shared
+conclusions are the `fund_files_*` six over `book/` where they were `brief_read`/`brief_write`.
+A folder is a bigger address space and not a bigger licence — a record refused as a key is refused as
+a path. So the private folder never contains active theses, raw evidence bodies, shared Brief
+content, executable gates, orders/fills, copied stale source data or self-approved rule changes.
+Briefs are readable by other managers on the same book; the private folder is scoped to this
 manager instance. Different instances do not share it. A model swap is not a different
-instance — the row is keyed by instance alone, so memory outlives the model that wrote it,
+instance — the folder is keyed by instance alone, so it outlives the model that wrote it,
 and deleting the manager is what ends it.
 
 ## Data architecture and installation policy
@@ -110,13 +115,21 @@ kept as provenance. There is no macro score: a regime call is a Brief judgement 
 
 ## Memory contract
 
-The package uses the stable keys documented in `skills/memory-contract/SKILL.md`, including a
-bounded `coverage/research-index` of names and Evidence references. Bundled KR 74 / US 83 rosters
+The package uses the stable paths documented in `skills/memory-contract/SKILL.md`, including a
+bounded `coverage/research-index` of names and Evidence references. ⚠️ **The keys did not change;
+they became paths** (`untilled/aumos#743`) — every stable key is that key with `state/` in front and
+`.json` behind, so a run reads and writes the same seventeen records it always did, at an address
+instead of a key. ⛔ **The other two folders this package owns are not that record**: `scans/` holds
+the recipe answers the host writes and `proposals/` holds what a run assembled, and neither is read
+as a learning key. Bundled KR 74 / US 83 rosters
 provide a reproducible research scope; host source storage is still needed for a fundamental cache.
 A second bounded exception, `research/catalyst-window` (#169), carries the catalyst calendar the
 discovery lanes read — event label, window, observation date and Evidence ids, and its instants are
-numbers because a window ends after `asOf` by construction and a later string timestamp is the one
-shape `memory_read` refuses. ⛔ Event records are not persisted: `sue`, `day1ExcessPct` and
+numbers because a window ends after `asOf` by construction and a later string timestamp was the one
+shape `memory_read` refused. ⚠️ **That refusal does not reach a file** — `files_read` hands the
+document back as one opaque string and the outgoing scan is anchored, so a JSON body is not a
+timestamp and its leaves are never walked — and the encoding stays anyway, as this package's own
+canon rather than as an accommodation (§Known limits). ⛔ Event records are not persisted: `sue`, `day1ExcessPct` and
 `preAnnouncementClose` are copied vendor numbers, so they are re-read each run.
 The review-memory record is what this instance **proposed** and whose instant has not passed —
 never a copy of a run's planned sequence, and ⛔ never gated on `decisions[].armed`, which is past
@@ -126,9 +139,20 @@ report-only parameter, and reported rather than acted on: it produces `standingA
 reaches neither the reviews to arm nor the state written back (#201). Values
 are JSON objects with schema version, update instant, supporting Decision/Evidence ids,
 sample/independent cluster counts, computable metrics, missing fields and maturity status.
-Writes reuse a key and create a new revision only when an aggregate changes. A historical
-replay reads the newest revision at or before its own `asOf`, not today's head. Empty or
-malformed memory is diagnosed and safely ignored, so a first run still returns a valid
+Writes reuse a stable path and happen only when an aggregate changes.
+
+⚠️ **Three properties the runtime used to keep are this package's now, and each is kept
+explicitly** (`untilled/aumos#743`). A write appended a revision and nothing could be lost; a file is
+replaced, so where the predecessor has to stay readable — a calibration series whose trend is the
+point, a roster a later run must be able to diff — a **dated sibling** is written beside the stable
+path (`state/calibration/mean-reversion.2026-09-08.json`) and never in place of it. ⛔ A read is not
+pinned: `memory_read` answered the newest revision at or before `asOf` and `files_read` answers the
+bytes that are on disk now, so the value's own `updatedAsOf` is the only point-in-time signal, and a
+value later than the invocation's `asOf` is skipped and diagnosed exactly as a future revision always
+was. And two writers were held apart by the append; they are held apart by `expectedHash`
+compare-and-swap, whose mismatch is `revision-conflict` and whose answer is to read what is actually
+there and decide again. Empty or malformed memory is diagnosed and safely ignored — `no-such-file` is
+that same empty and a first run has seventeen of them — so a first run still returns a valid
 WAIT, WATCH or qualified BUY.
 
 Reproduce the reference contract locally:
@@ -139,7 +163,12 @@ node tools/verify-evidence-gated-allocator.mjs
 
 The fixture proves run A → run B persistence, append-only same-key revisions, historical
 replay, instance isolation, model-swap continuity, shared-Brief/private-memory separation, audit/Evidence
-observability, empty-memory operation and malformed-memory degradation. It also checks
+observability, empty-memory operation and malformed-memory degradation. ⚠️ **Two of those cases model
+a runtime property that no longer exists** — the append-only revision and the replay that reads the
+newest revision at or before `asOf` were `memory_read`/`memory_write`'s and went with them in
+`untilled/aumos#743`. They are kept rather than deleted because what they assert is still owed, only
+by this side now: the dated sibling is the append, and the `updatedAsOf` check is the replay. The
+case names are the old runtime's and are inherited rather than corrected. It also checks
 future-row removal, staleness, source conflict and adjusted/unadjusted mixing. The fixture
 is a deterministic contract model; a release candidate must additionally repeat the same
 cases in paper/shadow runs against its installed Aumos runtime and a Toss-connected paper
@@ -163,7 +192,7 @@ gate remains open.
 - `thesis-challenge`: adversarial review and unresolved-risk blocking;
 - `sizing-and-concentration`: target weights, caps and WATCH hygiene;
 - `outcome-calibration`: forward outcome metrics and failure taxonomy;
-- `memory-contract`: keys, revisions, isolation and migration;
+- `memory-contract`: stable paths, the history and hash rules the runtime no longer keeps, isolation and migration;
 - `deterministic-metrics`: the versioned deterministic calculation interface.
 
 Scanner, sizing, coverage, evidence admission, calibration, attribution, point-in-time
@@ -188,9 +217,15 @@ Korean; only investor-facing prose is translated.
 
 For a private authored instance only, a one-time bootstrap may route active asset claims
 to Thesis, book conclusions to Brief, live review conditions to WATCH/plan, raw research
-to Evidence, and only aggregate sample/calibration/failure state to private memory.
+to Evidence, and only aggregate sample/calibration/failure state to the instance's private folder.
 `migration/schema-version` prevents a second import. The public package always starts
 empty.
+
+⛔ **This package does not migrate its own pre-`untilled/aumos#743` records, and that is deliberate.**
+Aumos exports what `memory_write` and `brief_write` stored into the two folders as a one-time host
+step; a package that copied them as well would be a second writer racing the first over paths it does
+not own. So an empty `state/` reads as an empty learning state and never as a failed migration —
+which is the reading a first run has always been required to survive.
 
 Ported from `morethanmin/trading-harness` at the commit recorded in `aumos.json`. The
 mapping is:
@@ -202,7 +237,7 @@ mapping is:
 | per-asset authored claims/invalidation | Thesis |
 | regime/sector/entry holds | Brief |
 | conditional rechecks | WATCH / plan |
-| closed-sample and calibration aggregate | private memory |
+| closed-sample and calibration aggregate | the instance's private folder |
 
 No credentials, account/position data, `data/*.jsonl`, SQLite, cache, backup,
 `_workspace`, personal thesis text, order implementation or historical performance is
@@ -226,23 +261,28 @@ fixture asserts the difference so it cannot be undone silently.
   ([#51](https://github.com/untilled/aumos-catalogue/issues/51)); a machine that has not
   installed it, or has no API key for it, is a machine that cannot judge Korean
   fundamentals.
-- **`thesis:read` and `evidence:read` are declared and serve nothing in the current Aumos
-  build.** The manifest vocabulary carries both, and `grant.ts` maps each to an empty tool
-  list, so a run gets no `thesis_read`/`evidence_read` tool. The manifest lists them under
-  `optionalSkills` for exactly that reason — that field is machine-readable and no run reads it.
+- **`thesis_read` and `evidence_read` are spellings no build has ever served, and the
+  capabilities behind them are not the same thing.** ⚠️ **This entry used to read *«two declared
+  capabilities serve nothing»*, and half of it stopped being true**: `thesis:read` and
+  `evidence:read` are served, under names this package had never written — `thesis_list`/`thesis_get`
+  and `evidence_get`/`evidence_search`. What survives is the point the entry was made for: a
+  capability's spelling and a tool's spelling are two vocabularies, the manifest's `optionalSkills`
+  names the second, and that field is machine-readable while no run reads it.
   ⚠️ **What a run reads used to say *when available*, and that was not enough** (2026-09-01): a
-  real session went looking for `thesis_read`, `evidence_read` and `manager_memory_read` — the
-  last of which is a spelling no build has ever had — and reported the gap itself. *When
+  real session went looking for `thesis_read`, `evidence_read` and `manager_memory_read` — none of
+  which any build has served under those names — and reported the gap itself. *When
   available* reads as *ask and find out*, and asking costs turns. `PROMPT.md` and
-  `skills/orchestrate/SKILL.md` now name only what is served and say plainly that those are not
-  tools. Until Aumos serves them, asset claims reach a run through the invocation payload and
-  through Brief, and the package says so rather than implying a lookup it cannot make.
+  `skills/orchestrate/SKILL.md` name only what is served and say plainly that those three are not
+  tools. Where a session does not hold the served pair, asset claims reach a run through the
+  invocation payload and through the book's shared folder, and the package says so rather than
+  implying a lookup it cannot make.
   `RunProvenance.unservedTools` is where a run records the difference.
 - **A manager can arm a WATCH and cannot call for one back.** The grant map publishes
-  `portfolio_read`, `brief_read`/`brief_write`, `memory_read`/`memory_write`, `source_request` and
+  `portfolio_read`, the `fund_files_*` six over the book's shared folder, the `files_*` six over this
+  instance's own, `task_start`/`task_get`/`task_cancel`, `source_request` and
   `connection_request`,
-  and carries no watch or plan capability at all — not even a declared-but-empty one like
-  `thesis:read`. WATCHes leave in a `DecisionProposal` and no tool returns them; what the host
+  and carries no watch or plan capability at all — not even a declared-but-empty one.
+  WATCHes leave in a `DecisionProposal` and no tool returns them; what the host
   publishes instead is a field on the invocation, `standingPlans`, and it is a floor rather than a
   ceiling — so a run can see promises it is re-arming and still cannot establish that one it does
   **not** see is gone. Since #87 that costs more than it did: every
@@ -287,26 +327,36 @@ fixture asserts the difference so it cannot be undone silently.
   the `intent` each unfilled rung is armed with, and `resolveTrancheWake` reads that marker back out
   of the fired plan's event summary, because there is nothing else to read.
   ([#120](https://github.com/untilled/aumos-catalogue/issues/120))
-- **A durable key that holds a future or a date cannot be read back.** `memory_read` refuses a
-  result carrying any string that is ISO-8601 shaped and later than `asOf`, and the shape it
-  matches includes the date-only form — a bare `2026-09-05` is compared against the end of that
+- **A durable key that held a future or a date could not be read back — and the record moved rather
+  than the rule.** `memory_read` refused a result carrying any string that was ISO-8601 shaped and
+  later than `asOf`, and the shape it matched included the date-only form — a bare `2026-09-05` was
+  compared against the end of that
   day, because that is what SEC's `filed` means. `run/armed-reviews` is future by construction and
   `run/watch-alerts` named the current session, so both were refused in normal operation. Before
   `untilled/aumos#659` the refusal was per read rather than per key, so one poisoned key took a
-  whole keyless namespace read with it; that read now folds per entry and names what it dropped in
-  `omitted.keys`. ⚠️ **The key itself is still not read.** What changed is that the rest of the
-  namespace survives and the absence is no longer silent — which is why the encoding here changed
-  too, and not instead. The package's answer is to stop writing timestamp-shaped strings: epoch
-  milliseconds for the instant that is one, a `session-` prefixed label for the field that never
-  was. ⛔ The other half was not an exemption, and that was decided rather than left open — which
+  whole keyless namespace read with it; that read folded per entry and named what it dropped in
+  `omitted.keys`, and the key itself was still not read. The package's answer was to stop writing
+  timestamp-shaped strings: epoch milliseconds for the instant that is one, a `session-` prefixed
+  label for the field that never was.
+  ✅ **`untilled/aumos#743` ends the refusal, by moving the record out of the guard's reach rather
+  than by relaxing the guard.** `files_read` answers the document as one opaque string and the
+  outgoing scan is anchored, so a JSON body is not a timestamp and its leaves are never walked; the
+  keyless-read collapse cannot recur either, because a folder is listed and read by path instead of
+  fetched as one payload of every key at once. ⛔ **The two encodings stay**, and they are this
+  package's canon now rather than an accommodation: the meaning was always identical, every reader
+  here expects `atEpochMs`, `windowStartEpochMs` and a `session-` label, and re-encoding stored
+  records to celebrate a lifted restriction buys nothing and risks a history no reader can parse.
+  ⛔ The other half was never an exemption, and that stays decided rather than reopened — which
   field is scheduled is the manager's private schema, and a gateway that knows it is a second table
   of every manager's fields.
   ([#136](https://github.com/untilled/aumos-catalogue/issues/136),
   [untilled/aumos#658](https://github.com/untilled/aumos/issues/658),
-  [untilled/aumos#659](https://github.com/untilled/aumos/issues/659))
-- **The paper track lives in instance-private memory, because nothing else can hold it.**
+  [untilled/aumos#659](https://github.com/untilled/aumos/issues/659),
+  [untilled/aumos#743](https://github.com/untilled/aumos/issues/743))
+- **The paper track lives in this instance's private folder, because nothing else can hold it.**
   A paper call has no order and no fill, so it is not a Decision; the runtime publishes no
-  `thesis:write` and `thesis:read` grants no tool. `learning/paper-cohorts` therefore
+  `thesis:write`, and what `thesis:read` serves is a read path — `thesis_list`/`thesis_get` — with
+  nothing to write a paper cohort into. `state/learning/paper-cohorts.json` therefore
   carries running sums and an index of open measurement windows. Two consequences follow
   and neither is hidden: another manager on the same book cannot see this evidence, and a
   new manager instance starts the track over. A shared record would be the right home;
@@ -353,8 +403,9 @@ fixture asserts the difference so it cannot be undone silently.
   (`position_cap_reduced_by_maturity`), which closes the asymmetry against
   `concentration_cap_missing`; what it does not do is shorten the wait.
   ⚠️ **And the neighbouring asymmetry — an empty lane read as a working methodology — is closed by a
-  count rather than a code since #212 ④.** `executionRecord` reads the host's research job and result
-  (`untilled/aumos#724`, `#730`) and answers `dataPreparation`, `candidateEvaluation` and
+  count rather than a code since #212 ④.** `executionRecord` reads the host's task run (`task_get`)
+  and the recipe answers this run reads back out of `scans/` with `files_read`, and answers
+  `dataPreparation`, `candidateEvaluation` and
   `eligibleCount`; `mandateExecution` decides the cause from that record and no longer from the
   `gate-ran` lane it used to intersect, which is deleted. ⛔ Diagnostics still *withdraw* the positive
   answer and no longer grant it, and `README.md` carries the deleted-to-replacement pairing. `promotionGate` wants

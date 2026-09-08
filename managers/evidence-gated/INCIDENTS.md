@@ -107,7 +107,12 @@ the three that counts *uses* of it.
 its tool list spent its whole turn discovering the session, reached for `Bash`, and the run ended
 `awaiting-input` with no judgement. Measured 2026-09-01: a run reported the gap itself, having been
 told to call four names the session did not hold — `thesis_read`, `evidence_read`,
-`manager_memory_read`/`_write`, none of which any build has ever served.
+`manager_memory_read`/`_write`, none of which any build has ever served under those names.
+⚠️ **Two of the four name capabilities that are served, and the spellings were the whole defect**:
+`thesis:read` and `evidence:read` answer through `thesis_list`/`thesis_get` and
+`evidence_get`/`evidence_search`, and `manager_memory_read`/`_write` names nothing in any tense —
+the private record was `memory_read`/`memory_write` and is `files_read`/`files_write` since
+`untilled/aumos#743`.
 
 **The web tools are the CLI's and the block left them out.** Measured 2026-09-04, run
 `run_ba37a8f6907a49c3a805a4ce3ee10ec6`: the session held **both** `WebSearch` and `WebFetch`, the
@@ -305,9 +310,15 @@ this instance proposed, and it was presented as what stands. The count is report
 `standingPlans`, and only as *at least this many*.
 
 **A correctly filled key was refused in proportion to how well it was filled.** `run/armed-reviews`
-holds future instants by design and `memory_read` refuses a payload carrying a **string** timestamp
+holds future instants by design and `memory_read` refused a payload carrying a **string** timestamp
 after `asOf` — and the refusal took the whole namespace read with it, not just this key. Hence epoch
-milliseconds there and in `research/catalyst-window`.
+milliseconds there and in `research/catalyst-window`. ⚠️ **`memory_read` is gone as of
+`untilled/aumos#743`; the record is a folder now, and that ended the refusal by moving the record
+rather than by relaxing the rule** — `files_read` answers the document as one opaque string, so a
+JSON body is not a timestamp and its leaves are never walked, and a folder is read by path rather
+than fetched as one payload of every key at once. ⛔ **The encoding stays**, as this package's own
+canon: every reader here expects it, and re-encoding stored records to celebrate a lifted
+restriction buys nothing.
 
 **Re-arming an identical promise used to cost a ledger row.** Measured on the owner's store: kr 3,
 us 3, allocate 2, growing monotonically with no path to remove them. `untilled/aumos#704` folds at
