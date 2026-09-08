@@ -635,3 +635,41 @@ reach the Mandate's cap with zero closed outcomes behind it. Four of the five br
 package's arithmetic (the risk budget, `portfolioHeat`, `concentration`, `newSinglePacing`); the
 fifth is the host's, and it is the strongest — **§12's per-order approval**. This package's answer
 to *"what stops a 20% first position"* names it, and it names it as somebody else's.
+
+## The cap raise reaches the investor as prose, and it should reach the screen as a number (#230)
+
+⚠️ **This package's half is done and it lands in the wrong place for the wrong reason.**
+`effectivePositionCap`, `effectiveCashFloor` and `concentration` compute `unlockDelta` — the control
+the investor typed the limit into, the value to type instead, and the weight and amount that opens —
+and `PROMPT.md` §4 sends it into `rationale.keyReasons`, because `Approvals.tsx` renders that and
+`rationale.risks` and nothing else.
+
+⛔ **`effectiveConstraints` is where it belongs and cannot go.** `effectiveConstraintSchema`
+(`untilled/aumos#681`, issue #679) is a `strictObject` of exactly `field`, `declared`, `effective`,
+`reason`, `unlocks` — so the one surface that draws the number *beside the control the investor
+filled in* has no field for what raising it would open. The recommendation therefore reaches the
+approval screen as a sentence and the fund-settings screen not at all, which is the half of #230 this
+package cannot close: the investor reads *«raise 포트폴리오 히트 to 0.071»* on one screen and then goes
+to another one that draws nothing.
+
+**What would discharge it**: two optional numbers on that row — `unlocksWeight` and, if the host
+wants the currency figure, `unlocksAmount` with `unlocksCurrency` — drawn beside the effective limit
+as *«raising this to X opens Y»*. ⚠️ The host owns the arithmetic's other half already: it holds the
+NAV, the mark and the currency, and this package's number is a weight against the same book.
+
+⛔ **Nothing here waits on it.** The recommendation fires today, `proposalDisclosure` refuses a
+proposal that owes one and is silent today, and the screen route is an improvement rather than a gate.
+
+⚠️ **What is deleted here on the day that row exists**: the `keyReasons` slot stays — it is where an
+*action for the investor* belongs before the approve button, and a fund-settings field nobody opened
+does not reach them during an approval. What moves is that `unlockDelta` gets copied into the host
+row as well as spoken, and `PROMPT.md` §4 gains the second half the way it gained
+`effectiveConstraints` for the reduction.
+
+⚠️ **One coupling this creates, stated rather than left to be discovered.** `MANDATE_CONTROLS` in
+`lib/sizing.mjs` spells three Aumos control labels — «집중도 상한», «현금 비중», «포트폴리오 히트» —
+and they are the **host's** vocabulary, on the host's pane, renamed by the host. A drift there is
+silent: the recommendation stays arithmetically right and sends the investor to a label that is not on
+the screen. ⛔ Naming the schema field instead is not the fix — `maxDrawdown` is asked for as
+«포트폴리오 히트» (`untilled/aumos#685`) and the field name is the one thing that is certainly not
+written anywhere the investor can see. The row on the host's own screen is what ends the coupling.
