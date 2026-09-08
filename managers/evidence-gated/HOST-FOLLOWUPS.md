@@ -73,10 +73,27 @@ the measurement survivable, not what makes it unnecessary.
 run a named computation in its own process over stored inputs; `untilled/aumos#726` let a published
 package put its own name on one, in `manifest.recipes`. This package now declares `roster-scan` and
 `opportunity-metrics`, whose entrypoints call the same `execute()` the MCP tool calls, and the
-whole-universe sweep is routed through them. `engines.aumos` moves to `>=0.3.34` — **the next
-release**, because neither host PR was merged when this was written and `research:prepare` /
-`research:read` are in no released binary, so an installed Aumos refuses the manifest whole. Same
-failure mode as `observation:file` below, for the fifth time.
+whole-universe sweep is routed through them. `engines.aumos` moved to `>=0.3.34` — **the next
+release at the time**, because neither host PR was merged when this was written and
+`research:prepare` / `research:read` were in no released binary, so an installed Aumos refused the
+manifest whole. Same failure mode as `observation:file` below, for the fifth time.
+
+✅ **Three of those four tools shipped renamed and the fourth was deleted** (`untilled/aumos#743`).
+`research_prepare` is **`task_start`** (`{recipeId, items, parameters, outputPath, asOf,
+idempotencyKey?}`, `items` a list of `{id, input?}`), `research_job_get` is **`task_get`**,
+`research_job_cancel` is **`task_cancel`**, and `research_result_get` has **no replacement**: each
+answer is a file at `<outputPath>/<itemId>.json`, read with `files_read`. ⚠️ **The capability
+spellings did not move and must not** — `research:prepare` and `research:read` are the AMP
+vocabulary's, and a renamed enum member stops every published manifest parsing. ⚠️ **Two properties
+of the new call are load-bearing on this side**: the item `id` must be the store's document
+coordinate `<MIC>:<symbol>` (`XKRX:005930`), because that equality is what makes the host hand the
+recipe this fund's stored documents, while the package's own `{symbol, market}` spelling rides in
+`input` and the host never parses it; and `outputPath` is part of the cache identity, so
+`scans/<asOf's calendar day>/<recipeId>` is asked for by name rather than left to a default.
+`engines.aumos` moves to `>=0.4.0`. ⛔ **And the failure mode is the opposite of the five before
+it**: no capability changed, so an older build does not refuse this manifest — it serves
+`research_prepare` and friends while every instruction surface here calls `task_start`, and the run
+reports the absence and submits a WAIT. That is quieter than a refusal.
 
 ### ✅ Discharged: a collector writes a price series (`untilled/aumos#734`)
 
@@ -113,9 +130,10 @@ re-run over the same closed bar reaches no vendor and answers `satisfied`, which
 this manifest already declares**, not a capability and not a manifest key, so a host that predates
 #734 refuses the name at call time — by name, with the accepted names in the message — instead of
 refusing this manifest whole. Raising the floor would trade a reportable run-time refusal for the
-silent catalogue drop this file has now recorded five times, and the floor stays at `>=0.3.34`: the
-release that carries #724/#726, which is what the manifest genuinely cannot be read without.
-⚠️ **So there is a window** — a host at 0.3.34 without #734 — in which the refresh is refused and
+silent catalogue drop this file has now recorded five times, and the floor is set by what the
+manifest and the instructions genuinely cannot be read without: `>=0.3.34` for #724/#726 when this
+was written, `>=0.4.0` since #743 renamed the tools those instructions call.
+⚠️ **So there is a window** — a host below #734 — in which the refresh is refused and
 the sweep is `unprepared`. That is the state every document here already describes, with the names
 attached, and it is why the wording was not deleted along with the debt.
 
@@ -299,6 +317,34 @@ The #136 claim that correctly supplied `previous.armed` never deduped was refute
 own conclusion that the journal is authoritative about arming was refuted in #156. Do not carry
 either forward as a confirmed rule — `refutedMemoryRules` retracts the second from durable memory.
 
+## The refusal two encodings were built against (#136 — ✅ closed by `untilled/aumos#743`)
+
+⚠️ **The debt here was never "relax the timestamp guard", and the host did not.** `memory_read`
+refused a result carrying any ISO-8601-shaped string later than `asOf`, and the pattern deliberately
+included the date-only form because that is what SEC's `filed` means. Two keys hold such values by
+construction: `run/armed-reviews` is future, and `run/watch-alerts` named the current session, whose
+date is on or after `asOf`'s. So both were refused in normal operation — measured on
+`run_3a48eaaa505241d5af94fb490d7c23c6`: three armed rows, three violations, the read refused, and
+because the refusal was per read rather than per key the run's first keyless `memory_read` died with
+it and twelve keys had to be fetched one at a time. `untilled/aumos#658`/`#659` folded that per entry
+and named the dropped keys in `omitted.keys`; the key itself was still not read.
+
+✅ **#743 closed it by moving the record.** `files_read` answers the document as one opaque string
+and the outgoing scan is anchored, so a whole JSON body is not a timestamp and its leaves are never
+walked — and the keyless-read collapse cannot recur either, because a folder is listed and read by
+path instead of fetched as one payload of every key at once. ⛔ **Nothing was asked for and nothing
+was granted**: no exemption, no per-field schedule declaration, and the ⛔ this file carried against
+one — *which field is scheduled is the manager's private schema, and a gateway that knows it is a
+second table of every manager's fields* — stands unchanged and unused.
+
+⛔ **The two encodings stay, and they are this package's canon now rather than an accommodation.**
+`atEpochMs` in `run/armed-reviews`, the three epoch instants in `research/catalyst-window`, and the
+`session-` prefix in `run/watch-alerts` all mean exactly what they meant; every reader here expects
+them, and re-encoding stored records to celebrate a lifted restriction is a migration with no
+benefit and a readable-history cost. ⚠️ `toArm` was always RFC 3339 and is untouched — it leaves in
+a `DecisionProposal`, where AMP takes strings and this guard never ran.
+([#136](https://github.com/untilled/aumos-catalogue/issues/136))
+
 ## Which promise opened this run (`untilled/aumos#622` landed; the window is what is left)
 
 ⚠️ **This package used to answer that question with a regex over a host sentence.** The flow a wake
@@ -343,8 +389,9 @@ so this is a host schema change and not something this side can arrange. ⛔ Unt
 adapter would make a wake whose arming judgement has aged out dispatch all three flows — three times
 the work and each sleeve judged twice, which is the `#87` state.
 
-⚠️ **`engines.aumos` does not move for this.** `>=0.3.34` already carries `#622`, and the fallback is
-what covers the window rather than an older host.
+⚠️ **`engines.aumos` does not move for this.** The floor already carries `#622` — `>=0.3.34` when
+this was written, `>=0.4.0` since #743 — and the fallback is what covers the window rather than an
+older host.
 
 ## Where a holding came from (`untilled/aumos#688`, landed in `#691`)
 
@@ -471,12 +518,17 @@ stop distance derived from the Mandate's `maxDrawdown` outside the control arm �
 the only way this package can: `watchesToRegister` returns a `price-below` and an `at-time` row for
 the entry's own `DecisionProposal`. The source wrote its registration into a file
 (`data/exit_rules.json`) that `exit-check` then watched; this package has `thesis:read` and no
-`thesis:write`, and the runtime maps that grant to an empty tool list, so there is no such file and
-no equivalent.
+`thesis:write`, and what `thesis:read` serves is a read path — `thesis_list`/`thesis_get` — with
+nothing to register a gate into, so there is no such file and no equivalent. ⚠️ **This entry used to
+say that grant maps to an empty tool list, which stopped being true and does not change the
+conclusion**: reading claims back was never the missing half, writing one was.
 
-⛔ **Private memory is not the substitute and must not become one.** `skills/memory-contract`
+⛔ **The instance's private folder is not the substitute and must not become one.**
+`skills/memory-contract`
 forbids exactly this shape — *"a gate that must execute"* and a hidden portfolio database — and a
-per-position stop table would be both. So the discipline is **re-derived from the entry date every
+per-position stop table would be both. ⚠️ **`untilled/aumos#743` widened the address space and not
+the licence**: a file tree is exactly the shape in which a per-position stop table would look
+natural, and it is refused as a path for the reason it was refused as a key. So the discipline is **re-derived from the entry date every
 run** rather than read back from state, which is correct but pays for the missing read path twice:
 a WATCH armed at entry could not be seen at all, and the same #97 gap that cost duplicate
 scheduling cost an unverifiable stop here. ⚠️ **`standingPlans` closed the seeing half and not the
