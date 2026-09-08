@@ -303,13 +303,18 @@ wake the host did attribute. `standingPlans` is not the substitute: a promise th
 longer standing at `asOf`, by construction.
 
 So the prose path stays as a **boundary adapter** — one fall-through, after the host has been asked
-— and every use of it is reported by name: `wake_attribution_unreadable` (no `armed` was handed
-over, which the caller can fix) or `wake_flow_unattributed` (handed over and naming nothing of this
-manager's, which it cannot).
+— and every use of it is reported by name: `wake_flow_recovered_from_prose` is the receipt for the
+use itself, and beside it the reason the host was not the answer, `wake_attribution_unreadable` (no
+`armed` was handed over, which the caller can fix) or `wake_flow_unattributed` (handed over and
+naming nothing of this manager's, which it cannot).
+
+⚠️ **And the receipt is what measures the removal** (#223). The two reason codes fire for wakes
+that never touch the adapter — a manual run has no marker to read — so counting them would say the
+adapter is load-bearing when it is idle. `wake_flow_recovered_from_prose` counts uses.
 
 ⚠️ **The removal condition is a host fact rather than a release date.** Delete the adapter — the
-marker scan, `wake_marker_unreadable` on the prose path, and both fallback codes — when the
-invocation names the fired plan **on the wake itself**: a `planId` on the `plan-trigger` event, or
+marker scan, `wake_marker_unreadable` on the prose path, and `wake_flow_recovered_from_prose` —
+when the invocation names the fired plan **on the wake itself**: a `planId` on the `plan-trigger` event, or
 any equivalent field not bounded by the `recentDecisions` window. `AumosEvent` is a strict object of
 `eventId`, `kind`, `subject`, `occurredAt`, `detectedAt`, `summary`, `materiality` and `evidenceIds`,
 so this is a host schema change and not something this side can arrange. ⛔ Until then, deleting the

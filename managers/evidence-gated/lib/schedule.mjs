@@ -439,10 +439,40 @@ export function marketReviewIntent(flow, at) {
  * ── The legacy adapter, and when it goes ───────────────────────────────────
  *
  * `summary` / `intent` are still read, in **one** place — the fall-through
- * below, after the host has been asked and has not answered — and the fallback
- * is reported by name (`wake_attribution_unreadable` when no `armed` was handed
- * over, `wake_flow_unattributed` when it was and named nothing of this
- * manager's).
+ * below, after the host has been asked and has not answered.
+ *
+ * ── ⚠️ Three codes, because two questions were being answered by one (#223) ─
+ *
+ * *"Why did the host not answer?"* and *"was the prose adapter then able to?"*
+ * are separate facts and they were carried by the same two codes — which were
+ * pushed **after** the adapter had already found a marker. So the two states
+ * this function returns `null` for were indistinguishable: no `armed` at all
+ * and `armed` naming nothing of this manager's both came back `data: null` with
+ * `diagnostics: []`, and a run could only tell them apart by remembering
+ * whether it had passed the field. The measured run
+ * (`run_c7ad46eea03840bf84ae7a8822ed02c3`, 0.4.60) had to do exactly that, and
+ * filed its own inference as though it were this operation's answer.
+ *
+ * The attribution codes are now emitted the moment the host declines to answer,
+ * whatever happens afterwards:
+ *
+ * | code | means | who fixes it |
+ * |---|---|---|
+ * | `wake_attribution_unreadable` | no `armed` was handed over | **the caller**, by passing the field |
+ * | `wake_flow_unattributed` | `armed` was handed over and no row of it is a promise of this manager's that fired for this run | nobody on this side — the host attributed elsewhere, legitimately |
+ * | `wake_flow_recovered_from_prose` | and then the legacy adapter answered anyway | it is the fallback's own receipt |
+ *
+ * ⛔ **Absent and empty stay on opposite sides of the first two, unchanged.**
+ * An empty array is a field that was passed and answered — *nothing of yours
+ * ended that you may see* — which is the reading #156 was burned for getting
+ * backwards, and `wake_flow_unattributed` is the code for it. Unreadable means
+ * nobody was asked.
+ *
+ * ⚠️ The third is what makes *"every use of the adapter is reported"* true: the
+ * first two say the host was silent, and only this one says prose was used. A
+ * run that sees the first two and not the third learnt nothing from the
+ * adapter, and its wake is the flowless one the orchestrator answers by
+ * dispatching every flow.
  *
  * ⚠️ **It cannot be deleted yet, and the reason is a window rather than a
  * version.** `engines.aumos` is already `>=0.3.34`, so every admitted host
@@ -459,11 +489,13 @@ export function marketReviewIntent(flow, at) {
  * then the fallback stays, and every use of it says so in a diagnostic.
  *
  * Returns `null` data for any wake this manager did not arm — a manual run, an
- * asset review, an earnings checkpoint. That is not an error and carries no
- * diagnostic: those wakes are real and the orchestrator's answer for them is to
- * run every flow, which is what it did for everything before #87. What *is* a
- * diagnostic is a market-review marker naming a flow nothing dispatches,
- * because that is a wake nobody will answer.
+ * asset review, an earnings checkpoint. **That is not an error**, and the
+ * severity says so: the attribution code is `info` and nothing here blocks.
+ * Those wakes are real and the orchestrator's answer for them is to run every
+ * flow, which is what it did for everything before #87. ⚠️ What the code adds
+ * is that the run does not have to guess *which* silence it got. What is a
+ * stronger diagnostic is a market-review marker naming a flow nothing
+ * dispatches, because that is a wake nobody will answer.
  */
 export const WAKE_FLOW_BASIS = Object.freeze({
   host: 'invocation.decisions[].armed',
@@ -556,6 +588,22 @@ export function resolveWakeFlow({ armed, summary, intent } = {}) {
       diagnostics,
     }
   }
+  /**
+   * ── The host declined to answer, and which silence it was is said here ───
+   *
+   * ⚠️ **Before the fall-through, not after it** (#223). These two used to be
+   * pushed beside the adapter's answer, so the two commonest wakes — no field
+   * passed, and a field naming nothing of this manager's — returned
+   * `data: null` with an empty `diagnostics` and were the same observation.
+   *
+   * ⚠️ **Absent and empty are two facts** (#201's split, one function over),
+   * and they are two exclusive codes because the action differs: an unreadable
+   * attribution is fixed by passing the field, an unattributed wake is not
+   * fixable from this side at all.
+   */
+  diagnostics.push(attributable
+    ? diagnostic('wake_flow_unattributed', 'info', 'The host attributed no promise of this manager to this wake — no `armed` entry fired for this run carrying the marker this package writes. That happens legitimately: the judgement that armed the review can be older than the `history.recentDecisions` window (aumos#688), and a manual run or an event review was never armed by this manager at all. The flow falls to the legacy summary adapter, which reports separately whether it could answer. ⛔ It is not evidence that the arm failed and not a reason to arm less', 'armed', { armedRows: armed.length, basis: WAKE_FLOW_BASIS.host })
+    : diagnostic('wake_attribution_unreadable', 'info', 'This call was handed no `armed`, so the host could not be asked which promise opened this run. Pass the `armed` entries of `history.recentDecisions`, flattened, to read the wake from the record the host itself keeps — it carries the `planId` as well. ⛔ Unreadable is not unattributed: an absent field means nobody was asked, and this code is the caller\'s to close', 'armed', { basis: WAKE_FLOW_BASIS.host }))
   /* ── The legacy adapter: the marker read out of prose, in one place ────── */
   const text = [summary, intent].find((value) => typeof value === 'string' && value.includes(`${MARKET_REVIEW_PREFIX}:`))
   if (text === undefined) return { data: null, diagnostics }
@@ -563,14 +611,14 @@ export function resolveWakeFlow({ armed, summary, intent } = {}) {
   const marker = decodeMarketReviewMarker(text, path, diagnostics)
   if (marker === null) return { data: null, diagnostics }
   /**
-   * ⚠️ **Absent and empty are two facts here as well** (#201's split, one
-   * function over), and they are two exclusive codes because the action differs:
-   * an unreadable attribution is fixed by passing the field, an unattributed
-   * wake is not fixable from this side at all.
+   * ⚠️ **The half of the promise that had no producer at all** (#223).
+   * `PROMPT.md` said every use of the adapter is reported and named only the
+   * two codes above — which say the *host* was silent, not that prose was
+   * read. A wake with no marker in its summary emits one of those and uses no
+   * adapter; this code is the only place the adapter's own use is recorded, so
+   * it is what the removal condition above will one day be measured against.
    */
-  diagnostics.push(attributable
-    ? diagnostic('wake_flow_unattributed', 'info', 'The host attributed no promise of this manager to this wake — no `armed` entry fired for this run carrying the marker this package writes — so the flow below was recovered from the event summary by the legacy adapter. That happens legitimately: the judgement that armed the review can be older than the `history.recentDecisions` window (aumos#688). ⛔ It is not evidence that the arm failed and not a reason to arm less', path, { flow: marker.flow, basis: WAKE_FLOW_BASIS.prose })
-    : diagnostic('wake_attribution_unreadable', 'info', 'This call was handed no `armed`, so the host could not be asked which promise opened this run, and the flow below was recovered from the event summary by the legacy adapter. Pass the `armed` entries of `history.recentDecisions`, flattened, to read the wake from the record the host itself keeps — it carries the `planId` as well. ⛔ Unreadable is not unattributed: an absent field means nobody was asked', path, { flow: marker.flow, basis: WAKE_FLOW_BASIS.prose }))
+  diagnostics.push(diagnostic('wake_flow_recovered_from_prose', 'info', 'The flow this run dispatches was recovered from the event summary by the legacy adapter rather than from the host\'s own attribution: a regex over a sentence the wake engine composes, which any rewording upstream takes with it. It is the documented fallback and not a fault; `HOST-FOLLOWUPS.md` carries what has to become true before it is deleted', path, { flow: marker.flow, basis: WAKE_FLOW_BASIS.prose, attribution: attributable ? 'wake_flow_unattributed' : 'wake_attribution_unreadable' }))
   return { data: { ...marker, planId: null, basis: WAKE_FLOW_BASIS.prose }, diagnostics }
 }
 

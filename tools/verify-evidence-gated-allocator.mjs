@@ -1304,6 +1304,63 @@ assert.deepEqual(
   'reading what fired and reading what stands both leave the re-arm obligation whole — the published rule is to re-arm at every judgement and let the host fold',
 )
 
+/**
+ * ── Every silence names itself, and so does every use of the adapter (#223) ─
+ *
+ * `PROMPT.md` promised that *"every use of the legacy adapter is reported"* and
+ * named two codes. **Neither ever fired for the two commonest wakes**: both
+ * were pushed after the adapter had already decoded a marker, so a run with no
+ * marker in its summary — the measured case — got `data: null` with
+ * `diagnostics: []` for *both* «you passed no `armed`» and «the host attributed
+ * nothing», and could only tell them apart by remembering what it had passed.
+ * `run_c7ad46eea03840bf84ae7a8822ed02c3` (0.4.60) did exactly that and recorded
+ * its own inference as the operation's answer.
+ *
+ * The three controls that issue measured are the three below, and the fourth
+ * assertion is the half of the promise that had no producer at all: the
+ * adapter's own receipt, distinct from the host's silence.
+ *
+ * ⚠️ **The two silence codes stay exclusive and `armed: []` stays on the
+ * *unattributed* side** — see `wake-flow-empty-armed-is-not-a-failed-arm`
+ * above. A passed field that answered is not an unread field.
+ */
+covers('schedule/wake-flow-silence-names-itself')
+const codesOf = (result) => result.diagnostics.map((entry) => entry.code)
+
+/** (a) `armed` handed over, three rows, none of them this run's promise. */
+const pastOnly = execute({
+  operation: 'resolveWakeFlow',
+  asOf: globalIntegration.asOf,
+  input: { armed: [armedFired('kr-sleeve', krWake.at, { review: 'no-judgement' }), armedFired('us-sleeve', usWake.at, { review: 'no-judgement' }), armedFired('allocate', krWake.at, { intent: marketReviewIntentFor('allocate', krWake.at), review: 'sealed', reviewedByDecisionId: 'dec_old' })] },
+})
+assert.equal(pastOnly.data, null, 'no promise of this manager fired for this run, so no flow is claimed — the safe answer, unchanged')
+assert.ok(codesOf(pastOnly).includes('wake_flow_unattributed'), 'and the run can ask the operation which silence it got rather than remembering whether it passed the field — this is the assertion the measured run had no way to make')
+assert.equal(codesOf(pastOnly).includes('wake_attribution_unreadable'), false, 'the field was handed over and read; the two codes are exclusive')
+assert.equal(codesOf(pastOnly).includes('wake_flow_recovered_from_prose'), false, '⛔ and no adapter was used, because there was no prose to read — the host being silent and prose being read are two facts')
+
+/** (b) nothing handed over at all — the caller's own omission, and fixable. */
+const nothingPassed = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: {} })
+assert.equal(nothingPassed.data, null, 'no attribution and no prose is still a flowless wake, which the orchestrator answers by dispatching every flow')
+assert.ok(codesOf(nothingPassed).includes('wake_attribution_unreadable'), 'nobody was asked, and the code that says so is the one the caller closes by passing `armed`')
+assert.equal(codesOf(nothingPassed).includes('wake_flow_unattributed'), false, 'unreadable is not unattributed')
+assert.notEqual(nothingPassed.status, 'blocked', 'and an unasked host is not a refusal — a severity here is what would make a run treat this as a verdict on its arming (#156)')
+for (const entry of [...pastOnly.diagnostics, ...nothingPassed.diagnostics]) {
+  assert.equal(entry.severity, 'info', 'both silences are facts about attribution, not findings about the book')
+  assert.equal(entry.path, 'armed', 'and each names the field the caller passed or did not — a diagnostic naming a key the input has nothing to do with is the #158 defect')
+}
+
+/** (c) the reader itself, which was never the defect. */
+const thisRun = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { armed: [armedFired('kr-sleeve', krWake.at)] } })
+assert.equal(thisRun.data?.flow, 'kr-sleeve', 'a promise the host marked fired/this-run resolves, exactly as it did before')
+assert.deepEqual(codesOf(thisRun), [], 'and an answered attribution reports nothing at all — no silence to name and no fallback taken')
+
+/** The adapter's own receipt: the half of the promise that had no producer. */
+const fromProse = execute({ operation: 'resolveWakeFlow', asOf: globalIntegration.asOf, input: { summary: asFiredEvent(krWake.intent) } })
+assert.equal(fromProse.data?.basis, 'event.summary', 'the adapter answers when the host did not')
+assert.ok(codesOf(fromProse).includes('wake_flow_recovered_from_prose'), 'and says so — «every use of it is reported» is true of the *use*, which the two silence codes above do not report')
+assert.equal(fromProse.diagnostics.find((entry) => entry.code === 'wake_flow_recovered_from_prose').details.attribution, 'wake_attribution_unreadable', 'the receipt carries which silence sent it there, so one diagnostic answers both halves')
+assert.ok(codesOf(fromProse).includes('wake_attribution_unreadable'), 'and the silence is still named separately: a caller reading only the receipt would not learn that passing `armed` is what closes it')
+
 const orchestrateSkill = await readFile(new URL('../skills/orchestrate/SKILL.md', fixtureRoot), 'utf8')
 const orchestrationProse = `${await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')}\n${orchestrateSkill}`
 assert.ok(orchestrationProse.includes('resolveWakeFlow'), 'the prompt or its orchestration skill names the operation that reads the wake — otherwise the flow is minted and read by nobody, which is the #87 defect exactly')
