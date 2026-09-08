@@ -803,6 +803,39 @@ array and the assembled proposal to. It emits the two `blocked` codes above and 
 run that reworded one sentence got a different position weight than a run that pasted a token it never
 understood. A size that moves when the prose beside it is edited is not a size.
 
+⛔ **When a limit is the only thing holding a position down, say what would open it — and only then.**
+`effectivePositionCap`, `effectiveCashFloor` and `concentration` each return `unlockDelta`: the
+control the investor filled in, the value to type instead, and the amount and weight that opens.
+The source's rule is the whole of it — *«캡 상향을 제안하기 전에 이 캡을 올리면 실제로 몇 원이 열리는가를
+계산해 확인할 것 — 0원이면 제안하지 않는다»* — so `null` is the ordinary answer and it means the raise is
+worth nothing: something else refuses, the next limit binds level with this one, or nothing above it was
+measured. ⛔ **Do not compute it yourself and do not argue past a `null`.** A raise the operation priced
+at zero is 2026-07-27 again, where 162,357원 sat unused behind a pace limit and a guard and the cap was
+not what was in the way.
+
+⚠️ **It rides in `rationale.keyReasons`, and the sentence names four things.** `Approvals.tsx` renders
+`keyReasons` and `risks` and nothing else, so those two are what reach the investor **before** the
+approve button; `keyReasons` is the slot because this is an action for the investor rather than a hazard
+or a note for the run's later readers. ⛔ Not `risks` — it already carries the manager-attestation
+warning, and a recommendation filed among the things that could go wrong is one a reader learns to skim.
+⛔ Not `effectiveConstraints` — `effectiveConstraintSchema` is the host's `strictObject` and has no field
+for this. One entry, in the invocation's language, carrying the code **verbatim**:
+
+> `cap_raise_would_unlock`: *«{control}» on FUND SETTINGS → 투자 원칙, {currentValue} → {proposedValue};
+> this opens up to {opensAmount} {opensCurrency} ({opensWeight} of the book). Above that the
+> {nextBinding} limit binds.*
+
+⛔ **Name the control, never the schema field.** `maxDrawdown` is asked for on that pane as
+«포트폴리오 히트», and a run that tells the investor to change `maxDrawdown` has sent them looking for a
+box that is not there. The operation returns `control` and `screen`; copy them.
+
+⚠️ **A proposal and never an edit.** `policyLint` refuses a run that answers a binding threshold by
+moving it, and that has not changed: this channel produces a sentence for the investor and never a
+change this run may make. The two together are the balance the source struck —
+*"Do proactively RECOMMEND cap adjustments"* beside *"Never edit caps/policy UNILATERALLY or
+automatically — the default is 제안"*. A proposal that owes this and is silent is
+`cap_raise_unlock_undisclosed` / `blocked`, judged by `proposalDisclosure` beside the other two.
+
 ⚠️ **Two nested readings of the venue minimum; report and act on the outer one.**
 `minimum_executable_exceeds_cap` (the venue's minimum executable amount exceeds the cap that binds,
 so no name enters at any price) ⊃ `experimental_ladder_unreachable` (a position fits, three rungs do

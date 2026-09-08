@@ -326,7 +326,7 @@ export const OPERATIONS = {
   effectiveCashFloor: {
     group: 'sizing',
     surface: 'published',
-    mode: 'named', keys: { mandateCashFloor: NUMBER, methodologyCashFloors: ARRAY, effectiveConstraints: ARRAY, projectedCashWeight: NUMBER, cashWeight: NUMBER },
+    mode: 'named', keys: { mandateCashFloor: NUMBER, methodologyCashFloors: ARRAY, effectiveConstraints: ARRAY, projectedCashWeight: NUMBER, cashWeight: NUMBER, portfolioNav: NUMBER, portfolioNavCurrency: STRING },
     describe: 'the cash floor the investor declared against the one that binds, and whether the plan still clears it *after* it executes',
     run: effectiveCashFloor,
   },
@@ -347,7 +347,8 @@ export const OPERATIONS = {
   concentration: {
     group: 'sizing',
     surface: 'published',
-    mode: 'strict', keys: { positions: ARRAY, proposed: ARRAY, caps: OBJECT, config: OBJECT },
+    /** ⚠️ `portfolioNav` is read for one thing only: turning `unlockDelta`'s weight into the amount an order would be placed for (#230). */
+    mode: 'strict', keys: { positions: ARRAY, proposed: ARRAY, caps: OBJECT, config: OBJECT, portfolioNav: NUMBER, portfolioNavCurrency: STRING },
     /**
      * ⚠️ `caps` was the whole published nesting, and the row shape is what the
      * caps are applied *to* (#173). A run that wrote `sectors` was told nothing.

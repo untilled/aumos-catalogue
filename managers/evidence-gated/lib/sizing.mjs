@@ -238,6 +238,172 @@ export function minimumExecutableWeight(input = {}) {
 }
 
 /**
+ * ── «올리면 실제로 몇 원이 열리는가», computed (issue #230) ─────────────────
+ *
+ * The source methodology instructed this manager to **propose** cap raises —
+ * *"Do proactively RECOMMEND cap adjustments … with a high-conviction
+ * opportunity blocked only by a cap"* (2026-07-12) — and then bounded the
+ * instruction with the thing that makes it honest:
+ *
+ * > 캡 상향을 제안하기 전에 «이 캡을 올리면 실제로 몇 원이 열리는가»를 계산해
+ * > 확인할 것 — **0원이면 제안하지 않는다.**
+ *
+ * The measured case behind that sentence (2026-07-27) had 162,357원 of headroom
+ * sitting unused and a cap raise worth **nothing**, because the pace limit was
+ * 1.94× over and the guard stood at 1×. Two other constraints bound; the cap
+ * was not the one holding the position down. A recommendation there would have
+ * asked the investor to loosen a limit that was not the limit.
+ *
+ * ⚠️ **This port had the two halves that refuse and disclose, and no half that
+ * recommends.** `policyLint` refuses a run-side loosening; `effectivePositionCap`
+ * discloses that the cap it sized under is smaller than the declared one. Both
+ * are about a size that was already decided. Neither answers *what would let me
+ * buy* — and the book this issue is written from spent ten runs reporting the
+ * same reduction to an investor who was never told which number to change.
+ *
+ * ── «Only binding» is computed, never assumed ─────────────────────────────
+ *
+ * Three tests, in this order, and any one of them is silence:
+ *
+ *  1. ⛔ **Something else refuses.** If the call carrying this limit raised any
+ *     `blocked` diagnostic, the limit is not the only thing standing in the
+ *     way — an unchecked variant view, a breach on a second axis, a cash floor
+ *     the plan already crosses — and a raise opens nothing at all.
+ *  2. ⛔ **The next limit binds at or below where this one stands.** `opensWeight`
+ *     is `min(every other ceiling) − current`, so a second limit sitting level
+ *     with this one produces zero and the raise is not proposed. This is the
+ *     2026-07-27 shape, computed.
+ *  3. ⛔ **Nothing else was measured.** A raise whose ceiling is unbounded is not
+ *     a number — it is the absence of one — and this package's rule for that is
+ *     the rule it uses everywhere: *«없는 캡은 제한 없음이 아니다»*. The caller
+ *     passes no `openedWeight` and nothing is said.
+ *
+ * ⚠️ **A proposal and never an edit.** This returns a sentence and four numbers
+ * for the investor to act on. It changes no threshold, and `policyLint` refuses
+ * a run that tries to — the two are the balance the source struck in the two
+ * sentences quoted above, and `tools/verify-evidence-gated-allocator.mjs`
+ * proves the refusal still stands beside this channel.
+ *
+ * ── Which value, on which screen ──────────────────────────────────────────
+ *
+ * ⚠️ **"Raise the cap" is not an instruction anyone can carry out.** The three
+ * limits an investor can actually move are three controls on one Aumos pane,
+ * and this table is the only place this package spells them. ⛔ It is the
+ * **host's** vocabulary and drifts with the host — `HOST-FOLLOWUPS.md` carries
+ * the debt that would end the coupling.
+ *
+ * ⚠️ **`maxDrawdown` is asked for under a different name than it carries**, and
+ * naming the field instead of the control is how an investor is sent looking
+ * for a box that is not there: the schema field is a drawdown limit, the
+ * control asks for portfolio heat, and `aumos#685` is where the two were
+ * reconciled in favour of the control.
+ *
+ * ⛔ **Sector, theme and factor caps get no row and it is not an omission.**
+ * They are this package's and its config's, no screen asks for them, and
+ * `policyLint` refuses a run that loosens one. A limit with nowhere for the
+ * investor to go is not a recommendation.
+ */
+const MANDATE_CONTROLS = Object.freeze({
+  maxPositionWeight: { screen: 'FUND SETTINGS → 투자 원칙', control: '집중도 상한', direction: 'raise', unit: 'portfolio-weight' },
+  cashFloor: { screen: 'FUND SETTINGS → 투자 원칙', control: '현금 비중', direction: 'lower', unit: 'portfolio-weight' },
+  maxDrawdown: { screen: 'FUND SETTINGS → 투자 원칙', control: '포트폴리오 히트', direction: 'raise', unit: 'portfolio-loss-fraction' },
+})
+
+/** The one code a proposal carries verbatim when a raise would open something. */
+const UNLOCK_CODE = 'cap_raise_would_unlock'
+const UNLOCK_UNDISCLOSED_CODE = 'cap_raise_unlock_undisclosed'
+
+/**
+ * ⚠️ **Zero is returned as `null` and never as a row of zeroes.** The source's
+ * condition is *0원이면 제안하지 않는다*, and a row saying «this would open
+ * nothing» is a recommendation the investor still has to read and dismiss.
+ * ⛔ `blockedBy` is the codes, not a boolean: a run told only that «something
+ * else refuses» cannot tell whether to fix it.
+ */
+function unlockDelta({
+  field,
+  currentValue,
+  proposedValue,
+  openedWeight,
+  bindingToday = null,
+  nextBinding = null,
+  nav = null,
+  navCurrency = null,
+  blockedBy = [],
+  subject = null,
+} = {}) {
+  const control = MANDATE_CONTROLS[field]
+  if (!control) return null
+  if (blockedBy.length > 0) return null
+  if (!finite(currentValue) || !finite(proposedValue) || !finite(openedWeight)) return null
+  /**
+   * ⛔ **The one test, and there is deliberately no second one beside it.**
+   * *0원이면 제안하지 않는다* is the whole condition, and a `direction` check on
+   * `proposedValue` against `currentValue` would be the same test written
+   * twice: all three callers derive the value to type **from** the weight that
+   * opens, so the two move together by construction and a duplicate guard is a
+   * line no mutation can turn red.
+   */
+  if (openedWeight <= 1e-9) return null
+  const opensAmount = finite(nav) && nav > 0 ? round(openedWeight * nav, 2) : null
+  return {
+    code: UNLOCK_CODE,
+    field,
+    screen: control.screen,
+    control: control.control,
+    direction: control.direction,
+    currentValue: round(currentValue),
+    proposedValue: round(proposedValue),
+    bindingToday,
+    nextBinding,
+    opensWeight: round(openedWeight),
+    opensAmount,
+    /** ⚠️ The venue's currency, because that is the unit the order is placed in. */
+    opensCurrency: opensAmount === null ? null : navCurrency,
+    subject,
+    units: { currentValue: control.unit, proposedValue: control.unit, opensWeight: 'portfolio-weight', opensAmount: 'currency-major-units' },
+  }
+}
+
+/**
+ * The sentence the proposal carries, in one place so the diagnostic, the
+ * disclosure row and the fixtures cannot say three different things.
+ */
+function unlockSentence(row) {
+  const amount = row.opensAmount === null ? `${row.opensWeight} of the book` : `${row.opensAmount} ${row.opensCurrency} (${row.opensWeight} of the book)`
+  const verb = row.direction === 'raise' ? 'Raising' : 'Lowering'
+  const next = row.nextBinding === null ? 'nothing further was measured above it' : `above that the ${row.nextBinding} limit binds`
+  return `${verb} «${row.control}» on ${row.screen} from ${row.currentValue} to ${row.proposedValue} would open up to ${amount}; ${next}. ⛔ This is a recommendation to the investor and never a change this run may make`
+}
+
+/** The obligation the proposal owes when a raise would open something. */
+function unlockDisclosure(row) {
+  return {
+    code: UNLOCK_CODE,
+    undisclosedCode: UNLOCK_UNDISCLOSED_CODE,
+    reason: 'cap-raise-would-unlock',
+    /**
+     * ⚠️ **`keyReasons`, measured.** `Approvals.tsx` renders `rationale.keyReasons`
+     * and `rationale.risks` and nothing else, so those two are the only slots
+     * that reach the investor *before* the approve button — and this is the
+     * screen where the recommendation has to land, because it is an action for
+     * the investor rather than a note for the run's later readers.
+     * ⛔ Not `risks`: that slot is a hazard, it already carries the
+     * manager-attestation warning, and filing a recommendation among the things
+     * that could go wrong is how a reader learns to skim it.
+     * ⛔ Not `uncertainty`: it is crowded, it is not drawn on that screen, and
+     * an unavailable judgement is not what this is.
+     * ⛔ Not `effectiveConstraints`: `effectiveConstraintSchema` is a
+     * `strictObject` of the host's five fields and has no room for a number
+     * this package computed — see `HOST-FOLLOWUPS.md`.
+     */
+    fields: ['keyReasons'],
+    details: { code: UNLOCK_CODE, unlockDelta: row },
+    message: `This run computed that ${row.direction === 'raise' ? 'raising' : 'lowering'} «${row.control}» would open ${row.opensAmount === null ? row.opensWeight : `${row.opensAmount} ${row.opensCurrency}`} and the proposal does not say so, which leaves the investor with the same refusal and no number to act on. Carry \`${UNLOCK_CODE}\` verbatim in one \`rationale.keyReasons\` entry, with the control, the value to type and what opens`,
+  }
+}
+
+/**
  * ── The cap the investor declared, the risk budget under it (issues #151, #226) ─
  *
  * An investor set `mandate.constraints.maxPositionWeight` to 0.20 and asked
@@ -533,6 +699,56 @@ export function effectivePositionCap(input = {}) {
   }
 
   /**
+   * ── The raise, and whether it opens anything (issue #230) ────────────────
+   *
+   * ⚠️ **Only two states in this operation are a cap actually holding a
+   * position down**, and outside them a recommendation would be noise on every
+   * run: `reduced` — the risk budget binds below the cap the investor declared
+   * — and `minimumVersusCap.exceeds` — the venue's smallest order is larger
+   * than the most this book may hold of one name, so no name enters at any
+   * price. Anywhere else the cap refused nothing, and the source's condition
+   * («blocked only by a cap») is not met.
+   *
+   * ⛔ **The control named is the one that binds, never the one that is
+   * convenient.** When the risk budget binds, raising `maxPositionWeight` opens
+   * nothing at all — the heat headroom is what is holding the size — so the row
+   * names `maxDrawdown` and converts the ceiling back into the drawdown number
+   * the investor would have to type: `heldHeat + ceiling × stopDistance`.
+   *
+   * ⚠️ **The venue minimum is the second constraint here, and it is checked
+   * against the ceiling rather than against today's cap.** A raise that lands
+   * the cap still under the smallest executable order opens weight and no
+   * order, which is the source's 0원 exactly.
+   */
+  const capBlockedBy = diagnostics.filter((row) => row.severity === 'blocked').map((row) => row.code)
+  const others = limits.filter((row) => row.source !== bound?.source)
+  const ceilingRow = others.length ? others.reduce((low, row) => (row.weight < low.weight ? row : low)) : null
+  const capBinds = reduced || minimumVersusCap?.exceeds === true
+  const unexecutableAfterRaise = ceilingRow !== null && finite(minimumWeight) && ceilingRow.weight + 1e-12 < minimumWeight
+  const capNav = minimumVersusCap !== null
+    ? { nav: minimumVersusCap.portfolioNavInMinimumCurrency, currency: minimumVersusCap.minimumCurrency }
+    : finite(input?.portfolioNav) && input.portfolioNav > 0 && typeof input?.portfolioNavCurrency === 'string'
+      ? { nav: input.portfolioNav, currency: input.portfolioNavCurrency }
+      : { nav: null, currency: null }
+  const capUnlock = !capBinds || ceilingRow === null || effective === null
+    ? null
+    : unlockDelta({
+      field: bound.source === 'risk-budget' ? 'maxDrawdown' : 'maxPositionWeight',
+      currentValue: bound.source === 'risk-budget' ? drawdown : declared,
+      proposedValue: bound.source === 'risk-budget' ? heldHeat + ceilingRow.weight * stopDistance : ceilingRow.weight,
+      openedWeight: ceilingRow.weight - effective,
+      bindingToday: bound.source,
+      nextBinding: ceilingRow.source,
+      nav: capNav.nav,
+      navCurrency: capNav.currency,
+      blockedBy: [...capBlockedBy, ...(unexecutableAfterRaise ? ['minimum_executable_exceeds_cap'] : [])],
+    })
+  if (capUnlock !== null) {
+    diagnostics.push(diagnostic(UNLOCK_CODE, 'unevaluated', unlockSentence(capUnlock), 'mandatePositionCap', capUnlock))
+    disclosures.push(unlockDisclosure(capUnlock))
+  }
+
+  /**
    * ── The 20% lane standing on the manager's own word, said out loud (#692) ──
    *
    * ⚠️ **This is the half of `untilled/aumos#693` that is this package's.** The
@@ -617,6 +833,13 @@ export function effectivePositionCap(input = {}) {
       mustReport: reduced,
       /** Copied into `DecisionProposal.effectiveConstraints` verbatim; empty is a complete answer. */
       effectiveConstraints,
+      /**
+       * ⚠️ **What a raise would open, or `null` because it would open nothing.**
+       * ⛔ Never a row of zeroes: the source's rule is *0원이면 제안하지 않는다*,
+       * and a recommendation worth nothing is one the investor still has to
+       * read and dismiss. (#230)
+       */
+      unlockDelta: capUnlock,
       /**
        * ⚠️ **What has to be disclosed, structured — never whether it was.**
        * Hand this array to `proposalDisclosure` beside the assembled proposal;
@@ -734,6 +957,53 @@ export function effectiveCashFloor(input = {}) {
     }
   }
 
+  /**
+   * ── The floor, and what lowering it would deploy (issue #230) ────────────
+   *
+   * ⚠️ **The floor blocks exactly when the plan crosses it**, and nowhere else:
+   * a floor with headroom under it refused nothing, so a recommendation there
+   * is noise. So this is emitted on `breached` and on nothing else.
+   *
+   * ⛔ **`cash_floor_breach` is the one `blocked` this does not stay silent
+   * for.** Every other rule in this file treats a refusal as proof that the
+   * limit is not the only thing in the way; here the refusal *is* the thing the
+   * recommendation resolves, and treating it as a veto would make the channel
+   * unreachable by construction.
+   *
+   * ⛔ **A floor this methodology holds above the Mandate's is not lowered on
+   * any screen.** When `binding` is a methodology row the investor has nowhere
+   * to go — `policyLint` refuses a run that lowers it, and this package's
+   * constant needs a version bump and a reviewer — so the row is not emitted
+   * and the methodology floor is named as what binds instead.
+   *
+   * ⚠️ **The next constraint is the plan's own need.** Lowering the floor past
+   * `projectedCashWeight` deploys nothing further, because there is nothing
+   * further this run asked to deploy; the second-highest floor bounds it from
+   * the other side. `max` of the two is where the raise stops paying.
+   */
+  const floorBlockedBy = diagnostics.filter((row) => row.severity === 'blocked' && row.code !== 'cash_floor_breach').map((row) => row.code)
+  const otherFloors = floors.filter((row) => row.source !== bound?.source)
+  const nextFloor = otherFloors.length ? otherFloors.reduce((high, row) => (row.weight > high.weight ? row : high)) : null
+  const floorStopsPayingAt = nextFloor !== null && nextFloor.weight > projected ? nextFloor.weight : projected
+  const floorUnlock = breached !== true || bound?.source !== 'mandate' || projected === null
+    ? null
+    : unlockDelta({
+      field: 'cashFloor',
+      currentValue: effective,
+      proposedValue: floorStopsPayingAt,
+      openedWeight: effective - floorStopsPayingAt,
+      bindingToday: bound.source,
+      nextBinding: nextFloor !== null && nextFloor.weight > projected ? nextFloor.source : 'projected-cash-weight',
+      nav: finite(input?.portfolioNav) && input.portfolioNav > 0 ? input.portfolioNav : null,
+      navCurrency: typeof input?.portfolioNavCurrency === 'string' ? input.portfolioNavCurrency : null,
+      blockedBy: floorBlockedBy,
+    })
+  const floorDisclosures = []
+  if (floorUnlock !== null) {
+    diagnostics.push(diagnostic(UNLOCK_CODE, 'unevaluated', unlockSentence(floorUnlock), 'mandateCashFloor', floorUnlock))
+    floorDisclosures.push(unlockDisclosure(floorUnlock))
+  }
+
   return {
     data: {
       declaredFloor: declared,
@@ -751,6 +1021,10 @@ export function effectiveCashFloor(input = {}) {
       /** Copied into `DecisionProposal.effectiveConstraints` verbatim; empty is a complete answer. */
       effectiveConstraints,
       constraintDisclosed,
+      /** ⚠️ `null` because lowering the floor would deploy nothing; ⛔ never a row of zeroes. (#230) */
+      unlockDelta: floorUnlock,
+      /** The obligation this floor owes the proposal, in `effectivePositionCap`'s shape. (#230) */
+      disclosures: floorDisclosures,
       units: { declaredFloor: 'portfolio-weight', effectiveFloor: 'portfolio-weight', projectedCashWeight: 'portfolio-weight', headroomWeight: 'portfolio-weight' },
     },
     diagnostics,
@@ -1070,6 +1344,8 @@ export function targetWeight(input) {
       positionCapUnlocksAt: capReport.data.unlocksAt,
       riskBudget: capReport.data.riskBudget,
       effectiveConstraints: capReport.data.effectiveConstraints,
+      /** ⚠️ What a raise would open, carried up so a run that only calls `targetWeight` still sees it. (#230) */
+      unlockDelta: capReport.data.unlockDelta,
       /** Carried up so a run that only calls `targetWeight` still meets the obligation. (#692) */
       mainLaneAttestation: capReport.data.mainLaneAttestation,
       /**
@@ -1246,7 +1522,7 @@ function portfolioHeat({ positions, proposed, cap, grandfather, diagnostics }) {
  * axis is the Mandate's `maxPositionWeight` and is untouched. The comment in
  * `accumulate` states the boundary and why it stops there.
  */
-export function concentration({ positions = [], proposed = [], caps = {}, config = {} }) {
+export function concentration({ positions = [], proposed = [], caps = {}, config = {}, portfolioNav = null, portfolioNavCurrency = null }) {
   const diagnostics = []
   const grandfather = grandfatherPolicy(config)
   const axes = () => ({ position: new Map(), sector: new Map(), theme: new Map(), factor: new Map() })
@@ -1441,6 +1717,55 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
   }
   const bookSplit = bookWeightSplit([...standing, ...proposed])
   const heat = portfolioHeat({ positions, proposed, cap: caps.portfolioHeat, grandfather, diagnostics })
+  /**
+   * ── The one axis a raise can open, and the 2026-07-27 shape (issue #230) ──
+   *
+   * ⚠️ **Exactly one refusal, or nothing is said.** This is where the source's
+   * measured zero lives: on 2026-07-27 the book had 162,357원 unspent and a cap
+   * raise worth nothing, because the pace limit and the guard were both binding
+   * — two constraints, so moving either one alone opened nothing. The
+   * arithmetic here is the same shape: a proposal refused on two axes is
+   * refused after a raise on one of them, so the raise opens **0** and the
+   * recommendation is not made. `blocking` counts them.
+   *
+   * ⛔ **Only the position axis.** Sector, theme and factor caps are this
+   * package's and its config's, no screen asks the investor for them, and
+   * `policyLint` refuses a run that loosens one — a limit with nowhere to go is
+   * not a recommendation. And ⛔ **heat is not answered here**: `maxDrawdown`
+   * is a loss budget, not a weight, and the one place it becomes a position
+   * weight is `effectivePositionCap`'s risk budget. Two operations answering
+   * that in different units is the drift this package keeps deleting.
+   *
+   * ⚠️ **The ceiling is what this run actually asked for.** Raising the cap
+   * past the proposed weight opens nothing, because nothing further was
+   * proposed — so `proposedValue` is the breaching weight itself and the
+   * sentence names `proposed-weight` as what binds above it.
+   */
+  const concentrationBlocking = [
+    ...created.map((row) => `concentration_breach:${row.kind}:${row.key}`),
+    ...(grandfather.blocksNewNonCoreWhenBreached ? expanded.map((row) => `concentration_breach_expanded:${row.kind}:${row.key}`) : []),
+    ...diagnostics.filter((row) => row.severity === 'blocked' && !['concentration_breach', 'concentration_breach_expanded'].includes(row.code)).map((row) => row.code),
+  ]
+  const soleBreach = created.length === 1 && concentrationBlocking.length === 1 ? created[0] : null
+  const concentrationUnlock = soleBreach === null || soleBreach.kind !== 'position'
+    ? null
+    : unlockDelta({
+      field: 'maxPositionWeight',
+      currentValue: caps.position,
+      proposedValue: soleBreach.weight,
+      openedWeight: soleBreach.weight - caps.position,
+      bindingToday: 'mandate',
+      nextBinding: 'proposed-weight',
+      nav: finite(portfolioNav) && portfolioNav > 0 ? portfolioNav : null,
+      navCurrency: typeof portfolioNavCurrency === 'string' ? portfolioNavCurrency : null,
+      blockedBy: [],
+      subject: soleBreach.key,
+    })
+  const concentrationDisclosures = []
+  if (concentrationUnlock !== null) {
+    diagnostics.push(diagnostic(UNLOCK_CODE, 'unevaluated', unlockSentence(concentrationUnlock), 'caps.position', concentrationUnlock))
+    concentrationDisclosures.push(unlockDisclosure(concentrationUnlock))
+  }
   return {
     data: {
       breaches,
@@ -1470,6 +1795,10 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
        * whether or not that axis has a cap to be measured against.
        */
       unlabelled,
+      /** ⚠️ `null` unless the position cap is the **only** thing refusing this proposal. (#230) */
+      unlockDelta: concentrationUnlock,
+      /** The obligation that recommendation owes the proposal, in `effectivePositionCap`'s shape. (#230) */
+      disclosures: concentrationDisclosures,
       parkedLiquidityWeight: bookSplit.parkedLiquidityWeight,
       coreWeight: bookSplit.coreWeight,
       singleNameWeight: bookSplit.singleNameWeight,

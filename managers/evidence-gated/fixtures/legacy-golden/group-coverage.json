@@ -98,7 +98,8 @@
       "price-conflict-tolerance-configurable",
       "declared-thresholds",
       "benchmark-fixed",
-      "policy-lint-provenance"
+      "policy-lint-provenance",
+      "cap-raise-is-a-proposal-not-an-edit"
     ],
     "portfolio": [
       "krw-usd-sgov-nav",
@@ -178,7 +179,10 @@
       "parked-liquidity-is-reported",
       "mandate-objective-unexecuted",
       "mandate-execution-reads-gap-sources",
-      "main-lane-attestation-disclosed"
+      "main-lane-attestation-disclosed",
+      "cap-raise-unlock",
+      "cap-raise-silent-when-not-sole-constraint",
+      "cash-floor-unlock"
     ],
     "source-parsers": [
       "sec-dart-asof",

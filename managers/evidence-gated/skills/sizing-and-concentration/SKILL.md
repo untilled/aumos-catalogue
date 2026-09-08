@@ -189,11 +189,30 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    `effectivePositionCap` as `stopLossPct` and the risk budget
    `(maxDrawdown − heldPortfolioHeat) / |stopLossPct|` is what holds the position under the
    Mandate's cap. `skills/evidence-gates` carries the rest.
+4c-2. **When one limit is the only thing in the way, say what would open it (#230).** All three of
+   `effectivePositionCap`, `effectiveCashFloor` and `concentration` return **`unlockDelta`**, and the
+   source's condition is the whole of it — *«캡 상향을 제안하기 전에 이 캡을 올리면 실제로 몇 원이
+   열리는가를 계산해 확인할 것 — 0원이면 제안하지 않는다»*. ⛔ **`null` is the ordinary answer and it
+   means do not propose anything**: something else already refuses, the next limit binds level with
+   this one, or nothing above it was measured. Do not compute the number yourself and do not argue
+   past a `null` — that is 2026-07-27, where 162,357원 sat unused behind a pace limit and a guard and
+   the cap was not what was in the way.
+   The row names `screen`, `control`, `currentValue`, `proposedValue`, `opensWeight` and
+   `opensAmount`. ⛔ **Copy `control`, never the schema field**: `maxDrawdown` is asked for as
+   «포트폴리오 히트» and a run naming the field sends the investor looking for a box that is not
+   there. ⚠️ Which control is named follows what binds — the risk budget answers on `maxDrawdown`,
+   the Mandate cap on `maxPositionWeight`, the cash floor on `cashFloor` — and ⛔ sector, theme and
+   factor caps get no row at all, because no screen asks the investor for one and `policyLint`
+   refuses a run that loosens one. It goes in one `rationale.keyReasons` entry carrying
+   `cap_raise_would_unlock` **verbatim**; `PROMPT.md` §4 has the sentence. ⚠️ **A proposal and never
+   an edit** — nothing here changes a threshold, and a run that answers a binding limit by moving it
+   is still `policy_auto_relax` / `blocked`.
 4e. **Judge the disclosures once the proposal exists — `proposalDisclosure`.** Hand it the
    `disclosures` array 4a returned (or `targetWeight`'s, which is the same array) **verbatim** and
    the assembled `DecisionProposal`. It answers `disclosed` and, for each obligation, which fields
    are silent — and it is the only operation that emits
-   `position_cap_reduction_undisclosed` / `main_lane_attestation_undisclosed`. ⚠️ **Absent is
+   `position_cap_reduction_undisclosed` / `main_lane_attestation_undisclosed` /
+   `cap_raise_unlock_undisclosed`. ⚠️ **Absent is
    unjudged; empty is refused.** A proposal that does not exist yet has cleared nothing, and an
    empty array is a proposal that exists and says nothing.
    ⚠️ **Why this is a separate step at all.** Until #212 ② `effectivePositionCap` read the prose

@@ -550,7 +550,15 @@ assert.equal(has(declaredVersusEffective, 'position_cap_reduced_by_maturity'), f
  * ── #212 ②: the calculation says what must be disclosed; another operation
  * says whether it was ─────────────────────────────────────────────────────
  */
-assert.deepEqual(declaredVersusEffective.data.disclosures.map((row) => row.code), ['position_cap_reduced_below_declared'])
+/**
+ * ⚠️ **Two rows since #230, and they are two different sentences to two
+ * different readers.** The reduction says *this size is smaller than you
+ * declared*; the unlock says *here is the control that would open it*. The
+ * second is emitted here because the risk budget is what binds and the Mandate
+ * cap sits measurably above it — see the `sizing/cap-raise-unlock` case in
+ * `verify-evidence-gated-allocator.mjs` for the arithmetic and the silences.
+ */
+assert.deepEqual(declaredVersusEffective.data.disclosures.map((row) => row.code), ['position_cap_reduced_below_declared', 'cap_raise_would_unlock'])
 const capDisclosure = declaredVersusEffective.data.disclosures[0]
 assert.deepEqual(capDisclosure.fields, ['uncertainty', 'effectiveConstraints'], 'both halves, and they are different readers')
 assert.equal(capDisclosure.undisclosedCode, 'position_cap_reduction_undisclosed', 'the refusal keeps the code it always had')
@@ -704,7 +712,10 @@ const budgetedWeight = run('targetWeight', { ...sizedShape, expectedActiveReturn
 assert.equal(budgetedWeight.data.effectivePositionCap, 0.1875)
 assert.equal(budgetedWeight.data.targetWeight, 0.1875)
 assert.equal(budgetedWeight.data.positionCapUnlocksAt, 'portfolioHeat')
-assert.deepEqual(budgetedWeight.data.disclosures.map((row) => row.code), ['position_cap_reduced_below_declared'])
+assert.deepEqual(budgetedWeight.data.disclosures.map((row) => row.code), ['position_cap_reduced_below_declared', 'cap_raise_would_unlock'])
+/** ⚠️ And so does the recommendation, for the same reason: a run that only calls `targetWeight` still sees it (#230). */
+assert.equal(budgetedWeight.data.unlockDelta.field, 'maxDrawdown')
+assert.equal(budgetedWeight.data.unlockDelta.control, '포트폴리오 히트')
 
 /**
  * ── The old config key still reads, and says it was renamed (#226) ─────────

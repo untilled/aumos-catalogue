@@ -4938,6 +4938,243 @@ assert.equal(
   'so a silent proposal on vendor evidence clears — the check is the obligation’s, not the operation’s',
 )
 
+
+/**
+ * ── «이 캡을 올리면 실제로 몇 원이 열리는가» (issue #230) ────────────────────
+ *
+ * The source methodology told this manager to **propose** cap raises and bounded
+ * the instruction with the arithmetic that makes one honest:
+ *
+ * > 캡 상향을 제안하기 전에 «이 캡을 올리면 실제로 몇 원이 열리는가»를 계산해
+ * > 확인할 것 — **0원이면 제안하지 않는다** (2026-07-27: 잔여 162,357원이 있었으나
+ * > 페이스 1.94배 초과 + 가드 1x로 캡 상향 효과 0이었다).
+ *
+ * The port refused a run-side loosening (`policyLint`) and disclosed a reduced
+ * cap (`effectivePositionCap`), and had no output that said **what to change**.
+ * Measured on `run_c7ad46eea03840bf84ae7a8822ed02c3` — NAV **USD 14,937.07**,
+ * USDKRW 1,340 — the book reported the same reduction for ten runs to an
+ * investor who was never told which number moved it.
+ *
+ * ⚠️ Every number below is on that book, so the amounts are the ones an
+ * investor would actually have seen.
+ */
+covers('sizing/cap-raise-unlock')
+const unlockBook = {
+  mandatePositionCap: 0.2,
+  thesis: thesisWith(consensusFixtures.vendorAttested),
+  challengeVerdict: 'cleared',
+  minimumExecutablePosition: { KRW: 300000, USD: 200 },
+  positionCurrency: 'USD',
+  portfolioNav: 14937.07,
+  portfolioNavCurrency: 'USD',
+  fx: { USDKRW: 1340 },
+}
+const capUnlock = execute({
+  operation: 'effectivePositionCap',
+  asOf: observationAsOf,
+  input: { ...unlockBook, mandateMaxDrawdown: 0.06, heldPortfolioHeat: 0.055, stopLossPct: -0.08 },
+})
+assert.equal(capUnlock.data.effectiveCap, 0.0625, '(0.06 − 0.055) / 0.08 — the heat headroom at this name’s own stop')
+assert.equal(capUnlock.data.binding, 'risk-budget')
+const capRow = capUnlock.data.unlockDelta
+assert.ok(capRow, 'the risk budget binds below the declared cap, so a raise opens something and it is computed')
+assert.equal(capRow.field, 'maxDrawdown', '⛔ not `maxPositionWeight`: raising the cap the risk budget already sits under opens nothing')
+assert.equal(capRow.control, '포트폴리오 히트', 'the control the investor filled in — the field is named for drawdown and the screen asks for heat (aumos#685)')
+assert.equal(capRow.screen, 'FUND SETTINGS → 투자 원칙', 'and where to find it')
+assert.equal(capRow.currentValue, 0.06)
+assert.equal(capRow.proposedValue, 0.071, 'held 0.055 plus the Mandate’s 0.20 at a −8% stop — the number to type, not «raise the cap»')
+assert.equal(capRow.opensWeight, 0.1375, '0.20 − 0.0625')
+assert.equal(capRow.opensAmount, 2053.85, 'USD 2,053.85 of this book, and the amount is in the venue’s currency because that is what an order is placed in')
+assert.equal(capRow.opensCurrency, 'USD')
+assert.equal(capRow.nextBinding, 'mandate', 'and what binds above it, so the recommendation stops where it stops paying')
+assert.ok(
+  capUnlock.diagnostics.some((row) => row.code === 'cap_raise_would_unlock' && row.severity === 'unevaluated'),
+  '⛔ `unevaluated` and never `blocked`: `targetWeight` returns null for any blocked diagnostic it is handed, and a recommendation may not move a size',
+)
+const capObligation = capUnlock.data.disclosures.find((row) => row.code === 'cap_raise_would_unlock')
+assert.ok(capObligation, 'the obligation is a row in the same array the reduction uses')
+assert.deepEqual(
+  capObligation.fields,
+  ['keyReasons'],
+  '⛔ `keyReasons` and not `risks`: `Approvals.tsx` renders both and only those two, and a recommendation filed among the hazards is one a reader learns to skim',
+)
+assert.equal(capObligation.undisclosedCode, 'cap_raise_unlock_undisclosed')
+
+/**
+ * ⚠️ **The whole channel is `proposalDisclosure`'s to refuse, exactly like the
+ * reduction.** A computed unlock that the proposal does not carry leaves the
+ * investor where issue #230 found them: the same refusal, ten runs running, and
+ * no number to act on.
+ */
+const unlockJudge = (proposal) => execute({ operation: 'proposalDisclosure', asOf: observationAsOf, input: { disclosures: capUnlock.data.disclosures, proposal } })
+const silentOnUnlock = unlockJudge({ rationale: { keyReasons: ['The risk budget binds.'], risks: [] }, uncertainty: ['position_cap_reduced_below_declared'] })
+assert.equal(silentOnUnlock.status, 'blocked')
+assert.ok(silentOnUnlock.diagnostics.some((row) => row.code === 'cap_raise_unlock_undisclosed'))
+const spokenUnlock = unlockJudge({
+  rationale: {
+    keyReasons: ['cap_raise_would_unlock: 포트폴리오 히트를 FUND SETTINGS → 투자 원칙에서 0.06 → 0.071로 올리면 최대 USD 2,053.85(장부의 13.75%)가 열린다; 그 위는 Mandate 캡이 잡는다.'],
+    risks: [],
+  },
+  uncertainty: ['position_cap_reduced_below_declared'],
+})
+assert.equal(spokenUnlock.diagnostics.some((row) => row.code === 'cap_raise_unlock_undisclosed'), false, 'carried verbatim in `keyReasons`, the recommendation clears')
+
+/**
+ * ── 0원이면 제안하지 않는다, four ways ─────────────────────────────────────
+ *
+ * ⚠️ **«Only binding» is computed rather than assumed**, and each of these is a
+ * different second constraint arriving at the same silence.
+ */
+covers('sizing/cap-raise-silent-when-not-sole-constraint')
+// ⑴ Something else refuses outright: an unchecked variant view means there is no position to open at any cap.
+const uncheckedUnlock = execute({
+  operation: 'effectivePositionCap',
+  asOf: observationAsOf,
+  input: { ...unlockBook, thesis: null, mandateMaxDrawdown: 0.06, heldPortfolioHeat: 0.055, stopLossPct: -0.08 },
+})
+assert.ok(uncheckedUnlock.diagnostics.some((row) => row.code === 'variant_view_required_for_position' && row.severity === 'blocked'))
+assert.equal(uncheckedUnlock.data.unlockDelta, null, 'the cap is not what is holding this position down, so no raise is proposed')
+// ⑵ The raise lands the cap still under the venue's smallest executable order: weight opens and no order does.
+const stillUnexecutable = execute({
+  operation: 'effectivePositionCap',
+  asOf: observationAsOf,
+  input: { ...unlockBook, mandatePositionCap: 0.01, mandateMaxDrawdown: 0.06, heldPortfolioHeat: 0.059, stopLossPct: -0.08 },
+})
+assert.equal(stillUnexecutable.data.riskBudget.weight, 0.0125)
+assert.ok(stillUnexecutable.diagnostics.some((row) => row.code === 'minimum_executable_exceeds_cap'), 'USD 200 is 0.01338951 of this book and the cap is 0.01')
+assert.equal(
+  stillUnexecutable.data.unlockDelta, null,
+  '⛔ 0.0125 is still under 0.01338951, so raising `maxPositionWeight` to the risk budget opens no order — the source’s 0원, computed',
+)
+// ⑶ Nothing above it was measured: an undeclared risk budget is not an unbounded one.
+const nothingMeasured = execute({
+  operation: 'effectivePositionCap',
+  asOf: observationAsOf,
+  input: { ...unlockBook, mandatePositionCap: 0.01 },
+})
+assert.ok(nothingMeasured.diagnostics.some((row) => row.code === 'position_risk_budget_unevaluated'))
+assert.equal(nothingMeasured.data.unlockDelta, null, '⛔ «없는 캡은 제한 없음이 아니다» — a raise with no measured ceiling is the absence of a number, not a number')
+// ⑷ The 2026-07-27 shape itself: two limits bind, so moving either one alone opens nothing.
+const concentrationInput = (sectorCap) => ({
+  positions: [],
+  proposed: [{ symbol: '005930', weight: 0.25, sector: 'semis', themes: ['ai'], factors: ['ai-capex'], stopLossPct: 0.05 }],
+  caps: { position: 0.2, sector: sectorCap, theme: 0.5, factor: 0.5, portfolioHeat: 0.06 },
+  portfolioNav: 14937.07,
+  portfolioNavCurrency: 'USD',
+})
+const twoAxes = execute({ operation: 'concentration', asOf: observationAsOf, input: concentrationInput(0.2) })
+assert.equal(twoAxes.data.breaches.length, 2, 'the position cap and the sector cap both refuse this proposal')
+assert.equal(
+  twoAxes.data.unlockDelta, null,
+  '⛔ raising one of two binding limits opens nothing — this is 2026-07-27 (162,357원 left, pace 1.94× over, guard 1×, cap raise worth 0) as arithmetic rather than as a memory',
+)
+const oneAxis = execute({ operation: 'concentration', asOf: observationAsOf, input: concentrationInput(0.5) })
+assert.equal(oneAxis.data.breaches.length, 1)
+assert.equal(oneAxis.data.unlockDelta.field, 'maxPositionWeight')
+assert.equal(oneAxis.data.unlockDelta.control, '집중도 상한')
+assert.equal(oneAxis.data.unlockDelta.currentValue, 0.2)
+assert.equal(oneAxis.data.unlockDelta.proposedValue, 0.25, 'the weight this run actually asked for; raising past it opens nothing because nothing further was proposed')
+assert.equal(oneAxis.data.unlockDelta.opensWeight, 0.05)
+assert.equal(oneAxis.data.unlockDelta.opensAmount, 746.85)
+assert.equal(oneAxis.data.unlockDelta.subject, '005930', 'and which name it is about')
+assert.deepEqual(oneAxis.data.disclosures.map((row) => row.code), ['cap_raise_would_unlock'])
+/** ⛔ Sector, theme and factor caps get no row: no screen asks the investor for one. */
+const sectorOnly = execute({
+  operation: 'concentration',
+  asOf: observationAsOf,
+  input: { ...concentrationInput(0.2), proposed: [{ symbol: '005930', weight: 0.19, sector: 'semis', themes: ['ai'], factors: ['ai-capex'], stopLossPct: 0.05 }] },
+})
+assert.equal(sectorOnly.data.breaches.length, 0)
+assert.equal(sectorOnly.data.unlockDelta, null)
+
+/**
+ * ── The cash floor, moved the other way ───────────────────────────────────
+ *
+ * ⚠️ A floor is lowered rather than raised, and `direction` is what says so —
+ * ⛔ and only when the Mandate's own floor is what binds. A methodology floor
+ * standing above it is not on any screen, and `policyLint` refuses a run that
+ * lowers one.
+ */
+covers('sizing/cash-floor-unlock')
+const floorInput = (methodologyCashFloors) => ({
+  mandateCashFloor: 0.1,
+  projectedCashWeight: 0.06,
+  cashWeight: 0.4,
+  portfolioNav: 14937.07,
+  portfolioNavCurrency: 'USD',
+  ...(methodologyCashFloors ? { methodologyCashFloors } : {}),
+})
+const floorUnlock = execute({ operation: 'effectiveCashFloor', asOf: observationAsOf, input: floorInput(null) })
+assert.equal(floorUnlock.data.breached, true)
+assert.equal(floorUnlock.data.unlockDelta.field, 'cashFloor')
+assert.equal(floorUnlock.data.unlockDelta.direction, 'lower')
+assert.equal(floorUnlock.data.unlockDelta.control, '현금 비중')
+assert.equal(floorUnlock.data.unlockDelta.proposedValue, 0.06, 'to exactly where the plan lands; lower than that deploys nothing because nothing further was planned')
+assert.equal(floorUnlock.data.unlockDelta.opensWeight, 0.04)
+assert.equal(floorUnlock.data.unlockDelta.opensAmount, 597.48)
+assert.equal(floorUnlock.data.unlockDelta.nextBinding, 'projected-cash-weight')
+/**
+ * ⚠️ **The source's 0원, at its most literal.** A second floor standing level
+ * with the Mandate's binds the moment the Mandate's moves, so lowering the one
+ * the investor can reach deploys nothing — and the row is not emitted rather
+ * than emitted at zero.
+ */
+const floorLevelWithIt = execute({ operation: 'effectiveCashFloor', asOf: observationAsOf, input: floorInput([{ source: 'coreDca', weight: 0.1 }]) })
+assert.equal(floorLevelWithIt.data.binding, 'mandate', 'the Mandate still binds — equal floors are not a raise')
+assert.equal(floorLevelWithIt.data.breached, true, 'and the plan still crosses it, so this is not silence for want of a refusal')
+assert.equal(floorLevelWithIt.data.unlockDelta, null, '⛔ 0원이면 제안하지 않는다')
+const methodologyFloor = execute({ operation: 'effectiveCashFloor', asOf: observationAsOf, input: floorInput([{ source: 'coreDca', weight: 0.15 }]) })
+assert.equal(methodologyFloor.data.binding, 'coreDca')
+assert.equal(methodologyFloor.data.unlockDelta, null, '⛔ lowering the Mandate’s floor while a methodology floor stands above it deploys nothing')
+/** A floor with headroom under it refused nothing, so there is nothing to recommend. */
+assert.equal(execute({ operation: 'effectiveCashFloor', asOf: observationAsOf, input: { ...floorInput(null), projectedCashWeight: 0.4 } }).data.unlockDelta, null)
+
+/**
+ * ── A proposal, and still never an edit (issue #230, proposal 3) ───────────
+ *
+ * ⚠️ The source's two sentences are one balance: *"Do proactively RECOMMEND cap
+ * adjustments"* and *"Never edit caps/policy UNILATERALLY or automatically —
+ * the default is 제안."* Opening the first must not open the second, so the
+ * refusal is asserted **beside** the channel rather than trusted to stay where
+ * it was.
+ */
+covers('policy/cap-raise-is-a-proposal-not-an-edit')
+const selfRelax = execute({
+  operation: 'policyLint',
+  asOf: observationAsOf,
+  input: {
+    current: { minimumExecutablePosition: { USD: 200 }, concentration: { sector: 0.2 } },
+    proposed: { minimumExecutablePosition: { USD: 100 }, concentration: { sector: 0.35 } },
+    provenance: {},
+  },
+})
+assert.equal(selfRelax.status, 'blocked', 'a run that answers a binding limit by moving it is refused, unchanged')
+assert.deepEqual(
+  selfRelax.diagnostics.filter((row) => row.code === 'policy_auto_relax').map((row) => row.path).sort(),
+  ['concentration.sector', 'minimumExecutablePosition.USD'],
+  'both directions still classify, and the recommendation channel added no exemption',
+)
+assert.equal(selfRelax.data.accepted, false)
+/** ⛔ And the channel itself writes nothing: the recommendation is data on a proposal, not a config change. */
+assert.deepEqual(
+  Object.keys(capRow).filter((key) => key.startsWith('apply') || key === 'write' || key === 'set'),
+  [],
+  'the row names a control and a number and carries no way to move either',
+)
+const unlockProse = await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')
+assert.ok(
+  unlockProse.includes('cap_raise_would_unlock') && unlockProse.includes('rationale.keyReasons'),
+  'PROMPT.md is where the slot and the code are specified — the operation computes a number and says nothing about where it goes',
+)
+assert.ok(
+  unlockProse.includes('never an edit') && unlockProse.includes('policyLint'),
+  'and the run reads the refusal beside the recommendation, which is how the source wrote it',
+)
+assert.ok(
+  unlockProse.includes('포트폴리오 히트') && unlockProse.includes('0원이면 제안하지 않는다'),
+  'the control the investor actually sees, and the condition that makes the recommendation honest',
+)
+
 /**
  * ── Read it, judged on it, cited nothing (issue aumos#692, measured) ───────
  *

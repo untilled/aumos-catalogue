@@ -67,11 +67,21 @@ const carriesConstraints = (value, expected) => {
     && Math.abs(entry.effective - row.effective) <= 1e-9))
 }
 
-/** `rationale.risks` is where the proposal actually carries it; a flat `risks` is read too. */
+/**
+ * `rationale.risks` and `rationale.keyReasons` are where the proposal actually
+ * carries them; a flat spelling is read too.
+ *
+ * ⚠️ **`keyReasons` is the second nested field since #230**, and it is nested
+ * for the same reason `risks` is: `Approvals.tsx` renders `rationale.keyReasons`
+ * and `rationale.risks` and nothing else, so those are the two slots that reach
+ * the investor before the approve button, and both live under `rationale`.
+ * Reading only the flat spelling made a carried recommendation look silent.
+ */
+const NESTED_RATIONALE_FIELDS = ['risks', 'keyReasons']
 const proposalField = (proposal, field) => {
-  if (field === 'risks') {
-    const nested = proposal?.rationale?.risks
-    return nested === undefined ? proposal?.risks : nested
+  if (NESTED_RATIONALE_FIELDS.includes(field)) {
+    const nested = proposal?.rationale?.[field]
+    return nested === undefined ? proposal?.[field] : nested
   }
   return proposal?.[field]
 }
