@@ -529,12 +529,18 @@ export function evaluateWatch({ watch, observation = {}, blocks = [], alertedSes
  * The session this key is bounded by, written so it is not mistaken for an
  * instant.
  *
- * ⚠️ **A bare date is a timestamp to the host, and this key held one.** (#136)
- * `memory_read` refuses a result carrying a string later than `asOf`, and the
- * pattern it matches deliberately includes the date-only form — SEC's `filed`
+ * ⚠️ **A bare date was a timestamp to the host, and this key held one.** (#136)
+ * `memory_read` refused a result carrying a string later than `asOf`, and the
+ * pattern it matched deliberately included the date-only form — SEC's `filed`
  * is written that way and *"some time on the 5th"* really can be after an `asOf`
- * earlier in the 5th. So a date-only field is compared against the **end** of
- * that day, and a session label is refused on the day it names.
+ * earlier in the 5th. So a date-only field was compared against the **end** of
+ * that day, and a session label was refused on the day it named.
+ *
+ * ⚠️ **The guard does not reach the file this became** (aumos#743): `files_read`
+ * answers the document as one opaque string and the anchored scan never walks
+ * its leaves. ⛔ The `session-` prefix stays anyway — it costs nothing, every
+ * reader here expects it, and it still says *which session* rather than *which
+ * instant*.
  *
  * That is not an edge case here: every session date this manager writes is on
  * or after `asOf`'s UTC date, because KST and ET are both ahead of UTC or the

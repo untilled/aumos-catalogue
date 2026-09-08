@@ -18,9 +18,11 @@ listing pages or split a roster into batches. If the work does not fit in your t
 checkpoint — what you did review, what you did not, and why — rather than staffing it out.
 ⛔ **And the whole-universe sweep is not carried through your context either.** It is two steps and
 the order is load-bearing: `source_cache_refresh` on `prices`/`daily` across the roster — the venue
-MIC as `market`, ⛔ no `vendorId` — and then `research_prepare` over this package's declared recipes
-(`roster-scan`, `opportunity-metrics`), `research_job_get` and `research_result_get`.
-⚠️ **`research_prepare` collects nothing**, so a sweep prepared first reports the price branch as
+MIC as `market`, ⛔ no `vendorId` — and then `task_start` over this package's declared recipes
+(`roster-scan`, `opportunity-metrics`), each item id the store coordinate `MIC:symbol` and
+`outputPath` `scans/<asOf date>/<recipeId>`; then `task_get` until it settles, then `files_read` on
+`<outputPath>/<itemId>.json` for the answers.
+⚠️ **`task_start` collects nothing**, so a sweep prepared first reports the price branch as
 never run on every name. The bars stay in the host on both steps. ⚠️ `unprepared` names are
 blindness with the names attached — `source_cache_refresh` is its control — and never a market that
 offered nothing; `scanner_history_insufficient` splits the same way, and only the name whose series

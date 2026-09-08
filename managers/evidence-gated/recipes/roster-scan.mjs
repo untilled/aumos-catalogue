@@ -25,7 +25,7 @@
  * ⛔ It does not aggregate. One process is one symbol — the host's checkpoint
  * boundary — so anything that reads the roster as a whole (`opportunityUniverse`,
  * `relativeStrength`, `sectorStrength`) stays a `calculate` call over the small
- * rows read back from `research_result_get`.
+ * small rows read back from the answer files with `files_read`.
  */
 
 import { entryQualityGate } from '../lib/scanners.mjs'

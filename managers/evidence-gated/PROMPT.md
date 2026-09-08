@@ -137,15 +137,15 @@ namespace is this one instance.
 convert or relay price arrays, to walk pages of a vendor listing, or to split a roster into batches,
 and do not type a roster of bars back in as tool arguments: a model retyping bars so another model
 can hand them back is the most expensive way this package has ever failed to reach a judgement.
-The whole-universe sweep is `research_prepare` over the two recipes this package declares in
-`aumos.json` — **`roster-scan`** and **`opportunity-metrics`** — then `research_job_get` and
-`research_result_get`. Host code runs this package's own `execute()` over the bars the host
-stores, one process per symbol, and hands back counts and a reference. Everything else — a single
-name, a sizing call, a methodology gate — stays `mcp__evidence-gated-metrics__calculate` in your own
-context, one call per operation.
+The whole-universe sweep is `task_start` over the two recipes this package declares in
+`aumos.json` — **`roster-scan`** and **`opportunity-metrics`** — then `task_get`, then `files_read`
+over the answer files. Host code runs this package's own `execute()` over the bars the host stores,
+one process per name, and **writes one answer file per name into your own folder**; what comes back
+on the wire is counts and a folder. Everything else — a single name, a sizing call, a methodology
+gate — stays `mcp__evidence-gated-metrics__calculate` in your own context, one call per operation.
 
 ⚠️ **And the sweep is two steps, in that order: collect the series, then prepare it.**
-`research_prepare` reads what this fund has **already** stored and collects nothing, so a roster
+`task_start` reads what this fund has **already** stored and collects nothing, so a roster
 prepared without the first step comes back with every row saying the price branch was never run.
 The first step is `source_cache_refresh` on **`prices`/`daily`** for each `{market, symbol}` — the
 venue MIC and ⛔ no `vendorId` — which asks the fund's own price sources for the gap and stores it
@@ -154,19 +154,67 @@ order, not a relay, and it is still true that a roster of bars typed back as too
 failure mode. `skills/data-source-contract/SKILL.md` owns the route and
 `skills/candidate-research/SKILL.md` the procedure.
 
-⚠️ **`sourced`, `evaluated` and `unprepared` are three reports and are never summed.**
-`unprepared` means nothing about those names was readable at this `asOf`: it is **blindness with the
-names attached**, its control is `source_cache_refresh`, and reporting it as a market that offered
-nothing is the same error as reporting `never-fed` as `fed-and-genuinely-empty`.
-⚠️ The four research tools are **optional skills**: unserved, say which one in `uncertainty` and
-report the sweep as not prepared. ⛔ That is not licence to reopen the relay path.
-`skills/candidate-research/SKILL.md` owns the procedure.
+⚠️ **`sourced`, `evaluated` and `unprepared` are three reports and are never summed** — and since
+`untilled/aumos#743` **you** count them, from the answer files. The host counts items (`total`,
+`pending`, `done`, `failed`) and stopped saying how many names it held anything readable for,
+because that was a judgement about documents. Each answer carries **`sourced`**, and `executionRecord`
+derives the three from the answers you hand it. `unprepared` means nothing about those names was
+readable at this `asOf`: it is **blindness with the names attached**, its control is
+`source_cache_refresh`, and reporting it as a market that offered nothing is the same error as
+reporting `never-fed` as `fed-and-genuinely-empty`.
+⚠️ **A settled run whose files you did not read is `unsettled`, not `prepared`.** Finishing is the
+host's fact; preparation is yours, and it is not established until the answers are read.
+⚠️ `task_start`, `task_get`, `task_cancel` and the file tools are **optional skills**: unserved, say
+which one in `uncertainty` and report the sweep as not prepared. ⛔ That is not licence to reopen the
+relay path. `skills/candidate-research/SKILL.md` owns the procedure.
 
 ⚠️ **When a limit stops you, leave a checkpoint rather than a silence.** Persist the roster you did
-review with `researchState` to `coverage/research-index` (`skills/memory-contract/SKILL.md` owns that
-key), name the unreviewed scope and the refusal code verbatim in one `uncertainty` entry, and submit.
+review with `researchState` to `state/coverage/research-index.json`
+(`skills/memory-contract/SKILL.md` owns that path), name the unreviewed scope and the refusal code
+verbatim in one `uncertainty` entry, and submit.
 A `WAIT` whose data was never prepared is a different answer from a `WAIT` where the gates ran and
 nothing qualified, and invariant 5 asks you to tell them apart.
+
+## Your two folders
+
+Everything durable this manager holds lives in files, in two folders, and this package owns every
+path in them. ⚠️ **Aumos reserves none of these names** — there is no business type to register, no
+manifest to declare and no schema the app checks. A folder is a folder.
+
+```
+your own folder                       the `files_*` six — no other manager can read it
+  state/<key>.json      the learning record. The paths are §1's list, and they are the stable
+                        keys this package has always used with `state/` in front.
+  scans/<YYYY-MM-DD>/<recipeId>/<itemId>.json
+                        one recipe answer per name, written by the host, read with `files_read`.
+                        The date is `asOf`'s calendar day; the folder is `task_start`'s `outputPath`.
+  proposals/<YYYY-MM-DD>-<flow>.json
+                        the DecisionProposal you assembled, written before you submit it.
+
+this book's shared folder             the `fund_files_*` six — every manager on this book reads it
+  book/<key>.md         the conclusion itself, Markdown, verbatim.
+  book/<key>.json       { title, status, updatedAsOf, changeSummary, evidenceIds } beside it.
+```
+
+⚠️ **Four things changed with the move and each costs something.**
+
+1. **There is no revision history any more.** The runtime appended one for `memory_write` and
+   `brief_write` and it does not for a file. So where history is the point — a calibration series, a
+   book conclusion whose predecessor must stay readable — write a **dated file beside the current
+   one** (`state/calibration/mean-reversion.<YYYY-MM-DD>.json`) and leave the current one at its
+   stable path. ⛔ Do not date the stable path: every reader in this package names it.
+2. **A write can lose a race, and `expectedHash` is how it does not.** Pass the `hash` you read for
+   that path — or `null` when you read nothing there — and a write over bytes that moved is refused
+   `revision-conflict`. ⛔ Do not retry it blindly: read what is actually there and decide again.
+3. **A read is not pinned.** File bytes are answered as they are now (§1), so a value's own
+   `updatedAsOf` is the only point-in-time signal and a value later than `asOf` is skipped and
+   diagnosed, exactly as a future revision always was.
+4. **`author` absent means no receipt, not nobody.** Your CLI can write into your own folder
+   directly, without passing through these tools, and such a file has no author on it.
+
+⛔ **Neither folder is a portfolio database, a source cache or a place for a gate that must
+execute.** That rule did not move with the bytes; `skills/memory-contract/SKILL.md` carries it in
+full, and it is the reason the folder has a bounded shape rather than a growing one.
 
 ## Run skeleton
 
@@ -181,27 +229,43 @@ holding open, and the only place a count of standing reviews may be reported fro
 `reconcileArmedReviews` as `standingPlans`, a report-only parameter. ⛔ It narrows nothing: `toArm`
 comes back as the whole sequence either way.
 
-Use `portfolio_read`, `brief_read` and `memory_read`. ⚠️ **Read `portfolio.cashByCurrency` and
+Use `portfolio_read`, `fund_files_read` over `book/` and `files_read` over `state/`.
+⚠️ **Read `portfolio.cashByCurrency` and
 `portfolio.fxRates`, not the aggregate `cash`.** The aggregate is converted into one denominator and
 says nothing about what can be paid in which currency; the FX in the snapshot is the rate this book
 was marked with, and sourcing another one is marking against a number nothing else in the invocation
 agrees with.
 
-⛔ **`thesis_read`, `evidence_read` and `manager_memory_read` are not tools.** The first two name
-capabilities no build serves; the third is a spelling no build has had — private memory is
-`memory_read`/`memory_write`. This book's thesis heads are in the **invocation payload**, and
-Evidence arrives attached to whatever answered a call. Private memory is isolated by manager instance
-and time, not by model: never request or infer a revision written after `asOf`, and never copy
-another manager's Brief into it.
+⛔ **`memory_read`, `memory_write`, `brief_read` and `brief_write` are gone.** Two folders replaced
+them (`untilled/aumos#743`): your own private folder, through `files_list`/`files_read`/`files_write`,
+and this book's shared folder, through the `fund_files_*` six. ⛔ **`manager_memory_read` never
+existed** and neither does a `thesis_read`/`evidence_read`; this book's thesis heads are in the
+**invocation payload**, `thesis_list`/`thesis_get` and `evidence_get`/`evidence_search` are the tools
+where they are served, and Evidence arrives attached to whatever answered a call. Your private folder
+is isolated by manager instance and outlives the model, the CLI vendor, an in-place package update and
+a config change; ⛔ never copy another manager's shared conclusion into it.
 
-Read these stable keys only; do not invent per-run keys:
+⚠️ **A read answers the file as it is NOW.** Unlike every other tool here, file bytes are not clamped
+to `asOf` — a working folder has no history to clamp to. So a value's own `updatedAsOf` is the only
+thing that says when it was written, and reading one later than `asOf` is a value to diagnose and
+skip, exactly as a future revision always was.
 
-`migration/schema-version`, `run/theme-radar-last`, `run/watch-alerts`, `run/armed-reviews`,
-`learning/evidence-maturity`, `learning/closed-decision-summary`, `calibration/mean-reversion`,
-`calibration/trend-pullback`, `calibration/quality-pullback`, `calibration/core-dca`,
-`calibration/inflection`, `calibration/post-event-continuation`, `failures/repeated-patterns`,
-`coverage/universe-state`, `coverage/research-index`, `research/catalyst-window`,
-`learning/paper-cohorts`.
+Read these stable paths only; do not invent a per-run path. They are the old keys with `state/` in
+front and `.json` behind, so what a run reads and what it used to read are the same records:
+
+`state/migration/schema-version.json`, `state/run/theme-radar-last.json`,
+`state/run/watch-alerts.json`, `state/run/armed-reviews.json`,
+`state/learning/evidence-maturity.json`, `state/learning/closed-decision-summary.json`,
+`state/calibration/mean-reversion.json`, `state/calibration/trend-pullback.json`,
+`state/calibration/quality-pullback.json`, `state/calibration/core-dca.json`,
+`state/calibration/inflection.json`, `state/calibration/post-event-continuation.json`,
+`state/failures/repeated-patterns.json`, `state/coverage/universe-state.json`,
+`state/coverage/research-index.json`, `state/research/catalyst-window.json`,
+`state/learning/paper-cohorts.json`.
+
+⚠️ **`files_list` with `recursive: true` over `state/` is one call and reads the whole folder's
+shape** — sizes, hashes and what is actually there — so a first run learns it is empty without
+seventeen refusals. ⛔ Absent is empty-learning-state and never a failed run.
 
 Every accepted value is a JSON object with `schemaVersion`, `updatedAsOf`, referenced
 decision/evidence ids, sample count, independent date-cluster count, computable metrics, missing
@@ -436,8 +500,9 @@ joins the universe as an extension, so a run that skips the radar leaves the bou
 where it was.
 
 ⛔ **The sweep is collected and then prepared — not split and not relayed.** It is
-`source_cache_refresh` on `prices`/`daily` across the roster, then `research_prepare` over
-`roster-scan` and `opportunity-metrics`, read back as a summary — not work to split across workers
+`source_cache_refresh` on `prices`/`daily` across the roster, then `task_start` over
+`roster-scan` and `opportunity-metrics`, polled with `task_get` and read back from the answer files
+with `files_read` — not work to split across workers
 and not a roster of bars carried through your context. ⚠️ A sweep prepared before the series was
 collected answers `scanner_history_insufficient` on every name, and that diagnostic has **three**
 causes — not collected, no price source for the venue, or a name that genuinely has almost no
@@ -638,9 +703,11 @@ Mandate's, and a classification in this package is never an exemption from an in
 path**.
 
 ⛔ **Record what your data preparation did before you explain an empty book.** Call
-`executionRecord` with what the research tools returned — `prepared` from `research_prepare`, `job`
-from `research_job_get`, `result` from `research_result_get`, **verbatim** — plus `eligibleSymbols`,
-the names your own fold found eligible. ⛔ **The count is derived from that list and never typed**,
+`executionRecord` with what the task tools returned — `started` from `task_start` and `run` from
+`task_get`, **verbatim** — plus **`rows`**, the recipe answers you read back out of your own folder
+with `files_read`, and `eligibleSymbols`, the names your own fold found eligible. ⚠️ **`rows` is
+what makes the roster measured rather than merely finished**: the host counts items and the answers
+carry `sourced`, so without them the record is `unsettled` however cleanly the run completed. ⛔ **The count is derived from that list and never typed**,
 and an absent list is `null` rather than `0`: «nobody folded the rows» and «the rows were folded and
 nothing cleared» are different facts.
 
@@ -833,8 +900,9 @@ passed and nothing could be corrected.
 Load `skills/outcome-calibration/SKILL.md` when closed decisions or forward outcomes are available, and
 `skills/memory-contract/SKILL.md` before any memory write. Write a new revision only when a meaningful
 aggregate changed. Every aggregate fact must trace to Decision/Evidence ids. Memory may record
-observations and rule proposals, never auto-change the methodology. Use `brief_write` only for a
-changed book-wide conclusion, and Thesis revision facilities only for an asset claim.
+observations and rule proposals, never auto-change the methodology. Use `fund_files_write` under
+`book/` only for a changed book-wide conclusion, and Thesis revision facilities only for an asset
+claim.
 
 ### 6. Re-arm and submit one proposal
 
@@ -852,5 +920,19 @@ set with.
 Assemble the one proposal from what the flows returned. `targets` is where a run that touched both
 markets lands: one `REBALANCE` naming every sleeve position it moves, rather than three judgements the
 investor would have to approve separately — this manager is approved as a whole or not at all.
+
+⚠️ **Write the assembled proposal to `proposals/<asOf's calendar day>-<flow>.json` before you submit
+it.** `files_write`, your own folder, the object exactly as you are about to send it.
+
+⛔ **It is not a submission and it does not become one.** `decision_submit` is still the only door and
+is still called exactly once; a file in `proposals/` is a record and Aumos does not read it. What it
+buys is the one thing the old shape could not: a run that dies between assembling a judgement and
+sealing it left **nothing at all** behind — the work was in a session that is gone — and that death is
+common enough for the host to have a name for it. Now the next run reads what this one concluded and
+why, instead of starting the same three flows from zero.
+
+⚠️ **Write it even when the verdict is `WAIT`.** A `WAIT` on an unavailable judgement is the run whose
+reasoning is most worth carrying forward, and it is the one a reader is most likely to assume was
+absent rather than recorded.
 
 Call `decision_submit` exactly once, yourself.

@@ -116,6 +116,53 @@ function namedIn(parameters, key, symbol) {
 }
 
 /**
+ * Which name this process is about, out of the two places it can be said. (aumos#743 §B)
+ *
+ * ── ⚠️ The host stopped saying it, and that is the point of the slice ───────
+ *
+ * `RecipeRequest` carried `market` and `symbol` until #743 §B. It does not any
+ * more: a common executor holds no opinion about what a unit of work *is*, so
+ * what arrives is `itemId` — the manager's own string — and an opaque `input`
+ * beside it that the host hands over verbatim and never parses.
+ *
+ * ⚠️ **The id is not free, and this package spends it on one thing.** The
+ * executor compares the id against the coordinate this fund files a document
+ * under, and hands over that filer's readings when the two are equal. So the id
+ * this package sends is the store's coordinate — `XKRX:005930` — because the
+ * alternative is a name of our choosing and an empty `readings` on every row,
+ * which is `untilled/aumos-catalogue#209`'s failure bought back for the price of
+ * a prettier string.
+ *
+ * ⚠️ **`input` carries this package's vocabulary and the id carries the host's.**
+ * The venue in a coordinate is always a MIC (aumos#571); the operations here
+ * take `kr`/`us`, and `canonicalMarket` at the input boundary reads either
+ * (#212 ⑥). Sending `{ symbol, market }` beside the id means neither side has to
+ * know the other's spelling — and it means a caller that gets the id wrong is
+ * told about it by `readings` being empty rather than by this file guessing.
+ *
+ * ⛔ **The id is parsed only as a fallback, and it is a fallback rather than the
+ * route.** A recipe that derived its subject by splitting a string would make
+ * the id's shape a contract the host does not enforce; reading `input` first
+ * means the package says what it means and the split is what answers a caller
+ * that said nothing.
+ */
+export function itemCoordinate(request) {
+  const stated = request?.input
+  if (stated !== null && typeof stated === 'object') {
+    const symbol = stated.symbol
+    const market = stated.market
+    if (typeof symbol === 'string' && symbol.length > 0) {
+      return { symbol, market: typeof market === 'string' && market.length > 0 ? market : undefined }
+    }
+  }
+  const id = request?.itemId
+  if (typeof id !== 'string' || id.length === 0) return { symbol: undefined, market: undefined }
+  const cut = id.lastIndexOf(':')
+  if (cut <= 0 || cut === id.length - 1) return { symbol: id, market: undefined }
+  return { symbol: id.slice(cut + 1), market: id.slice(0, cut) }
+}
+
+/**
  * The operations that read a `sector` label, and it is a short list on purpose.
  *
  * ⚠️ `execute()` reports an unread key rather than ignoring it —
@@ -151,18 +198,19 @@ export function scannerInput(operation, request) {
   }
   const normalized = normalizeBars(rows, request?.asOf)
   const sectors = parameters.sectors
+  const { symbol, market } = itemCoordinate(request)
   return {
     input: {
-      symbol: request?.symbol,
-      market: request?.market,
+      symbol,
+      market,
       bars: normalized.bars,
-      held: namedIn(parameters, 'held', request?.symbol),
-      pending: namedIn(parameters, 'pending', request?.symbol),
+      held: namedIn(parameters, 'held', symbol),
+      pending: namedIn(parameters, 'pending', symbol),
       ...(READS_SECTOR.has(operation) &&
       sectors !== null &&
       typeof sectors === 'object' &&
-      typeof sectors[request?.symbol] === 'string'
-        ? { sector: sectors[request.symbol] }
+      typeof sectors[symbol] === 'string'
+        ? { sector: sectors[symbol] }
         : {}),
     },
     normalizeDiagnostics: normalized.diagnostics,
@@ -190,6 +238,22 @@ export function scannerInput(operation, request) {
  * `decorate(data, input)` is how an entrypoint adds a field computed from the
  * **same normalized bars** without relaying them anywhere. Its keys are written
  * first so that nothing it returns can overwrite `data` or `diagnostics`.
+ *
+ * ── ⚠️ `sourced` is written here now, and it had to move (aumos#743 §B) ─────
+ *
+ * The host used to settle a summary carrying `sourced` and `unprepared`, and
+ * `executionRecord` read them. It does not any more, and the reason is right:
+ * *this fund held readable documents for this name* is a judgement about
+ * documents that only the domain reading them can make, and a common executor
+ * making it was the app holding an investment opinion.
+ *
+ * So this file says it, because this file is the one process that was handed the
+ * documents. `sourced` is **`documents > 0`** — whether anything at all was
+ * there to read — and it is deliberately not `barsRead > 0`: a name whose
+ * filings arrived and whose price series did not is *sourced and unevaluable*,
+ * which `scanner_history_insufficient` already says with the counts attached.
+ * Collapsing the two would report a fed roster as an unfed one and lose the
+ * distinction #209 is named after in the other direction.
  */
 export function scannerAnswer(operation, request, decorate) {
   const { input, normalizeDiagnostics, documents, barsRead } = scannerInput(operation, request)
@@ -199,8 +263,11 @@ export function scannerAnswer(operation, request, decorate) {
     ok: true,
     output: {
       ...extra,
-      symbol: request?.symbol,
-      market: request?.market,
+      itemId: request?.itemId,
+      symbol: input.symbol,
+      market: input.market,
+      /** ⛔ «Was there anything to read», never «was it enough». See the header. */
+      sourced: documents > 0,
       // Dated against the pin the host supplied. ⛔ Never `Date.now()`.
       evaluatedAsOf: request?.asOf,
       operation,

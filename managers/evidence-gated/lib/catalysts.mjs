@@ -52,12 +52,22 @@ import { diagnostic } from './diagnostics.mjs'
  *
  * ── Why the state holds numbers where the map holds strings ────────────────
  *
- * ⚠️ **A catalyst window ends in the future by construction, and that is the
- * one shape `memory_read` refuses.** The host walks a returned payload for any
- * **string** timestamp later than `asOf` and refuses the whole read
- * (`post-as-of-timestamp`); since aumos#658 it folds the offending entry out
- * and names the key instead, which is better and still means the register does
- * not arrive. `run/armed-reviews` hit this first and answered it with
+ * ⚠️ **A catalyst window ends in the future by construction, and that was the
+ * one shape `memory_read` refused.** The host walked a returned payload for any
+ * **string** timestamp later than `asOf` and refused the whole read
+ * (`post-as-of-timestamp`); since aumos#658 it folded the offending entry out
+ * and named the key instead, which was better and still meant the register did
+ * not arrive.
+ *
+ * ⚠️ **aumos#743 ended that by moving the record rather than relaxing the
+ * rule.** The register is a file now, `files_read` hands the document back as
+ * one opaque string, and the outgoing scan is anchored — a JSON body is not a
+ * timestamp and its leaves are never walked. ⛔ The encoding stays regardless:
+ * the meaning was always identical, every reader in this package reads numbers,
+ * and re-encoding a stored record to celebrate a lifted restriction is a
+ * migration with no benefit and a readable-history cost.
+ *
+ * `run/armed-reviews` hit this first and answered it with
  * `atEpochMs` — the meaning is identical and the key becomes readable — so the
  * revision this operation writes carries `windowStartEpochMs` /
  * `windowEndEpochMs` as **numbers**, and the `catalysts` map handed to
@@ -86,9 +96,10 @@ export const CATALYST_MEMORY_KEY = 'research/catalyst-window'
 
 /**
  * The three instants the revision carries, and it carries them as **numbers**:
- * a catalyst window ends after `asOf` by construction and `memory_read` refuses
- * a payload holding a later **string** timestamp, so RFC 3339 here makes the
- * key unreadable rather than wrong.
+ * a catalyst window ends after `asOf` by construction and `memory_read` refused
+ * a payload holding a later **string** timestamp, so RFC 3339 here made the
+ * record unreadable rather than wrong. ⚠️ The guard does not reach the file this
+ * became (aumos#743) and the encoding is kept as canon — see the header.
  *
  * ⚠️ Published because the encoding is a contract with two readers outside this
  * file — the memory contract a run reads, and the verifier that proves every

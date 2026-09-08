@@ -353,17 +353,24 @@ export const OPERATIONS = {
     run: concentration,
   },
   /**
-   * ⚠️ **`prepared`, `job` and `result` are the three research tools' answers,
-   * handed back verbatim** (#212 ④); `eligibleSymbols` is the one number that is
-   * this package's rather than the host's — the names this run's own fold found
-   * eligible, from which the count is derived. ⛔ An absent list is `null` and
-   * not `0`.
+   * ⚠️ **`started` and `run` are the two task tools' answers, handed back
+   * verbatim; `rows` is what the answers themselves say** (#212 ④,
+   * `untilled/aumos#743` §B). The host counts items — `total`, `pending`,
+   * `done`, `failed` — and stopped counting *how many had anything to read*,
+   * which was always a judgement about documents. That one is derived here from
+   * `rows`, the recipe answers this run read back out of its own folder with
+   * `files_read`, each carrying `sourced`. ⚠️ Absent `rows` is allowed and is a
+   * fact: the run has not measured its preparation, and the record says
+   * `unsettled` rather than guessing. `eligibleSymbols` is the one number that
+   * is this package's rather than the host's — the names this run's own fold
+   * found eligible, from which the count is derived. ⛔ An absent list is `null`
+   * and not `0`.
    */
   executionRecord: {
     group: 'sizing',
     surface: 'published',
-    mode: 'strict', keys: { prepared: OBJECT, job: OBJECT, result: OBJECT, eligibleSymbols: ARRAY },
-    describe: 'what this run\'s data preparation actually did, as counts read off the host\'s own research job and result — was the roster prepared, did the recipe answer, and how many of the answers cleared the gates. ⛔ Reads no diagnostic',
+    mode: 'strict', keys: { started: OBJECT, run: OBJECT, rows: ARRAY, eligibleSymbols: ARRAY },
+    describe: 'what this run\'s data preparation actually did — the host\'s own item counts from the task run, set beside what the recipe answers themselves report about how many names this fund held anything readable for, and how many of the answers cleared the gates. ⛔ Reads no diagnostic',
     run: executionRecord,
   },
   /**
@@ -1013,7 +1020,7 @@ export const OPERATIONS = {
       'catalysts[]': { symbol: STRING, market: STRING, event: STRING, windowStart: STRING, windowEnd: STRING, observedAt: STRING, evidenceIds: ARRAY },
       'events[]': { symbol: STRING, market: STRING, announcedAt: STRING, sue: NUMBER, day1ExcessPct: NUMBER, preAnnouncementClose: NUMBER, guidanceSurprise: NUMBER, evidenceIds: ARRAY },
       evidenceIds: 'Required on every row of both arrays, and this is the whole discipline of the operation: a catalyst window nobody can go and check is not a registered catalyst, it is a claim. File the reading with `observation_file` and put the returned id here — the same route `consensusRefs` takes.',
-      previous: 'The whole value read from `research/catalyst-window` — { schemaVersion: 1, updatedAsOf, rows[] }. ⚠️ Its rows carry `windowStartEpochMs` / `windowEndEpochMs` as **numbers**, because a catalyst window ends after `asOf` by construction and `memory_read` refuses a payload carrying a later **string** timestamp. Persist `nextState` verbatim; do not rewrite the instants as RFC 3339.',
+      previous: 'The whole value read from `state/research/catalyst-window.json` — { schemaVersion: 1, updatedAsOf, rows[] }. ⚠️ Its rows carry `windowStartEpochMs` / `windowEndEpochMs` as **numbers**: a catalyst window ends after `asOf` by construction, and `memory_read` refused a payload carrying a later **string** timestamp. That guard does not reach a file (`untilled/aumos#743`), and the encoding stays anyway as this package\'s own canon — every reader here expects it. Persist `nextState` verbatim; do not rewrite the instants as RFC 3339.',
       roster: 'The same `symbols` argument `radarCandidates` is given — the denominator the coverage counts are taken against, so the two operations cannot disagree about who was in the sweep. Absent, the counts are zero and no unresearched finding is raised: a denominator nobody declared is not evidence that nothing was missed.',
     },
     describe: 'the catalyst and event axis, which had **no producer at all** until #169: researched windows and event records in — each carrying the `evidenceIds` the reading was filed under — the two maps `radarCandidates` takes out, plus the bounded `research/catalyst-window` revision they are carried in. ⛔ It counts the names nobody researched separately from the names researched with nothing scheduled',

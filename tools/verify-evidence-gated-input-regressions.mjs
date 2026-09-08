@@ -2535,11 +2535,27 @@ const executionOf = (input) => execute({
   asOf: executionAsOf,
   input: { mandateObjective: executionObjective, positions: executionBook, cashWeight: 0.5725, ...input },
 })
-const settled = (summary) => ({ resultRef: 'res_regression', summary: { unpreparedSymbols: [], failedSymbols: [], ...summary } })
+/**
+ * ── The two halves of a settled roster (`untilled/aumos#743` §B) ────────────
+ *
+ * The host counts **items** — total, pending, done, failed — and stopped
+ * counting how many had anything to read, which was always a judgement about
+ * documents. So a fixture now needs both: a task run, and the recipe answers
+ * this run read back out of its folder with `files_read`, each carrying the
+ * `sourced` that `recipes/request.mjs` writes.
+ *
+ * ⛔ Deliberately two arguments rather than one convenience object: the whole
+ * point of the slice is that the two are counted by two different parties, and a
+ * helper that derived one from the other would fake the join under test.
+ */
+const taskRun = (counts, extra = {}) => ({ taskRunId: 'trun_regression', state: 'completed', outputPath: 'scans/2026-09-07/roster-scan', pendingItems: [], outputs: [], failures: [], counts, ...extra })
+const answers = (count, row, names = []) => Array.from({ length: count }, (_, index) => ({ itemId: `XKRX:${names[index] ?? `sym${index}`}`, symbol: names[index] ?? `sym${index}`, ...row }))
+const answerRead = { sourced: true, data: { scored: true } }
+const answerBlind = { sourced: false, data: null }
 
 /* ⑴ The record the whole section rests on: a prepared roster with nothing eligible. */
-const fullyPrepared = recordOf({ result: settled({ sourced: 74, evaluated: 74, unprepared: 0, failed: 0 }), eligibleSymbols: [] })
-assert.equal(fullyPrepared.data.basis, 'result')
+const fullyPrepared = recordOf({ run: taskRun({ total: 74, pending: 0, done: 74, failed: 0 }), rows: answers(74, answerRead), eligibleSymbols: [] })
+assert.equal(fullyPrepared.data.basis, 'rows')
 assert.equal(fullyPrepared.data.dataPreparation, 'prepared')
 assert.equal(fullyPrepared.data.candidateEvaluation, 'evaluated')
 assert.equal(fullyPrepared.data.eligibleCount, 0)
@@ -2593,7 +2609,7 @@ for (const reportedDiagnostics of executionProseShapes) {
  * irrelevant in **both** directions, and what separates the two verdicts is the
  * count. ⛔ `unprepared` is blindness and never an absence of opportunity.
  */
-const blindRoster = recordOf({ result: settled({ sourced: 0, evaluated: 0, unprepared: 74, failed: 0, unpreparedSymbols: ['005930', '000660'] }), eligibleSymbols: [] })
+const blindRoster = recordOf({ run: taskRun({ total: 74, pending: 0, done: 74, failed: 0 }), rows: answers(74, answerBlind, ['005930', '000660']), eligibleSymbols: [] })
 assert.equal(blindRoster.data.dataPreparation, 'unprepared')
 for (const reportedDiagnostics of executionProseShapes) {
   const answer = executionOf({ reportedDiagnostics, executionRecord: blindRoster.data })
@@ -2626,14 +2642,14 @@ assert.equal(measuredZero.data.cause, 'no-candidate-cleared-the-gates')
 assert.equal(new Set([noRecord.data.cause, notReached.data.cause, measuredZero.data.cause]).size, 3, 'the three are three answers and never collapse into one')
 
 /** ⛔ An absent fold is `null` and an empty one is `0`; only the second is a measurement. */
-const unfolded = recordOf({ result: settled({ sourced: 74, evaluated: 74, unprepared: 0, failed: 0 }) })
+const unfolded = recordOf({ run: taskRun({ total: 74, pending: 0, done: 74, failed: 0 }), rows: answers(74, answerRead) })
 assert.equal(unfolded.data.eligibleCount, null)
 assert.equal(unfolded.data.eligibleBasis, 'unreported')
 assert.ok(unfolded.diagnostics.some((row) => row.code === 'research_eligibility_unreported' && row.severity === 'unevaluated'))
 assert.equal(executionOf({ executionRecord: unfolded.data }).data.cause, 'unreported', 'a prepared roster nobody folded has not established that nothing cleared')
 
 /** ⚠️ And names that did clear over an empty lane is its own fact, not a silence. */
-const clearedButUnbought = recordOf({ result: settled({ sourced: 74, evaluated: 74, unprepared: 0, failed: 0 }), eligibleSymbols: ['005930', '000660'] })
+const clearedButUnbought = recordOf({ run: taskRun({ total: 74, pending: 0, done: 74, failed: 0 }), rows: answers(74, answerRead), eligibleSymbols: ['005930', '000660'] })
 assert.equal(clearedButUnbought.data.eligibleCount, 2, 'derived from the names, never typed')
 assert.equal(executionOf({ executionRecord: clearedButUnbought.data }).data.cause, 'candidates-cleared-not-proposed')
 
@@ -2657,18 +2673,40 @@ for (const forged of [
   assert.ok(answer.diagnostics.some((row) => row.code === 'execution_record_unreadable' && row.severity === 'unevaluated'))
 }
 
-/** ⛔ An unsettled job is not an answer, and `sourced` is absent from it on purpose. */
-const inFlight = recordOf({ job: { jobId: 'job_1', counts: { total: 74, pending: 30, evaluated: 44, unprepared: 0, failed: 0 }, pendingSymbols: ['005930'], failures: [] } })
-assert.equal(inFlight.data.basis, 'items')
+/** ⛔ An unsettled run is not an answer, and `sourced` is absent from it on purpose. */
+const inFlight = recordOf({ run: taskRun({ total: 74, pending: 30, done: 44, failed: 0 }, { state: 'running', pendingItems: ['XKRX:005930'] }) })
+assert.equal(inFlight.data.basis, 'run')
 assert.equal(inFlight.data.dataPreparation, 'unsettled')
 assert.equal(inFlight.data.counts.sourced, null, 'deriving it mid-flight counts a name nobody has reached yet as one this fund can read')
 assert.equal(executionOf({ executionRecord: inFlight.data }).data.cause, 'input-path-incomplete')
 
-/** ⚠️ A cache hit answers on `research_prepare` itself, and reading only `result` would miss it. */
-const cacheHit = recordOf({ prepared: { cached: true, status: 'completed', resultRef: 'res_cached', summary: { sourced: 74, evaluated: 74, unprepared: 0, failed: 0, unpreparedSymbols: [], failedSymbols: [] } }, eligibleSymbols: [] })
-assert.equal(cacheHit.data.basis, 'result')
+/** ⚠️ A cache hit answers on `task_start` itself, and polling only the run would miss it. */
+const cacheHit = recordOf({ started: { cached: true, status: 'completed', outputPath: 'scans/2026-09-07/roster-scan', counts: { total: 74, pending: 0, done: 74, failed: 0 } }, rows: answers(74, answerRead), eligibleSymbols: [] })
+assert.equal(cacheHit.data.basis, 'rows')
 assert.equal(cacheHit.data.dataPreparation, 'prepared')
-assert.equal(cacheHit.data.resultRef, 'res_cached')
+assert.equal(cacheHit.data.outputPath, 'scans/2026-09-07/roster-scan')
+
+/**
+ * ⛔ **A settled run whose files nobody read is `unsettled`, not `prepared`.**
+ *
+ * ⚠️ This is the one state #743 §B adds, and it is the slice's whole hinge: the
+ * host can now say a run finished and still know nothing about whether this fund
+ * held anything readable. A record that read «finished» as «prepared» would be
+ * asserting the state nobody counted — the defect #212 ④ removed, arriving back
+ * through the new tool.
+ */
+const unreadAnswers = recordOf({ run: taskRun({ total: 74, pending: 0, done: 74, failed: 0 }), eligibleSymbols: [] })
+assert.equal(unreadAnswers.data.basis, 'run')
+assert.equal(unreadAnswers.data.dataPreparation, 'unsettled')
+assert.equal(unreadAnswers.data.counts.sourced, null, 'the count is derived from the answers, and the answers were not read')
+assert.equal(executionOf({ executionRecord: unreadAnswers.data }).data.cause, 'input-path-incomplete')
+
+/** ⚠️ And `sourced` is about documents, never about bars — the recipe says so and this reads it. */
+const filedButUnpriced = recordOf({ run: taskRun({ total: 2, pending: 0, done: 2, failed: 0 }), rows: answers(2, { sourced: true, data: null }), eligibleSymbols: [] })
+assert.equal(filedButUnpriced.data.counts.sourced, 2, 'documents arrived for both names')
+assert.equal(filedButUnpriced.data.counts.evaluated, 0, 'and the recipe computed nothing from them')
+assert.equal(filedButUnpriced.data.dataPreparation, 'prepared')
+assert.equal(filedButUnpriced.data.candidateEvaluation, 'none', '⛔ «read and nothing came of it» is not «never fed»')
 
 /** ⛔ The input-path lane still outranks the record — the corp-code join is not the price sweep. */
 const stillWithdrawn = executionOf({ reportedDiagnostics: ['corp_code_unmapped_symbols'], executionRecord: fullyPrepared.data })

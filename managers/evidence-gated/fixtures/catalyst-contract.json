@@ -132,7 +132,7 @@
     ]
   },
   "carried": {
-    "note": "A prior revision of `research/catalyst-window`, in the encoding the operation writes: the instants are **numbers**, because a catalyst window ends after `asOf` by construction and `memory_read` refuses a payload carrying a later string timestamp. The AMD row's window closed on 2026-08-17 and leaves the register; the INTC row is the same window re-read above, observed four days earlier, so the fresh reading wins.",
+    "note": "A prior revision of `state/research/catalyst-window.json`, in the encoding the operation writes: the instants are **numbers**, because a catalyst window ends after `asOf` by construction and `memory_read` refused a payload carrying a later string timestamp. That guard does not reach a file (`untilled/aumos#743`) and the encoding is kept as this package's canon. The AMD row's window closed on 2026-08-17 and leaves the register; the INTC row is the same window re-read above, observed four days earlier, so the fresh reading wins.",
     "schemaVersion": 1,
     "updatedAsOf": "2026-09-05T00:00:00.000Z",
     "rows": [

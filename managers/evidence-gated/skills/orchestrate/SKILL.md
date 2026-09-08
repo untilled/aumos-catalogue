@@ -135,8 +135,14 @@ run:
 ```
 Your tools are the Aumos gateway's, already attached to this session:
   mcp__aumos__portfolio_read
-  mcp__aumos__brief_read       mcp__aumos__brief_write
-  mcp__aumos__memory_read      mcp__aumos__memory_write
+  mcp__aumos__files_list       mcp__aumos__files_read       mcp__aumos__files_write
+  mcp__aumos__files_mkdir      mcp__aumos__files_move       mcp__aumos__files_remove
+                                   (your own folder — state/, scans/, proposals/)
+  mcp__aumos__fund_files_list  mcp__aumos__fund_files_read  mcp__aumos__fund_files_write
+  mcp__aumos__fund_files_mkdir mcp__aumos__fund_files_move  mcp__aumos__fund_files_remove
+                                   (this book's shared folder — book/)
+  mcp__aumos__task_start       mcp__aumos__task_get         mcp__aumos__task_cancel
+                                   (the whole-universe sweep; answers land in scans/)
   mcp__aumos__source_request       (a data vendor this machine holds a key for)
   mcp__aumos__connection_request   (a broker login the investor already connected)
   mcp__aumos__source_cache_read    (stored filings for one filer, cut to this asOf)
@@ -154,10 +160,12 @@ and, when this session was served them, the CLI's own web research:
 Do not go looking for others, and do not use Bash or ToolSearch to find them.
 ```
 
-⛔ **`thesis_read`, `evidence_read` and `manager_memory_read`/`_write` were on that list and are
-not tools.** The first two name capabilities the AMP vocabulary declares and that `grant.ts` maps to
-an empty tool list, so no build has ever served them; the other two are a spelling no build has had —
-private memory is `memory_read`/`memory_write`. That is the ⚠️ two paragraphs down applied to the
+⛔ **`memory_read`, `memory_write`, `brief_read` and `brief_write` were on that list and are gone**
+(`untilled/aumos#743`): the two folders above replaced them, key for path. ⛔ **`thesis_read`,
+`evidence_read` and `manager_memory_read`/`_write` were on it too and never were tools** — the first
+two name capabilities served under other spellings (`thesis_list`/`thesis_get`,
+`evidence_get`/`evidence_search`, where this session holds them), and the other two are a spelling no
+build has ever had. That is the ⚠️ two paragraphs down applied to the
 literal block rather than only to the vendors: a flow told about a tool nobody served searches for
 it, which is the stall this whole section exists to prevent. Measured 2026-09-01: a run reported the
 gap itself, having been told to call four names the session did not hold.
@@ -253,18 +261,22 @@ Do all of that in your own context with calculate — do not open subagents to b
 relay bars, or to walk listing pages; that is refused and the run is charged for it either way.
 Collect the price series before you sweep, and in that order: call source_cache_refresh with
 provider `prices`, document `daily`, the venue MIC as market (XKRX/XNAS/XNYS, never kr/us) and no
-vendorId, for every name on the roster. research_prepare collects nothing — it reads what this fund
+vendorId, for every name on the roster. task_start collects nothing — it reads what this fund
 already stores — so a roster prepared first answers scanner_history_insufficient on every name and
 that is blindness, not an empty market. Re-running it over the same closed bar reaches no vendor at
 all, so a previous run having collected them is not a reason to skip it.
-Then run the whole-universe price sweep through research_prepare over this package's declared
-recipes (roster-scan, opportunity-metrics), then research_job_get and research_result_get; the bars
-stay in the host on both steps and never become tool arguments. Report sourced, evaluated and
-unprepared as three separate counts and never their sum, and treat unprepared as blindness with the
-names attached and source_cache_refresh as its fix — never as a market that offered nothing.
+Then run the whole-universe price sweep through task_start over this package's declared recipes
+(roster-scan, opportunity-metrics), with each item id the store coordinate MIC:symbol and
+outputPath scans/<asOf date>/<recipeId>; then task_get until it settles, then files_read on
+<outputPath>/<itemId>.json for the answers. The bars stay in the host on every step and never
+become tool arguments. Read the answer files — a settled run whose files nobody opened is not a
+prepared roster. Report sourced, evaluated and unprepared as three separate counts and never their
+sum; they are derived from the answers' own sourced field, not from the host's item counts. Treat
+unprepared as blindness with the names attached and source_cache_refresh as its fix — never as a
+market that offered nothing.
 scanner_history_insufficient has three causes and only one is a finding: not collected, no price
 source for that venue (the investor's control, reported once per venue), or a name that genuinely
-has too little history. Quote barsRead/barsUsed rather than the word. If the four research
+has too little history. Quote barsRead/barsUsed rather than the word. If the task tools or the file
 tools were not named in your grant, say so in uncertainty and do not reopen the relay path.
 skills/candidate-research/SKILL.md owns the procedure.
 Scan holdings' news/disclosures through granted web and installed filing sources every cycle.

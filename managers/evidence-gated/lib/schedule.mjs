@@ -710,8 +710,9 @@ export function resolveWakeFlow({ armed, summary, intent } = {}) {
  * silences it is where they cannot (#202).
  *
  * ⚠️ **A manager can arm a WATCH and cannot call for one back.** The grant map
- * publishes `portfolio_read`, `brief_read/write`, `memory_read/write` and
- * `source_request`, and there is no watch or plan capability at all — not even
+ * publishes `portfolio_read`, the fund and private file tools (aumos#743 — the
+ * folders that replaced `brief_*` and `memory_*`) and `source_request`, and
+ * there is no watch or plan capability at all — not even
  * a declared-but-empty one like `thesis:read`. WATCHes leave in a
  * `DecisionProposal` and there is no tool that returns them. What the host does
  * publish is a field on the invocation and not a call — `standingPlans`
@@ -742,7 +743,7 @@ export function resolveWakeFlow({ armed, summary, intent } = {}) {
  * ── The encoding, and why an instant in this key is a number (#136) ────────
  *
  * ⚠️ **This key holds future instants by design, and that is exactly what made
- * it unreadable.** Aumos rejects a `memory_read` whose result carries any
+ * it unreadable.** Aumos rejected a `memory_read` whose result carried any
  * **string** timestamp later than `asOf` — `post-as-of-timestamp` — so a
  * correctly filled `run/armed-reviews` was refused in proportion to how well it
  * was filled, and only an empty one came back. Measured on
@@ -752,9 +753,17 @@ export function resolveWakeFlow({ armed, summary, intent } = {}) {
  *
  * The guard walks strings. So the instant is stored as **epoch milliseconds**,
  * a number, and `skills/memory-contract/SKILL.md` carries that encoding as
- * canon. The meaning is unchanged and the key becomes readable.
+ * canon. The meaning is unchanged and the record becomes readable.
  *
- * ⛔ This is a package-side accommodation of a host rule, not agreement with
+ * ⚠️ **aumos#743 ended the refusal, by moving the record rather than relaxing
+ * the rule.** The record is a file; `files_read` answers the document as one
+ * opaque string and the anchored scan never walks its leaves. The keyless
+ * collapse cannot recur either — a folder is listed and read by path rather
+ * than fetched as one payload of every key at once. ⛔ The encoding stays as
+ * this package's canon: every reader here reads numbers, and rewriting stored
+ * records to celebrate a lifted restriction risks a history nothing can parse.
+ *
+ * ⛔ This was a package-side accommodation of a host rule, not agreement with
  * it: a schedule key whose whole content is future is a shape the guard has no
  * good answer for, and the exemption belongs in the host. `untilled/aumos` owns
  * that half.

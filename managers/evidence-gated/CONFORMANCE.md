@@ -162,6 +162,13 @@ SHADOW instances and run in order from the desktop app. All three completed and 
 | `brief_write` | 1 | 1 | 1 |
 | `memory_write` | 3 | 2 | 2 |
 
+⚠️ **The last two rows name tools that no longer exist.** `untilled/aumos#743` deleted
+`brief_read`/`brief_write` and `memory_read`/`memory_write` and replaced them with two folders — the
+`fund_files_*` six over the book's shared one and the `files_*` six over each instance's own. The
+counts are left as measured: what they establish is that three instances wrote where they were
+supposed to and nowhere else, and that property is what the folders have to keep rather than
+something the rename settled. ⛔ Re-measuring it is a runtime gate, below.
+
 ✅ **The collaboration this package was designed around happened.** KR wrote
 `kr-sleeve-baseline`; US started already holding it and wrote `us-sleeve-baseline`; Global started
 holding **both** and wrote `global-allocation-policy`. The three instances share no session, no
@@ -260,8 +267,15 @@ reports no session at all (aumos #453).
 - ✅ *Partly resolved by the cycle above.* Real `memory_write` reached the store from all
   three instances, each into its own namespace, and the seeds handed to each run were projected from
   what the earlier runs had written. What is **still** unmeasured is the pair that needs a second run
-  of the *same* instance: a later `memory_read` of a key that instance itself wrote, and a
-  historical replay proving a past `asOf` does not see a later revision.
+  of the *same* instance: a later read of a path that instance itself wrote, and the point-in-time
+  behaviour around it. ⚠️ **The second half of that pair changed shape rather than being met**
+  (`untilled/aumos#743`). It read *"a historical replay proving a past `asOf` does not see a later
+  revision"*, and there is no revision and no clamp: `files_read` answers the bytes on disk, so what
+  a run has to be observed doing is **skipping and diagnosing** a value whose own `updatedAsOf` is
+  after its `asOf`, and a genuine replay needs a snapshot frozen for that run. ⛔ The gate is not
+  discharged by the property having moved — it moved from the runtime to this package, which is
+  where an unmeasured check is worth more, not less. Two writers over one path is a third case now,
+  and what it measures is the `expectedHash` refusal.
 - Official IR web research → `at-time` WATCH → scheduled wake → actual release/missing retry →
   Evidence/Thesis/Decision → next WATCH needs a real CLI/web-enabled manager run in both KR and US.
 - Planner, mandate, approval and target-weight handoff need shadow runtime evidence. No order code may

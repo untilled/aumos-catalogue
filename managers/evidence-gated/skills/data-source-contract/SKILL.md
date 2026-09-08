@@ -92,7 +92,7 @@ sees a row. Filter again anyway; a boundary enforced in one place is one refacto
 ### `prices`/`daily` — the fund's own copy of a daily series (aumos#732)
 
 ⚠️ **This is the row that fed nothing until it existed.** Until `untilled/aumos#734` the three
-routed documents were all filings, so a roster prepared through `research_prepare` came back with
+routed documents were all filings, so a roster prepared through the sweep came back with
 receipts and no bars and both recipes answered `scanner_history_insufficient` with `count: 0`.
 `prices`/`daily` is the collector that fills `reading.normalized.bars`, and it is the **only** way
 a price series reaches the sweep.

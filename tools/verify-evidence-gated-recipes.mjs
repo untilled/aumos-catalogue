@@ -77,13 +77,21 @@ function series(count = 240) {
   return bars
 }
 
+/**
+ * ⚠️ **The host stopped naming the market and the symbol** (`untilled/aumos#743`
+ * §B). A common executor hands over `itemId` — the manager's own string, which
+ * this package spends on the store's own document coordinate so that `readings`
+ * arrives filled — and an opaque `input` it never parses. Both are written here
+ * because both are what the host now sends, and `itemCoordinate` reads them in
+ * that order.
+ */
 function request(bars, extra = {}) {
   return {
     recipeId: 'roster-scan',
     recipeVersion: '1.0.0',
     asOf,
-    market: 'XKRX',
-    symbol: '005930',
+    itemId: 'XKRX:005930',
+    input: { symbol: '005930', market: 'XKRX' },
     parameters: { held: [], pending: [], sectors: { '005930': 'technology' } },
     readings:
       bars === null
@@ -181,6 +189,42 @@ for (const [entrypoint, code] of [
     answered.output.diagnostics.some((row) => row.code === code && row.severity === 'unevaluated'),
     `${entrypoint} reports ${code} / unevaluated — the package's own word for "this was not judged", which is what an investor must not read as "nothing qualified"`,
   )
+  assert.equal(answered.output.sourced, true, `${entrypoint} reports a name whose documents arrived as sourced even when they carried no series; "we held nothing" and "we held filings and no bars" are two facts and only the first is blindness about the fund's collection`)
+}
+
+/**
+ * ── Who says `sourced`, now that the host does not (`untilled/aumos#743` §B) ─
+ *
+ * The settled summary carrying `sourced` and `unprepared` is gone: *this fund
+ * held readable documents for this name* is a judgement about documents, and a
+ * common executor making it was the app holding an investment opinion. The one
+ * process that was handed the documents says it instead, and these three cases
+ * are the whole of the claim — nothing to read, something to read, and the fact
+ * that the answer is about **documents** and not about bars.
+ *
+ * ⛔ Checked here rather than trusted, because it is the input the starvation
+ * diagnosis is built on and #209 is the measurement of getting it wrong.
+ */
+for (const entrypoint of ['recipes/roster-scan.mjs', 'recipes/opportunity-metrics.mjs']) {
+  const nothing = run(entrypoint, { ...request(bars), readings: [] })
+  assert.equal(nothing.output.sourced, false, `${entrypoint} reports a name this fund holds no document for as not sourced — the count the manager reads as blindness, with source_cache_refresh as its fix`)
+  assert.equal(nothing.output.documents, 0, `${entrypoint} says how many documents it was handed`)
+  assert.equal(run(entrypoint, request(bars)).output.sourced, true, `${entrypoint} reports a fed name as sourced`)
+}
+
+/**
+ * ── The id is read as a fallback, and a fallback is not the route ───────────
+ *
+ * `itemCoordinate` reads `input` first because that is where this package says
+ * what it means, and splits the id only when nothing was said. Both are checked:
+ * the first is what every run actually sends, and the second is what stops a
+ * caller that sent only an id from computing a row about `undefined`.
+ */
+{
+  const answered = run('recipes/roster-scan.mjs', { ...request(bars), input: undefined })
+  assert.equal(answered.output.symbol, '005930', 'a request carrying only an item id still knows which name it is about — the id is split on its last colon, the venue in front')
+  assert.equal(answered.output.market, 'XKRX', 'the venue read out of the coordinate is the MIC the store files under, which the input boundary converts')
+  assert.equal(answered.output.itemId, 'XKRX:005930', 'the answer names the item it is about, because the file it lands in is named after it and a row that did not say so could not be checked against its own path')
 }
 
 /**
@@ -307,8 +351,18 @@ for (const file of INSTRUCTION_FILES) {
     `${file} names the prices/daily document; a flow told to prepare a roster and not told to collect its series prepares an unfed one`,
   )
   const collect = text.indexOf('prices')
-  const prepare = text.indexOf('research_prepare')
-  assert.ok(prepare !== -1, `${file} still names research_prepare`)
+  // `untilled/aumos#743` §B renamed the sweep's three tools and deleted the
+  // fourth; the ordering this asserts did not move, because it is about the two
+  // calls and not about their names.
+  //
+  // ⚠️ **The grant roster is not an instruction.** `skills/orchestrate/SKILL.md`
+  // lists what this session holds as `mcp__aumos__task_start`, near the top and
+  // far above the procedure — matching that occurrence would compare the order
+  // of a **catalogue** against the order of two calls, and pass or fail on where
+  // the roster happens to sit. So the prefixed spelling is skipped and what is
+  // located is the sentence that tells a flow to sweep.
+  const prepare = [...text.matchAll(/(?<!mcp__aumos__)\btask_start\b/g)].at(0)?.index ?? -1
+  assert.ok(prepare !== -1, `${file} still names task_start as an instruction and not only in a tool roster`)
   assert.ok(
     collect < prepare,
     `${file} names the collection before the sweep; the two calls in the other order read as correct and produce a roster whose every row says the price branch was never run`,

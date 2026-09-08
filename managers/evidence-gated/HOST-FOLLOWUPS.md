@@ -1,6 +1,10 @@
 # Host dependencies after issues #145–153
 
-Version 0.4.30 wires the one input the 20% lane could never be given — a consensus observation —
+Version 0.5.0 follows the host out of keyed memory and into folders (`untilled/aumos#743`): the
+private record and the book's shared conclusions are `files_*` and `fund_files_*` paths, the
+whole-universe sweep is `task_start`/`task_get`/`task_cancel`, each recipe answer is a file read back
+with `files_read`, and `engines.aumos` moves to `>=0.4.0`. Three debts below close with it and are
+marked where they were recorded. 0.4.30 wires the one input the 20% lane could never be given — a consensus observation —
 and makes the grade it arrives at travel to the approval screen. 0.4.29 reported what share of the
 book is bearing risk at all, and read the Mandate's `objective` for the first time. 0.4.28 joined the filings to a fair value and separated a valuation
 gap that was never fetched from one no source can fill; 0.4.27 wired the fundamental discovery
@@ -19,13 +23,27 @@ about whether the roster was prepared. `untilled/aumos#724` and `#730` gave the 
 and a research result that count, `executionRecord` reads them, and `README.md` carries the
 deleted-to-replacement pairing.
 
-⚠️ **`engines.aumos` does not move for this.** The floor is already `>=0.3.34` — the release carrying
-`#724`/`#726`, whose four tools this record reads — and no capability and no manifest key was added.
-A host that predates them serves none of the four, which is an absence to report in `uncertainty`
+✅ **And half of that reading is discharged by `untilled/aumos#743` §B, which took the right half
+away.** `research_result_get` is deleted and with it the settled summary's `sourced` and
+`unprepared`. Those two said *this fund held readable documents for this name* — a judgement about
+documents that only the domain reading them makes, and a common executor making it was the app
+holding an investment opinion. So the counting is split: `task_get` says how many items, how many
+pending, done and failed, the recipe writes `sourced` onto each answer, and `executionRecord` derives
+`sourced`/`unprepared`/`evaluated` from the answers this run read back with `files_read`.
+`executionRecord`'s inputs are `{started, run, rows, eligibleSymbols}` and its `basis` vocabulary is
+`rows` · `run` · `none`. ⚠️ **A settled task run whose answer files were never read is `unsettled`
+and not `prepared`** — finishing is the host's fact and preparing is ours.
+
+⚠️ **`engines.aumos` moves for this, and for the tool names rather than for a capability.** The floor
+is `>=0.4.0` — the release carrying #743's twelve file tools and three task tools. ⛔ No capability
+and no manifest key was added, so an older build does **not** refuse this manifest: it serves a grant
+whose tool names nothing here calls, which is an absence to report in `uncertainty`
 exactly as `skills/candidate-research/SKILL.md` already says, and on such a host this operation
 answers `basis: 'none'` / `dataPreparation: 'unevaluated'` and `mandateExecution` says `unreported`.
 ⛔ **That is the designed answer and not a degradation to paper over**: *«nobody said»* is not a pass,
 and the alternative — falling back to the code lane — is the inference this revision removes.
+⚠️ Quiet is the whole risk here: the five earlier floors moved to avoid a **refused** manifest, and
+this one moves to avoid a served grant nobody calls.
 
 ### ⛔ Still owed by the host: nothing, and one number is deliberately ours
 
@@ -35,14 +53,18 @@ challenge — so it arrives as `eligibleSymbols`, the names this package's own f
 count is derived from them. A host field for it would be Aumos deciding what *eligible* means for
 every manager, which is the boundary `#209` §8-D drew when it put the recipe on this side.
 
-⬜ **Not measured on this side: a run against a live research job.** This repository has no host, so
-every count above is fixture-fed — the shapes come from `packages/skill-gateway/src/research.ts`
-(`ResearchSummaryView`, `ResearchJobView.counts`) and `ResearchSummary` in
-`packages/kernel/src/entities/research.ts`, read at `aumos` `176e8fcb`. What is unproven is the join:
-that a settled `research_result_get` summary arrives here with those five keys as whole numbers. ⛔ A
-summary that does not is refused as `research_record_unreadable` rather than read as zero, so the
-failure is reportable rather than silent — which is what makes the absence of the measurement
-survivable, not what makes it unnecessary.
+⬜ **Not measured on this side: a run against a live task run.** This repository has no host, so
+every count above is fixture-fed. ✅ **The join this entry named is gone rather than proven**
+(`untilled/aumos#743` §B): it read *"that a settled `research_result_get` summary arrives here with
+those five keys as whole numbers"*, and there is no such summary — `research_result_get` is deleted.
+⚠️ **What replaced it is a smaller claim about a shape this package writes itself.** The host's half
+is `task_get`'s four whole numbers (`total`, `pending`, `done`, `failed`) and the answers' half is
+`sourced` on each answer file, which `recipes/request.mjs` writes and `files_read` returns. So the
+unproven join is now *that an answer file written by this package's own recipe reads back through
+`files_read` with `sourced` on it* — checkable by a reader in a way an asserted count was not. ⛔ A
+record this operation did not produce is still refused as `execution_record_unreadable` rather than
+read as zero, so the failure is reportable rather than silent — which is what makes the absence of
+the measurement survivable, not what makes it unnecessary.
 
 ## Prepared research (#209 §8-D) — ✅ the route exists and the input is now fed
 

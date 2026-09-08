@@ -208,11 +208,20 @@ assert.equal(gateRanOnly.data.cause, 'unreported', '⛔ one gate refusing one ca
 assert.equal(gateRanOnly.data.executionRecordRead, false, 'the answer says out loud that it rests on no counted record')
 assert.equal(gateRanOnly.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity, 'unevaluated')
 
+/**
+ * The two halves a settled roster now takes (`untilled/aumos#743` §B): the
+ * host's item counts, and the recipe answers this run read back out of its own
+ * folder, each carrying the `sourced` the host stopped asserting.
+ */
+const rosterRun = { taskRunId: 'trun_kr', state: 'completed', outputPath: 'scans/kr', pendingItems: [], outputs: [], failures: [], counts: { total: 74, pending: 0, done: 74, failed: 0 } }
+const rosterAnswers = (row, names = []) => Array.from({ length: 74 }, (_, index) => ({ itemId: `XKRX:${names[index] ?? `sym${index}`}`, symbol: names[index] ?? `sym${index}`, ...row }))
+
 const preparedRecord = execute({
   operation: 'executionRecord',
   asOf,
   input: {
-    result: { resultRef: 'res_kr_1', summary: { sourced: 74, evaluated: 74, unprepared: 0, failed: 0, unpreparedSymbols: [], failedSymbols: [] } },
+    run: rosterRun,
+    rows: rosterAnswers({ sourced: true, data: { scored: true } }),
     eligibleSymbols: [],
   },
 }).data
@@ -235,7 +244,8 @@ const blindRecord = execute({
   operation: 'executionRecord',
   asOf,
   input: {
-    result: { resultRef: 'res_kr_2', summary: { sourced: 0, evaluated: 0, unprepared: 74, failed: 0, unpreparedSymbols: ['005930'], failedSymbols: [] } },
+    run: rosterRun,
+    rows: rosterAnswers({ sourced: false, data: null }, ['005930']),
     eligibleSymbols: [],
   },
 }).data

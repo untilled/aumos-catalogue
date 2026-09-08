@@ -37,7 +37,8 @@ through `mcp__evidence-gated-metrics__calculate` — never through `Bash`.
 
 ## What is different here
 
-Sleeve budgets are a **book-wide conclusion**: they belong in Brief through `brief_write`, not
+Sleeve budgets are a **book-wide conclusion**: they belong in this book's shared folder through
+`fund_files_write` under `book/`, not
 in private memory and not only in this run's rationale. The next run of either sleeve reads
 them there, and a budget that was never written is a budget that does not exist.
 
@@ -45,7 +46,7 @@ them there, and a budget that was never written is a budget that does not exist.
 investor reads it.** Two calls, in order.
 
 ⛔ **First `executionRecord`**, with what the research tools returned — `prepared` from
-`research_prepare`, `job` from `research_job_get`, `result` from `research_result_get`, **verbatim**
+`task_start`, `run` from `task_get`, **verbatim**, plus `rows` — the answer files read with `files_read`
 — and `eligibleSymbols`, the names your own fold found eligible. It answers three counted facts:
 whether the roster was prepared, whether the recipe answered, and how many of its answers cleared
 the gates. ⛔ **Never assemble that object by hand**: a state nobody counted is refused with
