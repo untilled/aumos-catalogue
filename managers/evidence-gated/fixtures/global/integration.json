@@ -8,9 +8,40 @@
     "duplicate": { "watchId": "watch-1", "scheduledAt": "2026-08-20T00:00:00Z", "consumedWatchIds": ["watch-1"], "sourceStatus": "available", "releaseFound": true }
   },
   "themeRadar": {
-    "recent": { "lastRunAt": "2026-08-19T00:00:00Z", "expectedDue": false },
-    "elapsed": { "lastRunAt": "2026-08-16T00:00:00Z", "expectedDue": true },
-    "dislocation": { "lastRunAt": "2026-08-19T00:00:00Z", "dislocation": true, "expectedDue": true }
+    "recent": { "lastThesisCallAt": "2026-08-19T00:00:00Z", "lastRunAt": "2026-08-19T00:00:00Z", "expectedDue": false, "expectedReason": "not-due" },
+    "elapsed": { "lastThesisCallAt": "2026-08-16T00:00:00Z", "lastRunAt": "2026-08-16T00:00:00Z", "expectedDue": true, "expectedReason": "interval-elapsed" },
+    "dislocation": { "lastThesisCallAt": "2026-08-19T00:00:00Z", "lastRunAt": "2026-08-19T00:00:00Z", "dislocation": true, "expectedDue": true, "expectedReason": "dislocation-override" },
+    "ranYesterdayAndFoundNothing": { "lastThesisCallAt": null, "lastRunAt": "2026-08-19T00:00:00Z", "expectedDue": true, "expectedReason": "no-thesis-call-yet" },
+    "ranYesterdayCallLastWeek": { "lastThesisCallAt": "2026-08-16T00:00:00Z", "lastRunAt": "2026-08-19T00:00:00Z", "expectedDue": true, "expectedReason": "interval-elapsed" },
+    "recordPredatesTheClock": { "lastRunAt": "2026-08-19T00:00:00Z", "expectedDue": true, "expectedReason": "thesis-call-clock-unstated" },
+    "neverRun": { "expectedDue": true, "expectedReason": "never-run" }
+  },
+  "dislocation": {
+    "indexDrawdown": {
+      "macro": { "retained": [
+        { "indicator": "index-level", "value": 2700, "observedAt": "2026-08-13T00:00:00Z", "sourceTier": "official", "sourceUrl": "https://example.test/index" },
+        { "indicator": "index-level", "value": 2550, "observedAt": "2026-08-19T00:00:00Z", "sourceTier": "official", "sourceUrl": "https://example.test/index" }
+      ] },
+      "expectedDislocated": true,
+      "expectedReasons": ["index-drawdown"]
+    },
+    "vixSpike": {
+      "macro": { "retained": [
+        { "indicator": "vix", "value": 14.2, "observedAt": "2026-08-13T00:00:00Z", "sourceTier": "official", "sourceUrl": "https://example.test/vix" },
+        { "indicator": "vix", "value": 31.5, "observedAt": "2026-08-19T00:00:00Z", "sourceTier": "official", "sourceUrl": "https://example.test/vix" }
+      ] },
+      "expectedDislocated": true,
+      "expectedReasons": ["vix-level"]
+    },
+    "calm": {
+      "macro": { "retained": [
+        { "indicator": "index-level", "value": 2700, "observedAt": "2026-08-13T00:00:00Z", "sourceTier": "official", "sourceUrl": "https://example.test/index" },
+        { "indicator": "index-level", "value": 2690, "observedAt": "2026-08-19T00:00:00Z", "sourceTier": "official", "sourceUrl": "https://example.test/index" },
+        { "indicator": "vix", "value": 15.1, "observedAt": "2026-08-19T00:00:00Z", "sourceTier": "official", "sourceUrl": "https://example.test/vix" }
+      ] },
+      "expectedDislocated": false,
+      "expectedReasons": []
+    }
   },
   "dedupe": [
     { "vendorId": "article-1", "sourceUrl": "https://example.test/a" },

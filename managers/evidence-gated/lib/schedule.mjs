@@ -270,16 +270,214 @@ export function deduplicateObservations({ rows = [] }) {
   return { data: { retained, duplicateCount: duplicates.length, duplicateKeys: duplicates.map((row) => row.vendorId ?? row.accession ?? row.receiptNumber ?? `${row.sourceUrl}|${row.publishedAt}`) }, diagnostics }
 }
 
-export function themeRadarDue({ lastRunAt = null, asOf, intervalDays = 3, dislocation = false }) {
+/**
+ * ── The clock this ran on, and the one it was ported from (issue #227) ─────
+ *
+ * The source methodology's §7 wakes the radar when *«the last `thesis_call` in
+ * `data/signal_paper_log.jsonl` is 3+ days old»*. This port read
+ * `run/theme-radar-last.lastRunAt` instead — **the last time the radar ran** —
+ * and the two clocks are not the same clock in the one case that matters: a run
+ * that looked and found nothing.
+ *
+ * ⛔ **Under the run clock, finding nothing locked the next three days.** That
+ * is the exact inverse of the design it came from, where finding nothing leaves
+ * the pressure on and the radar stays due. Measured on this book: the radar ran
+ * **2 times across 10 runs**, the second only because `ageDays` had drifted past
+ * the interval (3.5218 against 3), and `coverage/research-index.extensions` was
+ * an empty array in all ten. `PROMPT.md` §3 says this branch is the **only**
+ * path across the declared universe boundary, so the boundary never moved.
+ *
+ * So the verdict is decided by `lastThesisCallAt`, and `lastRunAt` stays on the
+ * record and in the answer as `runAgeDays`. ⚠️ **Keeping it is not hedging** —
+ * *«when did this last run»* and *«when did it last produce»* are two facts, a
+ * radar that has run six times and produced nothing is a different report from
+ * one that has never run, and the run record is the only place the first is
+ * written down.
+ *
+ * ── What a record holding only `lastRunAt` means, and why it is said ───────
+ *
+ * Every record written before this version has no `lastThesisCallAt`, and there
+ * are two true readings of that silence — *the radar has never produced a call*
+ * and *this record predates the clock*. Both are **due**, so the verdict is not
+ * in doubt; what would be lost is the caller ever finding out which one they are
+ * in, and a package that reads `due: true` forever without saying why has
+ * replaced one silent clock with another.
+ *
+ * | what the record carries | reason | diagnostic |
+ * |---|---|---|
+ * | neither field | `never-run` | none — a first run |
+ * | `lastRunAt` only | `thesis-call-clock-unstated` | `theme_radar_clock_unstated` / `unevaluated` |
+ * | `lastThesisCallAt: null` | `no-thesis-call-yet` | none — this is the **stated** answer, and the one the design wants |
+ * | an instant | `interval-elapsed` / `not-due` | — |
+ *
+ * ⚠️ **`null` is a value here and omission is not.** `validateInput` skips a
+ * declared key holding `null`, so a run can say *«the radar has run and produced
+ * no call»* — which is the ordinary state this clock exists to keep due — and be
+ * told nothing is missing. Writing the field is what closes the migration, and
+ * `MIGRATION.md` carries the row.
+ *
+ * ⛔ **No grace window, no «treat the run clock as the thesis clock once».**
+ * Either would restore the reset this issue removes, for exactly the runs that
+ * have not yet been rewritten — and the whole cost of the defect was three days
+ * of silence per empty run.
+ */
+export function themeRadarDue({ lastThesisCallAt, lastRunAt = null, asOf, intervalDays = 3, dislocation = false }) {
   const diagnostics = []
-  if (dislocation) return { data: { due: true, reason: 'dislocation-override', ageDays: lastRunAt ? (Date.parse(asOf) - Date.parse(lastRunAt)) / 86_400_000 : null }, diagnostics }
-  if (!lastRunAt) return { data: { due: true, reason: 'never-run', ageDays: null }, diagnostics }
-  if (!Number.isFinite(Date.parse(lastRunAt)) || Date.parse(lastRunAt) > Date.parse(asOf)) {
-    diagnostics.push(diagnostic('theme_radar_memory_invalid', 'unevaluated', 'Future or malformed last-run memory is ignored', 'lastRunAt'))
-    return { data: { due: true, reason: 'invalid-memory-ignored', ageDays: null }, diagnostics }
+  const runAge = Number.isFinite(Date.parse(lastRunAt)) ? (Date.parse(asOf) - Date.parse(lastRunAt)) / 86_400_000 : null
+  const answer = (data) => ({ data: { clock: 'thesis-call', runAgeDays: runAge, intervalDays, ...data }, diagnostics })
+  if (dislocation) return answer({ due: true, reason: 'dislocation-override', ageDays: Number.isFinite(Date.parse(lastThesisCallAt)) ? (Date.parse(asOf) - Date.parse(lastThesisCallAt)) / 86_400_000 : null })
+  if (lastThesisCallAt === undefined) {
+    if (lastRunAt === null || lastRunAt === undefined) return answer({ due: true, reason: 'never-run', ageDays: null })
+    diagnostics.push(diagnostic(
+      'theme_radar_clock_unstated',
+      'unevaluated',
+      'This record carries when the radar last ran and not when it last produced a thesis_call, which is the clock the interval is measured on; the run is due either way. Write `lastThesisCallAt` — an instant, or `null` when the radar has run and produced none',
+      'lastThesisCallAt',
+      { lastRunAt, runAgeDays: runAge },
+    ))
+    return answer({ due: true, reason: 'thesis-call-clock-unstated', ageDays: null })
   }
-  const ageDays = (Date.parse(asOf) - Date.parse(lastRunAt)) / 86_400_000
-  return { data: { due: ageDays >= intervalDays, reason: ageDays >= intervalDays ? 'interval-elapsed' : 'not-due', ageDays }, diagnostics }
+  if (lastThesisCallAt === null) return answer({ due: true, reason: 'no-thesis-call-yet', ageDays: null })
+  if (!Number.isFinite(Date.parse(lastThesisCallAt)) || Date.parse(lastThesisCallAt) > Date.parse(asOf)) {
+    diagnostics.push(diagnostic('theme_radar_memory_invalid', 'unevaluated', 'Future or malformed thesis-call memory is ignored', 'lastThesisCallAt'))
+    return answer({ due: true, reason: 'invalid-memory-ignored', ageDays: null })
+  }
+  const ageDays = (Date.parse(asOf) - Date.parse(lastThesisCallAt)) / 86_400_000
+  return answer({ due: ageDays >= intervalDays, reason: ageDays >= intervalDays ? 'interval-elapsed' : 'not-due', ageDays })
+}
+
+/**
+ * The `dislocation` argument's producer (issue #227).
+ *
+ * ⚠️ **`themeRadarDue` has taken a `dislocation` flag since it was ported and
+ * nothing in this package ever set it.** The source's §7 runs the radar
+ * *«regardless of staleness during dislocation weeks (index -5%+ moves, VIX
+ * spikes — richest thesis environment)»*, and an argument with no producer is
+ * that sentence in the shape of a parameter: the override existed, was
+ * published, and was `false` on every run this book has ever made.
+ *
+ * ⛔ **It is not read from the CLI, a config key or a run's own adjective.** The
+ * two readings the source names are dated observations, and this package already
+ * has an operation that dates, tiers and refuses them — `validateMacro`. So the
+ * input here is that operation's **answer**, and the vocabulary is the one
+ * `MACRO_INDICATORS` already publishes: `index-level` for the move, `vix` for
+ * the spike. Nothing new has to be procured for a run that already reads the
+ * macro lane.
+ *
+ * ⚠️ **The move is measured inside a window and not against a level.** A -5% move
+ * is a fall from the window's own high to its latest reading, so the rule needs
+ * at least two dated `index-level` rows and says so when it has one; a single
+ * print carries no move at all and reading it as *«no dislocation»* would answer
+ * a question nobody could have asked.
+ *
+ * ⚠️ **The spike has two forms because the two published readings disagree about
+ * what a spike is.** An absolute level catches a market that was already
+ * frightened before this window opened; a ratio against the window's own low
+ * catches the doubling that has not yet reached the level. Either fires, and the
+ * answer names which one did.
+ *
+ * ⛔ **`regimeTag` cannot produce this and is read as corroboration only.**
+ * `risk-off` is a Brief judgement about a market state that can stand for months
+ * — the source's own word is *weeks* — so a regime alone never makes this true.
+ * It travels in the answer as `regime` so a run that overrides by hand has a
+ * recorded reading beside it, and `regime_disagrees_with_reading` stays
+ * `regimeTag`'s own business.
+ *
+ * ⛔ **And it never makes the radar *not* due.** This answer is an override in
+ * one direction: `dislocated: false` says the staleness clock decides, which is
+ * what it decides anyway.
+ */
+export const DISLOCATION_RULE = Object.freeze({
+  lookbackDays: 10,
+  indexDrawdownPct: -0.05,
+  vixSpikeLevel: 28,
+  vixSpikeRatio: 1.5,
+})
+
+export function dislocationSignal({ macro = null, regime = null, asOf, lookbackDays = DISLOCATION_RULE.lookbackDays } = {}) {
+  const diagnostics = []
+  const rows = Array.isArray(macro?.retained) ? macro.retained : null
+  const regimeCall = typeof regime === 'string' ? regime : (regime?.regime ?? null)
+  const blank = (reason) => ({
+    data: {
+      dislocated: false, reasons: [], unread: reason, indexDrawdownPct: null, vix: null,
+      regime: regimeCall, lookbackDays, rule: DISLOCATION_RULE, observationCount: 0,
+    },
+    diagnostics,
+  })
+  if (rows === null) {
+    diagnostics.push(diagnostic(
+      'dislocation_macro_unread',
+      'unevaluated',
+      'Pass what `validateMacro` returned as `macro`; this reads its `retained` rows and judges nothing without them, because an unasked market is not a calm one',
+      'macro',
+    ))
+    return blank('macro-absent')
+  }
+  const floor = Date.parse(asOf) - lookbackDays * 86_400_000
+  const inWindow = rows.filter((row) => Number.isFinite(Date.parse(row?.observedAt)) && Date.parse(row.observedAt) >= floor)
+    .sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt))
+  const indexRows = inWindow.filter((row) => row.indicator === 'index-level' && finite(row.value))
+  const vixRows = inWindow.filter((row) => row.indicator === 'vix' && finite(row.value))
+  const reasons = []
+
+  let drawdown = null
+  if (indexRows.length >= 2) {
+    const high = Math.max(...indexRows.map((row) => row.value))
+    const latest = indexRows.at(-1).value
+    drawdown = high > 0 ? latest / high - 1 : null
+    if (finite(drawdown) && drawdown <= DISLOCATION_RULE.indexDrawdownPct) reasons.push('index-drawdown')
+  } else if (indexRows.length === 1) {
+    diagnostics.push(diagnostic(
+      'dislocation_index_move_unreadable',
+      'unevaluated',
+      'One dated index level carries no move; the drawdown is read from the window’s own high to its latest reading, so this axis is unread rather than clear',
+      'macro.retained',
+      { indexObservations: indexRows.length, lookbackDays },
+    ))
+  }
+
+  const vix = vixRows.length ? vixRows.at(-1).value : null
+  if (vixRows.length) {
+    const low = Math.min(...vixRows.map((row) => row.value))
+    if (vix >= DISLOCATION_RULE.vixSpikeLevel) reasons.push('vix-level')
+    else if (low > 0 && vix / low >= DISLOCATION_RULE.vixSpikeRatio) reasons.push('vix-ratio')
+  }
+
+  if (!indexRows.length && !vixRows.length) {
+    diagnostics.push(diagnostic(
+      'dislocation_macro_unread',
+      'unevaluated',
+      'No dated `index-level` or `vix` reading falls inside the window, so this run cannot say the market is calm; the override stays off and the staleness clock decides alone',
+      'macro.retained',
+      { lookbackDays, retained: rows.length },
+    ))
+  }
+
+  const dislocated = reasons.length > 0
+  if (dislocated) {
+    diagnostics.push(diagnostic(
+      'dislocation_window_open',
+      'info',
+      'A dislocation week runs the theme radar regardless of staleness — it is the richest thesis environment the source methodology names — so pass `dislocation: true` to `themeRadarDue`',
+      'macro.retained',
+      { reasons, indexDrawdownPct: drawdown, vix },
+    ))
+  }
+  return {
+    data: {
+      dislocated,
+      reasons,
+      unread: null,
+      indexDrawdownPct: finite(drawdown) ? Math.round(drawdown * 10_000) / 10_000 : null,
+      vix,
+      regime: regimeCall,
+      lookbackDays,
+      rule: DISLOCATION_RULE,
+      observationCount: indexRows.length + vixRows.length,
+    },
+    diagnostics,
+  }
 }
 
 export function nextReviewSequence({ krSessions = [], usSessions = [], globalReview = {}, asOf, buffers = {}, config = {} }) {

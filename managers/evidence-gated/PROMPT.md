@@ -296,7 +296,7 @@ something a run would otherwise discover *after* proposing.
 | 6 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
 | 7 | broker limits | Aumos owns them; read what the invocation carries and do not assume |
 | 8 | `signalPaper` → `verdictReport` | nothing — but a met threshold is stated in this run, a `NO_GO` freezes new non-core experiments, and an empty or unadvanced track is named in `uncertainty` |
-| 9 | `themeRadarDue` + `coverage` → `discoveryCapacity` | nothing — but **a run with no open discovery branch says so** |
+| 9 | `dislocationSignal` → `themeRadarDue` + `coverage` → `discoveryCapacity` | nothing — but **a run with no open discovery branch says so**, and so does a boundary that has not moved |
 
 **Is a discovery universe declared — and call `coverage` to find out, every run, before anything is
 proposed.** This is last because it is the one thing the skeleton cannot discover for itself: §3
@@ -312,6 +312,12 @@ needs a declared universe — so a run with no universe never reaches the step t
 - Then call `discoveryCapacity` with `themeRadarDue`'s answer as `radar` and `coverage`'s as
   `coverage`. Radar not due **and** no universe declared is `discovery_lane_dark` — this run's
   discovery capacity was zero, which is invariant 5's distinction applied to the discovery axis.
+- Pass `run/theme-radar-last`'s `boundary` in the same call and write the `nextBoundary` it returns
+  back. ⚠️ **It counts the consecutive runs in which the declared universe gained no extension** —
+  theme radar is the only path across that boundary, so `discovery_boundary_hardened` at three runs
+  is a fact about this methodology's reach and belongs in `uncertainty`. ⛔ It blocks nothing, and
+  it is not an instruction to lower a gate: zero extensions is a valid outcome of an honest radar.
+  On the book that measured this it was zero on **ten consecutive runs** and no output said so.
 
 ⛔ **A dark run carries the code `discovery_lane_dark` verbatim in one `uncertainty` entry.** Pass
 this run's `uncertainty` back to `discoveryCapacity` and an undisclosed dark run is `blocked` — what
@@ -464,7 +470,14 @@ never `met`. An `unevaluated` line is a reading to supply, not a condition to re
 `level` (a `time` rule's instant is `at`); the reading on the evidence row is `value` and its instant
 is `availableAt`. `threshold`, `observed` and `observedAt` are `input_shape_invalid`.
 
-**Forward research, when `themeRadarDue` says so.** Call it against `run/theme-radar-last`; when due,
+**Forward research, when `themeRadarDue` says so.** ⚠️ **Its clock is the last `thesis_call`, not
+the last run** — a run that looked and found nothing stays due, because finding nothing is what keeps
+the pressure on. So `run/theme-radar-last` carries `lastThesisCallAt` (the clock; `null` when the
+radar has run and produced none) beside `lastRunAt` (the observation, which decides nothing), and a
+record carrying only the second is answered `theme_radar_clock_unstated` and is due. ⚠️ Fill
+`dislocation` from `dislocationSignal` over what `validateMacro` returned — an index 5% or more off
+its window high, or a VIX spike — and a dislocation week runs the radar regardless of staleness.
+Call it against `run/theme-radar-last`; when due,
 load `skills/theme-radar/SKILL.md` and run it before naming lenses. Call `sectorStrength` first — its
 `researchQueue` is the input, and its ranking, rank moves and regime reading are attention, not
 signals. A run with no web lane produces no forward thesis and says the lane was missing; a silent

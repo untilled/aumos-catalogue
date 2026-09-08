@@ -1104,14 +1104,14 @@ assert.deepEqual([...mixedBases.data.bases].sort(), ['none', 'split'])
 assert.ok(has(mixedBases, 'adjustment_basis_conflict'))
 
 // A key the operation does not read is reported, not absorbed.
-const unread = run('themeRadarDue', { lastRunAt: '2026-09-01T00:00:00Z', expectedDue: true })
+const unread = run('themeRadarDue', { lastThesisCallAt: '2026-09-01T00:00:00Z', expectedDue: true })
 assert.ok(has(unread, 'input_key_unread'))
 assert.equal(unread.diagnostics.find((row) => row.code === 'input_key_unread').path, 'input.expectedDue')
 assert.equal(unread.status, 'unevaluated')
 assert.equal(unread.data.due, true, 'the answer it did compute still stands; the caller is told which part of the call was not read')
 // ⛔ And the invocation's asOf is not silently overruled by a second copy inside the input.
-assert.ok(has(execute({ operation: 'themeRadarDue', asOf, input: { lastRunAt: '2026-09-01T00:00:00Z', asOf: '2020-01-01T00:00:00Z' } }), 'input_shape_invalid'))
-assert.equal(execute({ operation: 'themeRadarDue', asOf, input: { lastRunAt: '2026-09-01T00:00:00Z', asOf } }).status, 'ok', 'a copy that agrees costs nothing')
+assert.ok(has(execute({ operation: 'themeRadarDue', asOf, input: { lastThesisCallAt: '2026-09-01T00:00:00Z', asOf: '2020-01-01T00:00:00Z' } }), 'input_shape_invalid'))
+assert.equal(execute({ operation: 'themeRadarDue', asOf, input: { lastThesisCallAt: '2026-09-01T00:00:00Z', asOf } }).status, 'ok', 'a copy that agrees costs nothing')
 
 console.log('evidence-gated issues #157-158 input-contract regression tests passed')
 
@@ -2953,3 +2953,117 @@ assert.equal(
 )
 
 console.log('evidence-gated issue #224 partial-bar regression tests passed')
+
+/**
+ * ── #227: the radar's clock, its override's producer, and the boundary ─────
+ *
+ * `themeRadarDue` measured staleness from `run/theme-radar-last.lastRunAt` —
+ * *the last time the radar ran* — where the methodology it was ported from
+ * measures from *the last `thesis_call`*. The two clocks agree on every run
+ * except the one that matters: **a run that looked and found nothing**, which
+ * under the run clock reset the interval and locked the next three days.
+ *
+ * Measured on this book (`run_c7ad46eea03840bf84ae7a8822ed02c3`, asOf
+ * 2026-09-08): the radar ran **2 times across 10 runs** — the second only
+ * because `ageDays` had drifted past the interval, 3.5218 against 3 — and
+ * `coverage/research-index.extensions` was `[]` in all ten. `PROMPT.md` §3
+ * names this branch as the **only** path across the declared universe
+ * boundary, so the boundary never moved.
+ *
+ * Four things are checked, and the first is the whole issue:
+ *
+ *  1. a run that produced no `thesis_call` is **due on the next run**;
+ *  2. a record written before this version is due and **says which clock it
+ *     is missing** rather than reading as due-forever in silence;
+ *  3. `dislocation` has a producer, and an unasked macro lane is not a calm
+ *     one;
+ *  4. the empty-extension streak is counted, carried and reported.
+ */
+const radarAsOf = '2026-09-08T03:01:37.490Z'
+const radarRun = (input) => execute({ operation: 'themeRadarDue', asOf: radarAsOf, input })
+
+/* ── ⑴ finding nothing keeps the pressure on ─────────────────────────────── */
+
+const ranYesterday = '2026-09-07T03:00:00.000Z'
+const foundNothing = radarRun({ lastThesisCallAt: null, lastRunAt: ranYesterday })
+assert.equal(foundNothing.data.due, true, 'a run that produced no thesis_call leaves the radar due on the next run')
+assert.equal(foundNothing.data.reason, 'no-thesis-call-yet')
+assert.equal(foundNothing.diagnostics.length, 0, 'and that is the ordinary state, not a diagnosis')
+assert.equal(foundNothing.data.runAgeDays < 3, true, 'the run clock would have called this not-due — it is kept as an observation and decides nothing')
+assert.equal(foundNothing.data.clock, 'thesis-call')
+
+/* A call four days old is due on the same record; one from yesterday is not. */
+assert.equal(radarRun({ lastThesisCallAt: '2026-09-04T03:00:00.000Z', lastRunAt: ranYesterday }).data.reason, 'interval-elapsed')
+assert.equal(radarRun({ lastThesisCallAt: ranYesterday, lastRunAt: ranYesterday }).data.due, false)
+/** ⛔ And `lastRunAt` cannot make a stale clock fresh: the radar running is not the radar producing. */
+assert.equal(radarRun({ lastThesisCallAt: '2026-09-04T03:00:00.000Z', lastRunAt: radarAsOf }).data.due, true)
+
+/* ── ⑵ the record that predates the clock says so ────────────────────────── */
+
+const legacyRecord = radarRun({ lastRunAt: ranYesterday })
+assert.equal(legacyRecord.data.due, true, 'a pre-0.6.0 record is due rather than silently not-due')
+assert.equal(legacyRecord.data.reason, 'thesis-call-clock-unstated')
+assert.ok(has(legacyRecord, 'theme_radar_clock_unstated'), 'and the absence is named rather than read as due-forever in silence')
+assert.equal(legacyRecord.diagnostics.find((row) => row.code === 'theme_radar_clock_unstated').path, 'lastThesisCallAt')
+/** ⚠️ An empty folder is a first run and is not diagnosed — «never written» and «written without this field» are two facts. */
+assert.equal(radarRun({}).data.reason, 'never-run')
+assert.equal(radarRun({}).diagnostics.length, 0)
+/** ⛔ And nothing invents the clock from the run instant: `null` is a value, omission is not. */
+assert.notEqual(legacyRecord.data.reason, foundNothing.data.reason)
+
+/* ── ⑶ the override that had no producer ─────────────────────────────────── */
+
+const dislocationRow = (indicator, value, observedAt) => ({ indicator, value, observedAt, sourceTier: 'official', sourceUrl: 'https://example.test/macro' })
+const dislocationRun = (input) => execute({ operation: 'dislocationSignal', asOf: radarAsOf, input })
+const fell = dislocationRun({ macro: { retained: [dislocationRow('index-level', 2700, '2026-09-02T00:00:00Z'), dislocationRow('index-level', 2540, '2026-09-07T00:00:00Z')] } })
+assert.equal(fell.data.dislocated, true, 'an index 5%+ off the window high is a dislocation week')
+assert.deepEqual(fell.data.reasons, ['index-drawdown'])
+assert.ok(fell.diagnostics.some((row) => row.code === 'dislocation_window_open' && row.severity === 'info'))
+const spiked = dislocationRun({ macro: { retained: [dislocationRow('vix', 13.4, '2026-09-02T00:00:00Z'), dislocationRow('vix', 21.5, '2026-09-07T00:00:00Z')] } })
+assert.deepEqual(spiked.data.reasons, ['vix-ratio'], 'a spike that has not reached the level is still a spike against the window low')
+/** ⛔ A single dated print carries no move, and reading it as calm would answer a question nobody asked. */
+const onePrint = dislocationRun({ macro: { retained: [dislocationRow('index-level', 2540, '2026-09-07T00:00:00Z')] } })
+assert.equal(onePrint.data.dislocated, false)
+assert.ok(has(onePrint, 'dislocation_index_move_unreadable'))
+/** ⛔ A regime tag never decides it — `risk-off` can stand for months and this question is about weeks. */
+assert.equal(dislocationRun({ macro: { retained: [] }, regime: { regime: 'risk-off' } }).data.dislocated, false)
+assert.equal(dislocationRun({ macro: { retained: [] }, regime: { regime: 'risk-off' } }).data.regime, 'risk-off')
+/** ⚠️ And the override only ever adds a run: `dislocation: true` beats a fresh call, and `false` changes nothing. */
+assert.equal(radarRun({ lastThesisCallAt: ranYesterday, dislocation: true }).data.reason, 'dislocation-override')
+assert.equal(radarRun({ lastThesisCallAt: ranYesterday, dislocation: false }).data.due, false)
+
+/* ── ⑷ the boundary that stood still for ten runs ────────────────────────── */
+
+const capacity = (input) => execute({ operation: 'discoveryCapacity', asOf: radarAsOf, input })
+const openRadar = { due: true, reason: 'no-thesis-call-yet' }
+const sweptNothingNew = { screenedUniverseCount: 74, extensionsCount: 0 }
+let boundary = null
+for (let run = 1; run <= 3; run += 1) {
+  const answer = capacity({ radar: openRadar, coverage: sweptNothingNew, boundary })
+  assert.equal(answer.data.boundary.emptyExtensionRuns, run, 'the streak is this operation’s arithmetic, never a number the run keeps by hand')
+  assert.equal(answer.data.boundary.radarOpenRunsInStreak, run, 'and it counts how many of those runs the forward branch was actually open in')
+  assert.equal(answer.data.boundary.hardened, run >= 3)
+  assert.equal(answer.data.nextBoundary.updatedAsOf, radarAsOf)
+  boundary = answer.data.nextBoundary
+}
+const hardened = capacity({ radar: openRadar, coverage: sweptNothingNew, boundary })
+assert.ok(hardened.diagnostics.some((row) => row.code === 'discovery_boundary_hardened' && row.severity === 'info'), 'a hardened boundary is stated rather than inferred')
+/** ⛔ It reports and never blocks: zero extensions is a valid outcome of an honest radar. */
+assert.equal(hardened.diagnostics.some((row) => row.severity === 'blocked'), false)
+assert.equal(hardened.data.capacity, 'full', 'and it is not a lane verdict — both lanes were open on every one of those runs')
+/** ⚠️ A boundary that moved resets the streak, because the branch did what it exists to do. */
+const boundaryMoved = capacity({ radar: openRadar, coverage: { screenedUniverseCount: 75, extensionsCount: 1 }, boundary })
+assert.equal(boundaryMoved.data.boundary.emptyExtensionRuns, 0)
+assert.equal(boundaryMoved.data.boundary.streakSince, null)
+assert.equal(boundaryMoved.diagnostics.some((row) => row.code === 'discovery_boundary_hardened'), false)
+/** ⛔ And a run nobody counted is not a run that found nothing: an unread count does not advance the streak. */
+const uncounted = capacity({ radar: openRadar, coverage: { screenedUniverseCount: 74 }, boundary })
+assert.equal(uncounted.data.boundary.emptyExtensionRuns, null)
+assert.equal(uncounted.data.nextBoundary, null)
+assert.ok(uncounted.diagnostics.some((row) => row.code === 'discovery_boundary_uncounted'))
+/** ⚠️ The distinction the second count exists for: a streak in which the radar was never open reads differently. */
+const clockBound = capacity({ radar: { due: false, reason: 'not-due' }, coverage: sweptNothingNew, boundary: { emptyExtensionRuns: 4, radarOpenRunsInStreak: 0, streakSince: '2026-09-01T00:00:00Z' } })
+assert.equal(clockBound.data.boundary.emptyExtensionRuns, 5)
+assert.equal(clockBound.data.boundary.radarOpenRunsInStreak, 0, 'five runs that moved nothing and a radar that was due in none of them is a clock finding, not a market one')
+
+console.log('evidence-gated issue #227 theme-radar clock regression tests passed')

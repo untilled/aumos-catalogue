@@ -158,12 +158,30 @@ absence had no entry, which is the failure mode this document exists to prevent.
 | `triage_verdicts.json` · `analysis/triage.py` | RT | the axis-selection study behind `upsideRadar`; its conclusion is the lane definitions, and the study itself is history |
 | `radar_coverage_state.json` | PP | `upsideRadar.lanes` coverage and starvation, computed per run rather than stored |
 | `outcomes.jsonl` · `decisions.jsonl` · `exit_signal_log.jsonl` · `sentinel_log.jsonl` · `features.jsonl` | AR | Aumos owns the Decision journal, Track Record and Evidence; this package computes over them and keeps no ledger |
-| `signal_paper_log.jsonl` · `shadow_portfolio.jsonl` | PX | `state/learning/paper-cohorts.json` in this instance's private folder, as running sums plus an index of open measurement windows. ⚠️ **This was recorded as `AR` and that was wrong.** A paper call has no order and no fill, so it is not a Decision and the journal does not hold it; the runtime publishes no `thesis:write`, and what `thesis:read` serves is a read path — `thesis_list`/`thesis_get` — with nothing to write a cohort into, so Thesis cannot either. ⚠️ **The store was `memory_write` and is a folder since `untilled/aumos#743`**, and the substitution changed nothing about this row except the address: the instance's own folder is still the only durable store served, and the cost — instance-scoped, invisible to any other manager on the book — is in `README.md` under Known limits. ⛔ What the folder does *not* keep for this package is the append: a file is replaced, so a cohort history that has to stay readable is a dated file written beside the current one |
+| `signal_paper_log.jsonl` · `shadow_portfolio.jsonl` | PX | `state/learning/paper-cohorts.json` in this instance's private folder, as running sums plus an index of open measurement windows. ⚠️ **This was recorded as `AR` and that was wrong.** A paper call has no order and no fill, so it is not a Decision and the journal does not hold it; the runtime publishes no `thesis:write`, and what `thesis:read` serves is a read path — `thesis_list`/`thesis_get` — with nothing to write a cohort into, so Thesis cannot either. ⚠️ **The store was `memory_write` and is a folder since `untilled/aumos#743`**, and the substitution changed nothing about this row except the address: the instance's own folder is still the only durable store served, and the cost — instance-scoped, invisible to any other manager on the book — is in `README.md` under Known limits. ⛔ What the folder does *not* keep for this package is the append: a file is replaced, so a cohort history that has to stay readable is a dated file written beside the current one. ⚠️ **This ledger was also the source's theme-radar clock and the port read a different one (#227).** §7 of the source wakes the radar when *«the last `thesis_call` in `data/signal_paper_log.jsonl` is 3+ days old»*; `themeRadarDue` read `run/theme-radar-last.lastRunAt` — the last time the radar **ran** — so a run that looked and found nothing locked the next three days, which is the inverse of a design where finding nothing keeps the pressure on. Measured on this book: the radar ran 2 times across 10 runs and `coverage/research-index.extensions` was empty in all ten, on the branch `PROMPT.md` §3 names as the only path across the declared boundary. The verdict is decided by `lastThesisCallAt` from 0.6.0; `lastRunAt` stays on the record and in the answer as `runAgeDays`, because *when did this last run* and *when did it last produce* are two facts |
 | `order_lifecycle.jsonl` · `order-limits.json` · `account_equity.jsonl` | AR | Aumos and the broker |
 | `history/` · `fundamentals/` · `mirror.sqlite` · `tradeos.sqlite` | AR | source data, fetched point-in-time through the source contract |
 | `schedule.json` · `watch_schedule.jsonl` · `night_gate_state.json` | AR | WATCH and the Wake Engine |
 | `config_changes.jsonl` · `notifications.jsonl` · `daily_check_log.jsonl` · `market_score_log.jsonl` · `parallel_run_log.jsonl` · `upside_radar_log.jsonl` · `proposed_sizing*.jsonl` | RT | run logs of a filesystem harness; a package that keeps no ledger has nothing to write them to |
 | `secrets/` · `*-credentials.json` | RT | never ported; the package declares `network.mode: deny` and holds no credential |
+
+## The stored records this port asks a run to rewrite
+
+⚠️ **A stored value the package can no longer read the way it wrote it is a migration, whether or
+not anything moved on disk.** One is open (#227, 0.6.0) and it is a **field**, not a key: the
+records under `state/run/theme-radar-last.json` are unchanged and unreadable by nobody.
+
+| record | what changed | what a pre-0.6.0 value means now | what closes it |
+|---|---|---|---|
+| `state/run/theme-radar-last.json` | `themeRadarDue`'s verdict moved from `lastRunAt` to **`lastThesisCallAt`**; `lastRunAt` is kept and decides nothing | **due**, with `reason: 'thesis-call-clock-unstated'` and `theme_radar_clock_unstated` / `unevaluated` naming the field. ⛔ Not silently due-forever: the diagnostic is raised on every run until the field is written | the next run writes `lastThesisCallAt` — an instant, or `null` when the radar has run and produced no call |
+| `state/run/theme-radar-last.json` | `boundary` is a **new** sibling `discoveryCapacity` counts into | a fresh streak, which is the right reading for a book that has never counted one | writing back the `nextBoundary` `discoveryCapacity` returns |
+
+⛔ **There is no grace window and no one-time reading of the run clock as the thesis clock.** Either
+would restore the three-day reset this issue removed, for exactly the records that have not been
+rewritten yet — and the whole cost of the defect was three days of silence per empty run. ⚠️ `null`
+is a value here and omission is not: `validateInput` skips a declared key holding `null`, so a run
+can state *«the radar has run and produced no call»* — the ordinary condition this clock exists to
+keep due — and be told nothing is missing.
 
 ## What the last column names, and what stands behind it
 

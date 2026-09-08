@@ -16,6 +16,18 @@ writable from public information months earlier. Writing that claim is what this
 Run it when `themeRadarDue` says the interval has elapsed or a dislocation shortened it, and record
 the run under `run/theme-radar-last` whether or not it produced anything.
 
+⚠️ **The interval is measured from the last `thesis_call`, not from the last run** (#227). A run that
+looked and found nothing leaves the radar due, which is the whole point: the pressure stays on until
+something comes out. So the record carries **two** instants and they are not interchangeable —
+`lastThesisCallAt`, which decides, and `lastRunAt`, which is the observation separating *this has
+never run* from *this has run six times and produced nothing*. Write `lastThesisCallAt: null` when
+this run produced no call; ⛔ leaving the field out is the pre-0.6.0 shape and is answered
+`theme_radar_clock_unstated`, still due.
+
+⚠️ **A dislocation week runs it regardless of staleness**, and `dislocationSignal` is what says so —
+an index down 5% or more from the window's own high, or a VIX spike, read off the rows
+`validateMacro` retained. ⛔ Never a run's own reading of the mood.
+
 ## Inputs
 
 - `sectorStrength.researchQueue` — where to look. It is a list of questions, not of candidates: a
@@ -60,10 +72,34 @@ this market, and it is the only fact that distinguishes a radar that ran from on
 never swept again, and the boundary closes behind it. The original methodology's own record of this
 is the name it found that way and would have lost.
 
+⚠️ **And a boundary that stands still is counted rather than left to be noticed** (#227).
+`discoveryCapacity` carries the streak of consecutive runs in which `extensions` gained nothing —
+with the count of those in which this branch was actually open beside it, because *the radar was
+never due* and *the radar ran every time and found nothing* are opposite findings — and reports
+`discovery_boundary_hardened` at three. ⛔ It blocks nothing: an honest radar can return zero for a
+long time. What it removes is the state this book was in for ten runs, where the boundary had not
+moved once and no output said so.
+
 ## What a forward thesis must contain
 
-Zero to three per run. Zero is a normal outcome and a better one than a narrative written to fill
-the slot. Each one carries, and `validateThesis` refuses it without them:
+**Aim for two to three conviction calls per run, and never fill the quota.** Both halves of that
+sentence come from the methodology this is ported from and neither survives without the other; the
+aim was dropped on the way across and this section read as a ceiling of three (#227).
+
+The aim is arithmetic rather than enthusiasm. `promotionGate` needs **30 closed samples across 10
+independent date clusters** before a lens may be promoted, and the paper track is the only path to
+it: at one call a week that sample arrives so far out that every size decision this book makes in
+the meantime is made under `insufficient` — a shortage designed in rather than measured. The source
+ran the same calculation against its own September deadline and raised the cadence for it
+(2026-07-15).
+
+⛔ **And a call written to reach a number is worse than no call.** Zero is a normal outcome and
+**valid data** — the source says so in the same breath as the aim — while a narrative composed to
+fill a slot enters the cohort that unlocks size, where nothing afterwards can tell it from one that
+was found. So the aim governs how hard you look and the gates below govern what survives: log the
+run, name the axis, and let the number be what it is.
+
+Each call carries, and `validateThesis` refuses it without them:
 
 | element | why it is required |
 |---|---|

@@ -300,6 +300,20 @@ answers for the forward branch and only for it; the mechanical sweep has no inte
 every run. A dispatch that drops discovery because the radar is not due has shut both branches by
 hand — which is precisely the `discovery_lane_dark` state `PROMPT.md` §1b makes you report.
 
+### ⚠️ Fill `dislocation` before you read `themeRadarDue`, and fill it from readings
+
+`themeRadarDue` takes a `dislocation` flag that runs the radar regardless of staleness, and **for the
+life of this port nothing set it** (#227) — the override was published, documented and `false` on
+every run. Its producer is `dislocationSignal`, and it is yours to call in pre-flight: hand it what
+`validateMacro` returned, and `regimeTag`'s answer beside it, then pass `dislocated` into
+`themeRadarDue` as `dislocation`.
+
+⛔ **It is a reading, not an adjective.** The two axes are an index down 5% or more from its own
+window high and a VIX spike, both from dated rows `validateMacro` retained; a market nobody
+observed comes back `unevaluated` with the override off, which is not the same as a calm one and
+the answer says which it is. A regime tag is carried and never decides — `risk-off` can stand for
+months and this question is about weeks.
+
 ### ⚠️ Settle the web lane before you dispatch, not after
 
 `themeRadarDue` is answered in pre-flight, and the lane theme radar needs is answered by you,
@@ -349,7 +363,9 @@ adequate; `WAIT` also when it was not, and the two are told apart in `keyReasons
 `uncertainty`.
 
 ⛔ **An empty set with no discovery behind it is the second kind, and it says so by name.** Call
-`discoveryCapacity` over this run's `themeRadarDue` and `coverage` answers before you assemble:
+`discoveryCapacity` over this run's `themeRadarDue` and `coverage` answers before you assemble —
+passing `run/theme-radar-last`'s `boundary` in and writing its `nextBoundary` back, which is how the
+hardened-boundary streak is counted at all (#227):
 when both branches were shut, the proposal carries the code `discovery_lane_dark` verbatim in one
 `uncertainty` entry, and `keyReasons` says the set is empty because nothing was searched rather
 than because nothing qualified. Passing the assembled `uncertainty` back to `discoveryCapacity`
