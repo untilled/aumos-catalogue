@@ -89,6 +89,47 @@ export const REFUTED_MEMORY_RULES = [
     correction: 'True of an ETF and false of a single name, and the difference decides a twentyfold position cap. An index vehicle has no filer, so nothing publishes statements for it and those two gaps stay open however many times the feed runs. A listed operating company does have one: `open-dart` `/api/corpCode.xml` → `corp_code` → `fnlttSinglAcntAll` (or, for US, `sec-edgar` `/files/company_tickers.json` \u2192 `cik_str` \u2192 `/api/xbrl/companyfacts/CIK{10-digit zero-padded}.json` \u2014 \u26d4 the ticker address is a 404, measured 2026-09-07) answers, `radarCandidates` normalizes it, and this methodology derives the two fields from the bear/base/bull scenario table those statements support — `candidate-research` §Candidate record 5 asks for target, return and factual drivers, and `researchGate` already computes the probability-weighted return. The gaps were unfetched, not unfillable. ⛔ Do not replace this rule with its opposite: call `thesisGapSources` per instrument, which classifies from the registry rather than asserting, and call `thesisValuation` where a filer exists.',
     supersededBy: 'valuation-gaps-are-unfetched-for-a-filer-and-unfillable-only-without-one',
   },
+  /**
+   * ── The third one, and it is a prescription rather than a diagnosis (#224) ─
+   *
+   * `failures/repeated-patterns`, filed `CONFIRMED`:
+   *
+   *   *"`before` accepts an instant and is how you exclude a mid-session
+   *   partial bar."*
+   *
+   * ⚠️ **Half right, and the wrong half is the operative half.** `before` does
+   * accept an instant. It is also **inclusive**, and a Toss daily bar is
+   * stamped at the venue's local midnight — so the sentence's own natural
+   * reading, *pass today's midnight to exclude today*, returns exactly today's
+   * incomplete bar. Measured 2026-09-08 on 069500 mid-session: three controlled
+   * calls, and `before=2026-09-08T00:00:00+09:00` answered with a 2026-09-08
+   * first row identical to the one no `before` at all returned, while
+   * `before=2026-09-07T23:59:59+09:00` answered 2026-09-07.
+   *
+   * ⛔ **And it is exactly the class of rule this registry exists for.** A wrong
+   * *diagnosis* costs a wasted branch; a wrong *prescription* filed `CONFIRMED`
+   * is followed, and this one is followed into a `trendState` verdict computed
+   * off a close 2,665 above the real prior close — with every shape check
+   * passing, because the partial bar's OHLCV is complete and numeric.
+   *
+   * ⚠️ The correction carries both halves the issue asked for: the instant goes
+   * **inside the previous day**, and the first row's date is checked afterwards
+   * whatever the vendor is currently doing with `before`.
+   */
+  {
+    id: 'candles-before-excludes-the-partial-bar',
+    key: 'failures/repeated-patterns',
+    /**
+     * Matched on the claim's wording as well as the id, for the reason the
+     * first rule is: another instance that reached the same conclusion named it
+     * something else. The invariant part is a rule that treats `before` as the
+     * thing that drops the partial bar.
+     */
+    claimPattern: /before[^.]{0,80}(exclude|excludes|drop|drops)[^.]{0,40}(mid-session|partial)|partial bar[^.]{0,60}\bbefore\b|candles-before-excludes/i,
+    refutedClaim: '`before` on `/api/v1/candles` accepts an instant and is how you exclude a mid-session partial bar.',
+    correction: '`before` is **inclusive** (`≤`) and a Toss daily bar carries the venue\'s local midnight as its stamp, so passing today\'s midnight returns today\'s bar — the incomplete one this rule was written to avoid. Measured 2026-09-08 on 069500 during the XKRX session: `before=2026-09-08T00:00:00+09:00` and an omitted `before` both answered with the same 2026-09-08 first row, two calls seconds apart disagreed about it (close 113,470 → 113,485, volume 11,452,779 → 11,466,966), and its close sat 2,665 above the real 2026-09-07 close of 110,820. To exclude the partial bar pass an instant **inside the previous day** — `2026-09-07T23:59:59+09:00` — and then **read the first row\'s date and confirm it is the session you meant**: `before`\'s meaning is the vendor\'s to change and the check is right either way. ⛔ Do not expect a shape check to catch this: a partial bar\'s OHLCV is complete and numeric, so `bar_value_invalid` and `trend_moving_average_unavailable` pass it through. What does report it is `newest_bar_may_be_unclosed` (`info`) from `indicators`, `scan`, `opportunityMetrics` and `trendState`, on the host\'s own rule that a daily bar becomes readable 24 hours after its opening stamp (aumos#732). ⛔ And the whole-universe sweep does not take this route at all: `source_cache_refresh` on `prices`/`daily` never hands back a bar that has not closed.',
+    supersededBy: 'candles-before-is-inclusive-so-the-instant-goes-inside-the-previous-day',
+  },
 ]
 
 const strings = (value, depth = 0) => {

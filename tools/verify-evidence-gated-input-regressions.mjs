@@ -6,6 +6,7 @@ import { METHODOLOGY } from '../managers/evidence-gated/lib/constants.mjs'
 import { marketReviewIntent } from '../managers/evidence-gated/lib/schedule.mjs'
 import { MACRO_INDICATORS } from '../managers/evidence-gated/lib/evidence.mjs'
 import { MANAGER_ID } from '../managers/evidence-gated/lib/diagnostics.mjs'
+import { BAR_CLOSE_LAG_MS, unclosedNewestBar } from '../managers/evidence-gated/lib/indicators.mjs'
 
 const configSchema = JSON.parse(await readFile(new URL('../managers/evidence-gated/config.schema.json', import.meta.url), 'utf8'))
 
@@ -2772,3 +2773,145 @@ for (const field of ['symbol', 'market', 'observedAt', 'evidenceIds']) assert.ok
 assert.ok(researchContract.previous.includes('previousRead'), 'the published sentence says how a value with no rows is read')
 
 console.log('evidence-gated issue #222 research-index regression tests passed')
+
+/**
+ * ── #224: the bar whose shape was valid and whose data was wrong ────────────
+ *
+ * `/api/v1/candles`'s `before` is **inclusive**, and a Toss daily bar is
+ * stamped at the venue's local midnight — so *«pass today's midnight to
+ * exclude today»*, which this book carried in `failures/repeated-patterns` as
+ * `CONFIRMED`, returns exactly today's incomplete bar. Measured 2026-09-08 on
+ * 069500 during the XKRX session: `before=2026-09-08T00:00:00+09:00` and an
+ * omitted `before` answered with the same 2026-09-08 first row, two calls
+ * seconds apart disagreed about it (close 113,470 → 113,485, volume 11,452,779
+ * → 11,466,966), and its close sat 2,665 above the real 2026-09-07 close of
+ * 110,820.
+ *
+ * ⛔ **#180's defence cannot reach it.** That one asks whether the row parsed,
+ * and a partial bar's OHLCV is complete, finite and numeric — every moving
+ * average computes and `trendState` returns a confident `trancheGuidance` off a
+ * price no session ever printed. So the assertions below are in two halves: the
+ * row fires on a newest bar younger than the 24 hours that make a daily bar
+ * readable, and it is **silent** otherwise — because a diagnostic that fires on
+ * a series a run collected correctly is one people learn to ignore.
+ *
+ * ⚠️ **`info`, and it must stay `info`.** This package holds no market-hours
+ * table (the sleeves take the close from the market-calendar source for exactly
+ * that reason), so it cannot tell a partial bar from a same-day bar collected
+ * after the close. The last assertion here is that the verdict is untouched.
+ */
+const partialAsOf = '2026-09-08T03:01:37.490Z'
+/** Sessions stamped at XKRX local midnight, which is the stamp the vendor sends. */
+const seoulMidnight = (daysBack) => new Date(Date.parse('2026-09-08T00:00:00+09:00') - daysBack * 86_400_000).toISOString()
+const partialSeries = Array.from({ length: 240 }, (_, index) => {
+  const close = 100 + index * 0.05
+  return { date: seoulMidnight(239 - index), open: close, high: close + 1, low: close - 1, close, volume: 1000 }
+})
+/** ⚠️ The same series with the newest row dropped — the corrected prescription's answer. */
+const closedSeries = partialSeries.slice(0, -1)
+const barOperations = ['indicators', 'scan', 'opportunityMetrics', 'trendState']
+/** ⚠️ Only the keys each operation declares — `input_key_unread` is `unevaluated` and would mask the assertions below. */
+const barInput = (operation, bars) => (
+  operation === 'indicators' ? { bars }
+    : operation === 'trendState' ? { symbol: '069500', bars }
+      : { symbol: '069500', market: 'kr', bars }
+)
+const barRun = (operation, bars) => execute({ operation, asOf: partialAsOf, input: barInput(operation, bars) })
+const unclosedRow = (answer) => answer.diagnostics.find((row) => row.code === 'newest_bar_may_be_unclosed') ?? null
+
+/* ── ⑴ it fires, on every operation that reads a bar array ────────────────── */
+for (const operation of barOperations) {
+  const row = unclosedRow(barRun(operation, partialSeries))
+  assert.ok(row, `${operation} reports a newest bar that has not been closed for 24 hours — this is the gap #224 measured`)
+  assert.equal(row.severity, 'info', `${operation}: the newest-bar age is a report, because this package cannot honestly decide whether the venue is mid-session`)
+  assert.equal(row.path, 'bars')
+  assert.equal(row.details.timestamp, partialSeries.at(-1).date, 'and it names the bar, so a run can check the row it was handed')
+  assert.ok(row.details.ageMs < 86_400_000 && row.details.ageMs >= 0, `${operation}: the age it reports is the age it measured`)
+}
+
+/* ── ⑵ and it is silent on a series the run collected correctly ───────────── */
+for (const operation of barOperations) {
+  assert.equal(
+    unclosedRow(barRun(operation, closedSeries)),
+    null,
+    `${operation} says nothing about a newest bar that closed more than 24 hours before asOf — a diagnostic that fires on a correct collection is one nobody reads`,
+  )
+}
+
+/**
+ * ⚠️ The boundary itself, asserted rather than inferred from a series: exactly
+ * 24 hours old is closed, one millisecond younger is not.
+ */
+assert.equal(unclosedNewestBar([{ timestamp: '2026-09-07T03:01:37.490Z' }], partialAsOf), null, '24 hours after its own stamp is readable')
+assert.ok(unclosedNewestBar([{ timestamp: '2026-09-07T03:01:37.491Z' }], partialAsOf), 'and a millisecond younger than that is not')
+assert.equal(unclosedNewestBar([], partialAsOf), null, 'no bars is not an unclosed bar')
+assert.equal(unclosedNewestBar([{ timestamp: 'not-a-date' }], partialAsOf), null, 'an unreadable stamp is #180\'s finding and not this one')
+assert.equal(BAR_CLOSE_LAG_MS, 86_400_000, 'the lag is the host\'s own rule — a daily bar becomes readable 24 hours after its opening stamp (aumos#732)')
+
+/**
+ * ⛔ **The verdict is untouched, and that is the point of the severity.** The
+ * partial series still answers with a state and a guidance; what changed is
+ * that the run is told which session the newest bar is.
+ */
+const partialTrend = barRun('trendState', partialSeries)
+assert.equal(partialTrend.status, 'ok', 'an `info` row does not demote the answer')
+assert.ok(typeof partialTrend.data.state === 'string' && partialTrend.data.state !== 'insufficient_data')
+assert.deepEqual(
+  { state: partialTrend.data.state, trancheGuidance: partialTrend.data.trancheGuidance },
+  { state: 'UPTREND', trancheGuidance: 'small_or_wait' },
+  'the gate still answers — refusing here would turn a correct post-close reading into no reading at all',
+)
+assert.equal(barRun('scan', partialSeries).status, 'ok')
+assert.equal(barRun('opportunityMetrics', partialSeries).status, 'ok')
+
+/**
+ * ⚠️ **And the partial bar is why the row is worth having at all**: the same
+ * series with the newest close 2,665 higher — the measured distortion — parses
+ * without a single complaint from #180's defence.
+ */
+const distorted = [...closedSeries, { ...partialSeries.at(-1), close: partialSeries.at(-1).close + 2_665, high: partialSeries.at(-1).close + 2_665 }]
+const distortedTrend = barRun('trendState', distorted)
+assert.equal(distortedTrend.data.state === 'insufficient_data', false, 'the shape is valid: no parse check sees this')
+assert.equal(distortedTrend.diagnostics.some((row) => ['bar_value_invalid', 'trend_bars_unreadable', 'trend_moving_average_unavailable'].includes(row.code)), false)
+assert.ok(unclosedRow(distortedTrend), 'and the only thing that reports it is the newest bar\'s age')
+
+/**
+ * ── The durable rule, retracted rather than left to a prompt (#156's mechanism)
+ *
+ * ⛔ A wrong prescription filed `CONFIRMED` in `failures/repeated-patterns` is
+ * the one defect a new package version cannot fix by itself: the key is
+ * instance-private, append-only and read on every wake. So the correction is
+ * computed and handed to the run.
+ */
+const beforeRuleRow = {
+  id: 'candles-before-instant-excludes-partial-bar',
+  state: 'CONFIRMED',
+  severity: 'blocks-every-future-wake',
+  note: '`before` accepts an instant and is how you exclude a mid-session partial bar.',
+}
+const beforeRetraction = execute({
+  operation: 'refutedMemoryRules',
+  asOf: partialAsOf,
+  input: { patterns: [beforeRuleRow], memory: { 'run/theme-radar-last': {} } },
+})
+const beforeRetracted = beforeRetraction.data.retractions.find((row) => row.refutedRuleId === 'candles-before-excludes-the-partial-bar')
+assert.ok(beforeRetracted, 'the wrong prescription is matched on its wording, because another instance filed it under another id')
+assert.equal(beforeRetracted.key, 'failures/repeated-patterns')
+assert.equal(beforeRetracted.writeAs.state, 'RETRACTED', 'retract, never delete — the key is append-only and a vanished rule is re-derived')
+assert.equal(beforeRetracted.writeAs.retracts, beforeRuleRow.id)
+for (const fragment of ['inclusive', 'inside the previous day', 'first row', '113,485', 'newest_bar_may_be_unclosed']) {
+  assert.ok(beforeRetracted.correction.includes(fragment), `the correction carries «${fragment}» — the measurement and both halves of the prescription`)
+}
+assert.ok(
+  beforeRetraction.diagnostics.some((row) => row.code === 'memory_rule_refuted'),
+  'and the run is told to write the retraction in this run rather than noticing it later',
+)
+
+/** ⛔ And a run carrying no such rule is not handed a retraction it has nothing to retract. */
+assert.equal(
+  execute({ operation: 'refutedMemoryRules', asOf: partialAsOf, input: { patterns: [], memory: { 'run/theme-radar-last': {} } } })
+    .data.retractions.some((row) => row.refutedRuleId === 'candles-before-excludes-the-partial-bar'),
+  false,
+)
+
+console.log('evidence-gated issue #224 partial-bar regression tests passed')

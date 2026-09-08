@@ -181,6 +181,27 @@ installed and answering throughout, because the first run wrote the miss into
 condition, and submitted 24 evidence ids none of which supported it. Before `untilled/aumos#693`
 there was nothing the run could have done; `observationLedger` makes the omission a finding.
 
+**A prescription that returned the very bar it was written to avoid** (#224). This book carried, as
+`CONFIRMED` in `failures/repeated-patterns`, *"`before` accepts an instant and is how you exclude a
+mid-session partial bar"*. `before` is **inclusive**, and a Toss daily bar is stamped at the venue's
+local midnight — so the sentence's own natural reading returns exactly today's unfinished bar.
+Measured 2026-09-08 on 069500 during the XKRX session, three controlled calls:
+`before=2026-09-08T00:00:00+09:00` and an omitted `before` both answered with the same 2026-09-08
+first row; `before=2026-09-07T23:59:59+09:00` answered 2026-09-07. Two calls seconds apart
+disagreed about that row — close 113,470 → 113,485, volume 11,452,779 → 11,466,966 — and its close
+sat 2,665 above the real 2026-09-07 close of 110,820, so `trendState` read `close`, `ma20` and
+`extensionPct` off a price no session ever printed and handed the answer to `trancheGuidance`.
+⛔ **No existing defence could see it**: `bar_value_invalid` and `trend_moving_average_unavailable`
+ask whether the row parsed, and a partial bar's OHLCV is complete and numeric. The shape was valid
+and the data was wrong. ⚠️ **And the runtime half is deliberately weaker than the issue asked
+for** — «that market is mid-session» is not a question this package may answer, because it holds no
+market-hours table and the sleeves source the close for exactly that reason. What it detects is age,
+on the host's own rule that a daily bar becomes readable 24 hours after its opening stamp
+(aumos#732), reported as `newest_bar_may_be_unclosed` / `info` and refusing nothing: a run pinned
+after the close holds a same-day bar that is complete, and refusing there would turn a correct
+reading into no reading. On the corrected prescription the row does not appear at all, so it fires
+exactly when a run did not follow it.
+
 ## The watch layer (§2b)
 
 **Three usable answers reported as nothing checked** (#157). `succeeded: 3` over `attempts: 10` used

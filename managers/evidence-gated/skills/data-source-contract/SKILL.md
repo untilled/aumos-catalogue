@@ -50,7 +50,7 @@ is what makes the wrong turn look right.
 | provider | tool | catalogue endpoints used here | time meaning |
 |---|---|---|---|
 | Toss broker connector | — | portfolio, cash, fills, order/approval path | Kernel-owned; never call through either tool |
-| 토스 login | `connection_request` | `/api/v1/candles`, `/prices`, `/orderbook`, `/trades`, `/stocks`, `/stocks/all`, warnings, flows, FX, calendars, rankings, indicators | the host bounds `before`/`until`/`dateTime` at `asOf` for you; a window may come back shorter than asked and never longer |
+| 토스 login | `connection_request` | `/api/v1/candles`, `/prices`, `/orderbook`, `/trades`, `/stocks`, `/stocks/all`, warnings, flows, FX, calendars, rankings, indicators | the host bounds `before`/`until`/`dateTime` at `asOf` for you; a window may come back shorter than asked and never longer. ⛔ **Bounded at `asOf` is not «the partial bar removed»** — `before` is inclusive and the host normalises nothing, so see below |
 | `sec-edgar` | `source_request` | `/files/company_tickers.json` **first**, then `/api/xbrl/companyfacts/CIK{10-digit zero-padded}.json` — ⛔ the allowlist's `{symbol}` is that **file name**, never a ticker | each fact unit is available at its `filed` date, not fiscal period end |
 | Alpaca login | `connection_request` | bars, news, corporate actions | `end` is filled at `asOf` if you leave it out; snapshots are always current and never canonical replay evidence |
 | `openbb-fmp` | `/api/v1/equity/price/historical` only | optional long history; set `end_date`, record provider and adjustment |
@@ -140,8 +140,56 @@ answered wrongly:
 
 | route family | parameter | shape | what comes back |
 |---|---|---|---|
-| `/api/v1/candles`, `/api/v1/market-indicators/{symbol}/candles` | `before` | RFC 3339 with an offset — `2026-08-20T00:00:00.000+09:00` | `nextBefore`, in that same shape |
+| `/api/v1/candles`, `/api/v1/market-indicators/{symbol}/candles` | `before` | RFC 3339 with an offset — `2026-08-20T00:00:00.000+09:00`; ⚠️ **inclusive (`≤`)** | `nextBefore`, in that same shape |
 | `/api/v1/stocks/{symbol}/…` | `until` | a date — `2026-08-27` | `nextUntil`, in that same shape |
+
+### ⛔ `before` does not exclude the partial bar, and this book had it backwards
+
+**`before` is inclusive**, and Aumos's own allowlist description now says so — `before=instant ≤`
+for `/api/v1/candles`. ⚠️ **Read that legend the way it is written**: the mark is what was
+*measured*, and a parameter with no mark beside it is **unmeasured rather than exclusive**. The host
+deliberately normalises nothing here; bounding `before` at `asOf` (the table above) keeps you from
+asking for the future and does **not** drop an unfinished session.
+
+A Toss daily bar is stamped at the venue's **local midnight**. So the sentence this book carried in
+`failures/repeated-patterns` as `CONFIRMED` — *"`before` accepts an instant and is how you exclude a
+mid-session partial bar"* — is half right, and the wrong half is the half you act on: pass today's
+midnight and you get **exactly today's incomplete bar**. Measured on 2026-09-08, 069500, XKRX
+mid-session (asOf 12:01 KST), three controlled calls:
+
+| call | first row |
+|---|---|
+| `before=2026-09-08T00:00:00+09:00`, `count: 200` | **2026-09-08** — the partial bar |
+| no `before`, `count: 3` | **2026-09-08** — the same one |
+| `before=2026-09-07T23:59:59+09:00`, `count: 3` | 2026-09-07 ✓ |
+
+Two calls seconds apart disagreed about that row — close 113,470 → 113,485, volume 11,452,779 →
+11,466,966 — which is the observation that proves it unfinished. Its close sat **2,665 above** the
+real 2026-09-07 close of 110,820.
+
+So, two steps and the second is not optional:
+
+1. **Pass an instant inside the previous day** — `2026-09-07T23:59:59+09:00`, not the day's
+   midnight. ⚠️ The offset is the venue's, because the stamp is.
+2. **Then read the first row's date and confirm it is the session you meant.** `before`'s meaning is
+   the vendor's to change, and this check is right whichever way it changes — it is also the only
+   thing that catches a paginated `nextBefore` walking back over the same boundary.
+
+⛔ **Do not expect a shape check to catch this.** A partial bar's OHLCV is complete, finite and
+numeric, so it parses; `bar_value_invalid`, `trend_bars_unreadable` and
+`trend_moving_average_unavailable` all pass it straight through and the moving averages compute. The
+shape is valid and the data is wrong. What reports it is **`newest_bar_may_be_unclosed`** (`info`)
+from `indicators`, `scan`, `opportunityMetrics` and `trendState`: the newest bar is younger than the
+24 hours after its own opening stamp that make a daily bar readable (aumos#732). ⚠️ That row is a
+report and never a refusal — a run pinned after the close holds a same-day bar that is genuinely
+complete, and this package holds no market-hours table with which to tell the two apart. Read it as
+*«say which session this verdict stands on»*, and note that on the corrected prescription above it
+does not appear at all.
+
+⚠️ **None of this touches the whole-universe sweep.** `source_cache_refresh` on `prices`/`daily`
+never hands back a bar that has not closed — that route's own rule is *«the newest bar you can read
+is yesterday's»* — and it is the route the sleeves require. This section is about the bars a run
+hand-collects for a single name.
 
 `interval` on the two candle routes is a closed vocabulary, and the daily member is **`1d`**.
 `day` is refused with a 400 — one string, and it stopped this book for two days
