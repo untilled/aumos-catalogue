@@ -246,6 +246,45 @@ historical OHLC bars, not previous scan runs. Fetching sufficient dated bars per
 on the first run; a durable scan-history database is not required for that gate. §3 of `PROMPT.md`
 carried the same misreading and no longer does.
 
+## The cadence basis, and the two things the cache cannot say (#228)
+
+`catalystCadence` derives the next expected disclosure window out of the filings the branch already
+read, which is what ended the catalyst axis's structural starvation without weakening the rule that
+every registered window is citable. ⛔ **Nothing was asked of the host to do it and nothing new was
+approved** — the capability set did not move by one row, and the inputs are the `source_cache_read`
+documents `radarCandidates` is already given. Two debts are recorded here because they bound what
+the derivation can honestly claim, not because the stage is blocked on them.
+
+### ⛔ Still owed by the host: a cached document does not name its own Evidence id
+
+The `CachedDocument` shape this package has measured is `{ publishedAt, version, normalized }` and
+carries **no Aumos evidence id**, so a derived window cannot cite the filings it was measured over
+from the cache answer alone. `catalystCadence` therefore takes the join as a separate `evidence`
+argument keyed by `documentKey`, which the flow fills from `evidence_search` — and ⛔ a document it
+cannot cite derives nothing (`cadence_basis_uncited`), because the discipline that refuses an uncited
+reading is repointed at the basis rather than relaxed. ⚠️ **The cost is a round trip and a join the
+package maintains**, and the join is by `documentKey`, which is the host's own key: if
+`source_cache_read` carried the evidence id on the document, the argument and its failure mode both
+disappear. Until it does, a flow that skips the join gets a sleeve with a measured cadence and zero
+derived windows, which is at least the honest shape.
+
+### ⛔ Still owed by the host: the cache holds regular reports, not primary disclosures
+
+Primary disclosure runs **ahead** of the regular report — a KR filer publishes 잠정실적 and a US one an
+earnings release days-to-weeks before the document whose lag this median measures — so a raw
+filing-cadence estimate is systematically late. That is the ported-from harness's own recorded
+finding and it is why this operation registers a **window** rather than a date: it opens at the
+earliest regular-report lag this cache has actually shown and closes at the latest, and every row
+carries `leadDays` and `leadBasis` saying how far ahead it was opened and on what.
+
+⚠️ **What that does not do is measure the primary disclosure itself**, and the answer says so:
+`leadCovers` is *the regular report only; a primary disclosure ahead of the earliest cached lag opens
+before this window*. Closing it needs a primary-disclosure document in the cache — `source_cache_refresh`
+routes `open-dart`/`filings`, `open-dart`/`financials`, `sec-edgar`/`companyfacts` and `prices`/`daily`,
+and none of them is one. ⛔ **It is deliberately not closed with a constant.** A lead lifted out of
+another book's cache is an assertion about this one, which is the same mistake as importing the
+harness's KR 45 / US 30 medians — and this operation exists partly to refuse that.
+
 ## Authoritative WATCH reads (#97, #148, #156 — `untilled/aumos#690` landed)
 
 ⚠️ **This section asked for the face, and then the package went ahead and built one out of a

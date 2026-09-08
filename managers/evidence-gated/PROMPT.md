@@ -618,10 +618,27 @@ CIK) → `mapCorporationCodes` → `fundamentalsPlan` → `source_cache_read` / 
   unmapped names (`corp_code_unmapped_symbols`), let `radarFeedDiagnosis` name the `registry` stage,
   run the price branch, and say in `uncertainty` that the fundamental branch was unfed rather than
   empty. `HOST-FOLLOWUPS.md` carries the decode this is waiting on.
-- **`catalystRegister` is the producer of the catalyst and event axis.** Research the window for
+- **`catalystCadence` derives the expected disclosure date, and `catalystRegister` is the producer
+  of the catalyst and event axis.** Research the window for
   every roster name, file the reading (`observation_file` for the web, the Aumos evidence id for a
   vendor calendar), and pass the two maps on. ⛔ Every row takes `evidenceIds` and a row without one
   is refused — *a catalyst is registered* has to mean somebody can go and check what it was.
+  ⚠️ **That requirement is what starved the axis, and #228 is how it is fed without weakening it.**
+  A window nobody had researched by hand did not exist, so both lenses that do not need a price fall
+  excluded every name for want of an input. `catalystCadence` reads the filings already in the host
+  cache, measures the period-end→publication lag **in this book, at run time**, and derives the next
+  expected window; the rows go to `catalystRegister` on **`estimated`**, carrying
+  `dateSource: "estimated_from_filing_cadence"` and the `cadenceBasis` — and citing the past filings
+  the cadence was measured over, so «somebody can go and check it» holds with the thing checked moved
+  from a future document to a basis that exists. ⛔ The ported-from harness's measured medians
+  (KR 45 days, US 30) are the precedent for the *method*: under the floor this refuses to estimate
+  rather than borrowing them. ⛔ An estimate on `catalysts`, or on `estimated` without saying it is
+  one, is `catalyst_estimate_unmarked` and blocked. ⛔ **And nothing derived reaches `actual`** —
+  `post-event-continuation` needs a real announcement record from the corporate-actions route and
+  stays honestly empty until it has one; a cadence says when a filer will probably speak, never what
+  it said. ⚠️ A derived window does not make a name researched: `coverage.researched` and
+  `coverage.derived` are counted apart, and `upsideRadar` ranks a confirmed catalyst above an
+  estimated one and says which opened the lane.
   ⚠️ Researched-and-absent is not unresearched: `catalyst_window_unresearched` and
   `event_record_unresearched` are `input-path` causes `mandateExecution` reads. ⚠️ The register is
   carried in `research/catalyst-window` with **numeric** instants; ⛔ event records are not persisted
@@ -630,7 +647,11 @@ CIK) → `mapCorporationCodes` → `fundamentalsPlan` → `source_cache_read` / 
   mapping, request, response, normalization, partially-fed — and `upsideRadar` puts it on the
   diagnostic when passed as `feed`; without it, `radar_starvation_cause_unreported`. ⛔ The report
   distinguishes **`fed-and-genuinely-empty`** from **`never-fed`**: identical empty candidate lists,
-  opposite meanings, and mixing them is the worst outcome this branch can produce. ⚠️ Most runs are
+  opposite meanings, and mixing them is the worst outcome this branch can produce.
+  ⚠️ **Pass `catalystRegister`'s answer as `catalysts`**, or `never-fed` cannot say which one it is:
+  **`never-fed-no-catalyst-producer`** (nobody produced the axis — `catalyst_producer_absent`) and
+  **`never-fed-catalyst-producer-empty`** (it ran and registered nothing) have opposite fixes and
+  were one word until #228. ⚠️ Most runs are
   neither and the third state is a count — `partially-fed` is its own stage and verdict, and every
   lane header carries `feedCoverage: { fed, of, unfed }`. ⛔ Report the counts, never «fed».
 

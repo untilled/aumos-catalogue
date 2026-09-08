@@ -115,7 +115,7 @@ carries had no producer at all (#169). `radarCandidates` takes `catalysts` and `
 `upsideRadar` reads a window open inside 60 days and an event announced inside 30, and nothing in
 this package ever built either — so `inflection` and `post-event-continuation`, the two lenses that
 do not require a price fall, excluded every candidate for want of an input and reported it as a
-finding about the company. Use `catalystRegister({previous, catalysts, events, roster})` and persist
+finding about the company. Use `catalystRegister({previous, catalysts, estimated, events, roster})` and persist
 only a non-null `nextState`. It carries at most 200 rows of symbol, market, an event label, the
 window, the observation date and up to eight Evidence ids — no prices, no filing numbers, no
 positions.
@@ -138,6 +138,15 @@ there. Write `nextState` verbatim and do not re-encode it.
 section below forbids in as many words. They are re-read from the corporate-actions route every run;
 what persists is the calendar. A window that has closed leaves the register on the next run and is
 reported as `catalyst_window_closed` — score whether the catalyst happened before dropping the name.
+
+⚠️ **A carried row states whether its date was read or derived** (#228). `dateSource` is
+`observed` or `estimated_from_filing_cadence`, and an estimated row carries the `cadenceBasis` it was
+derived from beside it; both are part of the revision and are persisted verbatim like everything else
+here. ⛔ A row written before #228 carries no `dateSource` and is read as observed, which is what it
+was. ⛔ **A derived window does not enter the researched count** — `coverage.researched` and
+`coverage.derived` are separate, so filling the axis from the cache does not retire
+`catalyst_window_unresearched`, and a confirmed window under a key is never replaced by an estimate
+however fresh the estimate is.
 
 For `run/armed-reviews`, `reconcileArmedReviews` persists what **this instance proposed** and whose
 instant has not passed. ⛔ It is not verified against `decisions[].armed` and cannot be: that field

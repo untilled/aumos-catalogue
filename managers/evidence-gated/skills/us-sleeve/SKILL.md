@@ -85,7 +85,33 @@ been fed. Do these in order and report each one:
    Three different findings; do not collapse them.
 5. **Read each response's own dates.** `normalizeSecFacts` takes `filed` as the availability
    instant — never the fiscal period end — and drops anything later than `asOf`.
-6. **`catalystRegister`** — the catalyst and event axis, which until #169 had **no producer at
+6. **`catalystCadence`** — the stage that fills the axis, because until #228 nothing did. #169
+   built the register and left its input to a person: every row requires `evidenceIds`, so the only
+   way to open the two lenses that do not need a price fall was to research a window by hand for
+   every roster name, and no run ever did. Measured on `run_c7ad46eea03840bf84ae7a8822ed02c3`
+   (asOf 2026-09-08): `radarFeedDiagnosis` `never-fed`, `inflection` 0 of 83,
+   `post-event-continuation` 0 of 83 with all 83 excluded for `no-event-in-the-last-30-days`.
+   The ported-from methodology hit the same wall on 2026-07-29 and answered it by deriving the next
+   expected disclosure date from the cadence already on disk; `inflection` went from 2 to 12.
+   - **Pass the same `documents` you pass `radarCandidates`.** The lag from a period end to the
+     filer's publication is measured **here, from this book's own cache**, and reported with its
+     count. ⛔ The original's measured medians — KR 45 days over 268 filings, US 30 over 312 — are
+     the precedent for the *method* and are never a fallback: a constant lifted out of another
+     book's cache is an assertion about this one. Under the floor the operation answers
+     `cadence_basis_insufficient` and estimates nothing.
+   - **Primary disclosure runs ahead of the regular report**, so a raw filing-cadence estimate is
+     systematically late. ⚠️ The correction is a **window**, not a second constant: it opens at the
+     earliest lag this cache has actually shown and closes at the latest, so the point estimate
+     sits inside it and `leadDays` on every row says how far ahead it was opened and on what.
+   - **Join the evidence ids on as `evidence`, keyed by `documentKey`.** A derived row cites the
+     **past filings its cadence was measured over** — the discipline that refuses an uncited window
+     is not relaxed, it is repointed at a basis that exists. ⛔ A document this branch cannot cite
+     derives nothing, and `cadence_basis_uncited` counts them.
+   - ⛔ **It produces no event record and must not.** `sue`, `day1ExcessPct` and
+     `preAnnouncementClose` are reported figures about an announcement that happened; a cadence says
+     when a filer will probably speak and never what it said. `post-event-continuation` stays fed by
+     the corporate-actions route and stays honestly empty until it is.
+7. **`catalystRegister`** — the catalyst and event axis, which until #169 had **no producer at
    all**. `radarCandidates` takes `catalysts` and `events`; `upsideRadar` reads a window open
    inside 60 days and an event announced inside 30; nothing in this package ever built either, so
    the two lenses that do not require a price fall excluded every name for want of an input and
@@ -114,16 +140,16 @@ been fed. Do these in order and report each one:
      `preAnnouncementClose` are numbers copied off a vendor answer, which
      `skills/memory-contract/SKILL.md` forbids. Re-read them each run.
 
-7. **`radarCandidates`** — vendor rows or cached documents in, radar candidates out. Every roster
+8. **`radarCandidates`** — vendor rows or cached documents in, radar candidates out. Every roster
    name comes back, including the unfed ones, with the reason it is unfed.
    ⚠️ **Pass `catalysts` and `events` from the step above.** They are separate arguments and a
    call that omits them is a call that hands the radar an empty catalyst axis — which the lanes
    report as a fact about the company.
-8. **`radarFeedDiagnosis`** — which stage lost the input: registry, mapping, request, response,
+9. **`radarFeedDiagnosis`** — which stage lost the input: registry, mapping, request, response,
    normalization, or none of them.
-9. **`upsideRadar({candidates, feed})`** — pass the diagnosis as `feed`. Without it a starved lane
+10. **`upsideRadar({candidates, feed})`** — pass the diagnosis as `feed`. Without it a starved lane
    can say it is unfed and not *why*, and that is `radar_starvation_cause_unreported`.
-10. **`thesisGapSources` and `thesisValuation` on any name that reaches a thesis** (#160). The same
+11. **`thesisGapSources` and `thesisValuation` on any name that reaches a thesis** (#160). The same
    statements feed sizing. `thesisGapSources({gaps, mapping, feed})` says whether an open
    `expectedUpsidePct` / `fairValueRange` gap is **unfetched** (a filer, so go and fetch) or
    **unfillable** (no filer — an index vehicle, and `candidate-research` §Core DCA already forbids
@@ -131,7 +157,7 @@ been fed. Do these in order and report each one:
    both fields from the bear/base/bull targets. ⛔ Without them a complete variant view still reads
    `missing: ["thesisComplete"]` and a declared 20% cap operates at 1%.
 
-11. **`observation_file` on every consensus reading, then carry the id onto the row** (#692). This
+12. **`observation_file` on every consensus reading, then carry the id onto the row** (#692). This
     is the step that turns a web reading into something the record holds. `variantViewCheck`'s
     `consensusRefs` requirement is the **only one of the four whose input exists nowhere but the
     web** — a broker estimate or a price target is in no filing and on no exchange feed — and your
@@ -151,7 +177,7 @@ been fed. Do these in order and report each one:
     proposal carries that code verbatim in one `rationale.risks` entry with the source URL and in
     one `uncertainty` entry, or the sizing is `blocked`. `risks` is not optional politeness — it is
     what the approval screen renders, and `uncertainty` is not on that screen at all.
-12. **`observationLedger` before you hand the flow back.** Pass what you filed
+13. **`observationLedger` before you hand the flow back.** Pass what you filed
     (`observations`), the ids the proposal will submit (`citedEvidenceIds`), and every web-read
     value your judgement leant on (`claims: [{claim, value, usedFor, evidenceId}]`). ⛔ A value
     used and uncited is `claim_evidence_missing` / `blocked` — that is the 2026-09-06 failure
