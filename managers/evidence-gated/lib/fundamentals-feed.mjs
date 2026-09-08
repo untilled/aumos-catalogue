@@ -187,7 +187,7 @@ function cacheEntry(cache, key) {
 export function fundamentalsPlan({ market, symbols = [], corporationCodes = [], cache = {}, businessYear = null, reportCode = null, freshForSeconds = FUNDAMENTALS_FRESH_FOR_SECONDS, asOf } = {}) {
   const diagnostics = []
   if (market !== 'kr' && market !== 'us') {
-    return { data: null, diagnostics: [diagnostic('feed_market_invalid', 'blocked', 'Expected kr or us — the same argument researchUniverse takes, and never a MIC', 'market', { received: market ?? null })] }
+    return { data: null, diagnostics: [diagnostic('feed_market_invalid', 'blocked', 'Expected kr or us — the sleeve, the same argument researchUniverse takes. ⚠️ The MIC (XKRX/XNAS/XNYS) is read too and converted at the one input boundary (#212 ⑥), so a value refused here is neither spelling', 'market', { received: market ?? null })] }
   }
   const names = [...new Set(symbols.map((row) => (typeof row === 'string' ? row : row?.symbol)).filter((row) => typeof row === 'string' && row))]
   if (!names.length) diagnostics.push(diagnostic('feed_universe_empty', 'unevaluated', 'A roster is required before the branch can be fed; researchUniverse is what supplies it', 'symbols'))
@@ -317,7 +317,7 @@ export function fundamentalsPlan({ market, symbols = [], corporationCodes = [], 
 export function mapCorporationCodes({ market = 'kr', symbols = [], registryRows = [], filingRows = [], tickerRows = [], asOf } = {}) {
   const diagnostics = []
   if (market !== 'kr' && market !== 'us') {
-    return { data: null, diagnostics: [diagnostic('feed_market_invalid', 'blocked', 'Expected kr or us — the same argument researchUniverse takes, and never a MIC', 'market', { received: market ?? null })] }
+    return { data: null, diagnostics: [diagnostic('feed_market_invalid', 'blocked', 'Expected kr or us — the sleeve, the same argument researchUniverse takes. ⚠️ The MIC (XKRX/XNAS/XNYS) is read too and converted at the one input boundary (#212 ⑥), so a value refused here is neither spelling', 'market', { received: market ?? null })] }
   }
   const names = [...new Set(symbols.map((row) => (typeof row === 'string' ? row : row?.symbol)).filter((row) => typeof row === 'string' && row))]
   const index = new Map()
@@ -545,7 +545,7 @@ function cachedFilings(documents, diagnostics) {
 export function radarCandidates({ market, symbols = [], financials = {}, facts = {}, documents = {}, prices = {}, events = {}, catalysts = {}, valuations = {}, asOf } = {}) {
   const diagnostics = []
   if (market !== 'kr' && market !== 'us') {
-    return { data: null, diagnostics: [diagnostic('feed_market_invalid', 'blocked', 'Expected kr or us — the same argument researchUniverse takes, and never a MIC', 'market', { received: market ?? null })] }
+    return { data: null, diagnostics: [diagnostic('feed_market_invalid', 'blocked', 'Expected kr or us — the sleeve, the same argument researchUniverse takes. ⚠️ The MIC (XKRX/XNAS/XNYS) is read too and converted at the one input boundary (#212 ⑥), so a value refused here is neither spelling', 'market', { received: market ?? null })] }
   }
   const roster = symbols.map((row) => (typeof row === 'string' ? { symbol: row } : row)).filter((row) => typeof row?.symbol === 'string' && row.symbol)
   const candidates = []
@@ -645,7 +645,7 @@ const FEED_STAGES = ['registry', 'mapping', 'request', 'response', 'normalizatio
 export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping = null, responses = [], candidates = null, lanes = null, asOf } = {}) {
   const diagnostics = []
   if (market !== 'kr' && market !== 'us') {
-    return { data: null, diagnostics: [diagnostic('feed_market_invalid', 'blocked', 'Expected kr or us — the same argument researchUniverse takes, and never a MIC', 'market', { received: market ?? null })] }
+    return { data: null, diagnostics: [diagnostic('feed_market_invalid', 'blocked', 'Expected kr or us — the sleeve, the same argument researchUniverse takes. ⚠️ The MIC (XKRX/XNAS/XNYS) is read too and converted at the one input boundary (#212 ⑥), so a value refused here is neither spelling', 'market', { received: market ?? null })] }
   }
   const rosterCount = new Set(symbols.map((row) => (typeof row === 'string' ? row : row?.symbol)).filter(Boolean)).size
   const requests = Array.isArray(plan?.requests) ? plan.requests : []

@@ -10,6 +10,7 @@ import { METHODOLOGY } from '../managers/evidence-gated/lib/constants.mjs'
 import { GRANDFATHER_DEFAULTS } from '../managers/evidence-gated/lib/diagnostics.mjs'
 import { OPERATIONS, PUBLISHED_OPERATIONS, INTERNAL_OPERATIONS, SUBSUMED_BY, assertRegistered } from '../managers/evidence-gated/lib/operations.mjs'
 import { labelAxes, sessionRows } from '../managers/evidence-gated/lib/input-shapes.mjs'
+import { canonicalizeInput, INPUT_VOCABULARY } from '../managers/evidence-gated/lib/input-contracts.mjs'
 import { renderOperations, checkOperations } from './generate-evidence-gated-operations.mjs'
 import { loadParity, comparePort } from './legacy-parity.mjs'
 
@@ -141,6 +142,25 @@ function assertSubset(actual, expected, path = 'data') {
   }
 }
 
+/**
+ * ── The revision is opaque, and this fixture used to model it as a count ────
+ *
+ * ⚠️ **The host's revision is the memory entry's id — a string** (aumos#721:
+ * `memory_write`'s `expectedRevision` and the `revision` `memory_read` carries
+ * are that id, compared for equality by a CAS). This fixture modelled it as the
+ * integers 1 and 2 and this helper sorted by `b.revision - a.revision`, so the
+ * one rule stating the host's visibility was written against an ordering the
+ * host does not publish — a shape that reads as *"revisions are numbered and
+ * the higher one is the later one"*, which is the kind of second answer #212 is
+ * about.
+ *
+ * The latest visible revision is the one **written last at or before `asOf`**,
+ * which is a fact the fixture does carry, and `revision` is now an id that is
+ * never ordered. ⛔ Fixing this is not required by #212 ⑥ — a fixture is not a
+ * contract a model reads — and it is done here because the same pass is
+ * lifting memory shapes to their canonical type, and a fixture that models an
+ * opaque id as a counter is how a leaf learns to compare two of them.
+ */
 const visibleRevision = ({ instance, asOf }) =>
   memory.revisions
     .filter(
@@ -148,7 +168,7 @@ const visibleRevision = ({ instance, asOf }) =>
         row.instance === instance &&
         Date.parse(row.writtenAsOf) <= Date.parse(asOf),
     )
-    .sort((a, b) => b.revision - a.revision)[0]?.revision ?? null
+    .sort((a, b) => Date.parse(b.writtenAsOf) - Date.parse(a.writtenAsOf))[0]?.revision ?? null
 
 covers('audit/memory-contract')
 assert.equal(memory.runs[0].expectedReadRevision, null, 'run A starts with empty memory')
@@ -160,6 +180,8 @@ assert.equal(
 )
 covers('learning/memory-revision')
 assert.equal(memory.revisions.length, 2, 'same key keeps both revisions')
+for (const row of memory.revisions) assert.equal(typeof row.revision, 'string', 'a revision is the memory entry id the host hands back, not a count')
+assert.equal(memory.runs[1].expectedReadRevision, memory.revisions[0].revision, 'and the revision a run expects is named by that id rather than derived from an order')
 assert.notEqual(memory.revisions[0].revision, memory.revisions[1].revision, 'revisions are append-only')
 assert.equal(visibleRevision(memory.replay), memory.replay.expectedRevision, 'replay excludes future revision')
 assert.equal(visibleRevision(memory.isolation), null, 'another instance cannot read private memory')
@@ -2841,6 +2863,220 @@ assert.ok(
     .diagnostics.some((row) => row.code === 'input_shape_invalid' && row.path === 'input.positions[0].sectors'),
   'and the check the row names is the check that runs',
 )
+
+/**
+ * ── One boundary, and the leaves hold no second spelling (#212 ⑥) ──────────
+ *
+ * Five facts arrived in two representations each, and each second
+ * representation was detected inside whichever leaf needed it. Two things are
+ * asserted, and neither can be satisfied by moving code around:
+ *
+ *  ⑴ **the two representations produce the same answer** — every judgement
+ *    field, not a status — because that is the whole claim a canonical boundary
+ *    makes, and
+ *  ⑵ **the branch is gone from the leaf** — by module and by name, the way
+ *    ⑷ above asserts no `operation === ` survives the shape chain.
+ *
+ * ⛔ Converting is not deciding: a value in no recognised shape is handed on
+ * untouched, so the refusal that already existed is still the thing that
+ * answers it. Each pair below asserts that too.
+ */
+const canonicalAsOf = '2026-09-08T00:00:00.000Z'
+const canonicalRun = (operation, input) => execute({ operation, asOf: canonicalAsOf, input })
+const canonicalHas = (answer, code) => answer.diagnostics.some((row) => row.code === code)
+const sameAnswer = (label, operation, [canonical, alias], code) => {
+  const first = canonicalRun(operation, canonical)
+  const second = canonicalRun(operation, alias)
+  assert.notEqual(first.data, null, `${label}: the canonical spelling answers, so the comparison has a subject`)
+  assert.deepEqual(second.data, first.data, `${label}: the two representations are one fact, field for field`)
+  assert.equal(second.status, first.status, `${label}: and the same status — a conversion is not a downgrade`)
+  assert.ok(
+    second.diagnostics.some((row) => row.code === code && row.severity === 'info'),
+    `${label}: it says which spelling is internal rather than converting silently`,
+  )
+  return { first, second }
+}
+
+/** ⑴ A market: the sleeve and the MIC the host's own tools take (aumos#571). */
+sameAnswer('market', 'researchUniverse', [{ market: 'kr' }, { market: 'XKRX' }], 'market_spelling_alias')
+sameAnswer('market rows', 'researchState', [
+  { observations: [{ symbol: '005930', market: 'kr', observedAt: '2026-09-01T00:00:00Z', evidenceIds: ['e1'] }] },
+  { observations: [{ symbol: '005930', market: 'XKRX', observedAt: '2026-09-01T00:00:00Z', evidenceIds: ['e1'] }] },
+], 'market_spelling_alias')
+assert.equal(canonicalRun('researchUniverse', { market: 'KOSPI' }).status, 'blocked', 'a value that is neither spelling is still refused by the leaf that owns the vocabulary')
+
+/**
+ * ⑵ An amount: a number of major units and AMP's `Money`, whose `exponent` is
+ * read first and the currency's own minor unit second (aumos#581).
+ */
+sameAnswer('money', 'exitCheck', [{ symbol: 'A', price: 77.09, rules: { stop: 80 } }, { symbol: 'A', price: { minorUnits: 7709, currency: 'USD' }, rules: { stop: 80 } }], 'money_spelling_alias')
+assert.deepEqual(
+  canonicalRun('exitCheck', { symbol: 'A', price: { minorUnits: 7709, currency: 'USD', exponent: 2 }, rules: { stop: 80 } }).data,
+  canonicalRun('exitCheck', { symbol: 'A', price: 77.09, rules: { stop: 80 } }).data,
+  'a stated exponent is read as the exponent',
+)
+assert.deepEqual(
+  canonicalRun('exitCheck', { symbol: 'A', price: { minorUnits: 7709, currency: 'KRW' }, rules: { stop: 8000 } }).data,
+  canonicalRun('exitCheck', { symbol: 'A', price: 7709, rules: { stop: 8000 } }).data,
+  'and a currency with no minor unit is not given two decimals — KRW 7709 is 7709, not 77.09',
+)
+assert.ok(
+  canonicalHas(canonicalRun('exitCheck', { symbol: 'A', price: { value: 77.09 }, rules: { stop: 80 } }), 'input_shape_invalid'),
+  'a price envelope that is not a Money is still refused by the shape check the row names, rather than guessed at',
+)
+
+/** ⑶ Cash per currency: the object, and the rows `portfolio.cashByCurrency` carries. */
+const cashObject = canonicalRun('sleeveNav', { cash: { KRW: 1000, USD: 20 }, positions: [], fx: { USDKRW: 1300 } })
+const cashRows = canonicalRun('sleeveNav', { cash: [{ currency: 'KRW', amount: 1000 }, { currency: 'USD', amount: 20 }], positions: [], fx: { USDKRW: 1300 } })
+assert.deepEqual(cashRows.data, cashObject.data, 'per-currency cash is one fact in two representations, and every NAV field agrees')
+assert.deepEqual(cashRows.diagnostics, cashObject.diagnostics, 'and neither shape is reported as a problem')
+assert.equal(cashObject.data.globalNavKrw, 27000, 'the arithmetic is the arithmetic — the conversion does not round, total or re-denominate')
+assert.deepEqual(
+  canonicalRun('specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02, sleeveCashByCurrency: [{ currency: 'KRW', amount: 11115231 }], portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }).data,
+  canonicalRun('specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02, sleeveCashByCurrency: { KRW: 11115231 }, portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }).data,
+  'and the other operation that takes per-currency cash reads both the same way',
+)
+/** ⛔ The aggregate #174 is about is still refused by name, on both keys. */
+for (const [operation, input, path] of [
+  ['sleeveNav', { cash: 8596.1, positions: [], fx: { USDKRW: 1300 } }, 'input.cash'],
+  ['specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02, sleeveCashByCurrency: 8596.1, portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }, 'input.sleeveCashByCurrency'],
+]) {
+  const refused = canonicalRun(operation, input)
+  assert.equal(refused.status, 'blocked', `${operation}: a bare amount names no currency`)
+  assert.ok(refused.diagnostics.some((row) => row.code === 'input_shape_invalid' && row.path === path), `${operation}: and the refusal names the key`)
+}
+
+/** ⑷ A trigger: the kind's two spellings, and the fields AMP writes the level in. */
+sameAnswer('trigger kind', 'validateThesis', [
+  { ...methodology.thesis, invalidationTriggers: [{ id: 'inv-1', kind: 'price-below', level: 90, checkBy: '2026-11-15' }] },
+  { ...methodology.thesis, invalidationTriggers: [{ id: 'inv-1', kind: 'price_below', level: 90, checkBy: '2026-11-15' }] },
+], 'trigger_kind_alias')
+sameAnswer('trigger fields', 'validateWatch', [
+  { watch: { kind: 'price-below', threshold: 100, expiresAt: '2026-12-01T00:00:00Z', reason: 'r' }, current: { price: 200 } },
+  { watch: { kind: 'price_below', price: { minorUnits: 10000, currency: 'USD' }, expiresAt: '2026-12-01T00:00:00Z', reason: 'r' }, current: { price: 200 } },
+], 'trigger_kind_alias')
+assert.deepEqual(
+  canonicalRun('evaluateWatch', { watch: { kind: 'weight-drift', beyond: 0.05, baselineWeight: 0.1 }, observation: { kind: 'last-price', weight: 0.2 } }).data,
+  canonicalRun('evaluateWatch', { watch: { kind: 'weight-drift', threshold: 0.05, baselineWeight: 0.1 }, observation: { kind: 'last-price', weight: 0.2 } }).data,
+  'AMP’s `beyond` and this server’s `threshold` are one band',
+)
+sameAnswer('tranche condition', 'entryTranchePlan', [
+  { symbol: 'A', maturity: 'observing', price: 100, plannedTotalWeight: 0.03, tranches: [{ label: 'T1', weight: 0.01, condition: { kind: 'immediate' } }, { label: 'T2', weight: 0.01, condition: { kind: 'price-below', threshold: 90 } }, { label: 'T3', weight: 0.01, condition: { kind: 'at-time', at: '2026-12-01T00:00:00Z' } }] },
+  { symbol: 'A', maturity: 'observing', price: 100, plannedTotalWeight: 0.03, tranches: [{ label: 'T1', weight: 0.01, condition: { kind: 'immediate' } }, { label: 'T2', weight: 0.01, condition: { kind: 'price_below', threshold: 90 } }, { label: 'T3', weight: 0.01, condition: { kind: 'at_time', at: '2026-12-01T00:00:00Z' } }] },
+], 'trigger_kind_alias')
+/**
+ * ⛔ `thesisSentinel`'s vocabulary is genuinely snake_case
+ * (`INPUT_VOCABULARY.sentinelKinds`), no row names the trigger normalizer for
+ * it, and folding it would silently change which rules a verdict is computed
+ * from. Asserted, because «one vocabulary everywhere» is the wrong reading.
+ */
+assert.equal(OPERATIONS.thesisSentinel.canonical, undefined, 'the sentinel keeps its own kind vocabulary; a conversion table is not a licence to fold every field named kind')
+assert.deepEqual([...INPUT_VOCABULARY.sentinelKinds].sort(), ['metric', 'price_above', 'price_below', 'time'], 'and that vocabulary is the snake_case one, published')
+
+/** ⑸ A memory value: the rows, and the §1 envelope holding them. */
+const refutedRows = [{ id: 'armed-reviews-memory-claims-arms-the-decision-never-made', claim: 'When they disagree, the journal wins.' }]
+const bareMemory = canonicalRun('refutedMemoryRules', { patterns: refutedRows })
+assert.equal(bareMemory.data.retractions.length, 1, 'the bare row list is matched, so the comparison has a subject')
+for (const field of ['patterns', 'rows', 'entries', 'failures']) {
+  assert.deepEqual(
+    canonicalRun('refutedMemoryRules', { patterns: { schemaVersion: 1, updatedAsOf: '2026-09-01T00:00:00Z', [field]: refutedRows } }).data,
+    bareMemory.data,
+    `a value wrapped in the §1 envelope under \`${field}\` retracts exactly what the bare rows retract`,
+  )
+}
+assert.deepEqual(
+  canonicalRun('refutedMemoryRules', { patterns: [], memory: { 'run/theme-radar-last': { rows: [{ claim: 'no granted source can fill this' }] } } }).data.retractions.map((row) => row.refutedRuleId),
+  ['valuation-gaps-have-no-granted-source'],
+  'and the envelope is unwrapped under every key of `memory`, not only the shorthand one',
+)
+assert.ok(
+  canonicalHas(canonicalRun('refutedMemoryRules', { patterns: { schemaVersion: 1 } }), 'memory_rules_shape_invalid'),
+  'a value that is neither rows nor an envelope around them is still refused, by the leaf',
+)
+
+/**
+ * ── Both spellings are published, because a manager reads the schema ───────
+ *
+ * ⚠️ aumos#618's rule: *"a manager reads the schema, not our source"*. A
+ * conversion the contract does not mention is one a caller discovers from a
+ * refusal, which is the guessed-shape failure #158 is named after — so the six
+ * facts and their second spellings are in `inputContracts.vocabulary`.
+ */
+const canonicalVocabulary = canonicalRun('inputContracts', {}).data.vocabulary
+assert.deepEqual(
+  Object.keys(canonicalVocabulary.canonicalInput).sort(),
+  ['amount', 'cashByCurrency', 'market', 'memoryValue', 'triggerKind', 'triggerLevel'],
+  'every fact folded at the boundary says so in the published vocabulary',
+)
+assert.equal(canonicalVocabulary.triggerKindAliases.price_below, 'price-below', 'and the kind table is published rather than only its effect')
+assert.equal(canonicalVocabulary.triggerKindAliases.time, 'at-time')
+for (const [alias, canonical] of Object.entries(canonicalVocabulary.triggerKindAliases)) {
+  assert.equal(canonicalRun('validateThesis', { ...methodology.thesis, invalidationTriggers: [{ id: 'inv-1', kind: alias, level: 90, checkBy: '2026-11-15' }] })
+    .diagnostics.find((row) => row.code === 'trigger_kind_alias')?.details.canonical, canonical, `the published table is the table that runs, for ${alias}`)
+}
+
+/**
+ * ── The branch is gone from the leaf, by name (#212 ⑥) ─────────────────────
+ *
+ * ⛔ The five modules below held the five detections. A leaf that grew one back
+ * fails here **naming the module and the token**, because the failure this
+ * replaces is silent: a second spelling read in one function and not the next
+ * is a value that means two things, and nothing says so.
+ *
+ * ⚠️ Comment lines are dropped first, for ⑷'s reason one paragraph up: these
+ * modules **describe** what moved, and a check that could not tell a sentence
+ * about the old branch from the old branch would forbid saying what changed.
+ */
+const CANONICAL_TOKENS = {
+  'methodology.mjs': ['TRIGGER_ALIASES', 'normalizeTriggerKind', 'normalizeWatch', 'moneyToMajor', 'minorUnits', 'CURRENCY_MINOR_DIGITS'],
+  'coverage.mjs': ['normalizeWatch', 'minorUnits'],
+  'sizing.mjs': ['normalizeTriggerKind', 'readCashByCurrency', 'minorUnits'],
+  /** ⚠️ Quoted, because `Object.entries` is not the envelope table — the table was these two as string literals. */
+  'memory-rules.mjs': ["'entries'", "'failures'", 'minorUnits'],
+  'diagnostics.mjs': ['readCashByCurrency', 'minorUnits'],
+  /**
+   * ⚠️ The token is the conversion table, not the MIC spelling: these three
+   * leaves **name** the MIC in the sentence they refuse an unreadable market
+   * with, and telling a caller which two spellings exist is the opposite of
+   * detecting one.
+   */
+  'research-state.mjs': ['marketToResearchMarket'],
+  'catalysts.mjs': ['marketToResearchMarket'],
+  'fundamentals-feed.mjs': ['marketToResearchMarket'],
+}
+const codeOf = (text) => text.split('\n').filter((line) => !/^\s*(\*|\/\*|\/\/)/.test(line)).join('\n')
+for (const [file, tokens] of Object.entries(CANONICAL_TOKENS)) {
+  const code = codeOf(await readFile(new URL(`../lib/${file}`, fixtureRoot), 'utf8'))
+  for (const token of tokens) {
+    assert.equal(code.includes(token), false, `${file} holds no \`${token}\`: the second representation is folded at the one input boundary, and a leaf that detects one is the defect #212 ⑥ removed`)
+  }
+}
+/**
+ * ⚠️ **And the check is not vacuous.** The same rule run against the module
+ * that *does* own the conversions has to fail on every one of those tokens —
+ * otherwise the loop above would pass on a package that never folded anything.
+ */
+const canonicalSource = codeOf(await readFile(new URL('../lib/canonical-input.mjs', fixtureRoot), 'utf8'))
+for (const token of ['TRIGGER_ALIASES', 'normalizeTriggerKind', 'moneyToMajor', 'minorUnits', 'CURRENCY_MINOR_DIGITS', 'readCashByCurrency', "'entries'", "'failures'", 'marketToResearchMarket']) {
+  assert.ok(canonicalSource.includes(token), `canonical-input.mjs owns \`${token}\`, so the loop above is asserting the tokens actually exist somewhere`)
+}
+
+/**
+ * ⛔ **`canonical` is dispatched by the row, exactly as `shape` is.** No
+ * `operation === ` in the boundary either — the loop in ⑷ covers
+ * `input-contracts.mjs`, and this covers the module the conversions live in.
+ */
+const canonicalCode = codeOf(await readFile(new URL('../lib/canonical-input.mjs', fixtureRoot), 'utf8'))
+assert.equal([...canonicalCode.matchAll(/operation !?===/g)].length, 0, 'canonical-input.mjs converts by the path its row named, not by comparing the operation name')
+refuses({ canonical: 'researchMarket' }, /canonical must be a function/)
+assert.equal(OPERATIONS.researchUniverse.canonical === OPERATIONS.fundamentalsPlan.canonical, false, 'each row names its own paths')
+for (const operation of ['researchUniverse', 'researchState', 'catalystRegister', 'fundamentalsPlan', 'mapCorporationCodes', 'radarCandidates', 'radarFeedDiagnosis', 'exitCheck', 'entryTranchePlan', 'sleeveNav', 'specialistBudget', 'validateWatch', 'evaluateWatch', 'validateThesis', 'variantViewCheck', 'targetWeight', 'effectivePositionCap', 'refutedMemoryRules']) {
+  assert.equal(typeof OPERATIONS[operation].canonical, 'function', `${operation} names its conversion in its own row`)
+}
+/** ⚠️ And an operation that names none is handed its input back, identical. */
+const untouched = { bars: [{ date: '2026-09-01', open: 1, high: 1, low: 1, close: 1, volume: 1 }] }
+assert.equal(canonicalizeInput('indicators', untouched).input, untouched, 'an operation with no `canonical` member gets the same object back, not a copy of it')
+assert.deepEqual(canonicalizeInput('indicators', untouched).diagnostics, [])
 
 /**
  * ── The internal surface is measured, not chosen (#212 ③) ──────────────────

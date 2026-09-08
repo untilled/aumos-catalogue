@@ -1,8 +1,8 @@
-import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW, MARKET_CURRENCIES, readCashByCurrency, convertCurrency } from './diagnostics.mjs'
+import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW, MARKET_CURRENCIES, convertCurrency } from './diagnostics.mjs'
 import { causeCodesInLane, REGISTERED_CAUSE_CODES } from './diagnostic-codes.mjs'
 import { DATA_PREPARATION_STATES, CANDIDATE_EVALUATION_STATES } from './execution-record.mjs'
 import { METHODOLOGY } from './constants.mjs'
-import { normalizeTriggerKind, variantViewCheck } from './methodology.mjs'
+import { variantViewCheck } from './methodology.mjs'
 import { trancheIntent } from './schedule.mjs'
 
 /**
@@ -50,16 +50,24 @@ import { trancheIntent } from './schedule.mjs'
  * named**, never added at face value. A number in the wrong unit is the defect
  * this whole comment is about.
  */
-export function sleeveNav({ cash = [], positions = [], fx = {} }) {
+export function sleeveNav({ cash = {}, positions = [], fx = {} }) {
   const diagnostics = []
   const totals = { KRW: 0, USD: 0 }
   const usdKrw = finite(fx?.USDKRW) && fx.USDKRW > 0 ? fx.USDKRW : null
-  for (const row of cash) {
-    if (!['KRW', 'USD'].includes(row?.currency) || !finite(row?.amount)) {
+  /**
+   * ⚠️ Cash is one internal type here — an object keyed by currency code (#212
+   * ⑥). The `{ currency, amount }` rows `portfolio.cashByCurrency` carries are
+   * the other representation of the same fact and are folded onto it at the one
+   * boundary, so this reads a single shape. ⛔ An array that could **not** be
+   * folded — a row missing either half — arrives as it was written and is
+   * reported row by row, exactly as before.
+   */
+  for (const [currency, amount] of Object.entries(cash ?? {})) {
+    if (!['KRW', 'USD'].includes(currency) || !finite(amount)) {
       diagnostics.push(diagnostic('cash_row_unevaluated', 'unevaluated', 'Cash row needs currency and amount', 'cash'))
       continue
     }
-    totals[row.currency] += row.amount
+    totals[currency] += amount
   }
   let stated = 0
   let assumed = 0
@@ -101,9 +109,7 @@ export function sleeveNav({ cash = [], positions = [], fx = {} }) {
   const sgov = valued
     .filter((row) => row.symbol === 'SGOV' && row.currency === 'USD')
     .reduce((sum, row) => sum + row.amount, 0)
-  const idleUsd = cash
-    .filter((row) => row?.currency === 'USD' && finite(row.amount))
-    .reduce((sum, row) => sum + row.amount, 0)
+  const idleUsd = finite(cash?.USD) ? cash.USD : 0
   const usdLiquidity = idleUsd + sgov
   const globalKrw = usdKrw !== null ? totals.KRW + totals.USD * usdKrw : null
   if (globalKrw === null) diagnostics.push(diagnostic('fx_missing', 'unevaluated', 'USDKRW is required for global NAV', 'fx.USDKRW'))
@@ -1988,7 +1994,18 @@ const BUDGET_EPSILON = 1e-9
  */
 function sleeveFunding({ market, sleeveCashByCurrency, portfolioNav, portfolioNavCurrency, fx }) {
   const sleeveCurrency = MARKET_CURRENCIES[market] ?? null
-  const { totals } = readCashByCurrency(sleeveCashByCurrency)
+  /**
+   * ⚠️ Per-currency cash is one internal type by the time it arrives (#212 ⑥):
+   * an object keyed by currency code. The `{ currency, amount }` rows
+   * `portfolio.cashByCurrency` carries were folded onto it at the boundary, and
+   * the bare amount #174 is about is still refused by name — by
+   * `input-shapes.mjs`' `sleeveCash`, which this operation's row already names.
+   */
+  const totals = sleeveCashByCurrency === undefined || sleeveCashByCurrency === null ||
+    Array.isArray(sleeveCashByCurrency) || typeof sleeveCashByCurrency !== 'object' ||
+    Object.values(sleeveCashByCurrency).some((amount) => !finite(amount))
+    ? null
+    : sleeveCashByCurrency
   const navCurrency = typeof portfolioNavCurrency === 'string' && portfolioNavCurrency ? portfolioNavCurrency : null
   const usdKrw = finite(fx?.USDKRW) && fx.USDKRW > 0 ? fx.USDKRW : null
   const needsFx = sleeveCurrency !== null && navCurrency !== null && sleeveCurrency !== navCurrency
@@ -2175,7 +2192,7 @@ export function entryTranchePlan({ symbol = null, lens = null, maturity = null, 
       plannedSum += row.weight
       if (row.filled) filledWeight += row.weight
     }
-    const kind = normalizeTriggerKind(row.condition?.kind)
+    const kind = row.condition?.kind
     if (!TRANCHE_CONDITION_KINDS.has(kind)) {
       diagnostics.push(diagnostic('tranche_condition_missing', 'blocked', '"We will add on weakness" is not a tranche; each one carries a date-or-price condition', `${where}.condition`, { label: row.label, supported: [...TRANCHE_CONDITION_KINDS] }))
       continue
@@ -2217,7 +2234,7 @@ export function entryTranchePlan({ symbol = null, lens = null, maturity = null, 
   const intents = []
   for (const row of rows) {
     if (row.filled) continue
-    const kind = normalizeTriggerKind(row.condition?.kind)
+    const kind = row.condition?.kind
     const expiry = Date.parse(row.expiresAt)
     if (Number.isFinite(expiry) && Number.isFinite(asOfInstant) && expiry <= asOfInstant) {
       lapsed.push(row.label)

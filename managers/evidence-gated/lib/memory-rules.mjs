@@ -97,14 +97,14 @@ const strings = (value, depth = 0) => {
   return Object.values(value).flatMap((child) => strings(child, depth + 1))
 }
 
-const rowsOf = (patterns) => {
-  if (Array.isArray(patterns)) return patterns
-  if (patterns === null || typeof patterns !== 'object') return null
-  for (const field of ['patterns', 'rows', 'entries', 'failures']) {
-    if (Array.isArray(patterns[field])) return patterns[field]
-  }
-  return null
-}
+/**
+ * ⚠️ **The envelope table is gone from here** (#212 ⑥). A memory value arrives
+ * either as its rows or wrapped in the §1 envelope, and the four keys the
+ * wrapper might hold them under were a per-shape branch in this leaf;
+ * `canonical-input.mjs` unwraps at the one boundary, so what reaches this
+ * function is the row array or a value that is not one.
+ */
+const rowsOf = (patterns) => (Array.isArray(patterns) ? patterns : null)
 
 /** The keys this registry currently has refuted rules under. */
 export const REFUTED_MEMORY_KEYS = [...new Set(REFUTED_MEMORY_RULES.map((rule) => rule.key))]

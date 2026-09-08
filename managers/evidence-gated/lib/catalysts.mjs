@@ -166,7 +166,7 @@ function eventRow(row, asOf) {
 export function catalystRegister({ market, previous = null, catalysts = [], events = [], roster = [], asOf } = {}) {
   const diagnostics = []
   if (market !== 'kr' && market !== 'us') {
-    return { data: null, diagnostics: [diagnostic('catalyst_market_invalid', 'blocked', 'Expected kr or us — the sleeve, the same argument radarCandidates takes, and never a MIC', 'market', { received: market ?? null })] }
+    return { data: null, diagnostics: [diagnostic('catalyst_market_invalid', 'blocked', 'Expected kr or us — the sleeve, the same argument radarCandidates takes. ⚠️ The MIC (XKRX/XNAS/XNYS) is read too and converted at the one input boundary (#212 ⑥), so a value refused here is neither spelling', 'market', { received: market ?? null })] }
   }
   const at = Date.parse(asOf)
   if (!Number.isFinite(at)) return { data: null, diagnostics: [diagnostic('catalyst_as_of_invalid', 'blocked', 'A valid asOf instant is required', 'asOf')] }

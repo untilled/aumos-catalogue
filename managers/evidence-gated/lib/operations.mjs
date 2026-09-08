@@ -82,6 +82,7 @@ import { MARKET_CURRENCIES, MANAGER_ID } from './diagnostics.mjs'
 import { MACRO_INDICATORS } from './evidence.mjs'
 import { ANY, ARRAY, ARRAY_OF_ARRAYS, OBJECT, NUMBER, STRING, BOOLEAN, INPUT_VOCABULARY, PAPER_SETUP_COHORTS } from './vocabulary.mjs'
 import { armedRecord, both, labelAxes, laneRows, macroRows, paperState, scalarPrice, scheduleBuffers, sentinelRules, sessionRows, sleeveCash, sleeveRows } from './input-shapes.mjs'
+import { all, cashByCurrency, memoryRows, moneyAmount, researchMarket, triggerKind, watchFields } from './canonical-input.mjs'
 
 /**
  * The sections the skill's operation table is rendered into, in this order.
@@ -214,6 +215,7 @@ export const OPERATIONS = {
   variantViewCheck: {
     group: 'scanners',
     surface: 'published',
+    canonical: triggerKind('thesis.invalidationTriggers[].kind'),
     mode: 'named', keys: { thesis: OBJECT, challengeVerdict: STRING, evidenceSamples: ARRAY },
     describe: 'whether a candidate\'s variant view is established — a complete thesis, a dated consensus citation and a cleared challenge — and therefore which lane may size it, plus **whose word** each accepted consensus row is: Aumos obtained it, the manager filed it, or nothing in the record stands behind it',
     run: (input, asOf) => variantViewCheck({ ...input, asOf }),
@@ -221,24 +223,27 @@ export const OPERATIONS = {
   sleeveNav: {
     group: 'sizing',
     surface: 'published',
-    mode: 'named', keys: { cash: ARRAY, positions: ARRAY, fx: OBJECT },
+    canonical: cashByCurrency('cash'),
+    mode: 'named', keys: { cash: ANY, positions: ARRAY, fx: OBJECT },
     /**
      * ⚠️ `currency` and the currency `marketValue` is counted in are two facts,
      * and reading one key as both is what put dollars in the won bucket (#177).
      */
     nested: {
+      cash: 'Per currency, in either representation: the object — { KRW: 11115231, USD: 294.02 } — or the { currency, amount } rows `portfolio.cashByCurrency` carries, which are folded onto it at the one input boundary (#212 ⑥). ⛔ Never an aggregate across currencies, and a row missing either half is reported as `cash_row_unevaluated` rather than added at face value.',
       'cash[]': { currency: STRING, amount: NUMBER },
       'positions[]': { symbol: STRING, currency: STRING, marketValue: NUMBER, valueCurrency: STRING },
       valueCurrency: 'The unit `marketValue` is counted in, when it is not the currency the asset quotes in. `portfolio_read` marks every position in the book\'s base currency, so a KRW listing on a USD book arrives as a **dollar** figure — pass `valueCurrency: "USD"` and it is converted into the sleeve at `fx.USDKRW`. ⛔ Absent it reads as the position\'s own `currency`, which is right on a single-currency book and was silently wrong by the rate itself (1,338.848×) on the book that measured this: krwSleeveNav 11,119,948.16 against 17,430,791.23, status ok, no diagnostic. `marketValueBasis` in the answer says which reading was taken.',
       positionCurrency: 'Always the currency the asset **quotes** in — it is what puts the row in the KR or the US sleeve — and never the currency the book keeps score in. A row key ending in `Currency` that is neither of these two is input_shape_invalid rather than ignored, because a unit read as nothing is added at face value.',
     },
-    shape: sleeveRows,
+    shape: both(sleeveRows, sleeveCash('cash')),
     describe: 'KRW/USD/SGOV net asset value and the FX that joins them',
     run: sleeveNav,
   },
   targetWeight: {
     group: 'sizing',
     surface: 'published',
+    canonical: triggerKind('thesis.invalidationTriggers[].kind'),
     mode: 'named',
     keys: {
       expectedActiveReturn: NUMBER, downsideReturn: NUMBER, conviction: NUMBER, mandatePositionCap: NUMBER,
@@ -278,6 +283,7 @@ export const OPERATIONS = {
   effectivePositionCap: {
     group: 'sizing',
     surface: 'published',
+    canonical: triggerKind('thesis.invalidationTriggers[].kind'),
     mode: 'named',
     keys: {
       mandatePositionCap: NUMBER, maturityStatus: STRING, lane: STRING, thesis: OBJECT, challengeVerdict: STRING,
@@ -373,6 +379,7 @@ export const OPERATIONS = {
   entryTranchePlan: {
     group: 'sizing',
     surface: 'published',
+    canonical: all(triggerKind('tranches[].condition.kind'), moneyAmount('price')),
     mode: 'named', keys: { symbol: STRING, lens: STRING, maturity: STRING, price: NUMBER, plannedTotalWeight: NUMBER, tranches: ARRAY, execution: OBJECT },
     describe: 'a single name\'s T1/T2/T3 ladder: which rung is due, which is within 5%, which lapsed with the plan unfinished — and that the whole plan is one sample',
     run: (input, asOf) => entryTranchePlan({ ...input, asOf }),
@@ -386,6 +393,7 @@ export const OPERATIONS = {
   specialistBudget: {
     group: 'sizing',
     surface: 'published',
+    canonical: cashByCurrency('sleeveCashByCurrency'),
     mode: 'strict',
     keys: {
       managerId: STRING, flow: STRING, market: STRING,
@@ -403,7 +411,7 @@ export const OPERATIONS = {
       managerId: `The literal id this package publishes — \`${MANAGER_ID}\`, also in inputContracts.vocabulary.managerIds — and **not** the instance id the host addresses this manager by. An \`inst_…\` is manager_id_unknown / blocked, which is the whole answer refused; \`managerId: "string"\` was all the contract said, and \`skills/deterministic-metrics\` named only the retired pre-2026-08-27 package ids as rejected. ⚠️ It defaults to the published id, so the safe call omits it. The market roles are **flows** of this one manager — \`flow\` carries them — not ids of their own.`,
       budget: 'The budget itself stays a plain weight and carries no currency: one FX rate scales a ratio\'s numerator and denominator alike, so a ratio has none. What has a currency is the cash that pays for it — which is why the shortfall is reported in the sleeve currency while `sleeveBudgetWeight` is not.',
     },
-    shape: sleeveCash,
+    shape: sleeveCash('sleeveCashByCurrency'),
     describe: 'a sleeve flow inside its Brief budget and market lane, and whether that budget can be paid for in the currency the sleeve settles in',
     run: specialistBudget,
   },
@@ -434,6 +442,7 @@ export const OPERATIONS = {
   validateWatch: {
     group: 'evidence',
     surface: 'published',
+    canonical: all(triggerKind('watch.kind'), watchFields('watch'), moneyAmount('current.price')),
     mode: 'named', keys: { watch: OBJECT, current: ANY, config: OBJECT },
     describe: 'kind, futurity, already-met, expiry and reachability',
     run: (input, asOf) => validateWatch(input?.watch, input?.current, asOf, input?.config),
@@ -441,6 +450,7 @@ export const OPERATIONS = {
   evaluateWatch: {
     group: 'evidence',
     surface: 'published',
+    canonical: all(triggerKind('watch.kind'), watchFields('watch')),
     mode: 'named', keys: { watch: OBJECT, observation: OBJECT, blocks: ARRAY, alertedSessionKeys: ARRAY, config: OBJECT },
     describe: 'a standing WATCH scored met / near / not-met / blocked / unevaluable, with the cadence its kind requires',
     run: (input, asOf) => evaluateWatch({ ...input, asOf }),
@@ -807,6 +817,7 @@ export const OPERATIONS = {
   validateThesis: {
     group: 'evidence',
     surface: 'published',
+    canonical: triggerKind('invalidationTriggers[].kind'),
     mode: 'open', keys: { evidenceStatus: STRING, variantView: ANY, consensusRefs: ARRAY, catalysts: ARRAY, invalidationTriggers: ARRAY, expectedUpsidePct: NUMBER, fairValueRange: ANY },
     describe: 'the thesis metadata contract; `complete` with gaps is refused',
     run: validateThesis,
@@ -832,6 +843,7 @@ export const OPERATIONS = {
   exitCheck: {
     group: 'watch',
     surface: 'published',
+    canonical: all(triggerKind('thesis.invalidationTriggers[].kind'), moneyAmount('price')),
     mode: 'strict', keys: { symbol: STRING, price: NUMBER, rules: OBJECT, thesis: OBJECT, sentinel: ANY },
     shape: scalarPrice,
     describe: 'L2.5: price and fundamental lanes → SELL / TRIM / REVIEW',
@@ -915,6 +927,7 @@ export const OPERATIONS = {
   fundamentalsPlan: {
     group: 'feeding',
     surface: 'published',
+    canonical: researchMarket('market'),
     mode: 'strict', keys: { market: STRING, symbols: ARRAY, corporationCodes: ARRAY, cache: OBJECT, businessYear: ANY, reportCode: ANY, freshForSeconds: NUMBER },
     nested: {
       'symbols[]': 'A roster symbol string, or a researchUniverse row — { symbol, sector }. The whole array from researchUniverse.data.symbols is what this expects.',
@@ -927,6 +940,7 @@ export const OPERATIONS = {
   mapCorporationCodes: {
     group: 'feeding',
     surface: 'published',
+    canonical: researchMarket('market'),
     mode: 'strict', keys: { market: STRING, symbols: ARRAY, registryRows: ANY, filingRows: ANY, tickerRows: ANY },
     nested: {
       registryRows: 'parseDartCorpCodes output — the array, or the { rows } wrapper. KR only.',
@@ -946,6 +960,7 @@ export const OPERATIONS = {
   radarCandidates: {
     group: 'feeding',
     surface: 'published',
+    canonical: researchMarket('market'),
     mode: 'strict', keys: { market: STRING, symbols: ARRAY, financials: OBJECT, facts: OBJECT, documents: OBJECT, prices: OBJECT, events: OBJECT, catalysts: OBJECT, valuations: OBJECT },
     nested: {
       'financials.<symbol>': 'normalizeDartFinancials output for that symbol. KR.',
@@ -960,6 +975,7 @@ export const OPERATIONS = {
   radarFeedDiagnosis: {
     group: 'feeding',
     surface: 'published',
+    canonical: researchMarket('market'),
     mode: 'strict', keys: { market: STRING, symbols: ARRAY, plan: OBJECT, mapping: OBJECT, responses: ARRAY, candidates: OBJECT, lanes: OBJECT },
     nested: {
       plan: 'The whole fundamentalsPlan data object; its requests carry the cache states this reads.',
@@ -974,6 +990,7 @@ export const OPERATIONS = {
   catalystRegister: {
     group: 'feeding',
     surface: 'published',
+    canonical: researchMarket('market'),
     mode: 'strict', keys: { market: STRING, previous: OBJECT, catalysts: ARRAY, events: ARRAY, roster: ARRAY },
     /**
      * ⚠️ Both row shapes are published because both were **absent inputs**, not
@@ -1143,6 +1160,7 @@ export const OPERATIONS = {
   researchState: {
     group: 'sizing',
     surface: 'published',
+    canonical: researchMarket('observations[].market', 'previous.rows[].market'),
     mode: 'strict', keys: { previous: OBJECT, observations: ARRAY },
     describe: 'bounded research roster and Evidence references; no source payload cache',
     run: (input, asOf) => researchState({ ...input, asOf }),
@@ -1150,6 +1168,7 @@ export const OPERATIONS = {
   researchUniverse: {
     group: 'sizing',
     surface: 'published',
+    canonical: researchMarket('market', 'extensions[].market'),
     mode: 'strict', keys: { market: STRING, extensions: ARRAY },
     describe: 'pinned KR/US curated roster plus dated, evidenced extensions; current eligibility must be checked',
     run: (input, asOf) => researchUniverse({ ...input, asOf }),
@@ -1157,6 +1176,7 @@ export const OPERATIONS = {
   refutedMemoryRules: {
     group: 'preflight',
     surface: 'published',
+    canonical: memoryRows('patterns', 'memory{}'),
     mode: 'strict', keys: { patterns: ANY, memory: OBJECT },
     nested: {
       patterns: 'The whole value read from `failures/repeated-patterns` — an array of rows, or the stored object holding them under `patterns`/`rows`/`entries`/`failures`. Read under a key that is not there, a carried rule reads as absent and stays uncorrected.',
@@ -1215,6 +1235,7 @@ export function assertRegistered(operations, groupIds = GROUP_IDS) {
       throw new Error(`${name}: a published operation names no subsumedBy`)
     }
     if (row.shape !== undefined && typeof row.shape !== 'function') throw new Error(`${name}: shape must be a function`)
+    if (row.canonical !== undefined && typeof row.canonical !== 'function') throw new Error(`${name}: canonical must be a function`)
   }
   return operations
 }

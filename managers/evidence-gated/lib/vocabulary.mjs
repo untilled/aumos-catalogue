@@ -16,6 +16,25 @@ import { MANAGER_ID } from './diagnostics.mjs'
 import { MACRO_INDICATORS } from './evidence.mjs'
 import { CATALYST_MEMORY_KEY } from './catalysts.mjs'
 
+/**
+ * ── The trigger kind's two spellings (§25, folded at the boundary #212 ⑥) ──
+ *
+ * ⚠️ Here rather than in `canonical-input.mjs` for the reason every other table
+ * in this file is here: `INPUT_VOCABULARY` publishes it, and the module that
+ * *uses* it imports this one.
+ */
+export const TRIGGER_ALIASES = Object.freeze({
+  price_below: 'price-below',
+  price_above: 'price-above',
+  at_time: 'at-time',
+  weight_drift: 'weight-drift',
+  /**
+   * `time` and `at-time` were the same condition under two names — the second
+   * half of the same inconsistency as the underscores. One name now.
+   */
+  time: 'at-time',
+})
+
 export const PAPER_SETUP_COHORTS = {
   thesis_call: 'llm-research', thesis_watch: 'llm-research', thesis_rejected: 'llm-research',
   rs_leader_pullback: 'mechanical-baseline', rs_breakout: 'mechanical-baseline',
@@ -104,6 +123,27 @@ export const INPUT_VOCABULARY = {
   managerObservationSource: 'manager:web-research',
   observationExcerptLimit: 64_000,
   paperSetups: Object.keys(PAPER_SETUP_COHORTS),
+  /**
+   * ⚠️ **The second representation of each fact, published because a manager
+   * reads the schema and not our source** (#212 ⑥, aumos#618). Five facts arrive
+   * in two spellings and one boundary folds them onto the internal type; a
+   * caller that cannot read which two exist has to discover the second one from
+   * a refusal, which is exactly the guessed-shape failure #158 is named after.
+   *
+   * ⛔ It is not a licence to fold every field with one of these names:
+   * `thesisSentinel`'s `invalidations[].kind` vocabulary is genuinely
+   * snake_case (`sentinelKinds` above) and is left alone. Which operation reads
+   * which conversion is decided by that operation's own definition row.
+   */
+  canonicalInput: {
+    market: 'The sleeve is internal and the MIC is read — see markets, researchMarkets and marketToResearchMarket. The conversion is one-way: a sleeve names two boards.',
+    amount: 'A number of major units is internal; AMP’s Money — { minorUnits, currency, exponent? } — is read and converted, exponent first and the currency’s own minor unit second (aumos#581). ⛔ KRW has no minor unit, so 7709 is 7709.',
+    cashByCurrency: 'An object keyed by currency code is internal; the { currency, amount } rows portfolio.cashByCurrency carries are read. ⛔ A bare amount is input_shape_invalid — it names no currency, and an aggregate across currencies is the one number a sleeve cannot be paid in.',
+    triggerKind: 'Kebab-case is internal; the snake_case forms are read so no recorded thesis becomes unreadable.',
+    triggerLevel: 'A WATCH’s level is internal as `threshold`, a number; AMP’s `price` (a Money) and `level` are read for a price condition and `beyond` for a drift band. ⛔ `baselineWeight` has no AMP counterpart and is never invented.',
+    memoryValue: 'A row array is internal; the PROMPT.md §1 envelope holding the rows under patterns/rows/entries/failures is read. ⛔ A value that is neither is matched as one value, which is what a prose memory record is.',
+  },
+  triggerKindAliases: TRIGGER_ALIASES,
 }
 
 /** The declared type of an input key. Checked in every mode — see `operations.mjs`. */
