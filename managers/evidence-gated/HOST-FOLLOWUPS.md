@@ -9,6 +9,41 @@ reading `decisions[].armed` as a receipt for a promise it cannot carry; 0.4.24 s
 lane from the maturity gate, read the Mandate's `cashFloor`, derived the single-name total from the
 Mandate and enforced the source's exit discipline.
 
+## Execution state (#212 ④) — ✅ the counts exist, and what is left to prove is the join
+
+**0.4.57 stops inferring execution state from diagnostics and reads the host's counts instead.**
+`mandateExecution` decided *«why does this book hold no single name?»* by intersecting the codes its
+siblings returned with the lanes of `lib/diagnostic-codes.mjs`, and the positive answer was granted
+by one member of a `gate-ran` lane — a code that says a gate refused **one** name and says nothing
+about whether the roster was prepared. `untilled/aumos#724` and `#730` gave the host a research job
+and a research result that count, `executionRecord` reads them, and `README.md` carries the
+deleted-to-replacement pairing.
+
+⚠️ **`engines.aumos` does not move for this.** The floor is already `>=0.3.34` — the release carrying
+`#724`/`#726`, whose four tools this record reads — and no capability and no manifest key was added.
+A host that predates them serves none of the four, which is an absence to report in `uncertainty`
+exactly as `skills/candidate-research/SKILL.md` already says, and on such a host this operation
+answers `basis: 'none'` / `dataPreparation: 'unevaluated'` and `mandateExecution` says `unreported`.
+⛔ **That is the designed answer and not a degradation to paper over**: *«nobody said»* is not a pass,
+and the alternative — falling back to the code lane — is the inference this revision removes.
+
+### ⛔ Still owed by the host: nothing, and one number is deliberately ours
+
+⚠️ **`eligibleCount` is not a host field and should not become one.** Eligibility is a methodology
+verdict — which of the recipe's answers cleared the lens envelopes, the evidence gates and the
+challenge — so it arrives as `eligibleSymbols`, the names this package's own fold arrived at, and the
+count is derived from them. A host field for it would be Aumos deciding what *eligible* means for
+every manager, which is the boundary `#209` §8-D drew when it put the recipe on this side.
+
+⬜ **Not measured on this side: a run against a live research job.** This repository has no host, so
+every count above is fixture-fed — the shapes come from `packages/skill-gateway/src/research.ts`
+(`ResearchSummaryView`, `ResearchJobView.counts`) and `ResearchSummary` in
+`packages/kernel/src/entities/research.ts`, read at `aumos` `176e8fcb`. What is unproven is the join:
+that a settled `research_result_get` summary arrives here with those five keys as whole numbers. ⛔ A
+summary that does not is refused as `research_record_unreadable` rather than read as zero, so the
+failure is reportable rather than silent — which is what makes the absence of the measurement
+survivable, not what makes it unnecessary.
+
 ## Prepared research (#209 §8-D) — ✅ the route exists and the input is now fed
 
 **0.4.53 declares two recipes and asks the host to run them.** `untilled/aumos#725` gave the host

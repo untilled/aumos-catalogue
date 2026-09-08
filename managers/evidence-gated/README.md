@@ -357,6 +357,46 @@ the rows named. A second belt stands behind it — no computed `ma200`, no `stat
 `trancheGuidance`, whatever left it null — and `inputContracts.nested.trendState` now publishes the
 row shape, since `bars: "array"` was the whole contract and a vendor payload satisfies it.
 
+**And the answer that table produced is no longer read off a code at all — it is counted** (#212 ④).
+`mandateExecution` decided *«why does this book hold no single name?»* by intersecting the
+diagnostics its siblings returned with the lanes of `lib/diagnostic-codes.mjs`, and the positive
+answer — `no-candidate-cleared-the-gates`, *the gates ran, on their inputs, and nothing was worth
+owning* — was granted by the presence of one `gate-ran` code. ⚠️ **No input to that table counted
+anything.** `active_return_below_gate` says a gate refused **one** name; it says nothing about
+whether the other seventy-three were prepared, so a roster nobody had collected a price series for,
+plus one gate refusing one candidate, came back as *the methodology is working*. That is
+`untilled/aumos-catalogue#209`'s own error — blindness reported as an absence of opportunity —
+reached through the check #171 added to stop a different one.
+
+`untilled/aumos#724` and `#730` gave the host a research job and a research result that **count**, so
+`executionRecord` reads them and answers three facts: `dataPreparation`, `candidateEvaluation` and
+`eligibleCount`. The first two are the host's own counts (`sourced`, `evaluated`, `unprepared`,
+`failed` — ⛔ three reports and never summed, the host's rule kept verbatim); the third is this
+package's, derived from `eligibleSymbols`, the names the run's own fold arrived at, because a number
+a run can type is a number a run can invent. ⛔ **Absent is `null` and `[]` is `0`** — the same
+three-way split the host's own `basis` keeps, where `none` is not zero — and a record this operation
+did not produce is refused as `execution_record_unreadable` rather than read, because an object
+asserting `dataPreparation: 'prepared'` is the same inference wearing the new field's name.
+
+What was deleted, and what replaced each piece:
+
+| deleted | replaced by |
+|---|---|
+| the `gate-ran` lane of `CAUSE_CODE_REGISTRY` and `CAUSE_GATE_RAN_CODES` (4 rows: `active_return_below_gate`, `challenge_not_cleared`, `thesis_incomplete`, `valuation_gap_has_no_source_for_this_instrument`) | `dataPreparation === 'prepared'` **and** `candidateEvaluation === 'evaluated'` **and** `eligibleCount === 0` on the record |
+| the emission proofs for those four rows in `tools/verify-evidence-gated-diagnostic-codes.mjs` ⑴ | ⛔ nothing — the codes are still emitted and still explain *why* a candidate was refused; they grant nothing, and an assertion that no lane holds them stands in their place |
+| `gateRanCodes` / `gateRanCodeVocabulary` on the response | `dataPreparation` · `candidateEvaluation` · `eligibleCount` · `executionRecordRead` · `executionBasis` |
+| `!recognisedCodes.length` as the guard against an unknown code reaching the positive answer (#171) | ⛔ structural: the answer needs a counted record, so no code can grant it. The observation survives as `mandate_execution_codes_unrecognised` / `info` — said, never silent |
+
+⚠️ **What the diagnostics still do is withdraw the answer, and that is the safe direction.** An
+`input-path` code names a stage that lost an input the research job cannot see — the corp-code join
+is not the price sweep — and it outranks the record; an `unresolved` code forbids the positive answer
+without claiming the wiring is at fault. Reading a reason to *decline* a claim is the opposite of
+reading one to grant it. ⛔ And the three absences never collapse: `'unevaluated'` is «no record»,
+`'unprepared'` is «the machine looked and nothing was readable at this pin», and `0` is a
+measurement. A fifth cause, `candidates-cleared-not-proposed`, exists because the record can say
+something the code lane never could — names *did* clear and the book holds none of them.
+⛔ Nothing blocks, nothing asks for a purchase, and no weight anywhere moved.
+
 **One table now decides what a diagnostic code means, because it was being spelled twice.**
 `mandateExecution` answers *«is this book empty because the methodology worked, or because its gates
 never received their inputs?»* by intersecting the codes a run reports with a vocabulary — and the

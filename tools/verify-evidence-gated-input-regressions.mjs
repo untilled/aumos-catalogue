@@ -2470,3 +2470,202 @@ assert.notEqual(
 
 console.log('evidence-gated issue #183 paper-row shape regression tests passed')
 console.log('evidence-gated issue #204 paper-state envelope regression tests passed')
+
+/**
+ * ── ④ Execution state is a count, and prose cannot move it (#212 ④) ────────
+ *
+ * `mandateExecution` decided *«why does this book hold no single name?»* by
+ * intersecting `reportedDiagnostics` with a classification table. Three of its
+ * four answers came from that intersection, and the positive one —
+ * `no-candidate-cleared-the-gates`, *the gates ran, on their inputs, and nothing
+ * was worth owning* — was granted by the presence of one `gate-ran` code.
+ *
+ * ⚠️ **No input to that table counted anything.** So a roster nobody had
+ * collected a price series for, plus one gate refusing one name, came back as
+ * *the methodology is working* — `untilled/aumos-catalogue#209`'s own error,
+ * blindness reported as an absence of opportunity, reached through the check
+ * #171 added to stop a different one.
+ *
+ * What is asserted below is the invariant, in the shape the sibling section
+ * above asserts #212 ②'s: **the verdict does not move when only the wording
+ * moves.** A diagnostic row carries a `message`, a `path`, a `details` map and a
+ * `severity`, all four of them prose or presentation, and a code from outside
+ * this operation's vocabulary carries no state either. ⛔ If any of these ever
+ * change the answer again, the operation is reading sentences for state.
+ */
+const executionAsOf = '2026-09-07T00:00:00.000Z'
+const executionBook = [
+  { symbol: '153130', weight: 0.27052, parkedLiquidity: true, sector: 'fixed-income' },
+  { symbol: 'SGOV', weight: 0.1149, parkedLiquidity: true, sector: 'fixed-income' },
+  { symbol: '069500', weight: 0.04206, core: true, sector: 'index' },
+]
+const executionObjective = 'Grow capital by understanding a few companies deeply and buying what the market has mispriced.'
+const recordOf = (input) => execute({ operation: 'executionRecord', asOf: executionAsOf, input })
+const executionOf = (input) => execute({
+  operation: 'mandateExecution',
+  asOf: executionAsOf,
+  input: { mandateObjective: executionObjective, positions: executionBook, cashWeight: 0.5725, ...input },
+})
+const settled = (summary) => ({ resultRef: 'res_regression', summary: { unpreparedSymbols: [], failedSymbols: [], ...summary } })
+
+/* ⑴ The record the whole section rests on: a prepared roster with nothing eligible. */
+const fullyPrepared = recordOf({ result: settled({ sourced: 74, evaluated: 74, unprepared: 0, failed: 0 }), eligibleSymbols: [] })
+assert.equal(fullyPrepared.data.basis, 'result')
+assert.equal(fullyPrepared.data.dataPreparation, 'prepared')
+assert.equal(fullyPrepared.data.candidateEvaluation, 'evaluated')
+assert.equal(fullyPrepared.data.eligibleCount, 0)
+assert.equal(fullyPrepared.data.inferredFromDiagnostics, false, 'the record reads no diagnostic — that is what makes it a record')
+
+/**
+ * ⑵ The prose shapes. Every row says the same thing about the same stage and
+ * says it differently: renamed, retranslated, re-pathed, re-detailed, and — the
+ * last two — spelled as codes this operation's vocabulary does not contain.
+ *
+ * ⛔ An `input-path` or `unresolved` code is **not** in this list, and must not
+ * be: those still withdraw the positive answer, which is the safe direction and
+ * is the half of the diagnostic reading that #212 ④ keeps.
+ */
+const executionProseShapes = [
+  [],
+  ['active_return_below_gate'],
+  [{ code: 'active_return_below_gate' }],
+  [{ code: 'active_return_below_gate', severity: 'blocked', message: 'Expected active return under the gate', path: 'expectedActiveReturn', details: { symbol: '005930', gate: 0.15 } }],
+  [{ code: 'active_return_below_gate', severity: 'info', message: '게이트 아래의 기대 초과수익', path: 'candidate', details: {} }],
+  [{ code: 'challenge_not_cleared', message: 'the challenge was not cleared' }, { code: 'thesis_incomplete', message: 'a different sentence entirely' }],
+  [{ code: 'valuation_gap_has_no_source_for_this_instrument', message: 'an index ETF publishes no statements' }],
+  ['a_code_no_operation_in_this_package_emits'],
+  [{ code: 'research_gate_active_return_short', message: "#171's invented spelling, still invented" }],
+]
+/** ⛔ Every field of the verdict, not only the cause: a moved count is a moved answer. */
+const verdictKeys = [
+  'cause', 'dataPreparation', 'candidateEvaluation', 'eligibleCount', 'executionRecordRead', 'executionBasis',
+  'singleNameLaneEmpty', 'singleNameWeight', 'riskBearingWeight', 'parkedLiquidityWeight', 'cashLikeWeight',
+  'objective', 'objectiveDeclared', 'causeInferredFromDiagnostics',
+]
+const executionBaseline = executionOf({ reportedDiagnostics: executionProseShapes[1], executionRecord: fullyPrepared.data })
+assert.equal(executionBaseline.data.cause, 'no-candidate-cleared-the-gates', 'the baseline is the positive answer, so the loop below is testing something that could fail')
+assert.equal(executionBaseline.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity, 'info')
+for (const reportedDiagnostics of executionProseShapes) {
+  const label = JSON.stringify(reportedDiagnostics)
+  const answer = executionOf({ reportedDiagnostics, executionRecord: fullyPrepared.data })
+  for (const key of verdictKeys) {
+    assert.deepEqual(answer.data[key], executionBaseline.data[key], `mandateExecution.${key} is unmoved by ${label} — this is the defect #212 ④ names`)
+  }
+  assert.equal(
+    answer.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity,
+    'info',
+    `and the severity the investor reads is unmoved by ${label}`,
+  )
+}
+
+/**
+ * ⑶ …and the same nine shapes over a roster nobody prepared all answer
+ * `input-path-incomplete`. This is the pair that matters: the wording is
+ * irrelevant in **both** directions, and what separates the two verdicts is the
+ * count. ⛔ `unprepared` is blindness and never an absence of opportunity.
+ */
+const blindRoster = recordOf({ result: settled({ sourced: 0, evaluated: 0, unprepared: 74, failed: 0, unpreparedSymbols: ['005930', '000660'] }), eligibleSymbols: [] })
+assert.equal(blindRoster.data.dataPreparation, 'unprepared')
+for (const reportedDiagnostics of executionProseShapes) {
+  const answer = executionOf({ reportedDiagnostics, executionRecord: blindRoster.data })
+  assert.equal(answer.data.cause, 'input-path-incomplete', `a blind roster answers the same however ${JSON.stringify(reportedDiagnostics)} is worded`)
+  assert.equal(answer.diagnostics.find((row) => row.code === 'mandate_objective_unexecuted').severity, 'unevaluated', '⛔ and «nobody said» is never a pass')
+}
+
+/**
+ * ⑷ `unevaluated`, `not reached` and `0` are three reports and are told apart.
+ *
+ * ⚠️ This is the assertion #209's completion criterion asks for in one line: a
+ * `WAIT` whose data was never prepared and a `WAIT` where the gates ran and
+ * nothing qualified are different answers.
+ */
+const noRecord = executionOf({ reportedDiagnostics: ['active_return_below_gate'] })
+assert.equal(noRecord.data.dataPreparation, 'unevaluated', 'no record: nobody counted anything')
+assert.equal(noRecord.data.eligibleCount, null)
+assert.equal(noRecord.data.executionRecordRead, false)
+assert.equal(noRecord.data.cause, 'unreported')
+
+const notReached = executionOf({ reportedDiagnostics: ['active_return_below_gate'], executionRecord: blindRoster.data })
+assert.equal(notReached.data.dataPreparation, 'unprepared', 'not reached: the machine looked and nothing was readable at the pin')
+assert.equal(notReached.data.cause, 'input-path-incomplete')
+
+const measuredZero = executionOf({ reportedDiagnostics: ['active_return_below_gate'], executionRecord: fullyPrepared.data })
+assert.equal(measuredZero.data.dataPreparation, 'prepared', 'zero: a measurement')
+assert.equal(measuredZero.data.eligibleCount, 0)
+assert.equal(measuredZero.data.cause, 'no-candidate-cleared-the-gates')
+
+assert.equal(new Set([noRecord.data.cause, notReached.data.cause, measuredZero.data.cause]).size, 3, 'the three are three answers and never collapse into one')
+
+/** ⛔ An absent fold is `null` and an empty one is `0`; only the second is a measurement. */
+const unfolded = recordOf({ result: settled({ sourced: 74, evaluated: 74, unprepared: 0, failed: 0 }) })
+assert.equal(unfolded.data.eligibleCount, null)
+assert.equal(unfolded.data.eligibleBasis, 'unreported')
+assert.ok(unfolded.diagnostics.some((row) => row.code === 'research_eligibility_unreported' && row.severity === 'unevaluated'))
+assert.equal(executionOf({ executionRecord: unfolded.data }).data.cause, 'unreported', 'a prepared roster nobody folded has not established that nothing cleared')
+
+/** ⚠️ And names that did clear over an empty lane is its own fact, not a silence. */
+const clearedButUnbought = recordOf({ result: settled({ sourced: 74, evaluated: 74, unprepared: 0, failed: 0 }), eligibleSymbols: ['005930', '000660'] })
+assert.equal(clearedButUnbought.data.eligibleCount, 2, 'derived from the names, never typed')
+assert.equal(executionOf({ executionRecord: clearedButUnbought.data }).data.cause, 'candidates-cleared-not-proposed')
+
+/**
+ * ⑸ A record nobody counted is refused rather than read.
+ *
+ * ⛔ Without this the change is cosmetic: an object the run assembles itself,
+ * asserting `dataPreparation: 'prepared'`, is the same inference under a new
+ * field's name.
+ */
+for (const forged of [
+  { dataPreparation: 'prepared', candidateEvaluation: 'evaluated', eligibleCount: 0 },
+  { recordVersion: 2, dataPreparation: 'prepared', candidateEvaluation: 'evaluated', eligibleCount: 0 },
+  { recordVersion: 1, dataPreparation: 'complete', candidateEvaluation: 'evaluated', eligibleCount: 0 },
+  { recordVersion: 1, dataPreparation: 'prepared', candidateEvaluation: 'evaluated', eligibleCount: '0' },
+  { ...fullyPrepared.data, dataPreparation: 'everything-is-fine' },
+]) {
+  const answer = executionOf({ reportedDiagnostics: ['active_return_below_gate'], executionRecord: forged })
+  assert.equal(answer.data.cause, 'unreported', `a hand-made record earns nothing: ${JSON.stringify(forged)}`)
+  assert.equal(answer.data.executionRecordRead, false)
+  assert.ok(answer.diagnostics.some((row) => row.code === 'execution_record_unreadable' && row.severity === 'unevaluated'))
+}
+
+/** ⛔ An unsettled job is not an answer, and `sourced` is absent from it on purpose. */
+const inFlight = recordOf({ job: { jobId: 'job_1', counts: { total: 74, pending: 30, evaluated: 44, unprepared: 0, failed: 0 }, pendingSymbols: ['005930'], failures: [] } })
+assert.equal(inFlight.data.basis, 'items')
+assert.equal(inFlight.data.dataPreparation, 'unsettled')
+assert.equal(inFlight.data.counts.sourced, null, 'deriving it mid-flight counts a name nobody has reached yet as one this fund can read')
+assert.equal(executionOf({ executionRecord: inFlight.data }).data.cause, 'input-path-incomplete')
+
+/** ⚠️ A cache hit answers on `research_prepare` itself, and reading only `result` would miss it. */
+const cacheHit = recordOf({ prepared: { cached: true, status: 'completed', resultRef: 'res_cached', summary: { sourced: 74, evaluated: 74, unprepared: 0, failed: 0, unpreparedSymbols: [], failedSymbols: [] } }, eligibleSymbols: [] })
+assert.equal(cacheHit.data.basis, 'result')
+assert.equal(cacheHit.data.dataPreparation, 'prepared')
+assert.equal(cacheHit.data.resultRef, 'res_cached')
+
+/** ⛔ The input-path lane still outranks the record — the corp-code join is not the price sweep. */
+const stillWithdrawn = executionOf({ reportedDiagnostics: ['corp_code_unmapped_symbols'], executionRecord: fullyPrepared.data })
+assert.equal(stillWithdrawn.data.cause, 'input-path-incomplete', 'a stage that lost an input the research job cannot see is established whatever the record says')
+assert.deepEqual(stillWithdrawn.data.inputPathCodes, ['corp_code_unmapped_symbols'])
+
+/** ⛔ And an unresolved code still forbids the positive answer without blaming the wiring. */
+const unknownInstrument = executionOf({ reportedDiagnostics: ['instrument_class_unknown'], executionRecord: fullyPrepared.data })
+assert.equal(unknownInstrument.data.cause, 'unreported', 'unknown is not incomplete, and it is not «the gates ran» either')
+assert.deepEqual(unknownInstrument.data.inputPathCodes, [])
+
+/** ⚠️ Codes reported and none of them readable is said out loud rather than ignored — #171's surviving half. */
+assert.ok(
+  executionOf({ reportedDiagnostics: ['a_code_no_operation_in_this_package_emits'], executionRecord: fullyPrepared.data })
+    .diagnostics.some((row) => row.code === 'mandate_execution_codes_unrecognised' && row.severity === 'info'),
+)
+
+/** ⛔ A held single name is still the end of the question, whatever anything reports. */
+for (const reportedDiagnostics of executionProseShapes) {
+  const executing = execute({
+    operation: 'mandateExecution',
+    asOf: executionAsOf,
+    input: { mandateObjective: executionObjective, positions: executionBook, proposed: [{ symbol: '035420', weight: 0.02 }], cashWeight: 0.5725, reportedDiagnostics, executionRecord: blindRoster.data },
+  })
+  assert.equal(executing.data.cause, 'executing', 'a single name in the plan leaves nothing to explain')
+  assert.equal(executing.diagnostics.some((row) => row.code === 'mandate_objective_unexecuted'), false)
+}
+
+console.log('evidence-gated issue #212 ④ execution-state regression tests passed')

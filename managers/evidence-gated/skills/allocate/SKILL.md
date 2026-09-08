@@ -42,14 +42,31 @@ in private memory and not only in this run's rationale. The next run of either s
 them there, and a budget that was never written is a budget that does not exist.
 
 **What share of this book is bearing risk is a book-wide conclusion too, and Brief is where the
-investor reads it.** Call `mandateExecution` — the invocation's `mandate.objective` verbatim, the
-book's `positions`, this run's `cashWeight`, and the diagnostic codes the rest of the run returned
-as `reportedDiagnostics` — and carry `parkedLiquidityWeight`, `riskBearingWeight` and
+investor reads it.** Two calls, in order.
+
+⛔ **First `executionRecord`**, with what the research tools returned — `prepared` from
+`research_prepare`, `job` from `research_job_get`, `result` from `research_result_get`, **verbatim**
+— and `eligibleSymbols`, the names your own fold found eligible. It answers three counted facts:
+whether the roster was prepared, whether the recipe answered, and how many of its answers cleared
+the gates. ⛔ **Never assemble that object by hand**: a state nobody counted is refused with
+`execution_record_unreadable`, and an absent `eligibleSymbols` is `null` rather than `0`.
+
+Then call `mandateExecution` — the invocation's `mandate.objective` verbatim, the
+book's `positions`, this run's `cashWeight`, the diagnostic codes the rest of the run returned
+as `reportedDiagnostics`, and that record's `data` as `executionRecord` — and carry
+`parkedLiquidityWeight`, `riskBearingWeight` and
 `singleNameWeight` into the Brief conclusion with the objective beside them. ⚠️ A book that is
 95.79% cash and parking passes every gate in `PROMPT.md` §4, and passes them **because** it is:
 this is the only line that tells the investor so. When no single name is held, write the cause the
-operation returned — nothing cleared the gates, the input path is unfinished, or nobody said —
-rather than the weights alone.
+operation returned — nothing cleared the gates, the input path is unfinished, names cleared and
+none was proposed, or nobody said — rather than the weights alone.
+
+⚠️ **The cause comes from the record and no longer from your diagnostics** (`#212` ④). Without the
+record it is `unreported` / `unevaluated`, which is not a pass; a roster that is `unsettled`,
+`unprepared` or only `partial` is `input-path-incomplete`, which is **blindness and never an absence
+of opportunity**; and *the gates ran and nothing was worth owning* is `info` only when all three
+facts say so. What the diagnostics still do is **withdraw** that answer — an `input-path` code names
+a stage the research job cannot see, and it outranks everything.
 
 ⛔ **Neither half of that is a trade.** It is not an argument for buying: when nothing clears the
 gates, holding cash is what this methodology is for. And it is not an argument for selling the

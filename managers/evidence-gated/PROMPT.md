@@ -633,24 +633,39 @@ Mandate's, and a classification in this package is never an exemption from an in
 ⚠️ A `factors` label claims that several holdings die together, and **a denomination is not a loss
 path**.
 
+⛔ **Record what your data preparation did before you explain an empty book.** Call
+`executionRecord` with what the research tools returned — `prepared` from `research_prepare`, `job`
+from `research_job_get`, `result` from `research_result_get`, **verbatim** — plus `eligibleSymbols`,
+the names your own fold found eligible. ⛔ **The count is derived from that list and never typed**,
+and an absent list is `null` rather than `0`: «nobody folded the rows» and «the rows were folded and
+nothing cleared» are different facts.
+
 ⛔ **Say what share of this book is bearing risk at all.** Call `mandateExecution` with
 `mandate.objective` **verbatim** as `mandateObjective`, the same `positions` and `proposed`, this run's
-`cashWeight`, and `reportedDiagnostics` — the diagnostic codes the rest of this run returned.
+`cashWeight`, `reportedDiagnostics` — the diagnostic codes the rest of this run returned — and
+**`executionRecord`**, that record's `data` handed over unedited.
 ⛔ **Pass those codes verbatim as the operations returned them**, never a paraphrase or a remembered
 spelling: the vocabulary is `lib/diagnostic-codes.mjs`, and a code no operation emits matches nothing.
-⚠️ `reportedDiagnosticCount` sits beside `recognisedCodes`; the second empty while the first is not
-makes the cause `unreported`.
+⚠️ `reportedDiagnosticCount` sits beside `recognisedCodes`; a run whose every code is unregistered is
+told so as `mandate_execution_codes_unrecognised` rather than in silence.
+⛔ **Do not assemble the record yourself.** An object asserting `dataPreparation: 'prepared'` is a
+state nobody counted, and it is refused with `execution_record_unreadable`.
 
 ⚠️ **`parkedLiquidity` excludes a row from the sector, theme, factor and heat axes; it never excludes
 it from existing.** With no single name held the operation returns `mandate_objective_unexecuted`, and
 the **cause** is what matters:
 
 - `no-candidate-cleared-the-gates` is `info` — holding cash because nothing cleared its gates is this
-  methodology working, and it is never an argument for buying. ⚠️ It is **earned rather than defaulted
-  to**: it needs at least one code from a gate that actually ran and refused (`gateRanCodeVocabulary`).
-- `input-path-incomplete` and `unreported` are `unevaluated`, which is not a pass. ⚠️ Pass
+  methodology working, and it is never an argument for buying. ⚠️ It is **earned by the record and
+  never by a code**: `dataPreparation: 'prepared'`, `candidateEvaluation: 'evaluated'` and
+  `eligibleCount === 0`, all three. One gate refusing one candidate says nothing about whether the
+  rest of the roster was prepared, and reading it as though it did is what this instruction used to do.
+- `input-path-incomplete`, `candidates-cleared-not-proposed` and `unreported` are `unevaluated`, which
+  is not a pass. A roster that is `unsettled`, `unprepared` or only `partial` is the first of them:
+  ⛔ **blindness, never an absence of opportunity.** ⚠️ Pass
   `thesisGapSources`' diagnostics in with the rest: `valuation_gap_is_unfetched_not_unfillable`
-  establishes that a source exists and was never called. ⛔ Its siblings do not, and
+  establishes that a source exists and was never called, and an input-path code outranks the record
+  because the corp-code join is not the price sweep. ⛔ Its siblings do not, and
   `instrument_class_unknown` establishes neither reading — **unknown is not incomplete**.
 
 Put the cause and the parked share in `uncertainty`. ⛔ **The objective is quoted, never parsed** —

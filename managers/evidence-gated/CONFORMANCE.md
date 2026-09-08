@@ -55,9 +55,16 @@ The verifier covers:
   refused, and no `trancheGuidance` on any of the refusals;
 - the diagnostic-code registry behind `mandateExecution` — every registered code proven to be emitted
   by the module the row names, every registered operation proven to be one `execute` dispatches, the
-  three published vocabularies proven to be projections of that one table rather than copies of it,
+  two published vocabularies proven to be projections of that one table rather than copies of it,
   and the causes re-derived end to end from `mapCorporationCodes`, `upsideRadar` and `laneCoverage`
   output handed over unedited, including the six codes of the run that reversed the verdict;
+- **execution state proven to be counted rather than read off a diagnostic** (#212 ④) — nine wordings
+  of the same finding (renamed, retranslated, re-pathed, re-detailed, and spelled as codes no
+  operation emits) run against every field of `mandateExecution`'s verdict over a prepared roster and
+  again over a roster nobody prepared, with the two verdicts differing only by the count; the four
+  codes of the deleted `gate-ran` lane proven to be registered in neither remaining lane; a record
+  the operation did not produce refused in five shapes rather than read; and `unevaluated`, *not
+  reached* and `0` proven to be three answers that do not collapse into one;
 - absence of network, broker/order/database capabilities in the manager manifest.
 
 On 2026-08-25 all six proposal fixtures were also parsed directly by

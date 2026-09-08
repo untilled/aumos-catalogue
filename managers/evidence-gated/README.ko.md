@@ -326,6 +326,44 @@ forbidden"*이라고 적어 놓고, 발표 주체가 있든 없든 모든 event�
 됐든 `state`도 `trancheGuidance`도 반환하지 않는다 — 그리고 `inputContracts.nested.trendState`가 행
 형태를 게시한다. 게시된 계약이 `bars: "array"` 하나여서 벤더 페이로드가 그것을 만족시켰기 때문이다.
 
+**그리고 그 표가 내던 답은 이제 코드에서 읽지 않고 «센다»** (#212 ④). `mandateExecution`은 «이 북이
+왜 단일 종목을 하나도 들고 있지 않은가»를 형제 연산들이 돌려준 진단과 `lib/diagnostic-codes.mjs`의
+레인의 교집합으로 답했고, 그중 긍정적인 답 — `no-candidate-cleared-the-gates`, *게이트가 자기 입력
+위에서 돌았고 가질 만한 것이 없었다* — 은 `gate-ran` 코드 하나의 존재로 얻어졌다. ⚠️ **그 표의 어떤
+입력도 아무것도 세지 않았다.** `active_return_below_gate`는 게이트가 **한** 종목을 거절했다는 말이고,
+나머지 일흔셋이 준비되기라도 했는지에 대해서는 아무 말도 하지 않는다 — 그래서 아무도 가격 계열을
+수집하지 않은 로스터에서 게이트 하나가 후보 하나를 거절하면 *방법론이 작동 중*이 돌아왔다. 그것이
+`untilled/aumos-catalogue#209`가 이름 댄 그 실수 — 눈이 먼 것을 기회의 부재로 보고하는 것 — 이고,
+#171이 다른 실수를 막으려고 세운 검사를 통해 도달됐다.
+
+`untilled/aumos#724`와 `#730`이 호스트에 **세는** 조사 job과 result를 줬으므로 `executionRecord`가
+그것을 읽어 세 사실을 답한다: `dataPreparation` · `candidateEvaluation` · `eligibleCount`. 앞의 둘은
+호스트 자신의 카운트(`sourced` · `evaluated` · `unprepared` · `failed` — ⛔ 세 보고이고 절대 합쳐지지
+않는다, 호스트의 규칙을 그대로 들고 왔다)이고, 셋째는 이 패키지의 것으로 `eligibleSymbols` — 그 런의
+자기 폴드가 도달한 이름들 — 에서 유도된다. 런이 타이핑할 수 있는 숫자는 런이 지어낼 수 있는 숫자이기
+때문이다. ⛔ **부재는 `null`이고 `[]`는 `0`이다** — 호스트의 `basis`가 지키는 것과 같은 3분할이고,
+거기서 `none`은 0이 아니다 — 그리고 이 연산이 만들지 않은 record는 읽지 않고
+`execution_record_unreadable`로 거절한다. `dataPreparation: 'prepared'`를 주장하는 객체는 같은 추론이
+새 필드의 이름을 입은 것이기 때문이다.
+
+지운 것과 각각을 대체한 것:
+
+| 지운 것 | 대체한 것 |
+|---|---|
+| `CAUSE_CODE_REGISTRY`의 `gate-ran` 레인과 `CAUSE_GATE_RAN_CODES` (행 4개: `active_return_below_gate` · `challenge_not_cleared` · `thesis_incomplete` · `valuation_gap_has_no_source_for_this_instrument`) | record의 `dataPreparation === 'prepared'` **그리고** `candidateEvaluation === 'evaluated'` **그리고** `eligibleCount === 0` |
+| `tools/verify-evidence-gated-diagnostic-codes.mjs` ⑴의 그 네 행에 대한 emission 검사 | ⛔ 없음 — 코드는 그대로 발행되고 후보가 **왜** 거절됐는지 그대로 설명한다. 아무것도 부여하지 않으며, 그 자리에는 «어느 레인도 이들을 들지 않는다»는 단언이 선다 |
+| 응답의 `gateRanCodes` / `gateRanCodeVocabulary` | `dataPreparation` · `candidateEvaluation` · `eligibleCount` · `executionRecordRead` · `executionBasis` |
+| 모르는 코드가 긍정적 답에 닿는 것을 막던 `!recognisedCodes.length` (#171) | ⛔ 구조 — 그 답은 이제 센 record를 요구하므로 어떤 코드도 그것을 부여할 수 없다. 관측은 `mandate_execution_codes_unrecognised` / `info`로 남는다: 말해지고, 조용하지 않다 |
+
+⚠️ **진단이 여전히 하는 일은 그 답을 «철회»하는 것이고, 그것이 안전한 방향이다.** `input-path` 코드는
+조사 job이 볼 수 없는 단계가 입력을 잃었다고 이름 대고 — 기업코드 조인은 가격 스윕이 아니다 —
+record를 이긴다. `unresolved` 코드는 배선을 탓하지 않으면서 긍정적 답을 금지한다. 주장을 **거절할**
+이유를 읽는 것은 부여할 이유를 읽는 것의 반대다. ⛔ 그리고 부재 셋은 절대 합쳐지지 않는다:
+`'unevaluated'`는 «record 없음», `'unprepared'`는 «기계가 봤고 이 핀에 읽을 것이 없었다», `0`은 측정이다.
+다섯째 원인 `candidates-cleared-not-proposed`가 있는 이유는 record가 코드 레인이 할 수 없던 말을 할 수
+있기 때문이다 — 이름들이 실제로 통과했고 북은 그중 하나도 들고 있지 않다. ⛔ 아무것도 막지 않고,
+아무 매수도 요구하지 않으며, 어떤 비중도 움직이지 않았다.
+
 **진단 코드의 뜻을 정하는 표가 하나가 됐다 — 두 곳에 적혀 있었기 때문이다.** `mandateExecution`은
 «이 북이 빈 것은 방법론이 작동한 결과인가, 게이트가 입력을 받은 적이 없어서인가»를 그 런이 보고한
 코드와 어휘의 교집합으로 답하는데, 어휘는 읽는 쪽 옆에 손으로 적혀 있었고 코드는 다른 모듈 다섯이

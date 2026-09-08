@@ -1,5 +1,6 @@
 import { diagnostic, finite, round, grandfatherPolicy, MANAGER_ID, SLEEVE_FLOW_MARKETS, ALLOCATOR_FLOW, MARKET_CURRENCIES, readCashByCurrency, convertCurrency } from './diagnostics.mjs'
 import { causeCodesInLane, REGISTERED_CAUSE_CODES } from './diagnostic-codes.mjs'
+import { DATA_PREPARATION_STATES, CANDIDATE_EVALUATION_STATES } from './execution-record.mjs'
 import { METHODOLOGY } from './constants.mjs'
 import { normalizeTriggerKind, variantViewCheck } from './methodology.mjs'
 import { trancheIntent } from './schedule.mjs'
@@ -1504,21 +1505,34 @@ export const INPUT_PATH_INCOMPLETE_CODES = causeCodesInLane('input-path')
 export const CAUSE_UNRESOLVED_CODES = causeCodesInLane('unresolved')
 
 /**
- * ── What the `info` answer has to be shown before it is given (#171) ───────
+ * ── What earns the `info` answer, and why it is no longer a code (#212 ④) ──
  *
  * `no-candidate-cleared-the-gates` claims *the gates ran, on their inputs, and
- * nothing was worth owning* — the one positive assertion this operation makes,
- * and until #171 it was the **fall-through**: any set of reported codes that
- * matched neither list above arrived here. A vocabulary that had drifted out of
- * step therefore did not produce an error, it produced the reassuring answer.
+ * nothing was worth owning* — the one positive assertion this operation makes.
+ * #171 made it earned rather than a fall-through by requiring a member of a
+ * `gate-ran` code lane: an expected active return under the gate, a challenge
+ * not cleared, a thesis still incomplete.
  *
- * So it is earned now. A gate that ran and refused — an expected active return
- * under the gate, a challenge not cleared, a thesis still incomplete, a
- * valuation gap no source can close for *this instrument* — is the evidence,
- * and a run that reports none of it says `unreported` instead.
+ * ⚠️ **That lane is deleted, because one refused candidate is not a judged
+ * roster.** `active_return_below_gate` says a gate refused **one** name and says
+ * nothing about whether the other seventy-three were ever prepared, so a run
+ * blind across its whole universe could emit it once and be told the methodology
+ * was working. That is `untilled/aumos-catalogue#209`'s error — blindness
+ * reported as an absence of opportunity — reached through the very check #171
+ * added to stop a different one.
+ *
+ * ⛔ **So the positive claim is now earned by a count and never by a string.**
+ * `executionRecord` reads the host's own research job and result (`aumos#724`,
+ * `#730`) and this operation requires all three of its facts:
+ * `dataPreparation: 'prepared'`, `candidateEvaluation: 'evaluated'` and
+ * `eligibleCount === 0`. The pairing is written out in `README.md`.
+ *
+ * ⚠️ **What the diagnostics still do is withdraw it**, which is the safe
+ * direction and is not state inference: an `input-path` code names a stage that
+ * lost an input the record cannot see (the corp-code join is not the price
+ * sweep), and an `unresolved` code refuses both conclusions. Reading a reason to
+ * *decline* a claim is the opposite of reading one to grant it.
  */
-export const CAUSE_GATE_RAN_CODES = causeCodesInLane('gate-ran')
-
 /** Every code this operation can read at all — membership decides `unreported`. */
 export const MANDATE_EXECUTION_CODE_VOCABULARY = REGISTERED_CAUSE_CODES
 
@@ -1526,6 +1540,18 @@ export const MANDATE_EXECUTION_CAUSES = Object.freeze([
   'executing',
   'input-path-incomplete',
   'no-candidate-cleared-the-gates',
+  /**
+   * ⚠️ **The fifth, and it exists because the record can say something the code
+   * lane never could** (#212 ④): the roster was prepared, the recipe answered,
+   * names *did* clear the gates — and the book still holds none of them. That is
+   * neither «the wiring is unfinished» nor «nothing was worth owning», and
+   * folding it into `unreported` would file a run that reported everything as a
+   * run that reported nothing.
+   *
+   * ⛔ It is a report and not an instruction: a purchase still needs its
+   * evidence and its approval, and this operation never asks for one.
+   */
+  'candidates-cleared-not-proposed',
   'unreported',
 ])
 
@@ -1582,7 +1608,7 @@ export const MANDATE_EXECUTION_CAUSES = Object.freeze([
  * The defect was that no output said it. So the answer is a number in every
  * response and no new limit anywhere.
  */
-export function mandateExecution({ mandateObjective = null, positions = [], proposed = [], cashWeight = null, reportedDiagnostics = [] } = {}) {
+export function mandateExecution({ mandateObjective = null, positions = [], proposed = [], cashWeight = null, reportedDiagnostics = [], executionRecord = null } = {}) {
   const diagnostics = []
   const declared = typeof mandateObjective === 'string' && mandateObjective.trim().length > 0
   if (!declared) {
@@ -1607,7 +1633,6 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
     .filter((code) => typeof code === 'string' && code.length > 0))]
   const inputPathCodes = codes.filter((code) => INPUT_PATH_INCOMPLETE_CODES.includes(code)).sort()
   const unresolvedCodes = codes.filter((code) => CAUSE_UNRESOLVED_CODES.includes(code)).sort()
-  const gateRanCodes = codes.filter((code) => CAUSE_GATE_RAN_CODES.includes(code)).sort()
   /**
    * ⚠️ **«21 codes reported, 0 recognised» is not «the gates ran» (#171).** It
    * is this operation saying it was handed a vocabulary it cannot read, and the
@@ -1616,28 +1641,90 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
    */
   const recognisedCodes = codes.filter((code) => REGISTERED_CAUSE_CODES.includes(code)).sort()
 
+  /**
+   * ── The record, read as a record (#212 ④) ────────────────────────────────
+   *
+   * `executionRecord`'s own `data`, handed back unedited. ⛔ Its shape is
+   * checked rather than trusted — a hand-written object claiming
+   * `dataPreparation: 'prepared'` is a state nobody counted, which is the
+   * inference this issue removes wearing the new field's name — and a value
+   * outside the published vocabularies is refused rather than read as absence,
+   * because «unreadable» and «not handed over» are different facts and only one
+   * of them is the run's own doing.
+   */
+  const record = executionRecord && typeof executionRecord === 'object' && !Array.isArray(executionRecord) ? executionRecord : null
+  const recordShaped = record !== null
+    && record.recordVersion === 1
+    && DATA_PREPARATION_STATES.includes(record.dataPreparation)
+    && CANDIDATE_EVALUATION_STATES.includes(record.candidateEvaluation)
+    && (record.eligibleCount === null || (typeof record.eligibleCount === 'number' && Number.isInteger(record.eligibleCount) && record.eligibleCount >= 0))
+  if (record !== null && !recordShaped) {
+    diagnostics.push(diagnostic(
+      'execution_record_unreadable',
+      'unevaluated',
+      'This is not a record `executionRecord` produced: it has to carry `recordVersion: 1`, a `dataPreparation` and a `candidateEvaluation` from the published vocabularies, and an `eligibleCount` that is a whole number or `null`. ⛔ Call that operation with what the research tools returned and hand its `data` over verbatim — an object asserting a state nobody counted is the inference #212 ④ removes, under a new name',
+      'executionRecord',
+      { executionRecord, dataPreparationStates: DATA_PREPARATION_STATES, candidateEvaluationStates: CANDIDATE_EVALUATION_STATES },
+    ))
+  }
+  const dataPreparation = recordShaped ? record.dataPreparation : 'unevaluated'
+  const candidateEvaluation = recordShaped ? record.candidateEvaluation : 'unevaluated'
+  const eligibleCount = recordShaped ? record.eligibleCount : null
+
   const laneEmpty = split.singleNameWeight <= 0
   /**
-   * ⛔ The order is the argument. A positive input-path finding outranks an
-   * unresolved one — a source that exists and was never called is established
-   * whatever else is unknown — but an unresolved one outranks the `info`
-   * answer, because `no-candidate-cleared-the-gates` claims the gates *ran* and
-   * a run that cannot say whether the instrument even has a filer has not
-   * earned that claim. (#162 reading #166's vocabulary.)
+   * ⛔ The order is the argument, and since #212 ④ only the first step of it
+   * reads a diagnostic.
    *
-   * ⚠️ **And the `info` answer is no longer the fall-through (#171).** It was
-   * the branch every unmatched set of codes reached, so a vocabulary that had
-   * drifted out of step with its siblings did not fail — it reassured. Two
-   * conditions now stand in front of it: at least one reported code this
-   * operation can read at all, and at least one of them a gate that ran.
+   *   1. **A positive input-path finding outranks everything.** A source that
+   *      exists and was never called is established whatever the record says,
+   *      and the record cannot see it: the corp-code join, the radar feed and
+   *      the lane preflight are not the price sweep the research job counts.
+   *   2. **The record decides the rest.** No record is `unreported` — ⛔ not
+   *      `info`, because *«nobody said»* is not a pass, which is the rule
+   *      `cash_floor_unevaluated` has always followed. A roster that did not
+   *      settle, answered for nothing, or is blind about some of its names is
+   *      `input-path-incomplete`: blindness, never an absence of opportunity
+   *      (`untilled/aumos-catalogue#209`).
+   *   3. **An unresolved code still withdraws the positive claim.**
+   *      `instrument_class_unknown` says the run could not establish whether a
+   *      filer exists at all, and unknown is not «the gates ran». (#166)
+   *   4. **`eligibleCount` splits the last two answers.** `null` is
+   *      `unreported` (nobody folded the rows), `0` earns the `info` answer,
+   *      and a positive count over an empty lane is its own fact.
+   *
+   * ⚠️ **#171's «21 reported, 0 recognised» is a report here and no longer a
+   * verdict.** It was a verdict because `info` was granted by a code, so a
+   * drifted vocabulary reassured; `info` is granted by the record now, so an
+   * unregistered code can neither grant nor withdraw. ⛔ It is not ignored in
+   * silence — that is the half of #171 that must not be lost — it is said, as
+   * `mandate_execution_codes_unrecognised`, beside the two numbers that have
+   * always been on the response. And ⛔ an unknown code is still never a pass on
+   * its own: with no record the answer is `unreported`, whatever was reported.
    */
   const cause = !laneEmpty
     ? 'executing'
     : inputPathCodes.length
       ? 'input-path-incomplete'
-      : unresolvedCodes.length || !recognisedCodes.length || !gateRanCodes.length
+      : dataPreparation === 'unevaluated' || candidateEvaluation === 'unevaluated'
         ? 'unreported'
-        : 'no-candidate-cleared-the-gates'
+        : dataPreparation !== 'prepared' || candidateEvaluation !== 'evaluated'
+          ? 'input-path-incomplete'
+          : unresolvedCodes.length || eligibleCount === null
+            ? 'unreported'
+            : eligibleCount > 0
+              ? 'candidates-cleared-not-proposed'
+              : 'no-candidate-cleared-the-gates'
+
+  if (laneEmpty && codes.length > 0 && recognisedCodes.length === 0) {
+    diagnostics.push(diagnostic(
+      'mandate_execution_codes_unrecognised',
+      'info',
+      'This run reported diagnostics and none of them is a code this operation reads: the registry is the vocabulary of codes that *withdraw* the positive answer, so these neither withdrew nor granted anything and the cause below rests on the counted record alone. ⛔ Not a defect on its own — a gate that refused one candidate is spelled outside this vocabulary on purpose since #212 ④ — and ⛔ not silent either, which is the half of #171 that had to survive',
+      'reportedDiagnostics',
+      { reportedCodeCount: codes.length, codes, vocabulary: MANDATE_EXECUTION_CODE_VOCABULARY },
+    ))
+  }
 
   if (laneEmpty) {
     diagnostics.push(diagnostic(
@@ -1648,9 +1735,11 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
       {
         objective: declared ? mandateObjective : null,
         cause,
+        dataPreparation,
+        candidateEvaluation,
+        eligibleCount,
         inputPathCodes,
         unresolvedCodes,
-        gateRanCodes,
         reportedCodeCount: codes.length,
         recognisedCodeCount: recognisedCodes.length,
         cashWeight: cash,
@@ -1685,9 +1774,25 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
       /** ⛔ Why this run may not claim the gates ran and found nothing. */
       unresolvedCodes,
       unresolvedCodeVocabulary: CAUSE_UNRESOLVED_CODES,
-      /** ⚠️ What the `info` answer is earned with, rather than fallen into. */
-      gateRanCodes,
-      gateRanCodeVocabulary: CAUSE_GATE_RAN_CODES,
+      /**
+       * ── The record, and the three facts the cause is decided from (#212 ④) ─
+       *
+       * ⚠️ **Three absences that are three answers, and they never collapse.**
+       * `'unevaluated'` is «no record was handed over», `'unprepared'` is «the
+       * record says nothing was readable at this pin» — *not reached* — and a
+       * count of `0` is a measurement. `eligibleCount: null` is the same split
+       * one field over: nobody folded the rows, which is not «nothing cleared».
+       */
+      dataPreparation,
+      dataPreparationStates: DATA_PREPARATION_STATES,
+      candidateEvaluation,
+      candidateEvaluationStates: CANDIDATE_EVALUATION_STATES,
+      eligibleCount,
+      /** ⛔ `false` says the cause below rests on no counted record at all. */
+      executionRecordRead: recordShaped,
+      executionBasis: recordShaped && typeof record.basis === 'string' ? record.basis : null,
+      /** ⛔ The one thing this operation no longer does: read state off a code. */
+      causeInferredFromDiagnostics: false,
       /**
        * ⚠️ Read this beside `reportedDiagnosticCount`: codes reported and codes
        * this operation could read are two numbers, and «many reported, none
