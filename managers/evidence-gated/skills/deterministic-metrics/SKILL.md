@@ -88,7 +88,7 @@ a name that does not exist.
 | `entryTranchePlan` | a single name's T1/T2/T3 ladder: which rung is due, which is within 5%, which lapsed with the plan unfinished — and that the whole plan is one sample |
 | `specialistBudget` | a sleeve flow inside its Brief budget and market lane, and whether that budget can be paid for in the currency the sleeve settles in |
 | `globalAllocation` | the one cross-market denominator; refuses double-spend |
-| `researchState` | bounded research roster and Evidence references; no source payload cache |
+| `researchState` | bounded research roster and Evidence references; no source payload cache. Rows require symbol, market, observedAt and non-empty evidenceIds. `previous` is the stored value as read — one with no `rows` is an empty index, not a refusal |
 | `researchUniverse` | pinned KR/US curated roster plus dated, evidenced extensions; current eligibility must be checked |
 
 ### Evidence admission and research gates
