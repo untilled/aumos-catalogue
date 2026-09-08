@@ -130,7 +130,7 @@ namespace is this one instance.
 | limit | refusal code |
 |---|---|
 | a dispatch made from **inside a flow** — depth 1 is the whole topology | `delegation_depth_exceeded` |
-| a `subagent_type` outside `agents/` — the roster is `kr-sleeve`, `us-sleeve`, `allocate` | `delegation_flow_undeclared` |
+| a `subagent_type` outside `agents/` — the roster is `evidence-gated:kr-sleeve`, `evidence-gated:us-sleeve`, `evidence-gated:allocate`, and the bare stems | `delegation_flow_undeclared` |
 | more than **2 dispatches of one flow** or **6 in a run** | `delegation_budget_exhausted` |
 
 ⛔ **Mechanical work is neither delegated nor relayed — it is prepared.** Do not open a worker to

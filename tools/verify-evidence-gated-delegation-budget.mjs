@@ -9,9 +9,11 @@ import {
   MAX_DELEGATION_DEPTH,
   MAX_DISPATCHES_PER_FLOW,
   MAX_DISPATCHES_PER_RUN,
+  canonicalFlow,
   declaredFlows,
   isDispatch,
   judgeDispatch,
+  pluginNamespace,
 } from '../managers/evidence-gated/hooks/guard-budget.mjs'
 
 /**
@@ -37,10 +39,20 @@ import {
  *  4. **The ledger accumulates across processes**, which is the whole reason
  *     the budget can be counted at all — hooks are separate processes and share
  *     nothing else.
+ *
+ * ── And the name the host actually sends (#221) ────────────────────────────
+ *
+ * The roster above is file stems, and the host enumerates a plugin's agents as
+ * `<plugin>:<name>`, so for the life of this guard the only `subagent_type` the
+ * CLI accepted was the only one this refused — **no flow had ever dispatched**.
+ * ⑸ below is the regression: the namespaced spelling passes, the bare one still
+ * passes, another plugin's worker with one of our names does not, and
+ * `general-purpose` still does not.
  */
 
 const hook = fileURLToPath(new URL('../managers/evidence-gated/hooks/guard-budget.mjs', import.meta.url))
 const flows = declaredFlows()
+const namespace = pluginNamespace()
 
 /* ── ⑴ the roster comes out of `agents/` ─────────────────────────────────── */
 
@@ -73,7 +85,7 @@ for (const name of ['Read', 'mcp__aumos__decision_submit', 'mcp__evidence-gated-
 
 /* ── ⑶ the verdicts ──────────────────────────────────────────────────────── */
 
-const judge = (payload, spent = []) => judgeDispatch({ payload, spent, flows })
+const judge = (payload, spent = []) => judgeDispatch({ payload, spent, flows, namespace })
 
 assert.equal(
   judge({ tool_name: 'Read', tool_input: {} }),
@@ -105,7 +117,11 @@ assert.equal(
 
 const undeclared = judge({ tool_name: 'Agent', tool_input: { subagent_type: 'general-purpose' } })
 assert.equal(undeclared.code, 'delegation_flow_undeclared', '28 of the 29 measured subagents were this')
-assert.match(undeclared.message, /allocate, kr-sleeve, us-sleeve/, 'and the message names the roster it read')
+assert.match(
+  undeclared.message,
+  /evidence-gated:allocate, evidence-gated:kr-sleeve, evidence-gated:us-sleeve/,
+  '⚠️ and the message names the roster in the spelling the CLI offers — the bare stems are what #221 sent a run looking for a name that does not exist',
+)
 
 assert.equal(
   judge({ tool_name: 'Agent', tool_input: {} }),
@@ -202,7 +218,88 @@ const sessionless = spawnSync(process.execPath, [hook], {
 })
 assert.equal(sessionless.status, 2, 'depth does not need a ledger')
 
+/* ── ⑸ the name the host sends, and the one it does not (#221) ───────────── */
+
+assert.equal(
+  namespace,
+  'evidence-gated',
+  'the namespace is this package’s own manifest id, read beside `agents/` rather than spelled in the guard',
+)
+
+assert.equal(
+  canonicalFlow('evidence-gated:us-sleeve', { flows, namespace }),
+  'us-sleeve',
+  '⚠️ the only `subagent_type` the CLI enumerates for this package, which this guard refused for its whole life',
+)
+assert.equal(
+  canonicalFlow('us-sleeve', { flows, namespace }),
+  'us-sleeve',
+  'and the front matter’s own name still resolves, so a host that stops namespacing is not a second outage',
+)
+assert.equal(
+  canonicalFlow('general-purpose', { flows, namespace }),
+  null,
+  '28 of the 29 subagents in the run that measured this were this, and it is still refused',
+)
+assert.equal(
+  canonicalFlow('evidence-gated:general-purpose', { flows, namespace }),
+  null,
+  '⚠️ a prefix is not a pass — the stem still has to be a declared flow',
+)
+assert.equal(
+  canonicalFlow('someone-else:us-sleeve', { flows, namespace }),
+  null,
+  '⛔ another plugin’s worker sharing one of our names has none of our skills, markets or prohibitions',
+)
+assert.equal(
+  canonicalFlow('someone-else:us-sleeve', { flows, namespace: null }),
+  'us-sleeve',
+  'and with no readable manifest there is no prefix to check against, so the roster alone answers rather than the package refusing every dispatch',
+)
+
+assert.equal(
+  judge({ tool_name: 'Agent', tool_input: { subagent_type: 'evidence-gated:kr-sleeve' } }),
+  null,
+  'so the dispatch the whole package is built out of is finally allowed',
+)
+assert.equal(
+  judge({ tool_name: 'Agent', tool_input: { subagent_type: 'someone-else:kr-sleeve' } }).code,
+  'delegation_flow_undeclared',
+  'and a foreign namespace is refused by the same rule that refuses `general-purpose`',
+)
+
+// ⚠️ One flow spelled two ways is one flow. Counting the typed string would give
+// it two budgets and the per-flow ceiling would never be reached.
+assert.equal(
+  judge(
+    { tool_name: 'Agent', tool_input: { subagent_type: 'evidence-gated:us-sleeve' } },
+    ['us-sleeve', 'evidence-gated:us-sleeve'],
+  ).code,
+  'delegation_budget_exhausted',
+  `${MAX_DISPATCHES_PER_FLOW} a flow is counted in canonical names, not in the spelling that was typed`,
+)
+
+// The same, through the processes that actually keep the count.
+const mixed = `verify-mixed-${process.pid}-${Date.now()}`
+const dispatch = (subagent_type, session) =>
+  spawnSync(process.execPath, [hook], {
+    input: JSON.stringify({ session_id: session, tool_name: 'Agent', tool_input: { subagent_type } }),
+    encoding: 'utf8',
+  })
+
+assert.equal(dispatch('evidence-gated:kr-sleeve', mixed).status, 0, 'the namespaced dispatch passes the hook the CLI runs')
+assert.equal(dispatch('kr-sleeve', mixed).status, 0, 'and so does the bare one, as its second')
+const third = dispatch('evidence-gated:kr-sleeve', mixed)
+assert.equal(third.status, 2, '⚠️ two spellings, one ledger — the third dispatch of one flow is over the ceiling')
+assert.match(third.stderr, /delegation_budget_exhausted/)
+
+const foreign = dispatch('someone-else:kr-sleeve', `${mixed}-foreign`)
+assert.equal(foreign.status, 2, 'and the foreign namespace is refused by the executable, not only by the rule')
+assert.match(foreign.stderr, /delegation_flow_undeclared/)
+
+
 console.log(
   `evidence-gated delegation budget: depth ${MAX_DELEGATION_DEPTH}, flows [${flows.join(', ')}], ` +
-    `${MAX_DISPATCHES_PER_FLOW} per flow and ${MAX_DISPATCHES_PER_RUN} per run — enforced by the hook the CLI runs`,
+    `${MAX_DISPATCHES_PER_FLOW} per flow and ${MAX_DISPATCHES_PER_RUN} per run — enforced by the hook the CLI runs, ` +
+    `under \`${namespace}:<flow>\` as well as the bare name`,
 )

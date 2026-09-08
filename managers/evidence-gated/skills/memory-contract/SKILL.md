@@ -34,6 +34,24 @@ Do not generate a key per run, asset or date.
 
 `coverage/research-index` is a bounded exception for a research roster, not source caching.
 Use `researchState({previous, observations})` and persist only a non-null `nextState`.
+
+⚠️ **The canonical shape of this key is `{schemaVersion: 1, updatedAsOf, rows[]}` — what
+`nextState` is.** Persist that object; hand it straight back as `previous` on the next run. Each
+row is `{symbol, market, observedAt, evidenceIds[], sector, extension}`, and an `observations[]`
+row you hand in requires **four** of those: `symbol`, `market`, `observedAt` (not after `asOf`)
+and a **non-empty** `evidenceIds`. A row missing one is `research_observation_invalid` / blocked;
+`inputContracts.nested.researchState` publishes the row.
+
+Extra descriptive fields **may** sit beside `rows` — earlier runs wrote `extensions`,
+`universeProvenance`, `usMapping` and friends there — and are permitted, not refused. They are
+**ignored**: `researchState` reports their names in `previousExtraKeys` and does not carry them
+into `nextState`, so a run that wants them re-writes them itself beside the roster. ⚠️ **A stored
+value with no `rows` at all reads as an empty index, not as a refusal** (#222) — the answer's
+`previousRead` says which reading was taken (`absent` / `rows` / `no-rows`). ⛔ Two things are
+still refused, and both are about correctness rather than shape: a `schemaVersion` that is present
+and is not `1` (an unknown writer, whose rows this package may misread), and an `updatedAsOf` that
+parses and is **after** `asOf` (an index written by a later run — the per-row date check cannot see
+that). Neither can lock the key: `previous: null` always re-seeds it.
 It carries at most 200 symbol/market rows with observation dates, up to eight Evidence ids,
 sector and an extension flag; no prices, filings, portfolio weights or source bodies.
 `researchUniverse` reads the bundled 74-name KR / 83-name US seed and validated extensions.
