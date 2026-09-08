@@ -45,6 +45,14 @@ publication/announcement time for news/actions, and bar timestamp. Snapshots tha
 return current state are not replay sources. Adjusted and unadjusted series are never
 mixed and corporate actions are used to explain discontinuities.
 
+⛔ **Bounded at `asOf` is not the same as «finished».** Toss's `before` is inclusive and a daily bar
+is stamped at the venue's local midnight, so a run pinned inside a session that asks for that day's
+midnight is handed that day's *incomplete* bar with complete, numeric OHLCV — valid in shape and
+wrong in data, which is why every parse check passes it. The prescription lives in
+`skills/data-source-contract/SKILL.md`: the instant goes inside the previous day, the first row's
+date is checked afterwards, and `newest_bar_may_be_unclosed` reports a newest bar younger than the
+24 hours that make a daily bar readable without refusing anything.
+
 | missing | continues | blocked |
 |---|---|---|
 | Toss connection | existing Evidence/Thesis review | new price signal and target calculation |

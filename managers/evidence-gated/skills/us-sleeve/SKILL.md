@@ -211,6 +211,16 @@ both steps and the row that comes back carries no series. ⛔ Never a worker ope
 walk listing pages or batch the roster, and ⛔ never a roster of bars typed back as `calculate`
 arguments. `skills/candidate-research/SKILL.md` owns the procedure and the three counts and
 `skills/data-source-contract/SKILL.md` the route.
+⛔ **And the bars you do hand-collect for a single name are not de-partialled by `before`.** That
+parameter is **inclusive**, and a Toss daily bar is stamped at the venue's local midnight, so
+today's midnight returns today's *unfinished* bar. ⚠️ It was measured on XKRX (2026-09-08, 069500,
+mid-session: the same call and an omitted `before` both answered with the same partial row, and its
+close sat 2,665 above the real prior close) and the stamp rule is the venue's, so the instant goes
+**inside the previous day in this venue's own offset** — `2026-09-04T23:59:59-04:00`, never the
+day's midnight and never KST carried across. Then **read the first row's date and confirm it is the
+session you meant**. ⛔ No shape check catches this — a partial bar's OHLCV parses and the moving averages
+compute — so `newest_bar_may_be_unclosed` (`info`) is what reports it and it refuses nothing.
+`skills/data-source-contract/SKILL.md` carries the measurement.
 ⚠️ Read `unprepared` as **blindness, never as an absence of opportunity**: the names come back and
 `source_cache_refresh` is what fixes them. ⚠️ And read `scanner_history_insufficient` the same way
 by asking what **your own refresh** answered for that symbol: not collected, or

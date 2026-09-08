@@ -148,7 +148,18 @@ export const OPERATIONS = {
     surface: 'published',
     mode: 'named', keys: { symbol: STRING, market: STRING, sector: STRING, bars: ARRAY, held: BOOLEAN, pending: BOOLEAN },
     describe: 'the five oversold axes for one candidate',
-    run: opportunityMetrics,
+    /**
+     * ⚠️ **Normalized like `scan` and for the same two reasons (#224).** This
+     * was the one bar operation that took `bars` raw: post-`asOf` rows were
+     * never dropped here, and the newest-bar age check had nowhere to run. The
+     * shape is copied from `scan` verbatim rather than paraphrased, so the four
+     * bar operations answer the bar contract with one rule instead of two.
+     */
+    run(input, asOf) {
+      const normalized = normalizeBars(input?.bars, asOf)
+      const measured = opportunityMetrics({ ...input, bars: normalized.bars })
+      return { data: measured.data, diagnostics: [...normalized.diagnostics, ...measured.diagnostics] }
+    },
   },
   opportunityUniverse: {
     group: 'scanners',
