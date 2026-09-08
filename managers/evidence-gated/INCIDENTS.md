@@ -207,6 +207,25 @@ after the close holds a same-day bar that is complete, and refusing there would 
 reading into no reading. On the corrected prescription the row does not appear at all, so it fires
 exactly when a run did not follow it.
 
+**A source that existed and a procedure that did not** (#229). `variantViewCheck` has four
+requirements and one of them — `consensusRefs` — takes an input that is in no filing and on no
+exchange feed. The session held `WebSearch`, `WebFetch` and `observation_file` throughout; what it
+did not hold was a step telling it to go and get a consensus for a candidate. Measured on
+`run_c7ad46eea03840bf84ae7a8822ed02c3` (asOf `2026-09-08T03:01:37.490Z`): `requirementReport` **0 of
+4**, `consensusRefs` outstanding as *"no consensus row was given, so there is nothing the view
+differs from"*. ⚠️ The run reported that as *"there is no consensus source"* — **overstated**, and
+the wrong half is the one a reader acts on: a missing source is somebody else's to fix and a missing
+step is this package's. ⛔ **Since #226 the cost is the whole position**, not a smaller one:
+`variant_view_required_for_position` / `blocked` with `targetWeight: null`, so ten runs generated no
+single-name proposal at any size. The spine was in the order that guarantees it — a step that files
+a consensus reading and a step that ledgers it, and no step that fetches one — so the retrieval is
+now a numbered step of `lib/flows.mjs` between the valuation and the filing, and
+`candidate-research` §Consensus, before the thesis owns the procedure and the two figures it asks
+for. ⚠️ **One reading closes three of `validateThesis`'s gaps**: the 036460 thesis that returned
++18.6%p carried *"애널 평균 목표 46,700원(고 59,000 / 저 26,000), 8 Buy·1 Sell"* — that sentence is
+`consensusRefs`, and the same targets are what `expectedUpsidePct` and `fairValueRange` are read
+out of.
+
 ## The watch layer (§2b)
 
 **Three usable answers reported as nothing checked** (#157). `succeeded: 3` over `attempts: 10` used

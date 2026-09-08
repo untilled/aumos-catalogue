@@ -26,8 +26,11 @@
  * step reordered, dropped, or unwired does not.
  *
  * ⚠️ `calls` are **names in this package**, not markdown. `kind: 'tool'` marks
- * the ones the host serves rather than `execute()` — they are steps of the run
- * loop all the same, which is exactly what #146 measured.
+ * the ones something other than `execute()` serves — they are steps of the run
+ * loop all the same, which is exactly what #146 measured. ⚠️ **And two of
+ * them are not the host's**: `WebSearch`/`WebFetch` are the CLI's, so that step
+ * exists only in a session whose prompt named them, and a session that was not
+ * given them reports the absence rather than routing around it (#229).
  */
 
 /** A consumer's input field, and the earlier step whose answer fills it. */
@@ -84,6 +87,16 @@ const tail = [
     feeds: [feed('radarCandidates', 'candidates'), feed('radarFeedDiagnosis', '*', 'feed')],
   },
   { calls: ['thesisGapSources', 'thesisValuation'], kind: 'operation' },
+  /**
+   * ⛔ **The step that was missing, and it was missing from the spine (#229).**
+   * `variantViewCheck`'s `consensusRefs` is the only one of its four requirements
+   * whose input is in no filing and on no exchange feed, and since #226 a candidate
+   * short of any of the four is refused outright rather than sized smaller. The
+   * next step could file a consensus reading and the one after could ledger it —
+   * and nothing anywhere said to go and **get** one. Measured on
+   * `run_c7ad46eea03840bf84ae7a8822ed02c3`: `requirementReport` 0 of 4.
+   */
+  { calls: ['WebSearch', 'WebFetch'], kind: 'tool' },
   { calls: ['observation_file'], kind: 'tool' },
   { calls: ['observationLedger'], kind: 'operation' },
 ]

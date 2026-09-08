@@ -3211,3 +3211,183 @@ assert.equal(clockBound.data.boundary.emptyExtensionRuns, 5)
 assert.equal(clockBound.data.boundary.radarOpenRunsInStreak, 0, 'five runs that moved nothing and a radar that was due in none of them is a clock finding, not a market one')
 
 console.log('evidence-gated issue #227 theme-radar clock regression tests passed')
+
+/**
+ * ── #229: the consensus source existed and the procedure did not ────────────
+ *
+ * `variantViewCheck` has four requirements and exactly one of them takes an
+ * input that is **in no filing and on no exchange feed**: `consensusRefs`. The
+ * session running this manager holds `WebSearch`, `WebFetch` and
+ * `observation_file`, so the input was reachable — and no numbered step of the
+ * spine, and no section of `candidate-research`, said to go and get it. The
+ * previous run reported that as *"there is no consensus source"*; ⚠️ that was
+ * **overstated**, and correcting it is half of what this block pins.
+ *
+ * ⛔ **#226 changed what the gap costs.** It removed the maturity-sized lane and
+ * resolved the open decision the other way from *shrink*: a candidate short of
+ * any requirement is now `variant_view_required_for_position` / `blocked` with
+ * `targetWeight: null`. So the measured state is not «every candidate falls to
+ * the control arm and gets 1%» any more — it is **no single name can be proposed
+ * at all**. Measured on the fixtures below, at conviction 0.35 / reward-risk
+ * 2.083 / Mandate cap 0.2:
+ *
+ * | | 0 of 4 (no thesis) | 4 of 4 (thesis + a filed consensus row) |
+ * |---|---|---|
+ * | `satisfiedCount` | 0 | 4 |
+ * | `lane` | `control-arm` | `main` |
+ * | `effectiveCap` | 0.2 (`mandate`) | 0.2 (`mandate`) |
+ * | `variantViewVerified` | false | true |
+ * | `targetWeight` | **`null`**, `variant_view_required_for_position` | **0.07916667** |
+ * | owed disclosures | none | `main_lane_rests_on_manager_attestation` |
+ *
+ * ⚠️ The cap is the same on both sides on purpose: since #226 this gate decides
+ * **whether** a position may be proposed and never how large it is.
+ */
+const consensusAsOf = JSON.parse(await readFile(new URL('../managers/evidence-gated/fixtures/observation-contract.json', import.meta.url), 'utf8'))
+const consensusFixture = consensusAsOf.consensusRefs
+const consensusGolden = JSON.parse(await readFile(new URL('../managers/evidence-gated/fixtures/legacy-golden/methodology.json', import.meta.url), 'utf8'))
+const conRun = (operation, input = {}) => execute({ operation, asOf: consensusAsOf.asOf, input })
+const conThesis = { ...consensusGolden.thesis, consensusRefs: [consensusFixture.managerAttested] }
+const sizingInput = { mandatePositionCap: 0.2, maturityStatus: 'observing', lane: 'main', expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.35, researchGate: 'passed' }
+
+/* ── ⑴ the step is on the spine, not only in prose ─────────────────────────── */
+
+const { FLOWS: consensusFlows, numberedSteps: consensusSteps, stepOf: consensusStepOf } = await import('../managers/evidence-gated/lib/flows.mjs')
+for (const flow of Object.keys(consensusFlows)) {
+  const retrieval = consensusStepOf(flow, 'WebSearch')
+  assert.ok(retrieval, `${flow} declares the consensus retrieval step — #229's defect is that the flow filed a reading nobody was told to fetch`)
+  assert.equal(retrieval.kind, 'tool', '⚠️ it is the CLI\'s tool and not this package\'s operation, and the spine says so')
+  assert.deepEqual(retrieval.calls, ['WebSearch', 'WebFetch'])
+  assert.ok(
+    consensusStepOf(flow, 'thesisGapSources').n < retrieval.n && retrieval.n < consensusStepOf(flow, 'observation_file').n,
+    'it comes after the step that prices a thesis and before the filing that turns the reading into a row — file-then-fetch is the order that produced 0 of 4',
+  )
+  assert.ok(retrieval.n < consensusStepOf(flow, 'observationLedger').n)
+}
+/** ⛔ Non-vacuity: a spine without that step has to fail the lookup, not fall through it. */
+assert.equal(consensusSteps('kr-sleeve').filter((step) => step.call === 'WebSearch').length, 1, 'exactly one step claims it, so the assertions above cannot be satisfied twice')
+
+const consensusSkills = Object.fromEntries(await Promise.all(
+  ['kr-sleeve', 'us-sleeve', 'candidate-research'].map(async (name) => [name, await readFile(new URL(`../managers/evidence-gated/skills/${name}/SKILL.md`, import.meta.url), 'utf8')]),
+))
+for (const sleeve of ['kr-sleeve', 'us-sleeve']) {
+  const text = consensusSkills[sleeve]
+  const marker = text.match(/^(\d+)\. \*\*`WebSearch`\/`WebFetch` the consensus/m)
+  assert.ok(marker, `${sleeve} carries the retrieval as a numbered step of its checklist, in the register the file already uses`)
+  assert.ok(Number(marker[1]) < Number(text.match(/^(\d+)\. \*\*`observation_file` on every consensus/m)[1]))
+  for (const fragment of ['analyst target price', 'buy/hold/sell', 'never a dependency', 'model knowledge']) {
+    assert.ok(text.includes(fragment), `${sleeve}'s step names «${fragment}» — the two figures, the refusal to sign a vendor, and the refusal to invent one`)
+  }
+}
+/** ⚠️ One worked path each, and they are different paths: a KR sentence copied into the US file answers nothing. */
+assert.ok(consensusSkills['kr-sleeve'].includes('broker consensus aggregation'))
+assert.ok(consensusSkills['us-sleeve'].includes('broker price-target aggregation'))
+assert.equal(consensusSkills['us-sleeve'].includes('broker consensus aggregation'), false, 'the US sleeve names a US path rather than inheriting the Korean one')
+assert.ok(consensusSkills['candidate-research'].includes('## Consensus, before the thesis'), 'and the procedure has one home the two sleeves point at')
+
+/* ── ⑵ the driver the contract already allowed, and what it still does not do ── */
+
+const targetDrivers = (metric) => [{ metric, evidenceId: consensusFixture.managerAttested.evidenceId }]
+const consensusValued = conRun('thesisValuation', {
+  asset: '036460',
+  market: 'kr',
+  price: 33_100,
+  currency: 'KRW',
+  scenarios: {
+    bear: { probability: 0.25, target: 26_000, drivers: targetDrivers('analystTargetLow') },
+    base: { probability: 0.5, target: 36_400, drivers: targetDrivers('analystTargetMean') },
+    bull: { probability: 0.25, target: 59_000, drivers: targetDrivers('analystTargetHigh') },
+  },
+  filings: [],
+})
+assert.notEqual(consensusValued.status, 'blocked', 'a filed analyst target is a legal driver — this is what the contract already allowed, and #229 widened nothing to say so')
+assert.deepEqual(consensusValued.data.fairValueRange, { low: 26_000, high: 59_000, currency: 'KRW' })
+assert.equal(consensusValued.data.expectedUpsidePct, 19.18429)
+assert.deepEqual(consensusValued.data.thesisFields, { expectedUpsidePct: 19.18429, fairValueRange: { low: 26_000, high: 59_000 } })
+assert.deepEqual(
+  consensusValued.data.scenarios.map((row) => row.drivers[0].evidenceId),
+  Array(3).fill(consensusFixture.managerAttested.evidenceId),
+  'and the id travels onto every returned row, which is the whole of what makes the number traceable',
+)
+/**
+ * ⛔ **And it is still not `grounded`, which is the honest answer.** `grounded`
+ * means a fact this run could read off a statement; an analyst target is a third
+ * party's opinion. Reporting it is the point — loosening it would delete the one
+ * distinction the field carries.
+ */
+assert.equal(consensusValued.data.grounded, false)
+assert.equal(consensusValued.data.groundedCases, 0)
+const ungroundedRow = consensusValued.diagnostics.find((row) => row.code === 'scenario_driver_ungrounded')
+assert.equal(ungroundedRow.severity, 'unevaluated', 'reported, never refused — the target the size was computed from stays visible')
+assert.equal(consensusValued.diagnostics.filter((row) => row.code === 'scenario_driver_ungrounded').length, 3)
+/** ⚠️ The pin on «nothing was loosened»: none of the four readable facts is an analyst target. */
+const { FILING_FACTS: consensusFacts } = await import('../managers/evidence-gated/lib/valuation.mjs')
+assert.deepEqual(Object.keys(consensusFacts), ['revenue', 'operatingIncome', 'operatingIncomeYoy', 'marginDeltaYoy'])
+assert.equal(Object.keys(consensusFacts).some((name) => /analyst|target|consensus/i.test(name)), false, '⛔ no analyst-target fact was added to make the case pass; the case is meant to say what it says')
+/** ⚠️ And the manager reads the published schema rather than this source (#618), so the sentence is there. */
+const driversContract = conRun('inputContracts').data.nested.thesisValuation['scenarios.<case>.drivers[]']
+for (const fragment of ['{ metric, evidenceId }', 'observation_file', 'scenario_driver_ungrounded', 'does not have to be a DCF']) {
+  assert.ok(driversContract.includes(fragment), `the published driver contract says «${fragment}»`)
+}
+
+/* ── ⑶ 0 of 4 → 4 of 4, and the position that was impossible ───────────────── */
+
+const zeroOfFour = conRun('variantViewCheck', {})
+assert.equal(zeroOfFour.data.satisfiedCount, 0)
+assert.deepEqual(
+  zeroOfFour.data.requirementReport.find((row) => row.requirement === 'consensusRefs').outstanding,
+  'no consensus row was given, so there is nothing the view differs from',
+  'the measured sentence, verbatim — it is the one the run mistook for «no source exists»',
+)
+const fourOfFour = conRun('variantViewCheck', { thesis: conThesis, challengeVerdict: 'cleared' })
+assert.equal(fourOfFour.data.satisfiedCount, 4)
+assert.equal(fourOfFour.data.verified, true)
+assert.equal(fourOfFour.data.lane, 'main')
+assert.equal(conRun('targetWeight', sizingInput).data.targetWeight, null, 'before: the candidate is refused outright since #226, not sized down')
+assert.ok(conRun('targetWeight', sizingInput).diagnostics.some((row) => row.code === 'variant_view_required_for_position' && row.severity === 'blocked'))
+const sizedOnConsensus = conRun('targetWeight', { ...sizingInput, thesis: conThesis, challengeVerdict: 'cleared' })
+assert.equal(sizedOnConsensus.data.targetWeight, 0.07916667, 'after: one filed consensus row is the difference between a proposal and none')
+assert.equal(sizedOnConsensus.data.effectivePositionCap, 0.2, '⚠️ and the cap is unchanged on both sides — this gate decides whether, never how large')
+
+/* ── ⑷ the grade reaches the approval screen, or the sizing is refused ──────── */
+
+/**
+ * `main_lane_rests_on_manager_attestation` already existed. What was not pinned
+ * is the whole path: `variantViewCheck` grades the row, **`targetWeight`** — the
+ * operation a run actually calls to size — has to carry the obligation up, and
+ * `proposalDisclosure` has to refuse the proposal that drops it from
+ * `rationale.risks`. ⚠️ Measured on the host: `Approvals.tsx` renders
+ * `rationale.keyReasons` and `rationale.risks` and nothing else, so `risks` is
+ * the only slot on that screen and `uncertainty` is not on it at all.
+ */
+assert.equal(sizedOnConsensus.data.mainLaneAttestation.disclosureCode, 'main_lane_rests_on_manager_attestation')
+assert.equal(sizedOnConsensus.data.mainLaneAttestation.grade, 'manager')
+assert.deepEqual(sizedOnConsensus.data.mainLaneAttestation.disclosureFields, ['risks', 'uncertainty'])
+assert.deepEqual(sizedOnConsensus.data.disclosures.map((row) => row.code), ['main_lane_rests_on_manager_attestation'], '⛔ dropped here and the investor is never told; the sizing has to hand it on')
+assert.equal(sizedOnConsensus.data.mainLaneAttestation.refs[0].evidenceId, consensusFixture.managerAttested.evidenceId)
+
+const judgeConsensus = (proposal) => conRun('proposalDisclosure', { disclosures: sizedOnConsensus.data.disclosures, proposal })
+/**
+ * ⚠️ **The case #229 asked for, and the one nothing covered.** A proposal that
+ * discloses in `uncertainty` and not in `risks` has told the run's later readers
+ * and told the approving investor nothing — the grade is dropped exactly on the
+ * way to the screen that matters, and it is refused there.
+ */
+const screenSilent = judgeConsensus({ rationale: { risks: ['A KRW book carries FX risk.'] }, uncertainty: ['main_lane_rests_on_manager_attestation: manager-attested consensus.'] })
+assert.equal(screenSilent.status, 'blocked')
+assert.deepEqual(screenSilent.data.missing, [{ code: 'main_lane_rests_on_manager_attestation', field: 'risks' }], 'and the one slot that is silent is named — «disclosed somewhere» is not the obligation')
+assert.ok(has(screenSilent, 'main_lane_attestation_undisclosed'))
+const bothSilent = judgeConsensus({ rationale: { risks: [] }, uncertainty: [] })
+assert.deepEqual(bothSilent.data.missing.map((row) => row.field), ['risks', 'uncertainty'])
+const bothCarried = judgeConsensus({ rationale: { risks: consensusAsOf.disclosure.risks }, uncertainty: consensusAsOf.disclosure.uncertainty })
+assert.equal(bothCarried.data.disclosed, true)
+assert.notEqual(bothCarried.status, 'blocked')
+/** ⛔ And no wording moved the weight: the sizing is a function of the numbers alone since #212 ②. */
+assert.equal(sizedOnConsensus.data.targetWeight, 0.07916667)
+/** ⛔ A lane opened on vendor evidence owes nothing — an obligation that fired on the ordinary case is noise. */
+const vendorSized = conRun('targetWeight', { ...sizingInput, thesis: { ...conThesis, consensusRefs: [consensusFixture.vendorAttested] }, challengeVerdict: 'cleared' })
+assert.equal(vendorSized.data.mainLaneAttestation, null)
+assert.deepEqual(vendorSized.data.disclosures, [])
+assert.equal(vendorSized.data.targetWeight, 0.07916667, 'and it sizes identically — the grade is a disclosure and never a discount')
+
+console.log('evidence-gated issue #229 consensus-procedure regression tests passed')

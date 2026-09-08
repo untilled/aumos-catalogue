@@ -187,6 +187,97 @@ of the fired plan's event summary.
 ⛔ The plan lives in the Thesis, not in private memory. It is one document because the decision was
 one decision; a ladder in a memory key would be a second copy of what the Thesis already owns.
 
+## Consensus, before the thesis
+
+⛔ **This was a source that existed and a procedure that did not.** `variantViewCheck`'s four
+requirements are all owed before a single name may be proposed at all — since #226 a failed check
+returns `variant_view_required_for_position` / `blocked` and `targetWeight: null`, so the shortfall
+costs the position rather than 95% of it — and `consensusRefs` is the one whose input is **in no
+filing and on no exchange feed**. A run holding `WebSearch`, `WebFetch` and `observation_file` has
+everything needed to fill it, and nothing on this page told it to. Measured on
+`run_c7ad46eea03840bf84ae7a8822ed02c3` (asOf `2026-09-08T03:01:37.490Z`): `requirementReport` 0 of
+4, `consensusRefs` outstanding as *"no consensus row was given, so there is nothing the view differs
+from"*. ⚠️ The run before it reported that as *"there is no consensus source"*, which was
+**overstated**: what was missing was these four steps.
+
+Do them for every candidate a price sweep or the radar raises, **before it reaches a thesis**:
+
+1. **Query the consensus.** Two figures and no more: the **aggregated analyst target price** —
+   mean, and the high and the low if the page carries them — and the **buy/hold/sell opinion
+   distribution**. One page per name is enough; this is what your view differs *from*, not a
+   research project of its own.
+2. **File the passage with `observation_file`** — the URL, the document's own title and publication
+   date, and the source's own words verbatim in `excerpt`, with your reading beside the quotation in
+   `reading` and never instead of it. Keep the returned `evidenceId`. ⛔ A `publishedAt` after your
+   `asOf` is refused, and a bare date counts as the **end** of that day; omit the date rather than
+   guessing.
+3. **Carry the id onto the row.** Each `consensusRefs` entry takes `metric`, a finite `value`,
+   `sourceUrl`, `publishedAt`, `capturedAt`, and the `evidenceId` with `evidenceKind: "observation"`
+   and `evidenceSource: "manager:web-research"`. A row without the id still satisfies the
+   requirement and is reported `consensus_ref_uncited` — since the route exists, an uncited figure
+   is a choice.
+4. **Report the absence rather than inventing around it.** If no page answers for this name, say so
+   in `uncertainty` and let the candidate stand at 3 of 4. ⛔ Do not substitute a number from model
+   knowledge, and ⛔ do not open a worker to crawl for one — a consensus nobody can go and check is
+   the failure this manager is named after.
+
+⚠️ **The same reading closes three of `validateThesis`'s four gaps at once**, which is why it is
+worth its own step. The 036460 thesis that returned +18.6%p carried *"애널 평균 목표 46,700원
+(고 59,000 / 저 26,000), 8 Buy·1 Sell → 약 +41% 상방"* and a probability-weighted *"~+18%"*: the
+first sentence is `consensusRefs` — what the view differs from — and both are what the bear/base/
+bull targets in §Candidate record 5 are read against, which is where `expectedUpsidePct` and
+`fairValueRange` come from.
+
+### Where the two figures come from — one worked path each, and neither is a dependency
+
+⛔ **This records that a path exists; it signs no vendor.** Any page that publishes the aggregate,
+names its own publication date and can be quoted verbatim is a legal source, and this package
+requires none of these in particular. What it requires is the `evidenceId`.
+
+| sleeve | one worked path | what it answers |
+|---|---|---|
+| KR | a broker consensus aggregation — e.g. the 종목분석 · 컨센서스 page a Korean brokerage or portal publishes per listing symbol, carrying the estimate house count | 목표주가 mean/high/low and the 투자의견 distribution |
+| US | a broker price-target aggregation — e.g. the analyst-ratings page a US market-data site publishes per ticker, carrying the contributing analyst count | mean/high/low price target and the Buy/Hold/Sell split |
+
+⚠️ **`WebSearch` and `WebFetch` are the CLI's and not this gateway's**, so they issue no evidence id
+and reach `evidenceIds` through nothing but step 2. ⚠️ And what you file is filed as **your
+testimony**: when the main lane opens on it, `effectivePositionCap` returns
+`main_lane_rests_on_manager_attestation` and the proposal has to carry that code in one
+`rationale.risks` entry — what the approval screen renders — and one `uncertainty` entry, or the
+sizing is `blocked`. See `skills/{kr,us}-sleeve/SKILL.md` step 12.
+
+### The filed target is a legal scenario driver, and the contract already said so
+
+A `scenarios.<case>.drivers[]` entry is **either** a filing fact name — `revenue`,
+`operatingIncome`, `operatingIncomeYoy`, `marginDeltaYoy`, the four `radarCandidates` normalizes —
+**or** an object `{ metric, evidenceId }`. So the analyst target you filed in step 2 is already a
+driver this operation accepts, and nothing had to be widened to make it one:
+
+```json
+{
+  "bear": { "probability": 0.25, "target": 26000,
+            "drivers": [{ "metric": "analystTargetLow",  "evidenceId": "ev_consensus_2026q3" }] },
+  "base": { "probability": 0.50, "target": 36400,
+            "drivers": [{ "metric": "analystTargetMean", "evidenceId": "ev_consensus_2026q3" }] },
+  "bull": { "probability": 0.25, "target": 59000,
+            "drivers": [{ "metric": "analystTargetHigh", "evidenceId": "ev_consensus_2026q3" }] }
+}
+```
+
+⚠️ **A fair value here does not have to be a DCF; it has to say where it came from.** This package
+publishes no multiple and no discount rate because this methodology names none, and the original was
+explicit about the same thing — the 035420 thesis wrote its 230,000~260,000원 band down as *"운영
+범위이며, 독립적인 DCF 산출값은 아니다"*. A cited band is a stated basis. An uncited one is not.
+
+⛔ **What that driver does not do is make the case `grounded`, and this page will not pretend
+otherwise.** Measured: the three rows above, at a price of 33,100, return `fairValueRange`
+`{low: 26000, high: 59000}`, `expectedUpsidePct` `19.18429` and a populated `thesisFields`, the `evidenceId` travels onto every
+returned driver row, and the answer is **not blocked** — and `grounded` is `false` with
+`scenario_driver_ungrounded` / `unevaluated` on each case, because `grounded` means *a filing fact
+this run could read off the statements*, which an analyst target is not. That report is correct and
+is left alone. Cite both where you have both: a target standing on an analyst aggregate **and** on
+the operating income under it is grounded and cited, and it is the only combination that is.
+
 ## Candidate record
 
 Write the following in reasoning and, when a durable asset claim is created, its Thesis:

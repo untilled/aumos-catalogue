@@ -52,6 +52,40 @@ import { diagnostic, finite, round } from './diagnostics.mjs'
  * what #160 asks for — is make the filings *reach* the place the targets are
  * written: every scenario names the filing facts it rests on, and a target
  * standing on nothing is reported as standing on nothing.
+ *
+ * ── ⚠️ An analyst target is already a legal driver (issue #229) ────────────
+ *
+ * A `drivers[]` entry is **either** a `FILING_FACTS` name **or**
+ * `{ metric, evidenceId }`, and the second form has been here since this module
+ * was written. So the consensus figure a run files with `observation_file` — the
+ * same reading `variantViewCheck`'s `consensusRefs` requirement takes — is a
+ * driver this operation accepts today, and #229 needed nothing widened to say so:
+ *
+ *     bear: { probability: 0.25, target: 26000,
+ *             drivers: [{ metric: 'analystTargetLow',  evidenceId: 'ev_consensus_2026q3' }] }
+ *     base: { probability: 0.50, target: 36400,
+ *             drivers: [{ metric: 'analystTargetMean', evidenceId: 'ev_consensus_2026q3' }] }
+ *     bull: { probability: 0.25, target: 59000,
+ *             drivers: [{ metric: 'analystTargetHigh', evidenceId: 'ev_consensus_2026q3' }] }
+ *
+ * ⚠️ **Measured, at price 33,100:** `fairValueRange` `{ low: 26000, high: 59000 }`,
+ * `expectedUpsidePct` `19.18429`, a populated `thesisFields`, the `evidenceId` on
+ * every returned driver row — and **not blocked**.
+ *
+ * ⛔ **And `grounded` stays `false`, which is the honest answer and is not
+ * loosened here.** `grounded` means *a fact this run could read off a filing*;
+ * an analyst target is a third party's opinion, so the case is reported
+ * `scenario_driver_ungrounded` / `unevaluated` and the number still comes back.
+ * ⚠️ Making an `evidenceId` count as grounding would delete the only distinction
+ * this field carries — between a target standing on the statements and one
+ * standing on somebody's estimate — and #141's defect is precisely a number the
+ * run supplied becoming an allocation limit unremarked.
+ *
+ * ⚠️ **A fair value here does not have to be a DCF; it has to say where it came
+ * from.** The original methodology was explicit about the same thing — the
+ * 035420 thesis wrote its 230,000~260,000원 band down as *"운영 범위이며,
+ * 독립적인 DCF 산출값은 아니다"*. A cited band is a stated basis; an uncited one
+ * is not, and the two are told apart on this line and nowhere else.
  */
 
 /** The three cases, in the order low → high they are read in. */

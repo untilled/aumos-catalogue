@@ -157,7 +157,26 @@ been fed. Do these in order and report each one:
    both fields from the bear/base/bull targets. ⛔ Without them a complete variant view still reads
    `missing: ["thesisComplete"]` and a declared 20% cap operates at 1%.
 
-12. **`observation_file` on every consensus reading, then carry the id onto the row** (#692). This
+12. **`WebSearch`/`WebFetch` the consensus for every candidate that reaches a thesis** (#229). ⛔ **The source
+    existed and the procedure did not.** `variantViewCheck`'s `consensusRefs` is the only one of the
+    four requirements whose input is in no filing and on no exchange feed, and since #226 a
+    candidate short of any of the four is not sized smaller — it is
+    `variant_view_required_for_position` / `blocked` with `targetWeight: null`. Measured on
+    `run_c7ad46eea03840bf84ae7a8822ed02c3`: `requirementReport` 0 of 4, `consensusRefs` outstanding
+    as *"no consensus row was given"*, and that run reported it as *there is no consensus source* —
+    ⚠️ **overstated.** You hold `WebSearch`/`WebFetch` when your prompt names them, and this is the
+    step that spends them. Get two figures and no more: the **aggregated analyst target price**
+    (mean, and high/low where the page carries them) and the **buy/hold/sell opinion distribution**.
+    One worked path for this sleeve is a **broker price-target aggregation** — the analyst-ratings
+    page a US market-data site publishes per ticker, carrying the contributing analyst count — ⛔ and that is an example and never a dependency: any page that publishes the aggregate,
+    names its own publication date and can be quoted verbatim is a legal source. ⚠️ **The same
+    reading closes three of `validateThesis`'s gaps**: it is `consensusRefs`, and its mean/high/low
+    are what the bear/base/bull targets are read against, which is where `expectedUpsidePct` and
+    `fairValueRange` come from (step 10). ⛔ If no page answers for a name, report the absence in
+    `uncertainty` and let it stand at 3 of 4 — never a number from model knowledge, and never a
+    worker opened to crawl for one. `skills/candidate-research/SKILL.md` §Consensus, before the
+    thesis owns the procedure and the `{ metric, evidenceId }` driver it feeds.
+13. **`observation_file` on every consensus reading, then carry the id onto the row** (#692). This
     is the step that turns a web reading into something the record holds. `variantViewCheck`'s
     `consensusRefs` requirement is the **only one of the four whose input exists nowhere but the
     web** — a broker estimate or a price target is in no filing and on no exchange feed — and your
@@ -177,7 +196,7 @@ been fed. Do these in order and report each one:
     proposal carries that code verbatim in one `rationale.risks` entry with the source URL and in
     one `uncertainty` entry, or the sizing is `blocked`. `risks` is not optional politeness — it is
     what the approval screen renders, and `uncertainty` is not on that screen at all.
-13. **`observationLedger` before you hand the flow back.** Pass what you filed
+14. **`observationLedger` before you hand the flow back.** Pass what you filed
     (`observations`), the ids the proposal will submit (`citedEvidenceIds`), and every web-read
     value your judgement leant on (`claims: [{claim, value, usedFor, evidenceId}]`). ⛔ A value
     used and uncited is `claim_evidence_missing` / `blocked` — that is the 2026-09-06 failure
@@ -213,7 +232,7 @@ Named, they are yours and the web lane is open; unnamed, that lane is an absence
 ⛔ They are for research and never for discovering tools — that is what the sentence above bans.
 
 ⚠️ **What they find is not evidence until you file it.** `observation_file` is the gateway tool
-that turns a reading into a citable row — see step 11 of the numbered branch above — and it is the
+that turns a reading into a citable row — see step 12 of the numbered branch above — and it is the
 only route by which anything you read on the web reaches `evidenceIds`. ⛔ **Reading a figure,
 judging on it, and citing nothing is the failure this manager is named after.** Run
 `observationLedger` before you hand back.
