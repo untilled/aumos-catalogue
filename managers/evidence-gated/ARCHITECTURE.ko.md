@@ -340,21 +340,39 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   트랙레코드의 실패 행이다. 그래서 닿은 레벨로 깨어난 실행은 **`WAIT`을 제출한다**: 무엇에
   깨어났고, 무엇을 찾았고, 무엇이 아직 닫힌 봉을 요구하고, 무엇을 다시 걸었는지 말하는 WAIT.
   침묵은 기계적으로 가능하지만 크래시로 채점된다.
-- **레인은 둘이고, 성숙도 게이트는 그중 하나의 것이다.** 원본 방법론은 기계적 대조군 —
-  variant view를 요구하지 않는 대신 종목당 1%·레인 총 6% — 과, variant view를 요구하는 대신
-  투자자 자신의 `maxPositionWeight`까지 실을 수 있는 정식 편입 레인을 함께 돌렸다. 이식본은 §4의
-  렌즈 성숙도 상한을 **두 레인 모두**에 걸었고, 그래서 variant view를 갖춘 후보도 기계 후보와
-  똑같이 `experimentalCeiling`(USD 14,866.44 장부에서 0.01345312)에 묶여 선언된
-  `maxPositionWeight` 0.20이 0.01로 작동했다. 두 레인을 가르는 것은 `variantViewCheck`이고, 그것은
-  주장이 아니라 검사 가능한 입력으로 답한다 — `variantView`를 담은 완전한 thesis, 출처와 날짜가
-  붙은 컨센서스 인용 최소 1건, 통과한 챌린지. 확인되지 않은 것은 전부 대조군으로 떨어지고
-  (`variant_view_unverified`), 대조군의 1%/6%는 원본 승인값 그대로 불변이다. ⛔ 여기서
-  `promotionGate`를 낮춘 것은 없고 `controlArmLane.expansionProhibited`는 그대로다 — 대조군의 성과는
-  결코 사이징의 근거가 아니며, 기계 코호트를 근거로 든 thesis는 레인 입구에서
-  `control_arm_evidence_cited` / `blocked`이다. 상한이 *실제로* 구속하는 자리에서는
-  `effectivePositionCap`이 여전히 그 비교를 계산해 `disclosures`에 의무로 이름 대고,
-  `proposalDisclosure`가 그것을 싣지 않은 제안을 거절한다(`position_cap_reduced_by_maturity`).
-  `concentration_cap_missing`과의 비대칭은 이것으로 닫힌다.
+- **성숙도 레인은 없앴다 — 크기는 Mandate가 정하고, 증거 게이트는 거절한다.** 원본 방법론은
+  기계적 대조군 — variant view를 요구하지 않는 대신 종목당 1%·레인 총 6% — 과, variant view를
+  요구하는 대신 투자자 자신의 `maxPositionWeight`까지 실을 수 있는 정식 편입 레인을 함께 돌렸다.
+  이식본은 §4의 렌즈 성숙도 상한을 **두 레인 모두**에 걸었고, 그래서 선언된 `maxPositionWeight`
+  0.20이 0.01로 작동했다. #153이 두 레인을 다시 갈랐고, **#226이 두 캡을 전부 없앴다** —
+  2026-09-08 투자자 결정: *"실험 레인은 없애고 실제로 aumos의 mandate에 따라 매수하면서 실험하는
+  방향으로 바꿔라."*
+  ⚠️ **실제 매수 자체가 이미 측정 장치다** — 실제 브로커에 붙어 있고, 모든 주문이 사람의 승인을
+  거치며, 모든 판단이 전방수익률과 함께 append-only 원장에 남는다. 별도의 축소된 레인은 측정을
+  앞당기지 않고 **측정 대상이 생기는 것을 막았다**: `run_c7ad46eea03840bf84ae7a8822ed02c3`에서
+  잰 것 — `consensusRefs` 수집 절차가 없어 `variantViewCheck`가 0/4, 모든 후보가 강제로 대조군에
+  떨어지고, USD 14,937.07 장부의 평면 1%가 **USD 149.37**로 USD 200 최소 티켓에 미달, 그래서 10개
+  런 동안 단일종목 0건.
+  이제 크기를 정하는 것은 **천장으로서의 Mandate**와 그 아래의 계산된 둘이다: 리스크 예산
+  `(maxDrawdown − heldPortfolioHeat) / |stopLossPct|`, 그리고 후보 자신의 기대·하방 수익률 위에서
+  도는 `targetWeight`의 quarter-Kelly 산식. ⛔ **20%는 기본값이 아니다** — 원본도 단일종목 캡은
+  20%였고 실제 KOGAS 진입은 2.6%였다.
+  `variantViewCheck`가 검사하는 것은 한 글자도 안 움직였고 **그 결과의 대가가 바뀌었다**:
+  `variantView`를 담은 완전한 thesis, 출처와 날짜가 붙은 컨센서스 인용, 통과한 챌린지 — 이 중
+  하나라도 없는 후보는 20배 작게 실리는 것이 아니라 **거절된다**
+  (`variant_view_required_for_position` / `blocked`, `targetWeight`는 `null`). ⛔ 새 바가 아니다:
+  넷 중 `challengeCleared`는 원래도 단독으로 치명적이었다.
+  ⛔ `promotionGate`를 낮춘 것은 없고(이제 렌즈의 기록을 보고할 뿐 어떤 크기도 게이트하지 않는다)
+  `controlArmLane.expansionProhibited`는 그대로다 — 대조군의 성과는 결코 사이징의 근거가 아니며,
+  기계 코호트를 근거로 든 thesis는 `control_arm_evidence_cited` / `blocked`이다. 선언된 캡보다
+  낮은 캡이 실제로 구속하는 자리에서는 `effectivePositionCap`이 그 비교를 계산해 `disclosures`에
+  의무로 이름 대고, `proposalDisclosure`가 그것을 싣지 않은 제안을 거절한다
+  (`position_cap_reduced_below_declared`). `concentration_cap_missing`과의 비대칭은 이것으로 닫힌다.
+  ⚠️ **위험은 사라진 것이 아니라 이전됐다.** 성숙도 게이트가 없으므로 닫힌 결과 0건 상태에서 첫
+  단일종목이 Mandate 상한까지 갈 수 있다. 남는 제동은 리스크 예산과 `portfolioHeat`을 통한
+  `maxDrawdown` 0.06 · `cashFloor` 0.10 · 종목별 손절 · 집중도 전 축 · `newSinglePacing` · 그리고
+  주문마다의 사람 승인이다.
+  ([#226](https://github.com/untilled/aumos-catalogue/issues/226))
   ⚠️ **그리고 그 옆의 비대칭 — 빈 레인을 «방법론이 작동 중»으로 읽던 것 — 은 #212 ④부터 코드가
   아니라 카운트가 닫는다.** `executionRecord`가 호스트의 task run(`task_get`)과, 그 실행이
   `files_read`로 `scans/`에서 되읽은 recipe 답들을 읽어
@@ -404,12 +422,18 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   `effectivePositionCap`이 `maxPositionWeight`에 대해 하는 것과 같은 공시다. ⚠️ 하한은 목표가
   아니다. 10%는 장부가 거기까지 *가도 된다*는 말이지 거기까지 채우라는 말이 아니다.
   ([#153](https://github.com/untilled/aumos-catalogue/issues/153))
-- **벤더 최소 실행금액이 대조군을 통째로 닫을 수 있다.** `experimentalPositionFloor`는 그 시장에서
-  낼 가치가 있는 가장 작은 주문이고, 작은 장부에서는 레인 자체의 1% 칸을 넘어설 수 있다 — USD
-  14,866.44 장부에서 USD 148.66 대 USD 200 — 그 뒤로는 어떤 미국 종목도 주가와 무관하게 그 레인에
-  들어가지 못한다. `experimental_floor_exceeds_cap`이 그것을 이름 대고 해소 NAV를 함께 싣는다. 같은
-  플로어를 보는 세 진단 중 가운데다. `experimental_floor_unreachable`이 더 넓고 #149의
-  `experimental_ladder_unreachable`이 더 좁으며, 발화한 것 중 가장 바깥이 답할 것이다.
+- **벤더 최소 실행금액은 거절하지, 들어올리지 않는다.** `minimumExecutablePosition`은 그 시장에서
+  낼 가치가 있는 가장 작은 주문 — 틱·랏·왕복 수수료 아래로는 측정할 결과가 남지 않는 금액 — 이고,
+  `minimumExecutableWeight`가 그것을 이 장부의 비중으로 바꾼다. ⛔ #226 전에는 이 값이 실험 상한을
+  **들어올렸다**. 들어올릴 상한이 이제 없으므로, 산식이 그 아래를 답한 비중은 그 최소치로
+  올림되지 않고 `minimum_executable_not_met` / `blocked`이다 — 올리면 그 크기가 재는 것은 아이디어가
+  아니라 반올림이다. 최소치가 구속하는 캡을 넘어서는 작은 장부에서는
+  `minimum_executable_exceeds_cap`이 그것을 이름 대고 해소 NAV를 함께 싣는다. #149의
+  `experimental_ladder_unreachable`이 더 좁고, 발화한 것 중 바깥이 답할 것이다.
+  ⚠️ `policyLint` 방향도 뜻을 따라 뒤집혔다 — 최소치가 크면 더 많이 거절하므로 이제
+  `higher-is-stricter`이고, 낮추는 것은 `policy_auto_relax`다. ⛔
+  `experimental_floor_unreachable`·`experimental_floor_exceeds_cap`은 그것들이 재던 밴드와 레인
+  칸과 함께 삭제됐다.
 - 소스 벤더는 자기 응답 모양을 그대로 중계한다. 날짜와 신선도를 검사하는 것은 Aumos가 아니라 이
   매니저다.
 - CLI web 관측은 replay 정본 Evidence가 아니다.

@@ -1774,8 +1774,19 @@ const laneShut = execute({
   asOf: observationContract.asOf,
   input: { mandatePositionCap: 0.2, maturityStatus: 'observing', lane: 'main', thesis: { ...methodology.thesis, consensusRefs: [] }, challengeVerdict: 'cleared' },
 })
-assert.equal(laneShut.data.mainLaneOpen, false, 'with nothing filed the main lane is shut')
-assert.equal(laneShut.data.effectiveCap, 0.01, "and the investor's declared 0.20 is sized at the control arm's 0.01 — the measured run, reproduced")
+assert.equal(laneShut.data.variantViewVerified, false, 'with nothing filed the requirement is unmet')
+/**
+ * ⚠️ **#226 changed what that costs, and it is the honest version of the same
+ * arithmetic.** The unmet requirement used to size the position at the control
+ * arm's 0.01 against a declared 0.20; it now refuses the position outright and
+ * the declared cap is untouched. Either way the missing line is what decides,
+ * which is what this case is here to measure.
+ */
+assert.equal(laneShut.data.effectiveCap, 0.2, '⛔ the cap is not lowered')
+assert.ok(
+  laneShut.diagnostics.some((row) => row.code === 'variant_view_required_for_position' && row.severity === 'blocked'),
+  'the position is refused instead — an evidence gate is not a dial (#226)',
+)
 const laneOpen = execute({
   operation: 'effectivePositionCap',
   asOf: observationContract.asOf,
@@ -1787,8 +1798,12 @@ const laneOpen = execute({
     challengeVerdict: 'cleared',
   },
 })
-assert.equal(laneOpen.data.mainLaneOpen, true, 'one row filed through `observation_file` and the lane opens')
-assert.equal(laneOpen.data.effectiveCap, 0.2, 'at the cap the investor declared — twentyfold, and the only thing that changed is that the flow was told the tool exists')
+assert.equal(laneOpen.data.variantViewVerified, true, 'one row filed through `observation_file` and the requirement is met')
+assert.equal(laneOpen.data.effectiveCap, 0.2, 'at the cap the investor declared')
+assert.equal(
+  laneOpen.diagnostics.some((row) => row.code === 'variant_view_required_for_position'), false,
+  'and there is a position to size — the only thing that changed is that the flow was told the tool exists',
+)
 
 /**
  * ── The universe is declared each run, and by a named owner (issue #129) ───
@@ -3663,74 +3678,96 @@ assert.equal(starved.data.lanes.inflection.starved, false, 'a lane that is being
  * unbounded as the book shrinks, and on a 3,000,000 KRW book the floor alone
  * would ask for 10%.
  */
-covers('sizing/executable-experimental-ceiling')
-const ceilingConfig = { experimentalPositionCeiling: 0.01, experimentalPositionFloor: { KRW: 300000, USD: 200 }, experimentalPositionCeilingMax: 0.03 }
+covers('sizing/minimum-executable-position')
+const minimumConfig = { minimumExecutablePosition: { KRW: 300000, USD: 200 } }
 const issueBook = { portfolioNav: 10095751, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1359.14 } }
-const ceilingOf = (input) => execute({ operation: 'experimentalCeiling', asOf: radarAsOf, input })
-const krCeiling = ceilingOf({ ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' })
-assert.equal(krCeiling.status, 'ok')
-assert.equal(krCeiling.data.binding, 'floor', 'on this book the executable minimum binds, not the ratio')
-assert.ok(krCeiling.data.experimentalCeiling > 0.025 && krCeiling.data.experimentalCeiling <= 0.03, 'and it lands on the Experiment-stage size the port came from, not a third of it')
+const minimumOf = (input) => execute({ operation: 'minimumExecutableWeight', asOf: radarAsOf, input })
+const krMinimum = minimumOf({ ...minimumConfig, ...issueBook, positionCurrency: 'KRW' })
+assert.equal(krMinimum.status, 'ok')
+assert.ok(krMinimum.data.minimumWeight > 0.029 && krMinimum.data.minimumWeight < 0.03, 'KRW 300,000 of a 10,095,751 KRW book')
 assert.ok(
-  Math.floor((krCeiling.data.experimentalCeiling * 10095751) / 33050) >= 9,
-  'nine whole shares of the name the issue measured, against three under the ratio alone',
+  Math.floor((krMinimum.data.minimumWeight * 10095751) / 33050) >= 9,
+  'nine whole shares of the name the issue measured, against three under the 1% ratio the lane used to impose',
 )
-const usCeiling = ceilingOf({ ...ceilingConfig, ...issueBook, positionCurrency: 'USD' })
-assert.equal(usCeiling.data.binding, 'floor')
-assert.ok(usCeiling.data.floorWeight > 0.026 && usCeiling.data.floorWeight < 0.028, 'the USD floor crosses into the KRW denominator at the NAV rate and not by a second FX rule')
-const smallBook = ceilingOf({ ...ceilingConfig, portfolioNav: 3000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1359.14 }, positionCurrency: 'KRW' })
-assert.equal(smallBook.data.floorWeight, 0.1)
-assert.equal(smallBook.data.experimentalCeiling, 0.03, 'the floor never carries the ceiling past experimentalPositionCeilingMax')
-assert.equal(smallBook.data.binding, 'ceilingMax')
+const usMinimum = minimumOf({ ...minimumConfig, ...issueBook, positionCurrency: 'USD' })
+assert.ok(usMinimum.data.minimumWeight > 0.026 && usMinimum.data.minimumWeight < 0.028, 'the USD amount crosses into the KRW denominator at the NAV rate and not by a second FX rule')
+const smallBook = minimumOf({ ...minimumConfig, portfolioNav: 3000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1359.14 }, positionCurrency: 'KRW' })
+assert.equal(smallBook.data.minimumWeight, 0.1, 'on a small enough book one executable ticket is a tenth of it, and the number is stated rather than bounded away')
+/**
+ * ⛔ **There is no ceiling for this to lift and no bound to stop it at (#226).**
+ * `experimentalPositionCeiling` and `experimentalPositionCeilingMax` were
+ * removed with the maturity lane, so the two branches this case used to
+ * measure — the ratio winning on a large book, and the bound catching the floor
+ * on a small one — are gone with them. What is asserted instead is the shape
+ * that replaced them: this number **refuses** a weight below it and never lifts
+ * one to it.
+ */
+assert.equal(METHODOLOGY.experimentalPositionCeiling, undefined)
+assert.equal(METHODOLOGY.experimentalPositionCeilingMax, undefined)
+assert.equal(minimumOf({ ...issueBook, positionCurrency: 'KRW' }).data.minimumWeight, null, 'a caller that declares no minimum gets no number, and no ratio is invented for it')
 assert.ok(
-  smallBook.diagnostics.some((row) => row.code === 'experimental_floor_unreachable'),
-  'a book that cannot hold an executable experiment inside the band is told so; a position rounded up to the cap is not the one the floor asked for',
+  minimumOf({ ...issueBook, positionCurrency: 'KRW' }).diagnostics.some((row) => row.code === 'minimum_executable_unevaluated'),
+  'and is told the venue minimum is unjudged rather than absent',
 )
-const bigBook = ceilingOf({ ...ceilingConfig, portfolioNav: 100000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1359.14 }, positionCurrency: 'KRW' })
-assert.equal(bigBook.data.experimentalCeiling, 0.01, 'where the ratio is already executable it is still the ceiling — this floor lifts nothing on a large book')
-assert.equal(ceilingOf({ experimentalPositionCeiling: 0.01 }).data.experimentalCeiling, 0.01, 'a caller that declares no floor gets the ratio it always got')
-assert.equal(ceilingOf({}).data.experimentalCeiling, METHODOLOGY.experimentalPositionCeiling, 'and a caller that declares no ratio either gets the package constant — an absent one used to read as 0, which refuses every experiment rather than sizing one small')
-assert.equal(ceilingOf({ portfolioNav: 1000000, portfolioNavCurrency: 'KRW', positionCurrency: 'KRW', experimentalPositionFloor: { KRW: 300000 } }).data.ceilingMax, METHODOLOGY.experimentalPositionCeilingMax, 'and the bound the floor may lift it to is the same constant')
 assert.ok(
-  ceilingOf({ ...ceilingConfig, ...issueBook }).diagnostics.some((row) => row.code === 'experimental_floor_unevaluated'),
-  'a floor quoted per venue needs the venue named; guessing the currency would be inventing the number',
+  minimumOf({ ...minimumConfig, ...issueBook }).diagnostics.some((row) => row.code === 'minimum_executable_unevaluated'),
+  'a minimum quoted per venue needs the venue named; guessing the currency would be inventing the number',
 )
-const sizedUnderFloor = execute({
-  operation: 'targetWeight',
-  asOf: radarAsOf,
-  input: { expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'observing', researchGate: 'passed', challengeVerdict: 'cleared', ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' },
-})
-assert.equal(sizedUnderFloor.data.experimentalCeiling, krCeiling.data.experimentalCeiling, 'targetWeight applies the same rule rather than a second copy of the arithmetic')
-assert.equal(sizedUnderFloor.data.bindingCap, krCeiling.data.experimentalCeiling)
+/**
+ * The refusal, through `targetWeight`: a weight the arithmetic put under the
+ * ticket is `blocked` rather than rounded up to it. ⚠️ On this book the KRW
+ * ticket is ~2.97%, and quarter Kelly at these odds asks for 1.75%.
+ */
+const checkedThesis = {
+  thesisId: 'th-036460', asset: '036460', createdAt: '2026-08-21T00:00:00Z', coreClaim: 'regulated return normalisation', horizonEnd: '2027-03-31T00:00:00Z',
+  evidenceStatus: 'complete', variantView: 'the market prices the receivable as permanent',
+  consensusRefs: [{ metric: 'consensusTargetPrice', value: 42000, sourceUrl: 'https://example.invalid/consensus', publishedAt: '2026-08-20T00:00:00Z', capturedAt: '2026-08-21T00:00:00Z' }],
+  catalysts: [{ event: 'Q3 result', windowStart: '2026-10-20T00:00:00Z', windowEnd: '2026-11-10T00:00:00Z' }],
+  invalidationTriggers: [{ kind: 'price-below', level: 29200, checkBy: '2026-12-31T00:00:00Z' }],
+  expectedUpsidePct: 25, fairValueRange: { low: 38000, high: 45000 },
+}
+const sizedBase = { ...minimumConfig, ...issueBook, positionCurrency: 'KRW', mandatePositionCap: 0.2, researchGate: 'passed', challengeVerdict: 'cleared', thesis: checkedThesis }
+const underTicket = execute({ operation: 'targetWeight', asOf: radarAsOf, input: { ...sizedBase, expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.33 } })
+assert.equal(underTicket.data.rawWeight, 0.0175)
+assert.ok(
+  underTicket.diagnostics.some((row) => row.code === 'minimum_executable_not_met' && row.severity === 'blocked'),
+  'a position under the venue ticket is refused',
+)
+assert.equal(underTicket.data.targetWeight, null, '⛔ and it is refused rather than rounded up to the ticket — the size would measure the rounding, not the idea')
+const overTicket = execute({ operation: 'targetWeight', asOf: radarAsOf, input: { ...sizedBase, expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.35 } })
+assert.ok(overTicket.data.targetWeight > krMinimum.data.minimumWeight)
+assert.ok(overTicket.data.targetWeight < 0.2, "⛔ and the Mandate's cap is the ceiling above the arithmetic, never the answer by default")
+assert.equal(overTicket.data.bindingCap, 0.2)
 assert.equal(
-  execute({ operation: 'targetWeight', asOf: radarAsOf, input: { expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, mandatePositionCap: 0.2, maturityStatus: 'promoted', researchGate: 'passed', challengeVerdict: 'cleared', ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' } }).data.bindingCap,
-  0.2,
-  "a promoted lens is not held to the experimental ceiling at all, floor or no floor — what binds is the Mandate's maxPositionWeight, which since #133 is the only position cap there is",
-)
-assert.ok(
-  execute({ operation: 'targetWeight', asOf: radarAsOf, input: { expectedActiveReturn: 0.2, downsideReturn: -0.1, conviction: 1, sectorHeadroom: 0.2, themeHeadroom: 0.15, maturityStatus: 'promoted', researchGate: 'passed', challengeVerdict: 'cleared', ...ceilingConfig, ...issueBook, positionCurrency: 'KRW' } })
+  execute({ operation: 'targetWeight', asOf: radarAsOf, input: { ...sizedBase, sectorHeadroom: 0.2, themeHeadroom: 0.15, expectedActiveReturn: 0.25, downsideReturn: -0.12, conviction: 0.35, mandatePositionCap: undefined } })
     .diagnostics.some((row) => row.code === 'concentration_inputs_missing' && row.path === 'mandatePositionCap'),
+  true,
   'and a run with sector and theme headroom but no Mandate position cap is unevaluated rather than sized to a sector limit',
 )
 
 /**
- * ── The control arm, and the prohibition on expanding it (issue #70 §9) ────
+ * ── The control arm keeps its role and loses its caps (issues #70 §9, #226) ─
  */
-covers('sizing/control-arm-limits')
+covers('sizing/control-arm-role')
 const armRow = (weight) => ({ symbol: 'M1', weight, exitRegistered: true })
 const arm = execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: [armRow(0.01), { ...armRow(0.01), symbol: 'M2' }] } })
 assert.equal(arm.data.admitted, true)
 assert.equal(arm.data.role, 'control-arm')
 assert.equal(arm.data.purpose, 'produce-closed-outcomes-not-returns')
 assert.equal(arm.data.expansionProhibited, true)
-assert.equal(arm.data.countsAgainstExperimentTotal, true)
-assert.equal(arm.data.variantViewRequired, false, 'the variant view is waived because the size is bounded, not because the bar was lowered')
-assert.deepEqual(arm.data.limits, { singleMaxWeight: 0.01, laneTotalMaxWeight: 0.06, maxConcurrentPositions: 6, timeStopTradingDays: 40, hardStopPct: -0.08 })
-assert.ok(
-  execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: [armRow(0.03)] } })
-    .diagnostics.some((row) => row.code === 'control_arm_single_cap'),
-  'a bigger position is the main lane and owes a variant view',
+assert.deepEqual(arm.data.limits, { maxConcurrentPositions: 6, timeStopTradingDays: 40, hardStopPct: -0.08 })
+/**
+ * ⛔ **The size caps are gone and the waiver they paid for is gone with them.**
+ * A 3% control-arm row is admitted here; what refuses an unchecked candidate is
+ * `effectivePositionCap`, one operation over, and it refuses the *position*
+ * rather than shrinking it.
+ */
+assert.equal(
+  execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: [armRow(0.03)] } }).data.admitted,
+  true,
+  'a bigger control-arm position is not a lane violation any more',
 )
+assert.equal(arm.data.variantViewRequired, true, 'the waiver was paid for by the 1% bound, and #226 removed the bound')
 assert.ok(
   execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: [{ symbol: 'M1', weight: 0.01 }] } })
     .diagnostics.some((row) => row.code === 'control_arm_exit_unregistered'),
@@ -3739,12 +3776,7 @@ assert.ok(
 assert.ok(
   execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: Array.from({ length: 7 }, () => armRow(0.005)) } })
     .diagnostics.some((row) => row.code === 'control_arm_concurrency'),
-  'the lane holds a bounded number of positions at once',
-)
-assert.ok(
-  execute({ operation: 'controlArmLane', asOf: radarAsOf, input: { proposed: [armRow(0.01)], experimentTotalRemainingWeight: 0.005 } })
-    .diagnostics.some((row) => row.code === 'control_arm_exceeds_experiment_total'),
-  'the lane spends inside the experimental total, not beside it',
+  'the lane holds a bounded number of positions at once — a pace, not a size',
 )
 
 covers('promotion/expansion-prohibition')
@@ -4868,7 +4900,7 @@ const attestationCapInput = {
  */
 const attestedCap = execute({ operation: 'effectivePositionCap', asOf: observationAsOf, input: attestationCapInput })
 assert.equal(attestedCap.data.effectiveCap, 0.2, 'the cap is the Mandate’s and is not reduced — this refuses silence, not size')
-assert.equal(attestedCap.data.mainLaneOpen, true)
+assert.equal(attestedCap.data.variantViewVerified, true)
 assert.notEqual(attestedCap.status, 'blocked', 'the arithmetic refuses nothing about a proposal it was not handed')
 const attestationObligation = attestedCap.data.disclosures.find((row) => row.code === 'main_lane_rests_on_manager_attestation')
 assert.ok(attestationObligation, 'the obligation is returned as a row')

@@ -29,9 +29,10 @@ not become one. It has no fill, no cost and no slippage, so admitting it here wo
 hypothetical unlock real size, and that is the failure this whole gate exists to prevent.
 
 It is also the only thing that makes the gate reachable. The floors are 30 samples, 10 independent
-clusters and 3 regimes; real fills are capped at the experimental ceiling while a lens is
-unpromoted, so a book that counted only real fills would take years to reach a verdict and the gate
-would be decoration. The methodology this is ported from answered that by running a paper track
+clusters and 3 regimes; ⚠️ **the experimental ceiling that made real fills too small to count was
+removed in #226**, and the gate no longer decides a size either — but three regimes still turn on
+the calendar rather than on activity, so a book that counted only real fills would still take years
+to reach a verdict. The methodology this is ported from answered that by running a paper track
 beside the real one — more throughput, no additional risk.
 
 So both are kept, in separate columns:
@@ -98,28 +99,40 @@ Its second job is to close positions. Sizing only opens on closed evidence, and 
 closes anything keeps that gate shut forever — so this lane runs a fixed exit discipline and a loss
 is a valid output, because the output being bought is the outcome record.
 
-`controlArmLane` holds the limits: 1% a name, 6% across the lane, six concurrent at most, spent
-inside the experimental total rather than beside it, and the time stop (40 trading days) and hard
-stop (−8%) registered **before** the entry rather than promised after it. A variant view is not
-required here — the size is why. A candidate that does have one belongs in the main lane, where it
-can be sized properly.
+`controlArmLane` holds what is left of the limits: six concurrent at most, and the time stop (40
+trading days) and hard stop (−8%) registered **before** the entry rather than promised after it.
 
-⚠️ **"Belongs in the main lane" is now computed rather than described.** `variantViewCheck` is the
+⛔ **Its size caps are gone (#226).** 1% a name and 6% across the lane were removed on 2026-09-08,
+with `control_arm_single_cap`, `control_arm_lane_cap` and `control_arm_exceeds_experiment_total`.
+They were the axis that turned an evidence gate into a size dial, and with `variantViewCheck`
+standing at 0/4 every candidate fell here and was flattened to a position under the venue's minimum
+ticket. ⚠️ **Everything that makes it a control arm survives** — `role`, `purpose`,
+`expansionProhibited`, the registered exits, and `verdictReport`'s refusal to promote a control arm
+however well it did. The lens is what tags outcomes in the Aumos ledger; the measurement is made
+there rather than by a cap standing in for it.
+
+⛔ **And the variant view is no longer waived here.** The waiver was paid for by the 1% bound, and
+the bound is gone: `controlArmLane.variantViewRequired` is `true`. Every real-money position owes a
+checked variant view, whichever lens found it.
+
+⚠️ **"A checked variant view" is computed rather than described.** `variantViewCheck` is the
 operation, and it answers from inputs that can be checked rather than from the claim itself: a
 thesis `validateThesis` calls complete, a non-empty `variantView`, at least one `consensusRefs` row
 with a metric, a value, a source URL and `publishedAt` ≤ `capturedAt` ≤ `asOf`, and
-`challengeVerdict: 'cleared'`. All four, or the candidate is a control-arm entry
-(`variant_view_unverified`). `effectivePositionCap` reads it, and only when it is satisfied does the
-§4 maturity ceiling stop applying — the Mandate's `maxPositionWeight` and every concentration cap
-still bind, and an explicit `lane: 'control-arm'` still holds the name to 1%.
+`challengeVerdict: 'cleared'`. All four, or there is no position
+(`variant_view_unverified`, and `variant_view_required_for_position` / `blocked` at the sizing
+door). The Mandate's `maxPositionWeight`, the risk budget and every concentration cap still bind on
+top of it.
 
 ⚠️ **And when it says no, it says which of the four and what is outstanding on it** (#160). The
 2026-09-06 run met three — `variantView`, `consensusRefs`, `challengeCleared` — and read back
 `missing: ["thesisComplete"]`, one word covering the fact that almost everything had been done and
 that the whole of a twentyfold cap reduction hung on two derivable fields. `requirementReport` is
-per requirement, and `effectivePositionCap` carries it on `position_cap_reduced_by_maturity` under
-`mainLane`. ⛔ Reporting the reason changes no threshold: the four requirements and `verified` are
-what they were, and `thesisComplete` is not waived for a candidate that has three of four.
+per requirement, and `effectivePositionCap` carries it on
+`variant_view_required_for_position` since #226. ⛔ Reporting the reason changes no threshold: the
+four requirements and `verified` are what they were, and `thesisComplete` is not waived for a
+candidate that has three of four — it is now the difference between a position and none, which is
+the honest form of the same answer.
 
 ⚠️ **And when it says yes, it says whose word it is saying yes on** (#692). `consensusRefs` is the
 one requirement of the four whose input is on the web and nowhere else — a broker estimate or a
@@ -133,7 +146,7 @@ behind it at all). `consensusStrongestAttestation` is the best grade the candida
 ⛔ **A manager-attested row satisfies the requirement, unchanged.** That is the trade the investor
 was asked for and chose — *file it, and I read the passage before I approve* — over keeping the
 lane shut or dropping the requirement. ⛔ **And it collapses into dropping the requirement the
-moment the grade stops travelling.** So when the main lane opens on one,
+moment the grade stops travelling.** So when a position opens on one,
 `effectivePositionCap` returns `main_lane_rests_on_manager_attestation` on `disclosures` and the
 proposal carries that code verbatim in one `rationale.risks` entry with the source URL and in one
 `uncertainty` entry; hand both to `proposalDisclosure`, where missing either is
@@ -148,7 +161,7 @@ requires, drivers checked against the filings — so a `thesisComplete` gap on a
 yet done rather than a source that does not exist. `thesisGapSources` is what tells those apart, and
 it decides from the registry rather than from an assumption about the instrument.
 
-⛔ **The leak this closes on the other side.** A thesis may not reach the main lane on the control
+⛔ **The leak this closes on the other side.** A thesis may not open a position on the control
 arm's own record: `evidenceSamples` rows from any cohort other than `llm-research` come back
 `control_arm_evidence_cited` / `blocked`. That is `expansionProhibited` at the lane door — the same
 rule `verdictReport` enforces one layer up, where a mechanical cohort gets no verdict at all.
@@ -206,31 +219,41 @@ For a new single-name BUY require all of the following:
 - fresh, non-conflicting evidence and an intact adjusted/unadjusted price basis;
 - Mandate and concentration headroom.
 
-If an input is unknowable, do not insert a neutral number. Mark the gate unresolved. `insufficient`
-or `observing` permits at most the experimental ceiling when every research and safety
-gate is otherwise complete; missing fundamental provenance or unresolved high risk permits no BUY.
+If an input is unknowable, do not insert a neutral number. Mark the gate unresolved. Missing
+fundamental provenance or unresolved high risk permits no BUY.
 
-⚠️ **A small experiment has to be one that can be executed.** The ceiling is the package's
-experimental ratio or the configured `experimentalPositionFloor` — the smallest position worth
-opening in the venue's own currency — whichever is larger, bounded by the package's ceiling maximum;
-`experimentalCeiling` is the one operation that answers it. The ratio alone was capping this book's
-first real experiment at three shares, and the source methodology's Experiment-stage entry in that
-same name was ten. Below the band the answer is `experimental_floor_unreachable`: this book runs
-that lane on paper, and paper never unlocks real size — the columns stay separate.
+⚠️ **Maturity no longer caps a size, and the variant view no longer shrinks one (#226).** The
+investor removed the experimental lane on 2026-09-08: *"실험 레인은 없애고 실제로 aumos의
+mandate에 따라 매수하면서 실험하는 방향으로 바꿔라."* `insufficient`, `observing` and `reviewable`
+buy at the same cap `promoted` does — the Mandate's `maxPositionWeight`, under a computed risk
+budget — and the learning temperament moved to the Aumos decision ledger and its Forward Track
+Record, where every judgement is recorded with its lens and its forward return.
 
-⚠️ **And the floor can sit above the control arm's cell without being above the band.** On a USD
-14,866.44 book the lane's 1% is USD 148.66 and the configured floor is USD 200 — so the arm is shut
-to every US name at every share price, while `experimentalCeiling` reports a perfectly ordinary
-0.01345312. `effectivePositionCap` is what says it: `experimental_floor_exceeds_cap`, carrying the
-NAV that resolves it (USD 20,000 there). ⛔ It is a report about the size of the book, not a reason
-to lift the lane cap — the control arm's 1% is what makes its variant-view waiver legitimate, and a
-lane enlarged to fit a floor is no longer a control.
+⛔ **The variant view is now a gate on whether the position exists, not on how large it is.** A
+candidate without a checked one is refused: `effectivePositionCap` returns
+`variant_view_required_for_position` / **`blocked`** and `targetWeight` answers `null`. It is not
+sized twenty times smaller and submitted anyway. The four requirements are unchanged, and
+`challengeCleared` was already fatal on its own — what changed is that the other three are held to
+the same standard. Read `requirementReport` for the one that binds and what is outstanding on it.
 
-The same call is what tells the investor that a declared `maxPositionWeight` of 0.20 is operating
-at 0.01 while the lens is unpromoted **and no variant view is established**: `position_cap_reduced_by_maturity`, with the declared number,
-the effective number, and `promotionGate` as what lifts it. ⛔ **Disclosing the gate is not
-loosening it.** Nothing in this package's promotion thresholds moves because a cap was found to be
-binding; the whole point of a control arm is that it binds.
+⚠️ **The measured reason this had to change.** On `run_c7ad46eea03840bf84ae7a8822ed02c3` the chain
+ran: `consensusRefs` had no collection procedure → `variantViewCheck` 0/4 → every candidate forced
+to the control arm → a flat 1% of a USD 14,937.07 book = **USD 149.37** → under the USD 200 minimum
+ticket → no single name at any price, for ten runs. The gate was not slowing the measurement down;
+it was preventing one from existing.
+
+⚠️ **A position still has to be one that can be executed, and the minimum refuses rather than
+lifts.** `minimumExecutablePosition` — the smallest position worth opening in the venue's own
+currency — is what `minimumExecutableWeight` reads. A weight the arithmetic puts below it comes back
+`minimum_executable_not_met` / `blocked`: ⛔ **do not round a position up to the minimum**, because
+then the size measures the rounding rather than the idea. Before #226 this number *lifted* an
+experimental ceiling; there is no ceiling to lift now.
+
+The disclosure is what tells the investor that a declared `maxPositionWeight` of 0.20 is operating
+lower — `position_cap_reduced_below_declared`, with the declared number, the effective number and
+the risk arithmetic that holds it there. ⛔ **Disclosing a limit is not loosening it**, and nothing
+in this package's promotion thresholds moved: `promotionGate` reports a lens's record and gates no
+size (`promotion.gatesSize: false`).
 
 ## WAIT versus unable to judge
 

@@ -57,7 +57,7 @@ export function calibrationSummary({ samples = [], minimumSamples = METHODOLOGY.
  *
  * | axis | what feeds it | what it moves |
  * |---|---|---|
- * | `calibrationSummary` → `learning/evidence-maturity` | **closed real decisions**, one sample each | `maturityStatus`, and therefore the experimental ceiling |
+ * | `calibrationSummary` → `learning/evidence-maturity` | **closed real decisions**, one sample each | `maturityStatus` — ⛔ an attribution label since #226, which caps no size |
  * | `promotionGate` (30 · 3 · 10) | **matured paper windows** in the `promote` cohort (`signalPaper`) | promotion of a lens |
  *
  * ⛔ **A closed real position does not become a `promotionGate` sample, and

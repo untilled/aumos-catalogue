@@ -157,9 +157,13 @@ export const BOOLEAN = 'boolean'
 
 /** Where "expected an object" is not enough of an answer for the caller who got it wrong. */
 export const KEY_MESSAGES = {
-  'experimentalCeiling.experimentalPositionFloor': 'The minimum executable amount is declared per venue currency — { KRW: 300000, USD: 200 } — because what makes an order unexecutable is a fact about the exchange; a bare amount names no venue and is not read',
-  'effectivePositionCap.experimentalPositionFloor': 'The minimum executable amount is declared per venue currency — { KRW: 300000, USD: 200 }; a bare amount names no venue and is not read',
-  'targetWeight.experimentalPositionFloor': 'The minimum executable amount is declared per venue currency — { KRW: 300000, USD: 200 }; a bare amount names no venue and is not read',
+  'minimumExecutableWeight.minimumExecutablePosition': 'The minimum executable amount is declared per venue currency — { KRW: 300000, USD: 200 } — because what makes an order unexecutable is a fact about the exchange; a bare amount names no venue and is not read',
+  'effectivePositionCap.minimumExecutablePosition': 'The minimum executable amount is declared per venue currency — { KRW: 300000, USD: 200 }; a bare amount names no venue and is not read',
+  'targetWeight.minimumExecutablePosition': 'The minimum executable amount is declared per venue currency — { KRW: 300000, USD: 200 }; a bare amount names no venue and is not read',
+  /** ⚠️ The pre-#226 spelling, still read; `minimum_executable_key_renamed` says so beside the answer. */
+  'minimumExecutableWeight.experimentalPositionFloor': 'This is the pre-#226 name for `minimumExecutablePosition`; it is still read, and it is declared per venue currency — { KRW: 300000, USD: 200 } — never as a bare amount',
+  'effectivePositionCap.experimentalPositionFloor': 'This is the pre-#226 name for `minimumExecutablePosition`; it is still read, and a bare amount names no venue and is not read',
+  'targetWeight.experimentalPositionFloor': 'This is the pre-#226 name for `minimumExecutablePosition`; it is still read, and a bare amount names no venue and is not read',
 }
 
 export const TYPE_LABELS = {

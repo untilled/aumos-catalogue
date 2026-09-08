@@ -71,15 +71,27 @@ export const METHODOLOGY = Object.freeze({
    *
    * ⛔ **So nothing below answers a question the investor is asked.** Each
    * remaining value is a claim this methodology makes about *evidence* — how
-   * many samples a lens needs, how large an unproven claim may be, how long a
-   * control-arm position is held before it must produce an outcome — and the
-   * argument for each is beside it. Changing one is a package revision with a
-   * reviewer, which is a stronger gate than a config field, not a weaker one.
+   * many samples a lens needs, how long a control-arm position is held before
+   * it must produce an outcome — and the argument for each is beside it.
+   * Changing one is a package revision with a reviewer, which is a stronger
+   * gate than a config field, not a weaker one.
+   *
+   * ⚠️ **Since #226 none of them is a size.** *"How large may an unproven claim
+   * be"* was a value here and is not one any more: the answer is the Mandate's
+   * `maxPositionWeight` held under a computed risk budget, and this file no
+   * longer holds a second opinion about it.
    */
   /** Complete samples before a lens leaves `observing`. */
   minimumLensSamples: 10,
   /**
    * What `promotionGate` requires before a lens may be promoted.
+   *
+   * ⚠️ **It reports; it no longer gates a size (#226).** These three were the
+   * door a reduced cap lifted at, and `regimes: 3` is *years* by this file's
+   * own admission — a book that may not buy until it clears them can never
+   * build the sample that clears them. Promotion is now a statement about a
+   * lens's record, carried in `promotion` for the reader, and the position cap
+   * is the Mandate's from the first run.
    *
    * ⚠️ **These were three literals inside `promotionGate` and are read from
    * here since #151.** The reason is not tidiness: `effectivePositionCap` has
@@ -100,34 +112,60 @@ export const METHODOLOGY = Object.freeze({
   /** Closed outcomes after which new-single pacing relaxes from unevaluated to advisory. */
   reviewReadyClosedOutcomes: 10,
   /**
-   * Ratio side of the maximum target weight while a lens is insufficient,
-   * observing or reviewable. `experimentalCeiling` joins it to
-   * `experimentalPositionFloor`, which stays configured because it is a fact
-   * about a venue rather than a claim of this methodology.
-   */
-  experimentalPositionCeiling: 0.01,
-  /**
-   * The most the floor may lift that ceiling to. 3% sits just above the source
-   * methodology's own Experiment-stage size for the name it was ported with
-   * (2.6%), so the floor can reproduce what that methodology did and never
-   * exceed it.
-   */
-  experimentalPositionCeilingMax: 0.03,
-  /**
-   * The control arm's limits — 1% a name, 6% across the lane, six concurrent,
-   * and the exit discipline it registers before entry.
+   * ── The maturity lane is gone, and the Mandate sizes (issue #226) ─────────
    *
-   * ⚠️ **These lived in `learning.mjs` and are read from here since #151**, for
-   * the same reason `promotionGate`'s thresholds moved: `singleMaxWeight` is
-   * the number that actually binds a new single name on an unpromoted book, so
-   * `effectivePositionCap` in `sizing.mjs` has to be able to say so, and a
-   * lane cap copied into the operation that needed it second is how the two
-   * come to disagree. The argument for each value is in `controlArmLane`,
-   * which is still the only thing that enforces them.
+   * `experimentalPositionCeiling` (0.01) and `experimentalPositionCeilingMax`
+   * (0.03) stood here until 2026-09-08. The investor removed them: *"실험
+   * 레인은 없애고 실제로 aumos의 mandate에 따라 매수하면서 실험하는 방향으로
+   * 바꿔라."* Size is the declared Mandate — `maxPositionWeight`, `cashFloor`,
+   * `maxDrawdown` — and the evidence gates; the learning temperament moves from
+   * paper cohorts to the Aumos decision ledger and its Forward Track Record.
+   *
+   * ⚠️ **The argument is that the buying *is* the measurement.** This manager
+   * is attached to a real broker, every order passes a person's approval and
+   * every judgement lands in an append-only ledger beside its forward return. A
+   * separately shrunken lane did not bring the measurement forward; it stopped
+   * anything from being measured — ten runs, zero single names, `singleNameWeight`
+   * 0 against `cashLikeWeight` 0.956.
+   *
+   * ⛔ **Nothing replaced them with a bigger number.** What replaced them is a
+   * risk budget that is *computed*: `positionRiskBudget` below, quarter Kelly on
+   * the candidate's own expected and downside return, held under the Mandate's
+   * `maxDrawdown` divided by the stop distance. 20% is the ceiling above that
+   * arithmetic and is never the answer by default — the source methodology also
+   * capped a single name at 20% and entered KOGAS at 2.6%.
+   */
+  /**
+   * The fraction of full Kelly a position is sized at, in the one place both
+   * sizing entry points read it: `targetWeight` derives its risk budget from
+   * this, and `legacySizeSuggestion` defaults to it. ⚠️ **Quarter Kelly is the
+   * ported number** (`kellyFraction` 0.25) and it stays the number; what
+   * changed in #226 is that the main sizing path uses it instead of a
+   * reward-risk ratio that saturated its cap at any conviction above a half.
+   */
+  positionRiskBudget: Object.freeze({ kellyFraction: 0.25 }),
+  /**
+   * What is left of the control arm: the concurrency bound and the exit
+   * discipline it registers before entry.
+   *
+   * ⛔ **The size caps are gone (issue #226)** — 1% a name and 6% across the
+   * lane. They were the axis that made `variantViewCheck` a twentyfold size
+   * switch, and with `variantViewCheck` 0/4 for want of a `consensusRefs`
+   * collection procedure every candidate fell here, was flattened to 1%, and
+   * `experimental_floor_exceeds_cap` then refused it at USD 149.37 against a
+   * USD 200 minimum ticket. No single name was bought at any price.
+   *
+   * ⚠️ **The lens tag and the measurement role are kept and are untouched.**
+   * `role`, `purpose`, `expansionProhibited` and `verdictReport`'s *a control
+   * arm is measured, never promoted* all still stand — a price-pattern lens is
+   * still the baseline an edge claim clears, and the Aumos ledger splits
+   * outcomes by lens without a size limit having to do it.
+   *
+   * ⚠️ `maxConcurrentPositions` stays for the reason `newSinglePacing` stays:
+   * it is a pace, not a size. A bounded number of open control-arm positions is
+   * how the lane keeps producing closed outcomes rather than accumulating.
    */
   controlArm: Object.freeze({
-    singleMaxWeight: 0.01,
-    laneTotalMaxWeight: 0.06,
     maxConcurrentPositions: 6,
     timeStopTradingDays: EXIT_DISCIPLINE.timeStopTradingDays,
     hardStopPct: EXIT_DISCIPLINE.maximumHardStopPct,

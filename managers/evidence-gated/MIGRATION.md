@@ -146,7 +146,7 @@ absence had no entry, which is the failure mode this document exists to prevent.
 | `lens_definitions.json` | PX | `lib/envelopes.mjs` `LENS_ENVELOPES` — one source the scanner reads, so the copy-and-check-drift idiom is unnecessary rather than unported |
 | `entry_gates.json` | PX | `clusterBlock` for the correlated-cluster hold; the rest is WATCH, which Aumos owns |
 | `exit_rules.json` | PX | `exitCheck` price rules + `timeStopPolicy` for the approved review-date promotion + `exitDiscipline` for the unconditional stop. ⚠️ **The unconditional half did not come across until #153.** Both ported time stops are conditional on a `reviewBy` a run had to have written, so a position with no review date was invisible to both and the book reached zero closed outcomes with neither reporting anything wrong. `exitDiscipline` reads the entry date — 40 trading days, whatever the position is doing — and where they overlap it is the one that answers. ⚠️ The file itself has no port: registration is `watchesToRegister`, copied into the entry's own `DecisionProposal`, because this package holds no `thesis:write` and its private folder may not hold a gate that must execute — ⚠️ **a folder is a bigger address space and not a bigger licence** (`untilled/aumos#743`), so what was refused as a key is refused as a path. ⚠️ The source's −8% is kept **only in the control arm it was computed for**; every other lane derives its stop from the Mandate's `maxDrawdown` and is `hard_stop_unevaluated` until that is declared |
-| `sizing_policy.json` | PX | `config.schema.json` (`concentration` sector/theme/factor, `experimentalPositionFloor`), the Mandate (`maxPositionWeight`, `maxDrawdown`), `lib/constants.mjs` (the experimental ratio and its bound, grandfathering), `entryQualityGate`, `newSinglePacing`, `controlArmLane`, `variantViewCheck`. ⚠️ **`mechanical_experiment_lane` was ported and the lane it was defined against was not (#153).** The source ran two lanes — the mechanical one waiving the variant view in exchange for 1% a name / 6% a lane, and the main lane requiring one and reaching `single_position_max_pct_account` — and this port applied §4's maturity ceiling to both, so the main lane had no size the control arm did not. `variantViewCheck` restores the distinction from checked inputs; the control arm's approved 1% / 6% are unchanged, and `expansion_prohibition` is still enforced by `controlArmLane` and `verdictReport`. `experiment_total_max_pct_account` (28%) is **not ported, by decision** — the investor answered #153 §3 with (a), and `singleNameBudget` derives the total from the Mandate's `cashFloor` and `maxPositionWeight` instead. That value belonged to an allocation carrying a 50% core ETF target, and in an account without that lane it is not the same statement; porting it would repeat the `experimentalPositionCeiling` failure of carrying a number across without the arithmetic that produced it. ⚠️ With this row settled, no sizing constant in this package answers a question the investor is asked on a screen. ⚠️ `grandfather` was a schema entry and nothing more until #109 — this row said ported while the only thing ported was the declaration. `grandfatherPolicy` in `lib/diagnostics.mjs` is what reads it now, for `concentration` and `harnessAudit` both. ⚠️ `experimentalPositionCeiling` was ported as a bare ratio and the source's "small experiment" never was one — its Experiment-stage KOGAS entry was ten shares, 2.6% of that book, while 1% of the porting book is three shares of the same name (#121). `experimentalPositionFloor` (per venue currency) and the ceiling maximum carry the half that did not come across, and `experimentalCeiling` in `lib/sizing.mjs` is the one rule that joins them. ⚠️ **This row named four config keys and #133 kept one.** The source's `position_max_pct_account` and `portfolio_heat_max_pct_account` are the investor's standing instructions, which Aumos already holds as `mandate.constraints` — porting them into a package schema created a second copy of two limits at different numbers, and the run had no way to know which one it was judged against. The rest are the methodology's own numbers and are constants, where changing one is a package revision a reviewer reads |
+| `sizing_policy.json` | PX | `config.schema.json` (`concentration` sector/theme/factor, `minimumExecutablePosition`), the Mandate (`maxPositionWeight`, `maxDrawdown`, `cashFloor`), `lib/constants.mjs` (grandfathering, `positionRiskBudget.kellyFraction`), `entryQualityGate`, `newSinglePacing`, `controlArmLane`, `variantViewCheck`. ⚠️ **`mechanical_experiment_lane` was ported and the lane it was defined against was not (#153).** The source ran two lanes — the mechanical one waiving the variant view in exchange for 1% a name / 6% a lane, and the main lane requiring one and reaching `single_position_max_pct_account` — and this port applied §4's maturity ceiling to both, so the main lane had no size the control arm did not. `variantViewCheck` restores the distinction from checked inputs, and `expansion_prohibition` is still enforced by `controlArmLane` and `verdictReport`. ⚠️ **#226 removed both lanes' size caps** (2026-09-08, investor decision): `experiment_single_max_pct_account` has no port at all now, the control arm's 1% / 6% are gone, and `single_position_max_pct_account` is the Mandate's `maxPositionWeight` used as a *ceiling* over a computed risk budget and quarter-Kelly arithmetic. The source's own shape is what that reproduces — a 20% single-name cap and a 2.6% actual entry — which the ported rules could not express: measured on `run_c7ad46eea03840bf84ae7a8822ed02c3`, a flat 1% of a USD 14,937.07 book was USD 149.37 against a USD 200 minimum ticket, and no single name entered at any price for ten runs. `experiment_total_max_pct_account` (28%) is **not ported, by decision** — the investor answered #153 §3 with (a), and `singleNameBudget` derives the total from the Mandate's `cashFloor` and `maxPositionWeight` instead. That value belonged to an allocation carrying a 50% core ETF target, and in an account without that lane it is not the same statement; porting it would repeat the failure of carrying a number across without the arithmetic that produced it. ⚠️ With this row settled, no sizing constant in this package answers a question the investor is asked on a screen. ⚠️ `grandfather` was a schema entry and nothing more until #109 — this row said ported while the only thing ported was the declaration. `grandfatherPolicy` in `lib/diagnostics.mjs` is what reads it now, for `concentration` and `harnessAudit` both. ⚠️ `experimentalPositionCeiling` was ported as a bare ratio and the source's "small experiment" never was one — its Experiment-stage KOGAS entry was ten shares, 2.6% of that book, while 1% of the porting book is three shares of the same name (#121). The ratio and its bound are **deleted in 0.6.0** (#226); what survives is `minimumExecutablePosition` (per venue currency), which was never a lane remnant — it is the amount below which tick, lot and the round-trip fee leave nothing to measure — and `minimumExecutableWeight` in `lib/sizing.mjs` is what turns it into a weight. ⛔ It **refuses** a weight below it (`minimum_executable_not_met`) and no longer lifts one to it. ⚠️ **This row named four config keys and #133 kept one.** The source's `position_max_pct_account` and `portfolio_heat_max_pct_account` are the investor's standing instructions, which Aumos already holds as `mandate.constraints` — porting them into a package schema created a second copy of two limits at different numbers, and the run had no way to know which one it was judged against. The rest are the methodology's own numbers and are constants, where changing one is a package revision a reviewer reads |
 | `allocation_policy.json` | PX | `config.coreDca` (cash threshold, tranche and catch-up ceilings); the targets themselves are the investor's Mandate. ⚠️ **The reserve floor left this row in #153.** `coreDca.reserveFloorWeight` held 0.15 while the Mandate declared `cashFloor` 0.10 and the package read only its own copy — the same second-copy defect #133 removed from the position and drawdown axes, except that this one was not disclosed either. `min_cash_pct` maps to the Mandate's `cashFloor`, and `effectiveCashFloor` in `lib/sizing.mjs` is what reads it, checks the plan's post-trade cash against it, and publishes an `effectiveConstraints` row if this methodology ever raises it |
 | `workspace_policy.json` | PX | `config.benchmarks`, `config.benchmarkHurdleAnnualPct`; `round_trip_cost_pct` is `promotionGate`'s cost model |
 | `prereg_policy.json` | PP | `verdictReport` pre-registered criteria — stricter-only at call time |
@@ -248,3 +248,72 @@ Two more differences were found and are **not** methodology: the legacy rounds t
 return to four decimals before returning it, and this repository spells enum values in kebab case.
 Both are recorded in the fixture as a rounding rule and a value map so the comparison stays exact
 rather than being loosened with a tolerance.
+
+
+## 0.6.0 — the experimental lane, removed (issue #226)
+
+The investor's decision of 2026-09-08: *"실험 레인은 없애고 실제로 aumos의 mandate에 따라
+매수하면서 실험하는 방향으로 바꿔라."* Size is the declared Mandate and the evidence gates; the
+learning temperament moves from paper cohorts to the Aumos decision ledger and its Forward Track
+Record.
+
+⚠️ **Nothing in a stored record moves.** No memory key, no brief, no fixture and no Evidence row is
+rewritten by this revision; what changes is what the operations answer from the next run onward.
+
+### The one configuration key that has to be migrated
+
+| before | after | what happens to an install that still holds the old key |
+|---|---|---|
+| `config.experimentalPositionFloor` | **`config.minimumExecutablePosition`** | It is read, and the value is unchanged. `minimumExecutableWeight` answers from it and reports `minimum_executable_key_renamed` / `info` beside the answer; `config.schema.json` keeps the old key as a deprecated property so the configuration still validates. ⛔ Nothing rewrites the investor's configuration — a package may not edit an install's settings. A configuration carrying both is answered from `minimumExecutablePosition`. |
+
+⚠️ **The key's `policyLint` direction is reversed and both spellings carry the new one.** While the
+floor *lifted* an experimental ceiling, a larger floor bought a larger position and was therefore
+`lower-is-stricter`. It refuses now, so a larger minimum refuses more candidates:
+`higher-is-stricter`, and **lowering it is `policy_auto_relax`** — the change a run may not make to
+its own refusal.
+
+### Operations, constants and codes
+
+| kind | before | after |
+|---|---|---|
+| operation | `experimentalCeiling` | **`minimumExecutableWeight`** — the ratio and its bound went with the lane; the venue amount is what is left |
+| constant | `METHODOLOGY.experimentalPositionCeiling` (0.01) | ⛔ deleted |
+| constant | `METHODOLOGY.experimentalPositionCeilingMax` (0.03) | ⛔ deleted |
+| constant | `METHODOLOGY.controlArm.singleMaxWeight` (0.01) | ⛔ deleted |
+| constant | `METHODOLOGY.controlArm.laneTotalMaxWeight` (0.06) | ⛔ deleted |
+| constant | — | **`METHODOLOGY.positionRiskBudget.kellyFraction`** (0.25), read by `targetWeight` and defaulted to by `legacySizeSuggestion` — one copy, two readers |
+| limit source | `lens-maturity`, `control-arm-lane` | ⛔ deleted; **`risk-budget`** — `(maxDrawdown − heldPortfolioHeat) / \|stopLossPct\|` — takes their place under `mandate` |
+| code | `position_cap_reduced_by_maturity` | **`position_cap_reduced_below_declared`** — maturity is not what reduces a cap any more, so the old token named a rule that no longer exists. ⚠️ `position_cap_reduction_undisclosed` is **unchanged**: the refusal is the same refusal |
+| code | `main_lane_requires_variant_view` (`unevaluated`) | **`variant_view_required_for_position`** (`blocked`) — the gate refuses the position rather than shrinking it |
+| code | `experimental_floor_unevaluated` | **`minimum_executable_unevaluated`** |
+| code | `experimental_floor_exceeds_cap` | **`minimum_executable_exceeds_cap`** — compared against the cap that binds, not against a lane cell that no longer exists |
+| code | `experimental_floor_unreachable` | ⛔ deleted — it asked whether the amount was above the experimental band, and there is no band |
+| code | `control_arm_single_cap`, `control_arm_lane_cap`, `control_arm_exceeds_experiment_total` | ⛔ deleted with the caps |
+| code | — | **`minimum_executable_not_met`** (`blocked`), **`position_risk_budget_unevaluated`** (`unevaluated`), **`position_edge_not_positive`** (`unevaluated`), **`minimum_executable_key_renamed`** (`info`) |
+| input | `singleNameBudget.controlArmWeight`, `controlArmLane.experimentTotalRemainingWeight` | ⛔ deleted with the 6% lane total they fed |
+| output | `singleNameBudget.controlArmRemainingWeight`, `.controlArmLaneTotalMaxWeight`, `.controlArmSpendsInside` | ⛔ deleted |
+| output | `effectivePositionCap.mainLaneOpen`, `.ceilingApplies`, `.ceiling`, `.floorVersusCap` | **`.variantViewVerified`**, **`.minimumExecutable`**, **`.minimumVersusCap`**, **`.riskBudget`** |
+| output | `targetWeight.experimentalCeiling*` | **`.minimumExecutableWeight`**, **`.sizing`** (the quarter-Kelly working), **`.riskBudget`** |
+
+⛔ **`experimental_ladder_unreachable`, `experimental_ladder_unevaluated` and
+`tranche_below_minimum_lot` are untouched.** They are `entryTranchePlan`'s, and they describe a
+*staging* requirement — can a planned position fund one executable lot per rung — which is a
+question about a ladder rather than about a lane. The word «experimental» in them is historical.
+
+### What sizes a position after this
+
+1. `targetWeight` computes quarter Kelly on the candidate's own numbers:
+   `b = expected / |downside|`, `edge = conviction − (1 − conviction) / b`,
+   `raw = 0.25 × max(0, edge) / |downside|`. ⛔ The old `rawWeight` was `b × conviction`, which
+   exceeds the whole book at any reward-risk of 2 above half conviction — under a 1% lane cap that
+   was survivable, under a 20% Mandate cap it would have meant 20% by default.
+2. `effectivePositionCap` caps it at the lower of the Mandate's `maxPositionWeight` and the risk
+   budget; `sectorHeadroom` and `themeHeadroom` still bind on top.
+3. `minimumExecutableWeight` refuses the result if it is below the venue's minimum ticket.
+4. `variantViewCheck` decides whether there is a position at all.
+
+⚠️ **The risk this transfers, recorded rather than argued away.** With no maturity gate a first
+single name can reach the Mandate's cap with zero closed outcomes behind it. What remains holding
+it: `maxDrawdown` 0.06 through the risk budget and `portfolioHeat`, `cashFloor` 0.10, the per-name
+stop registered by `exitDiscipline`, every `concentration` axis, `newSinglePacing`, and the
+investor's approval on each order.

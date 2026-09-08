@@ -463,9 +463,13 @@ are used only when the broker actually supports them. Missing execution inputs p
 `experimental_ladder_unevaluated`, never an assertion that every entry gate passed.
 
 ⚠️ The issue's own "only names under USD 66 can enter" reading is **withdrawn** by #151 and was
-too generous. The binding fact is that `experimentalPositionFloor.USD` (200) is above the control
-arm's single-name cell (1% of USD 14,866.44 = USD 148.66), so no US name enters that lane at any
-share price. `experimental_floor_exceeds_cap` reports it, with the resolving NAV (USD 20,000).
+too generous. The binding fact was that the venue minimum (USD 200) sat above the control arm's
+single-name cell (1% of USD 14,866.44 = USD 148.66), so no US name entered that lane at any share
+price. ⚠️ **#226 removed the cell.** The comparison is now against the cap that binds —
+`minimum_executable_exceeds_cap`, with the resolving NAV — and on the measured book USD 200 is
+1.34% against a 20% cap, so it does not fire at all. That is the fix rather than a widened
+tolerance: the position the arithmetic asks for is above the minimum ticket, where before it was
+below.
 
 ## The effective cap on the input screen (#151, proposal 4)
 
@@ -481,9 +485,9 @@ and `PROMPT.md` §4 says to copy it verbatim:
 ```jsonc
 { "field": "maxPositionWeight",     // the host's vocabulary; a methodology name is refused
   "declared": 0.2,                  // echoed from this invocation's mandate, never a constant
-  "effective": 0.01,
-  "reason": "lens_insufficient",    // this package's own code, rendered opaque
-  "unlocks": "promotionGate: samples 0/30 · regimes 0/3 · clusters 0/10" }
+  "effective": 0.1875,
+  "reason": "risk_budget",          // this package's own code, rendered opaque
+  "unlocks": "portfolioHeat: maxDrawdown 0.06 · held 0.045 · stop 0.08" }
 ```
 
 ⚠️ **The two repositories have to land together.** The diagnostic alone leaves the screen empty,
@@ -579,12 +583,18 @@ rather than assuming it stands.
 ⚠️ **The stop distance itself waits on the investor, not the host.** `mandate.constraints.maxDrawdown`
 is undeclared, so outside the control arm the distance comes back `hard_stop_unevaluated` with the
 declaration that resolves it named in the diagnostic. No number is invented, and the control arm —
-whose 1% cell is what the source's −8% was computed against — is fully judged today.
+whose −8% is the source's own approved number — is fully judged today. ⚠️ **Since #226 that same
+undeclared `maxDrawdown` costs a second answer**: `effectivePositionCap`'s risk budget is
+`(maxDrawdown − heldPortfolioHeat) / |stopLossPct|`, so without it the position is
+`position_risk_budget_unevaluated` and the Mandate's cap is the only thing between the candidate
+and the whole book.
 
 ## Closed outcomes reach one maturity axis, not both (#153 · #118)
 
 `closedOutcomeSamples` turns a closed decision into the calibration sample that moves
-`maturityStatus`, which is the axis the experimental ceiling reads. That conversion previously
+`maturityStatus`. ⚠️ **Since #226 that axis reads no ceiling** — the experimental lane is gone and
+`maturityStatus` is an attribution label — so what this conversion feeds is what the run may
+*claim*, and the Aumos decision ledger is where the learning now lands. That conversion previously
 existed only as a sentence in `skills/outcome-calibration` and no operation performed it — the same
 shape as the paper-track registration that held zero rows across every run.
 
@@ -603,3 +613,25 @@ regime — is a methodology judgement about how much size unproven evidence may 
 exactly the kind of number the source harness marked *"값 수정·완화는 사용자만 한다"*. This
 revision changes no threshold and adds no rung. It states the wait in `README.md` so the investor
 can decide before installing, and leaves the ladder question on the issue.
+
+
+## The experimental lane is gone and the ledger is the sample (#226)
+
+⚠️ **This package's half is done and the host's half is what it always was.** The investor removed
+the maturity lane on 2026-09-08 and moved the learning temperament from paper cohorts to the **Aumos
+decision ledger and its Forward Track Record** — `closedOutcomeSamples`, `outcomeClassification`,
+`attribution`. Every one of those reads a record only Aumos holds: a sealed Decision, the order that
+executed under it, and the forward return beside it.
+
+⛔ **Nothing new is asked for.** The reads exist (`decisions[]`, `history`, `positions[].origin`,
+`positions[].acquisition`), and what this revision changes is that they are now the *only* sample —
+so their gaps stop being a reporting inconvenience and become the measurement itself. The two that
+matter most: a decision whose forward return the host cannot attribute is a sample this package
+cannot count, and `history.recentDecisions` is a window rather than a journal
+(`history.totalDecisions` says so, `untilled/aumos#688`).
+
+⚠️ **The risk transfer belongs on this page too.** With no maturity gate, a first single name can
+reach the Mandate's cap with zero closed outcomes behind it. Four of the five brakes left are this
+package's arithmetic (the risk budget, `portfolioHeat`, `concentration`, `newSinglePacing`); the
+fifth is the host's, and it is the strongest — **§12's per-order approval**. This package's answer
+to *"what stops a 20% first position"* names it, and it names it as somebody else's.

@@ -120,7 +120,7 @@ held zero rows across every run (#118).
 
 | axis | fed by | moves |
 |---|---|---|
-| `calibrationSummary` → `learning/evidence-maturity` · `calibration/*` | closed real decisions | `maturityStatus`, and so the experimental ceiling |
+| `calibrationSummary` → `learning/evidence-maturity` · `calibration/*` | closed real decisions | `maturityStatus` — ⛔ an attribution label since #226, which caps no size |
 | `promotionGate` — 30 · 3 · 10 | matured **paper** windows in the `promote` cohort | promotion of a lens |
 
 A realized trade has a fill, a cost and a size; a paper row has none of them and was registered

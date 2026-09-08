@@ -628,14 +628,28 @@ const POLICY_DIRECTIONS = {
   minimumExpectedActiveReturn: 'higher-is-stricter',
   benchmarkHurdleAnnualPct: 'higher-is-stricter',
   /**
-   * The floor raises the ceiling, so a larger floor is a looser manager and a
-   * smaller one is a stricter manager — the opposite of what the word "floor"
-   * suggests, which is exactly why it is declared rather than inferred. An
-   * undeclared key is `policy_direction_undeclared`, and a value whose
-   * direction nobody can name is one `policyLint` cannot refuse.
+   * ⚠️ **The direction is reversed since #226, and the reversal is the point.**
+   * While the floor *lifted* an experimental ceiling, a larger floor bought a
+   * larger position and was therefore the looser manager — the opposite of what
+   * the word "floor" suggests, which is why it was declared rather than
+   * inferred. There is no ceiling for it to lift any more: it refuses a weight
+   * the arithmetic put below it, so a larger minimum refuses more candidates
+   * and is the *stricter* manager. The word and the direction now agree.
+   *
+   * ⛔ **Which means lowering it is a `policy_auto_relax`.** A run that finds
+   * itself refused by the minimum may not answer by moving the minimum; that is
+   * a package revision with a reviewer, and it is exactly the shape of change
+   * this operation exists to refuse. An undeclared key is
+   * `policy_direction_undeclared`, and a value whose direction nobody can name
+   * is one `policyLint` cannot refuse.
+   *
+   * ⚠️ The pre-#226 spelling keeps its rows because an install may still hold
+   * it; both names are the same number and the same direction.
    */
-  'experimentalPositionFloor.KRW': 'lower-is-stricter',
-  'experimentalPositionFloor.USD': 'lower-is-stricter',
+  'minimumExecutablePosition.KRW': 'higher-is-stricter',
+  'minimumExecutablePosition.USD': 'higher-is-stricter',
+  'experimentalPositionFloor.KRW': 'higher-is-stricter',
+  'experimentalPositionFloor.USD': 'higher-is-stricter',
   priceConflictTolerance: 'lower-is-stricter',
   'concentration.sector': 'lower-is-stricter',
   'concentration.theme': 'lower-is-stricter',

@@ -290,7 +290,7 @@ something a run would otherwise discover *after* proposing.
 |---|---|---|
 | 1 | `lessonAudit` | nothing — but proposing a change already waiting for the investor is repeating yourself |
 | 2 | `harnessAudit` | **a blocker stops planning.** Orphaned WATCHes, size disagreements, order-ready decisions with no registered exit. A held position no decision explains is a **`warn`** |
-| 3 | `calibration` | low maturity does not stop the run; it frames what it may claim and caps size at `experimentalCeiling`, not the ratio alone |
+| 3 | `calibration` | low maturity does not stop the run and ⛔ since #226 it does not cap size either; it frames what the run may claim, and `maturityStatus` travels for attribution |
 | 4 | `exitDiscipline` over every non-core holding and every proposed entry | **a due stop this run does not act on is `blocked`.** The time stop is unconditional — 40 trading days from entry — and an entry with no registered stop and review date is refused: `entryProposed: true` with an entry, `false` for a holding review |
 | 5 | `exitCheck` over every non-core holding | nothing — but **its SELL and TRIM candidates are reported before any new buy is considered** |
 | 6 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
@@ -339,7 +339,8 @@ than no proposal, because it looks like one.
 | `effectivePositionCap.mandatePositionCap` · `singleNameBudget.mandatePositionCap` · `concentration.caps.position` | `mandate.constraints.maxPositionWeight` |
 | `effectiveCashFloor.mandateCashFloor` · `singleNameBudget.mandateCashFloor` | `mandate.constraints.cashFloor` |
 | `exitDiscipline.mandateMaxDrawdown` · `concentration.caps.portfolioHeat` | `mandate.constraints.maxDrawdown` |
-| `experimentalCeiling.experimentalPositionFloor` | `config.experimentalPositionFloor`, keyed per venue currency |
+| `minimumExecutableWeight.minimumExecutablePosition` | `config.minimumExecutablePosition`, keyed per venue currency — ⚠️ the pre-#226 `config.experimentalPositionFloor` is still read and answers `minimum_executable_key_renamed` |
+| `effectivePositionCap.mandateMaxDrawdown` · `effectivePositionCap.stopLossPct` · `effectivePositionCap.heldPortfolioHeat` | `mandate.constraints.maxDrawdown`, the stop this entry registers with `exitDiscipline`, and the heat the book already carries — the risk budget beneath the declared cap (#226) |
 
 ⛔ **Read every other shape from `inputContracts`, not from a table here.** It publishes each
 operation's keys, their types and the nested shapes — `config.schedule`, `researchActivity[]`,
@@ -539,19 +540,22 @@ three-way split.
 
 ⚠️ **This branch is the control arm, not the strategy.** Oversold and pullback are the most
 arbitraged signals there are, run by institutions at lower cost over large caps where there is no
-capacity advantage to hide in. `controlArmLane` caps it at 1% a name and 6% in total, requires the
-exit discipline registered before entry, and **its results are never an argument for expanding it**.
-Load `skills/evidence-gates/SKILL.md`, which owns the lane rules below.
+capacity advantage to hide in. `controlArmLane` requires the exit discipline registered before
+entry, holds the lane to six concurrent positions, and **its results are never an argument for
+expanding it**. ⛔ **Its 1% / 6% size caps were removed on 2026-09-08 (#226)** — the lens is what
+tags an outcome in the Aumos ledger, not what limits it. Load `skills/evidence-gates/SKILL.md`,
+which owns the lane rules below.
 
-⚠️ **There are two lanes and which one a candidate is in is computed.** The control arm waives the
-variant view *in exchange for* being small; the main lane requires one and may be sized to the
-Mandate's `maxPositionWeight`. `variantViewCheck` decides from four checked inputs — a complete
+⚠️ **A checked variant view decides whether there is a position, not how large it is (#226).**
+The waiver the control arm had was paid for by being small, and the bound is gone, so every
+real-money position owes one. `variantViewCheck` decides from four checked inputs — a complete
 thesis, `variantView`, at least one dated and sourced `consensusRefs` row, and
-`challengeVerdict: 'cleared'` — and **anything unchecked is the control arm**
-(`variant_view_unverified`). ⛔ No argument or flag turns "not checked" into "checked":
-`lane: 'main'` without one is `main_lane_requires_variant_view`. ⛔ A thesis whose evidence is this
-book's own mechanical cohort is `control_arm_evidence_cited` / `blocked` — the control arm's result
-is the baseline an edge claim clears, never the argument for one.
+`challengeVerdict: 'cleared'` — and **anything unchecked is refused**:
+`variant_view_required_for_position` / `blocked` at `effectivePositionCap`, so `targetWeight`
+answers `null`. ⛔ It is not sized twenty times smaller and submitted anyway, and no argument or
+flag turns "not checked" into "checked". ⛔ A thesis whose evidence is this book's own mechanical
+cohort is `control_arm_evidence_cited` / `blocked` — the control arm's result is the baseline an
+edge claim clears, never the argument for one.
 
 ⚠️ **`consensusRefs` is the one requirement whose input exists nowhere but the web.** A broker
 estimate or price target is in no filing and on no exchange feed, so the row that opens the 20% lane
@@ -779,8 +783,10 @@ label — and it is not a sell signal.
 
 ⛔ **A cap the Mandate declares and this methodology then reduces is disclosed twice, and the proposal
 carries both halves.** `effectivePositionCap` returns the declared cap beside the one that binds, which
-of the three limits produced it, and what lifts it; `skills/sizing-and-concentration/SKILL.md` owns its
-inputs. A reduction is `position_cap_reduced_by_maturity`, and a proposal sized under it that does not
+of the two limits produced it — the Mandate, or the risk budget
+`(maxDrawdown − heldPortfolioHeat) / |stopLossPct|` beneath it — and what lifts it;
+`skills/sizing-and-concentration/SKILL.md` owns its inputs. A reduction is
+`position_cap_reduced_below_declared`, and a proposal sized under it that does not
 carry that code **verbatim** in one `uncertainty` entry is `position_cap_reduction_undisclosed` /
 `blocked`. The other half is `DecisionProposal.effectiveConstraints` — copy the operation's array in
 **verbatim**; a proposal carrying the code in prose while leaving the field empty is `blocked` on that
@@ -797,16 +803,21 @@ array and the assembled proposal to. It emits the two `blocked` codes above and 
 run that reworded one sentence got a different position weight than a run that pasted a token it never
 understood. A size that moves when the prose beside it is edited is not a size.
 
-⚠️ **Three nested readings of the same floor; report and act on the outermost that fires.**
-`experimental_floor_unreachable` (above the whole band) ⊃ `experimental_floor_exceeds_cap` (the venue's
-minimum executable amount exceeds what the control arm allows one name to be) ⊃
-`experimental_ladder_unreachable` (a position fits, three rungs do not). Answering the ladder first is
-how a run enlarges a plan to solve a book-size problem.
+⚠️ **Two nested readings of the venue minimum; report and act on the outer one.**
+`minimum_executable_exceeds_cap` (the venue's minimum executable amount exceeds the cap that binds,
+so no name enters at any price) ⊃ `experimental_ladder_unreachable` (a position fits, three rungs do
+not). Answering the ladder first is how a run enlarges a plan to solve a book-size problem.
+⛔ `experimental_floor_unreachable` and `experimental_floor_exceeds_cap` are gone with the band and
+the control-arm cell they measured (#226).
 
-`targetWeight` is never negative. An `insufficient` or `observing` lens can only support a controlled
-experiment at or below the experimental ceiling; it never supports larger size by rhetoric. **Call
-`experimentalCeiling` for that number and do not derive it** — a ratio on its own permits three shares
-on a small book, which is an order that cannot be trimmed or added to and leaves nothing to measure.
+`targetWeight` is never negative, and ⛔ **it is never the cap by default (#226)**: the weight is
+quarter Kelly on this candidate's own expected and downside return —
+`0.25 × max(0, p − (1−p)/b) / |downside|` — and the Mandate's `maxPositionWeight` is the ceiling
+above it. Maturity supports nothing and refuses nothing; rhetoric supports no size at all.
+**Call `minimumExecutableWeight` for the venue minimum and do not derive it** — a weight under it is
+`minimum_executable_not_met` / `blocked`, because an order that cannot be trimmed or added to leaves
+nothing to measure. ⛔ **Do not round a position up to that minimum**: then the size measures the
+rounding rather than the idea.
 
 A machine-evaluable future condition belongs in `watches` or `plans`, with an achievable trigger and
 expiry. Never register a trigger already true at creation.

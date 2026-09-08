@@ -136,10 +136,31 @@
         }
       }
     },
+    "minimumExecutablePosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "⚠️ Renamed from `experimentalPositionFloor` in 0.6.0 (issue #226); an install that still carries the old key is read from it and told so with `minimum_executable_key_renamed`, and the number is unchanged. ⛔ It was never a lane remnant and it is not one now: it is the smallest position, per venue currency, that is worth opening on real money — the amount below which tick size, lot size and the round-trip fee leave no result to measure. ⛔ It is a floor that **refuses** and never a target that lifts — before #226 it raised an experimental ceiling until a position became executable; there is no ceiling to raise now, so a weight the arithmetic puts below it is refused (`minimum_executable_not_met`) rather than rounded up to it. Raising it makes this manager stricter and lowering it is `policy_auto_relax`. ⚠️ It is denominated per venue rather than in the book's base currency because what makes an order unexecutable is a fact about the exchange: the tick, the lot, the price a share trades at and the fee and tax schedule. The base currency is only where the investor keeps score, and one number in it would buy a granular position in a market quoting $0.01 ticks and a three-share position in one quoting 50 KRW ticks on a 33,050 KRW share. Converting into the book's denominator uses the same USDKRW the global NAV already requires. ⚠️ It is an approximation and stays one — exact granularity is a fact about the name, and the sizing operation is given no price.",
+      "properties": {
+        "KRW": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100000000,
+          "default": 300000,
+          "description": "XKRX. 300,000 KRW is nine to fifteen whole shares across the 20,000–50,000 KRW tick band, so one share is at most about a tenth of the position and one 50 KRW tick is 0.1–0.25% of it. The methodology this is ported from entered KOGAS at 33,050 with ten shares — 330,500 KRW — and called that its Experiment-stage small position."
+        },
+        "USD": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100000,
+          "default": 200,
+          "description": "XNAS/XNYS. About one share of a median S&P 500 constituent, and ten or more of a $20 name. Smaller than the Korean floor because US venues quote to $0.01 — 0.005% of a $200 share against 0.15% for a 50 KRW tick on a 33,050 KRW one — so granularity binds far less tightly here. It is not smaller because the sleeve matters less."
+        }
+      }
+    },
     "experimentalPositionFloor": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Smallest position, per venue currency, that is worth opening on real money — the amount below which tick size, lot size and the round-trip fee leave no result to measure. ⚠️ It is denominated per venue rather than in the book's base currency because what makes an order unexecutable is a fact about the exchange: the tick, the lot, the price a share trades at and the fee and tax schedule. The base currency is only where the investor keeps score, and one number in it would buy a granular position in a market quoting $0.01 ticks and a three-share position in one quoting 50 KRW ticks on a 33,050 KRW share. Converting into the book's denominator uses the same USDKRW the global NAV already requires. ⚠️ It is an approximation and stays one — exact granularity is a fact about the name, and the sizing operation is given no price.",
+      "description": "⛔ Deprecated in 0.6.0 (issue #226) — the pre-rename spelling of `minimumExecutablePosition`, kept so an install that holds it still validates and is still read. It names the experimental lane, and that lane no longer exists; `MIGRATION.md` carries the path. A configuration that carries both is answered from `minimumExecutablePosition`.",
       "properties": {
         "KRW": {
           "type": "number",

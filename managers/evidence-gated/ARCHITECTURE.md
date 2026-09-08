@@ -384,24 +384,44 @@ fixture asserts the difference so it cannot be undone silently.
   touched level **submits a `WAIT`**: one that says it was woken, what it found, what still
   needs a closed bar, and what it re-armed. Staying silent is available in mechanism and is
   scored as a crash.
-- **There are two lanes, and the maturity gate belongs to one of them.** The source
+- **The maturity lane is gone; the Mandate sizes and the evidence gate refuses.** The source
   methodology ran a mechanical control arm — no variant view required, 1% a name and 6%
   across the lane — *and* a main lane that required a variant view and could size a name to
   the investor's own `maxPositionWeight`. The port applied §4's lens-maturity ceiling to
-  both, so a candidate with a variant view was held to `experimentalCeiling` — 0.01345312 on
-  a USD 14,866.44 book — exactly like a mechanical one, and a declared `maxPositionWeight` of
-  0.20 operated at 0.01. `variantViewCheck` is what tells the lanes apart, and it answers
-  from checked inputs rather than a claim: a complete thesis carrying `variantView`, at least
-  one dated and sourced consensus citation, and a cleared challenge. Anything unchecked falls
-  to the control arm — `variant_view_unverified` — and the control arm's 1% / 6% are the
-  source's own approved numbers and are unchanged. ⛔ Nothing here lowers `promotionGate`, and
+  both, so a declared `maxPositionWeight` of 0.20 operated at 0.01. #153 restored the
+  distinction; **#226 removed both caps**, on the investor's decision of 2026-09-08: *"실험
+  레인은 없애고 실제로 aumos의 mandate에 따라 매수하면서 실험하는 방향으로 바꿔라."*
+  The buying **is** the measurement — a real broker, a person's approval on every order, an
+  append-only ledger recording each judgement with its forward return — and a separately
+  shrunken lane did not bring that measurement forward. It stopped one from existing:
+  measured on `run_c7ad46eea03840bf84ae7a8822ed02c3`, `variantViewCheck` stood at 0/4 for
+  want of a `consensusRefs` collection procedure, every candidate was forced to the control
+  arm, a flat 1% of a USD 14,937.07 book was **USD 149.37** against a USD 200 minimum ticket,
+  and ten runs bought no single name at any price.
+  What sizes now is the Mandate as a **ceiling** with two computed things under it: the risk
+  budget `(maxDrawdown − heldPortfolioHeat) / |stopLossPct|`, and `targetWeight`'s
+  quarter-Kelly arithmetic on the candidate's own expected and downside return. ⛔ 20% is
+  never the answer by default — the source capped a single name at 20% and entered KOGAS at
+  2.6%.
+  `variantViewCheck` is unchanged in what it checks and changed in what it costs: a candidate
+  without a complete thesis carrying `variantView`, a dated and sourced consensus citation
+  and a cleared challenge is **refused**, not sized twenty times smaller
+  (`variant_view_required_for_position` / `blocked`, `targetWeight` → `null`). ⛔ That is not
+  a new bar: `challengeCleared` is one of the four and has always been fatal on its own.
+  ⛔ Nothing here lowers `promotionGate` — it reports a lens's record and gates no size — and
   `controlArmLane.expansionProhibited` still stands: a control-arm result is never an argument
   for size, and a thesis that cites the mechanical cohort as its evidence is
-  `control_arm_evidence_cited` / `blocked` at the lane door. Where the ceiling *does* bind,
-  `effectivePositionCap` still computes the comparison, names it as owed on `disclosures`, and
+  `control_arm_evidence_cited` / `blocked`. Where a cap *is* reduced below the declared one,
+  `effectivePositionCap` computes the comparison, names it as owed on `disclosures`, and
   `proposalDisclosure` refuses a proposal that does not carry it
-  (`position_cap_reduced_by_maturity`), which closes the asymmetry against
-  `concentration_cap_missing`; what it does not do is shorten the wait.
+  (`position_cap_reduced_below_declared`), which closes the asymmetry against
+  `concentration_cap_missing`.
+  ⚠️ **The risk transferred rather than disappearing.** With no maturity gate, a first single
+  name can reach the Mandate's cap with zero closed outcomes behind it. What is left holding
+  it: `maxDrawdown` 0.06 through the risk budget and `portfolioHeat`, `cashFloor` 0.10, the
+  per-name stop, every concentration axis, `newSinglePacing`, and the investor's approval on
+  each order.
+  ([#226](https://github.com/untilled/aumos-catalogue/issues/226))
   ⚠️ **And the neighbouring asymmetry — an empty lane read as a working methodology — is closed by a
   count rather than a code since #212 ④.** `executionRecord` reads the host's task run (`task_get`)
   and the recipe answers this run reads back out of `scans/` with `files_read`, and answers
@@ -458,13 +478,19 @@ fixture asserts the difference so it cannot be undone silently.
   `effectivePositionCap` makes for `maxPositionWeight`. ⚠️ A floor is not a target: 10%
   says the book *may* go there, never that it should.
   ([#153](https://github.com/untilled/aumos-catalogue/issues/153))
-- **A venue floor can close the control arm outright.** `experimentalPositionFloor` is the
-  smallest order worth placing in a venue, and on a small book it can exceed the lane's
-  own 1% cell — USD 200 against USD 148.66 on a USD 14,866.44 book — after which no US name
-  enters that lane at any share price. `experimental_floor_exceeds_cap` names it and carries
-  the resolving NAV. It is the middle of three nested readings of the same floor;
-  `experimental_floor_unreachable` is wider and #149's `experimental_ladder_unreachable` is
-  narrower, and the outermost that fires is the one to act on.
+- **A venue minimum refuses a position; it never lifts one.** `minimumExecutablePosition` is
+  the smallest order worth placing in a venue — the amount below which tick, lot and the
+  round-trip fee leave no result to measure — and `minimumExecutableWeight` is what turns it
+  into a weight of this book. ⛔ Before #226 it *raised* an experimental ceiling until a
+  position became executable; there is no ceiling to raise now, so a weight the arithmetic
+  puts below it is `minimum_executable_not_met` / `blocked` rather than rounded up to it —
+  otherwise the size measures the rounding rather than the idea. On a book small enough for
+  the minimum to exceed the cap that binds, `minimum_executable_exceeds_cap` names it and
+  carries the resolving NAV; #149's `experimental_ladder_unreachable` is narrower, and the
+  outer one that fires is the one to act on. ⚠️ Its `policyLint` direction reversed with its
+  meaning: a larger minimum refuses more, so it is now `higher-is-stricter` and lowering it is
+  `policy_auto_relax`. ⛔ `experimental_floor_unreachable` and `experimental_floor_exceeds_cap`
+  are deleted with the band and the lane cell they measured.
 - Source vendors relay their own response shapes; this manager, not Aumos, checks dates
   and freshness.
 - CLI web observations are not replay-canonical Evidence.

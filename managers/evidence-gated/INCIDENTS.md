@@ -303,6 +303,25 @@ diagnostic. `marketValueBasis` now says which reading was used.
 `caps.portfolioHeat` and `singleNameBudget`, and `heldSingleNameWeight: 0` reads as *the lane has
 room* rather than as *nothing this Mandate is for is being done*.
 
+**A gate that doubled as a size dial, and shut the book** (#226, 2026-09-08). Measured on
+`run_c7ad46eea03840bf84ae7a8822ed02c3`, NAV USD 14,937.07, USDKRW 1,340. `variantViewCheck` stood at
+**0 of 4** because `consensusRefs` had no collection procedure, so every candidate was forced to the
+control arm; the arm capped a single name at a flat **1%** with no floor lift, which is **USD
+149.37** against a USD 200 minimum ticket, and `experimental_floor_exceeds_cap` refused it. The
+chain, end to end:
+
+```text
+consensusRefs 수집 절차 없음 → variantViewCheck 0/4 → lane 강제 control-arm
+→ 평면 1%, floor-lift 없음 → USD 149.37 < 최소 티켓 200 → 단일종목 0건
+```
+
+⚠️ **Ten runs, `singleNameWeight` 0, `cashLikeWeight` 0.956.** Every rule in that chain was
+defensible alone. ⛔ And the package's own comment beside `experimentalPositionCeilingMax` claimed
+the floor could *"reproduce what that methodology did"* — the source's 2.6% Experiment-stage KOGAS
+entry — while the control-arm cap it fed through had no floor lift at all, so the reproduction was
+structurally impossible. The investor's decision removed the lane rather than adding a fourth rule
+to it, and `variantViewCheck` now refuses the position instead of shrinking it.
+
 **A cause vocabulary that matched nothing** (#171). `mandateExecution` decides whether an empty book
 is the methodology working or its gates never receiving inputs, by intersecting reported codes with a
 vocabulary that was hand-written beside the reader while the codes are emitted by five other modules.
