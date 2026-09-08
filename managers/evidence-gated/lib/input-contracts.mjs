@@ -368,7 +368,8 @@ export const INPUT_CONTRACTS = {
     keys: {
       expectedActiveReturn: NUMBER, downsideReturn: NUMBER, conviction: NUMBER, mandatePositionCap: NUMBER,
       sectorHeadroom: NUMBER, themeHeadroom: NUMBER, maturityStatus: STRING, researchGate: STRING, challengeVerdict: STRING,
-      lane: STRING, thesis: OBJECT, evidenceSamples: ARRAY, promotion: OBJECT, uncertainty: ARRAY, effectiveConstraints: ARRAY, risks: ARRAY,
+      /** ⛔ No `uncertainty` / `risks` / `effectiveConstraints`: this weight is a function of numbers alone (#212 ②). */
+      lane: STRING, thesis: OBJECT, evidenceSamples: ARRAY, promotion: OBJECT,
       experimentalPositionCeiling: NUMBER, experimentalPositionCeilingMax: NUMBER, experimentalPositionFloor: OBJECT,
       positionCurrency: STRING, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
     },
@@ -380,17 +381,26 @@ export const INPUT_CONTRACTS = {
       positionCurrency: STRING, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
     },
   },
+  /**
+   * ⚠️ **`uncertainty`, `risks` and `effectiveConstraints` are gone from this
+   * contract (#212 ②).** They were how the arithmetic read the proposal's
+   * prose, and a `blocked` raised from a substring reached `targetWeight`,
+   * which returns `null` for any `blocked` — so a rewritten sentence changed a
+   * weight. This operation names the obligation (`data.disclosures`);
+   * `proposalDisclosure` judges it. Handing them here is now `input_key_unread`,
+   * which is the true answer: nothing reads them.
+   */
   effectivePositionCap: {
     mode: 'named',
     keys: {
       mandatePositionCap: NUMBER, maturityStatus: STRING, lane: STRING, thesis: OBJECT, challengeVerdict: STRING,
-      evidenceSamples: ARRAY, promotion: OBJECT, uncertainty: ARRAY, effectiveConstraints: ARRAY,
-      /** `risks` is what the approval screen renders, so it is where the attestation disclosure lands (#692). */
-      risks: ARRAY,
+      evidenceSamples: ARRAY, promotion: OBJECT,
       experimentalPositionCeiling: NUMBER, experimentalPositionCeilingMax: NUMBER, experimentalPositionFloor: OBJECT,
       positionCurrency: STRING, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
     },
   },
+  /** The assembled proposal, and the obligations the sizing handed over. (#212 ②) */
+  proposalDisclosure: { mode: 'strict', keys: { disclosures: ARRAY, proposal: OBJECT } },
   effectiveCashFloor: { mode: 'named', keys: { mandateCashFloor: NUMBER, methodologyCashFloors: ARRAY, effectiveConstraints: ARRAY, projectedCashWeight: NUMBER, cashWeight: NUMBER } },
   singleNameBudget: { mode: 'named', keys: { mandateCashFloor: NUMBER, mandatePositionCap: NUMBER, positions: ARRAY, proposed: ARRAY, controlArmWeight: NUMBER } },
   legacySizeSuggestion: { mode: 'named', keys: { riskRewardRatio: NUMBER, capWeight: NUMBER, minimumCalibrationSamples: NUMBER, calibrationSamples: NUMBER, winProbability: NUMBER, kellyFraction: NUMBER, stopDistance: NUMBER, fullCapAtRiskReward: NUMBER, expectedValue: NUMBER } },

@@ -281,10 +281,13 @@ Evidence id를 만들지 않는다 — 그리고 `evidenceIds`는 그 말고는 
 ⚠️ **그 행은 이 매니저의 증언이고, 패키지는 그 사실을 조용하게 두지 않는다.** Aumos는 아무것도
 가져오지 않았고 아무것도 검증하지 않았다 — 행은 모든 단계에서 `observation` / `manager:web-research`로
 등급된다. 그래서 `variantViewCheck`는 수립된 컨센서스 행 각각의 등급을 게시하고, 매니저가 직접 기록한
-행 위에서 메인 레인이 열리면 `effectivePositionCap`이 `main_lane_rests_on_manager_attestation`을
-돌려주며, 제안은 그 코드를 `rationale.risks` 항목 하나에 출처 URL과 함께, 그리고 `uncertainty` 항목
-하나에 그대로 실어야 한다 — `risks`인 이유는 승인 화면이 그것을 그리기 때문이다. 둘 중 하나라도
-빠지면 `main_lane_attestation_undisclosed` / `blocked`다. ⛔ 요구 넷도, 캐도, 대조군의 1% / 6%도
+행 위에서 메인 레인이 열리면 `effectivePositionCap`이 `disclosures`에
+`main_lane_rests_on_manager_attestation`을 실어 돌려주며, 제안은 그 코드를 `rationale.risks` 항목
+하나에 출처 URL과 함께, 그리고 `uncertainty` 항목 하나에 그대로 실어야 한다 — `risks`인 이유는 승인
+화면이 그것을 그리기 때문이다. 조립된 제안을 그 의무와 대조하는 것은 `proposalDisclosure`이고, 둘 중
+하나라도 빠지면 거기서 `main_lane_attestation_undisclosed` / `blocked`다. ⛔ #212 ② 이후 산술 자체는
+산문을 읽지 않는다 — 부분 문자열에서 올라온 `blocked`가 `targetWeight`에 닿아 문장을 고치면 비중이
+움직였다. ⛔ 요구 넷도, 캐도, 대조군의 1% / 6%도
 바뀌지 않는다 — 거부하는 것은 레인을 **조용히** 여는 것이다. 그리고 `observationLedger`가 반대 방향의
 고리를 닫는다 — 웹에서 읽고 판단에 썼는데 제출된 어느 id도 받치지 않는 값은
 `claim_evidence_missing` / `blocked`이며, 그것이 2026-09-06 BOK 금리 실패를 진단으로 만든 것이다.

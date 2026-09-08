@@ -99,9 +99,10 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    resting on the mechanical cohort is `control_arm_evidence_cited` / `blocked`. ⚠️ **And a main
    lane opened on a consensus row you filed yourself says so at the approval point** (#692):
    `observation_file` is the only route a web reading has into `evidenceIds`, the row is graded as
-   your testimony, and `effectivePositionCap` returns `main_lane_rests_on_manager_attestation` with
-   the source URLs. Carry that code verbatim in one `rationale.risks` entry and one `uncertainty`
-   entry — `risks` because that is what the approval screen shows — or the sizing is
+   your testimony, and `effectivePositionCap` returns `main_lane_rests_on_manager_attestation` on
+   `disclosures`, with the source URLs. Carry that code verbatim in one `rationale.risks` entry and
+   one `uncertainty` entry — `risks` because that is what the approval screen shows — and hand the
+   assembled proposal to `proposalDisclosure` (step 4e), where a silent one is
    `main_lane_attestation_undisclosed` / `blocked`. ⛔ It reduces no cap and waives no requirement;
    it refuses opening the lane **quietly**. ⚠️ What total the
    single-name lanes may reach *together* is an open question this revision does not answer.
@@ -120,8 +121,10 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    and the honest answer is that this book cannot run a real-money controlled experiment in that
    market — not a position rounded up to the cap.
 4a. **Say what the investor's declared cap became.** Call `effectivePositionCap` with
-   `mandatePositionCap`, `maturityStatus`, the `lane` (`control-arm` or `main`), the same NAV and
-   floor inputs `experimentalCeiling` takes, and this run's `uncertainty` once the proposal exists.
+   `mandatePositionCap`, `maturityStatus`, the `lane` (`control-arm` or `main`) and the same NAV and
+   floor inputs `experimentalCeiling` takes. ⛔ **Do not pass `uncertainty`, `risks` or
+   `effectiveConstraints`** — they are not read here since #212 ② and a call carrying them answers
+   `input_key_unread`. This operation is arithmetic; step 4e is what reads the proposal.
    It returns `declaredCap`, `effectiveCap`, which of the three limits bound — the Mandate, the
    lens-maturity ceiling, the control arm's single-name cell — and `unlocksAt`. ⚠️ **This is the
    asymmetry #151 closed.** A cap nobody declared has been reported every run since the beginning as
@@ -129,12 +132,11 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    A book on an insufficient lens ran at a twentieth of a declared 0.20 and no output said so.
    ⛔ A proposal sized under a reduced cap carries the code `position_cap_reduced_by_maturity`
    **verbatim** in one `uncertainty` entry **and** this operation's `effectiveConstraints` array
-   copied into `DecisionProposal.effectiveConstraints` verbatim, or it comes back
+   copied into `DecisionProposal.effectiveConstraints` verbatim, or step 4e comes back
    `position_cap_reduction_undisclosed` / `blocked` — the proposal, never the run. The two halves
    have different readers: `uncertainty` is prose a person reads after the run, and
    `effectiveConstraints` is what the fund-settings screen draws beside the control the limit was
-   typed into. Pass both back to be judged; either one missing is judged, either one absent is
-   unjudged. ⚠️ `field` is the **host's** vocabulary — `maxPositionWeight`, `cashFloor`,
+   typed into. ⚠️ `field` is the **host's** vocabulary — `maxPositionWeight`, `cashFloor`,
    `maxDrawdown` — and a methodology name like `controlArmLane` is refused by that schema; what
    bound goes in `reason`, which is where this package's own code belongs. `declared` echoes the
    Mandate value this invocation handed the run and is never a constant. ⛔ An entry is emitted
@@ -178,6 +180,17 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    −8% in that lane and derived from the Mandate's `maxDrawdown` in every other, so a large position
    carries a tighter stop than a 1% one — the two lanes holding different numbers is the rule
    working, not an inconsistency. `skills/evidence-gates` carries the rest.
+4e. **Judge the disclosures once the proposal exists — `proposalDisclosure`.** Hand it the
+   `disclosures` array 4a returned (or `targetWeight`'s, which is the same array) **verbatim** and
+   the assembled `DecisionProposal`. It answers `disclosed` and, for each obligation, which fields
+   are silent — and it is the only operation that emits
+   `position_cap_reduction_undisclosed` / `main_lane_attestation_undisclosed`. ⚠️ **Absent is
+   unjudged; empty is refused.** A proposal that does not exist yet has cleared nothing, and an
+   empty array is a proposal that exists and says nothing.
+   ⚠️ **Why this is a separate step at all.** Until #212 ② `effectivePositionCap` read the prose
+   itself and pushed `blocked`, and `targetWeight` returns `null` for any `blocked` — so **rewording
+   one `uncertainty` entry changed a position weight.** The obligation is unchanged and the codes are
+   unchanged; what moved is that the size is now a function of the numbers alone.
 5. Compare with cash and benchmark alternatives. A target is the desired portfolio weight, not an
    order quantity, and it is never negative.
 

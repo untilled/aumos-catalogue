@@ -134,10 +134,13 @@ behind it at all). `consensusStrongestAttestation` is the best grade the candida
 was asked for and chose — *file it, and I read the passage before I approve* — over keeping the
 lane shut or dropping the requirement. ⛔ **And it collapses into dropping the requirement the
 moment the grade stops travelling.** So when the main lane opens on one,
-`effectivePositionCap` returns `main_lane_rests_on_manager_attestation` and the proposal carries
-that code verbatim in one `rationale.risks` entry with the source URL and in one `uncertainty`
-entry; missing either is `main_lane_attestation_undisclosed` / `blocked`. `risks` is the slot
-because the approval screen renders `keyReasons` and `risks` and nothing else.
+`effectivePositionCap` returns `main_lane_rests_on_manager_attestation` on `disclosures` and the
+proposal carries that code verbatim in one `rationale.risks` entry with the source URL and in one
+`uncertainty` entry; hand both to `proposalDisclosure`, where missing either is
+`main_lane_attestation_undisclosed` / `blocked`. `risks` is the slot because the approval screen
+renders `keyReasons` and `risks` and nothing else. ⛔ **The arithmetic does not read the prose** —
+since #212 ② it names the obligation and `proposalDisclosure` judges it, because a `blocked` raised
+from a substring reached `targetWeight` and made a reworded sentence change a position weight.
 
 ⚠️ **The requirement that binds is usually fillable, and the fill is a fetch.** `expectedUpsidePct`
 and `fairValueRange` come off `thesisValuation` — the bear/base/bull targets this page already

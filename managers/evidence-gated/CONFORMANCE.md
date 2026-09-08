@@ -242,9 +242,9 @@ reports no session at all (aumos #453).
   granted and an Aumos at `>=0.3.32`, reporting a `consensusRefs` row carrying an evidence id the
   gateway actually minted.
 - **And the disclosure this package writes has not been read by an investor yet.** When the main
-  lane opens on a manager-attested consensus row, `effectivePositionCap` requires
-  `main_lane_rests_on_manager_attestation` verbatim in `rationale.risks` and in `uncertainty`, and
-  refuses the sizing otherwise. `risks` was chosen because `apps/desktop/src/screens/Approvals.tsx`
+  lane opens on a manager-attested consensus row, `effectivePositionCap` names
+  `main_lane_rests_on_manager_attestation` as owed in `rationale.risks` and in `uncertainty`, and
+  `proposalDisclosure` refuses a proposal that carries neither. `risks` was chosen because `apps/desktop/src/screens/Approvals.tsx`
   renders `keyReasons` and `risks` and nothing else — measured, not assumed. ⛔ That reading is of a
   host revision at the time of writing; if the approval screen changes, this choice has to be
   re-measured rather than inherited. `HOST-FOLLOWUPS.md` records what would close it host-side.

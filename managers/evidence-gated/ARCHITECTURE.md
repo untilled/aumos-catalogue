@@ -340,7 +340,8 @@ fixture asserts the difference so it cannot be undone silently.
   `controlArmLane.expansionProhibited` still stands: a control-arm result is never an argument
   for size, and a thesis that cites the mechanical cohort as its evidence is
   `control_arm_evidence_cited` / `blocked` at the lane door. Where the ceiling *does* bind,
-  `effectivePositionCap` still computes the comparison and every applying run discloses it
+  `effectivePositionCap` still computes the comparison, names it as owed on `disclosures`, and
+  `proposalDisclosure` refuses a proposal that does not carry it
   (`position_cap_reduced_by_maturity`), which closes the asymmetry against
   `concentration_cap_missing`; what it does not do is shorten the wait. `promotionGate` wants
   30 samples, 10 clusters and **3 regimes**, and only the first two respond to a higher

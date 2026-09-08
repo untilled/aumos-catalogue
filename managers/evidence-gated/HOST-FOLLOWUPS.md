@@ -97,7 +97,7 @@ decision*, one click past the approve button, and `uncertainty` is not on that s
 
 That gap is why this package writes its disclosure into **`rationale.risks`** rather than into
 `effectiveConstraints` or `uncertainty` alone, and why `main_lane_attestation_undisclosed` is
-`blocked`. It is a workaround, and it works only for managers that choose to do it. **What would
+`blocked` — raised by `proposalDisclosure` since #212 ②, never by the arithmetic. It is a workaround, and it works only for managers that choose to do it. **What would
 close it properly is host-side**, and one of these would do:
 
 - an attestation summary on the approval card itself — *"n of the m evidence rows behind this
@@ -353,6 +353,39 @@ left to diligence.
 
 ⛔ The dependency is a **disclosure** one and not a gating one. Nothing here waits on the host: the
 diagnostic fires today, and the proposal that does not carry both halves is refused today.
+
+### Where that refusal lives, and what is deleted when the host takes it (#212 ②)
+
+⚠️ **The refusal moved out of the arithmetic on 2026-09-08 and it did not move to the host.**
+`effectivePositionCap` used to read the proposal's `uncertainty`, `risks` and `effectiveConstraints`
+and push `blocked` — and `targetWeight` returns `null` for any `blocked` diagnostic it is handed, so
+**rewording one sentence changed a position weight**. A run that rephrased the entry carrying the
+token lost its size; a run that pasted a token it never understood kept it. The calculation now
+returns `disclosures` — the code, the fields it is owed in, and the `effectiveConstraints` row to
+copy — and **`proposalDisclosure`** is the operation that reads an assembled proposal and emits
+`position_cap_reduction_undisclosed` / `main_lane_attestation_undisclosed`.
+
+⛔ **That is still this package checking its own homework.** The obligation belongs on the approval
+screen: the host holds `DecisionProposal.effectiveConstraints` and renders `rationale.risks`, so it
+is the only surface that can refuse to *draw* a size whose disclosure is absent, whatever the
+manager chose to do. `proposalDisclosure` is where the check stands until that exists — and it is
+one operation rather than a rule inside the arithmetic precisely so that it can be removed without
+touching a number.
+
+**What is deleted here on the day the host enforces it** — the day `Approvals.tsx` (or its
+successor) refuses, or visibly annotates, a proposal whose `effectiveConstraints` do not match the
+sealed sizing and whose `rationale.risks` does not carry a required attestation code:
+
+| deleted | kept |
+|---|---|
+| `lib/proposal.mjs` in full, and the `proposalDisclosure` registration in `lib/index.mjs` | `effectivePositionCap.data.disclosures` — the host needs to be *told* what is owed |
+| the `proposalDisclosure` contract row in `lib/input-contracts.mjs`, and its two rows in `skills/deterministic-metrics/SKILL.md` | `effectiveConstraints`, `mainLaneAttestation` and both `unevaluated` codes (`position_cap_reduced_by_maturity`, `main_lane_rests_on_manager_attestation`) |
+| step 4e of `skills/sizing-and-concentration/SKILL.md` and the `proposalDisclosure` sentences in `PROMPT.md` §2 / §4 | the instruction to carry the code verbatim in `uncertainty` and `rationale.risks` — the host refusing it does not make it optional |
+| the `proposalDisclosure` assertions in `tools/verify-evidence-gated-allocator.mjs` and `tools/verify-evidence-gated-input-regressions.mjs` | ⛔ **the prose-invariance test**, which is about the arithmetic and outlives every host change |
+
+⛔ **Not before.** Deleting the check while no screen refuses is #692's ⑴ collapsing into ⑶: the
+investor approves a size whose supporting evidence they were never told was self-reported, and the
+requirement is dropped without anyone deciding to drop it.
 
 ## The lane split, and the number that is now decided (#153, requests 1–3)
 

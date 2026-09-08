@@ -481,9 +481,10 @@ without its markers is `consensus_ref_grade_unstated`.
 exactly as it always did — that is the trade the investor chose: *file it, and I read the passage
 before I approve 20%-scale sizing.* ⛔ **That trade holds only while the grade reaches the approval
 screen.** When the main lane opens on a manager-attested citation, `effectivePositionCap` returns
-`main_lane_rests_on_manager_attestation` and the proposal carries that code **verbatim in one
-`rationale.risks` entry, with the source URL**, and in one `uncertainty` entry. Missing either is
-`main_lane_attestation_undisclosed` / `blocked`. ⚠️ `risks` rather than `effectiveConstraints`
+`main_lane_rests_on_manager_attestation` on `disclosures`, and the proposal carries that code
+**verbatim in one `rationale.risks` entry, with the source URL**, and in one `uncertainty` entry.
+Hand `disclosures` and the assembled proposal to **`proposalDisclosure`**; missing either half is
+`main_lane_attestation_undisclosed` / `blocked` there. ⚠️ `risks` rather than `effectiveConstraints`
 because that array takes only the host's three numeric fields and is emitted only when a cap was
 *reduced*; `risks` rather than `uncertainty` alone because the approval screen renders `keyReasons`
 and `risks` and nothing else.
@@ -665,6 +666,16 @@ carry that code **verbatim** in one `uncertainty` entry is `position_cap_reducti
 **verbatim**; a proposal carrying the code in prose while leaving the field empty is `blocked` on that
 half alone, and an empty array is a complete answer only when nothing was reduced. ⛔ The disclosure is
 never an argument for raising anything; `policyLint` refuses a loosened threshold.
+
+⚠️ **Who checks it: `proposalDisclosure`, and never the arithmetic.** The sizing operations return
+`disclosures` — a row per obligation, with the code, the fields it has to appear in and the
+`effectiveConstraints` row to copy — and **`proposalDisclosure`** is the operation you hand that
+array and the assembled proposal to. It emits the two `blocked` codes above and nothing else does.
+⛔ **Do not pass `uncertainty`, `risks` or `effectiveConstraints` to `effectivePositionCap` or
+`targetWeight`**: they are not read there, and a call carrying them answers `input_key_unread`. Until
+#212 ② they *were* read, and because `targetWeight` returns `null` for any `blocked` diagnostic, a
+run that reworded one sentence got a different position weight than a run that pasted a token it never
+understood. A size that moves when the prose beside it is edited is not a size.
 
 ⚠️ **Three nested readings of the same floor; report and act on the outermost that fires.**
 `experimental_floor_unreachable` (above the whole band) ⊃ `experimental_floor_exceeds_cap` (the venue's

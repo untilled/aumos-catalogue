@@ -298,8 +298,9 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   `promotionGate`를 낮춘 것은 없고 `controlArmLane.expansionProhibited`는 그대로다 — 대조군의 성과는
   결코 사이징의 근거가 아니며, 기계 코호트를 근거로 든 thesis는 레인 입구에서
   `control_arm_evidence_cited` / `blocked`이다. 상한이 *실제로* 구속하는 자리에서는
-  `effectivePositionCap`이 여전히 그 비교를 계산하고 적용되는 모든 실행이 공시한다
-  (`position_cap_reduced_by_maturity`). `concentration_cap_missing`과의 비대칭은 이것으로 닫힌다.
+  `effectivePositionCap`이 여전히 그 비교를 계산해 `disclosures`에 의무로 이름 대고,
+  `proposalDisclosure`가 그것을 싣지 않은 제안을 거절한다(`position_cap_reduced_by_maturity`).
+  `concentration_cap_missing`과의 비대칭은 이것으로 닫힌다.
   닫지 *못하는* 것은 대기 시간이다. `promotionGate`는 표본 30건, 클러스터 10개, **레짐 3개**를
   요구하고 앞의 둘만 후보 생성률에 반응한다 — 레짐은 달력이 지나야 바뀐다. 두 질문은 답하지 않고
   열린 채로 기록한다: 개별종목 레인들이 합쳐서 어디까지 갈 수 있는가, 그리고 1%와 완전 승격 사이에
