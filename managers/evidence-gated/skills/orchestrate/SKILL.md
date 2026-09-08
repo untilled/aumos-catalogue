@@ -241,7 +241,7 @@ Feed the fundamental branch before running it, in this order (#146): the registr
 vendor's own filer id (open-dart /api/corpCode.xml for corp_code, sec-edgar
 /files/company_tickers.json for the CIK) → mapCorporationCodes → fundamentalsPlan →
 source_cache_read / source_cache_refresh → dartVendorStatus on every OpenDART response →
-catalystRegister → radarCandidates → radarFeedDiagnosis → upsideRadar({candidates, feed}). If the registry cannot be read, report corp_code_unmapped_symbols, let radarFeedDiagnosis name the
+catalystCadence → catalystRegister → radarCandidates → radarFeedDiagnosis({candidates, catalysts, lanes}) → upsideRadar({candidates, feed}). If the registry cannot be read, report corp_code_unmapped_symbols, let radarFeedDiagnosis name the
 registry stage and run the price branch — never reconstruct it by walking disclosure pages. The registry call is the
 one no run has ever made; without it nothing fetched can be addressed to a filer — on **both**
 sides (#179): sec-edgar companyfacts is the CIK file name
@@ -257,6 +257,10 @@ the radar an empty axis and the two lenses that need no price fall report it as 
 company — measured: post-event-continuation 0 of 83, inflection excluding the one name that cleared
 every filing test. catalystRegister is that producer, every row carries the evidenceIds the reading
 was filed under, and its nextState is persisted to research/catalyst-window with numeric instants.
+catalystCadence derives the expected window from the filings already cached, measuring the lag in
+this book at run time; those rows go on estimated, marked estimated_from_filing_cadence and citing
+the past filings the cadence came from. Nothing derived reaches actual — post-event-continuation
+still needs a real announcement record.
 Do all of that in your own context with calculate — do not open subagents to batch the roster, to
 relay bars, or to walk listing pages; that is refused and the run is charged for it either way.
 Collect the price series before you sweep, and in that order: call source_cache_refresh with

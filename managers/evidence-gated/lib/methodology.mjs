@@ -569,7 +569,15 @@ function radarLaneVerdicts(row, candidate, asOf) {
   else if (!(filingYoy > 0)) decide('inflection', false, 'latest-filing-operating-income-not-improving')
   else if (!inflection.signFlip) decide('inflection', false, 'no-sign-flip-against-the-previous-comparable-filing')
   else if (catalyst.status !== 'present') decide('inflection', false, 'no-catalyst-registered-within-60-days')
-  else decide('inflection', true, 'sign-flip-with-a-registered-catalyst')
+  /**
+   * ⚠️ **An estimated window opens the lane and says so in the reason** (#228).
+   * It has to open it — a lane fed only by hand research is the starvation this
+   * whole axis was rebuilt to end — and the sentence has to differ, because
+   * *«a date somebody read»* and *«a date this package projected from the filing
+   * cadence»* are different grounds for the same inclusion, and a reader who
+   * cannot tell them apart is reading the second as the first.
+   */
+  else decide('inflection', true, catalyst.confirmed ? 'sign-flip-with-a-registered-catalyst' : 'sign-flip-with-an-estimated-catalyst-window')
 
   /**
    * The radar's route into the same population the scanner's `quality-pullback`
@@ -625,9 +633,20 @@ export function upsideRadar({ candidates = [], feed = null, asOf }) {
       availableAt: latest.availableAt,
     } : { status: 'unknown', reason: 'no-valid-point-in-time-filing' }
     const price = candidate.price ?? { status: 'unknown' }
-    const catalyst = (candidate.catalysts ?? []).some((row) => Date.parse(row.windowEnd) >= Date.parse(asOf) && Date.parse(row.windowStart) <= Date.parse(asOf) + 60 * 86_400_000)
-      ? { status: 'present' }
-      : { status: 'unknown', reason: 'no-registered-catalyst-not-proof-of-absence' }
+    /**
+     * ⚠️ **Two ways of being present, and the axis names which** (#228). A
+     * window `catalystCadence` derived from the filing cadence is registered,
+     * cited and open — so it is `present`, which is the whole point of the
+     * stage — and it is not the same evidence as a date somebody read. The axis
+     * carries `dateSource` and `confirmed`, the lane reason differs, and the
+     * rank below puts a confirmed window ahead of an estimated one; ⛔ what it
+     * does not do is quietly report one as the other.
+     */
+    const openWindows = (candidate.catalysts ?? []).filter((row) => Date.parse(row.windowEnd) >= Date.parse(asOf) && Date.parse(row.windowStart) <= Date.parse(asOf) + 60 * 86_400_000)
+    const confirmedWindow = openWindows.some((row) => (row.dateSource ?? 'observed') === 'observed')
+    const catalyst = openWindows.length
+      ? { status: 'present', confirmed: confirmedWindow, dateSource: confirmedWindow ? 'observed' : 'estimated_from_filing_cadence' }
+      : { status: 'unknown', confirmed: false, reason: 'no-registered-catalyst-not-proof-of-absence' }
     const expectation = candidate.latestEarnings ? { status: 'recorded', sue: candidate.latestEarnings.sue ?? null, guidanceSurprise: candidate.latestEarnings.guidanceSurprise ?? null } : { status: 'unknown', reason: 'no-point-in-time-event-record' }
     /**
      * ⚠️ **This axis is reported and it gates nothing, and it now says so on
@@ -672,13 +691,24 @@ export function upsideRadar({ candidates = [], feed = null, asOf }) {
     row.lensesEntered = Object.entries(row.lanes).filter(([, verdict]) => verdict.included).map(([lane]) => lane)
     return row
   })
+  /**
+   * ⚠️ **The second term is the whole of #228's third ask, and its position is
+   * the judgement.** A confirmed catalyst outranks an estimated one, and both
+   * outrank none — but *below* the improving-and-confirmed-price cell, because
+   * how a catalyst date was arrived at is a tie-break between names the axes
+   * already agree about, never a promotion past a name whose statements and
+   * price both answered. ⛔ It is not a fourth lane and it changes no lane's
+   * verdict; a name with only an estimated window is still included, still
+   * ranked, and still says so.
+   */
   const rankKey = (row) => {
     const cell = row.axes.inflection.status === 'improving' && row.axes.price.status === 'confirmed' ? 2 : row.axes.inflection.status === 'improving' || row.axes.catalyst.status === 'present' ? 1 : 0
-    return [cell, row.axes.inflection.marginDeltaYoy ?? -1e15, row.axes.price.rs20VsBenchmarkPct ?? -1e15]
+    const catalystStrength = row.axes.catalyst.status !== 'present' ? 0 : row.axes.catalyst.confirmed ? 2 : 1
+    return [cell, catalystStrength, row.axes.inflection.marginDeltaYoy ?? -1e15, row.axes.price.rs20VsBenchmarkPct ?? -1e15]
   }
   const ranked = rows.filter((row) => row.eligible).sort((a, b) => {
     const aa = rankKey(a); const bb = rankKey(b)
-    return bb[0] - aa[0] || bb[1] - aa[1] || bb[2] - aa[2] || String(a.asset).localeCompare(String(b.asset))
+    return bb[0] - aa[0] || bb[1] - aa[1] || bb[2] - aa[2] || bb[3] - aa[3] || String(a.asset).localeCompare(String(b.asset))
   }).map((row, index) => ({ ...row, rank: index + 1 }))
   /**
    * Starvation is a finding. A lane whose every exclusion is the same missing
@@ -739,7 +769,20 @@ export function upsideRadar({ candidates = [], feed = null, asOf }) {
    * shape as a value nobody reads (#141), and this is that field for #170.
    */
   const reportedNotGatedAxes = ['valuation']
-  return { data: { ranked, unranked: rows.filter((row) => !row.eligible), lanes: laneCoverage, starvedLanes, reportedNotGatedAxes, feed: feedCause ? { stage: feedStage, cause: feedCause, fed: feed?.fed ?? null, coverage: feedCoverage } : null, branch: 'fundamental-and-event', rankMeaning: 'research-priority-only' }, diagnostics }
+  /**
+   * ⚠️ **How much of a fed catalyst axis was read and how much was projected**
+   * (#228), once, for the reader holding the whole answer. A lane that is no
+   * longer starved because every window under it was derived from a filing
+   * cadence is a real improvement and a different claim from a researched
+   * calendar, and the count is the only place that difference is visible
+   * without walking every row.
+   */
+  const catalystBasis = {
+    confirmed: rows.filter((row) => row.axes.catalyst.status === 'present' && row.axes.catalyst.confirmed).length,
+    estimated: rows.filter((row) => row.axes.catalyst.status === 'present' && !row.axes.catalyst.confirmed).length,
+    absent: rows.filter((row) => row.axes.catalyst.status !== 'present').length,
+  }
+  return { data: { ranked, unranked: rows.filter((row) => !row.eligible), lanes: laneCoverage, starvedLanes, catalystBasis, reportedNotGatedAxes, feed: feedCause ? { stage: feedStage, cause: feedCause, fed: feed?.fed ?? null, coverage: feedCoverage } : null, branch: 'fundamental-and-event', rankMeaning: 'research-priority-only' }, diagnostics }
 }
 
 /**

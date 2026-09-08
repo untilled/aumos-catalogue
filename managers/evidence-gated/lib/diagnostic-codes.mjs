@@ -144,6 +144,27 @@ export const CAUSE_CODE_REGISTRY = Object.freeze([
   { code: 'catalyst_window_unresearched', operation: 'catalystRegister', module: 'catalysts.mjs', lane: 'input-path' },
   { code: 'event_record_unresearched', operation: 'catalystRegister', module: 'catalysts.mjs', lane: 'input-path' },
 
+  /**
+   * ── the axis's own missing producer, and its missing basis (#228) ─────
+   *
+   * ⚠️ **`catalyst_producer_absent` is the code for a third thing**, and it is
+   * `input-path` for the same reason its two neighbours are: a lane starved on
+   * the catalyst axis with no register in the run is a stage that lost an
+   * input, and the two above cannot say so because they are raised by the
+   * operation that was never called. It is what splits `never-fed` into
+   * *nobody produced the axis* and *the producer answered nothing*.
+   *
+   * ⚠️ **`cadence_basis_insufficient` is the honest half of the fix.** The
+   * derivation refuses to estimate under its floor rather than falling back on
+   * the ported-from harness's measured medians, and the branch is then blind on
+   * that axis exactly as before — so it withdraws the positive answer. ⛔ It
+   * does **not** grant one either: an estimate produced is not a catalyst
+   * researched, and `catalystRegister`'s coverage counts the two apart.
+   */
+  { code: 'catalyst_producer_absent', operation: 'radarFeedDiagnosis', module: 'fundamentals-feed.mjs', lane: 'input-path' },
+  { code: 'cadence_basis_insufficient', operation: 'catalystCadence', module: 'catalysts.mjs', lane: 'input-path' },
+  { code: 'cadence_basis_uncited', operation: 'catalystCadence', module: 'catalysts.mjs', lane: 'input-path' },
+
   /* ── the research lanes ──────────────────────────────────────────────── */
   { code: 'lane_not_queried', operation: 'laneCoverage', module: 'source-parsers.mjs', lane: 'input-path' },
   { code: 'lane_query_failed', operation: 'laneCoverage', module: 'source-parsers.mjs', lane: 'input-path' },

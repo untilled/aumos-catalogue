@@ -2894,7 +2894,7 @@ assert.equal(new Set(tabledOperations).size, tabledOperations.length, 'no operat
  * that a row which cannot fill all four is refused by name rather than
  * published half-wired.
  */
-assert.equal(Object.keys(OPERATIONS).length, 108, 'every operation the package answers has a definition row')
+assert.equal(Object.keys(OPERATIONS).length, 109, 'every operation the package answers has a definition row')
 assert.equal(PUBLISHED_OPERATIONS.length + INTERNAL_OPERATIONS.length, Object.keys(OPERATIONS).length, 'surface partitions the table; there is no third state')
 assert.deepEqual([...supportedOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'operation_unknown lists the published surface, projected from the definition')
 assert.deepEqual([...tabledOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'and the skill table is that same surface')
@@ -5094,6 +5094,146 @@ const emptyBook = execute({
 })
 assert.equal(emptyBook.data.cause, 'input-path-incomplete', "a book holding nothing while its catalyst axis was never fed is not «the methodology is working»")
 assert.deepEqual(emptyBook.data.inputPathCodes, ['catalyst_window_unresearched', 'event_record_unresearched'])
+
+/**
+ * ── The stage that fills the axis, and what it refuses to invent (#228) ───
+ *
+ * #169 built the register and left its input to a person: `evidenceIds` is
+ * required on every row, so a window could only be registered by hand, and the
+ * two lenses that do not need a price fall were starved run after run —
+ * `never-fed`, `inflection` 0 of 83, `post-event-continuation` 0 of 83.
+ * `catalystCadence` derives the next expected disclosure from the filings the
+ * branch already read, and these are the three properties that make that
+ * honest rather than convenient.
+ */
+covers('research/catalyst-axis-producer')
+const cadenceContract = JSON.parse(await readFile(new URL('cadence-contract.json', fixtureRoot), 'utf8'))
+const cadenceOf = (sleeve, asOf = cadenceContract.asOf) => execute({
+  operation: 'catalystCadence',
+  asOf,
+  input: { market: cadenceContract[sleeve].market, documents: cadenceContract[sleeve].documents, evidence: cadenceContract[sleeve].evidence, roster: cadenceContract[sleeve].roster },
+})
+
+/* ⑴ a cache with past filings yields estimated rows, and the lag is measured out of it. */
+const usCadence = cadenceOf('us')
+assert.equal(usCadence.data.cadence.basisFilings, 30, 'the median is reported with the count it was taken over')
+assert.equal(usCadence.data.cadence.medianLagDays, 30)
+assert.equal(usCadence.data.estimated.length, 5, 'five filers with a readable cadence, five derived windows')
+/**
+ * ⚠️ **And it is measured rather than asserted, which is the whole of the ⛔ in
+ * the issue.** The ported-from harness measured KR 45 / US 30 and those numbers
+ * must not survive the removal of the pairs they were measured over: halving
+ * every lag in the cache has to halve the answer.
+ */
+const halvedDocuments = Object.fromEntries(Object.entries(cadenceContract.us.documents).map(([symbol, rows]) => [symbol, rows.map((row) => ({
+  ...row,
+  publishedAt: new Date(Date.parse(row.normalized.period.end) + (Date.parse(row.publishedAt) - Date.parse(row.normalized.period.end)) / 2).toISOString().slice(0, 10),
+}))]))
+const halved = execute({ operation: 'catalystCadence', asOf: cadenceContract.asOf, input: { market: 'us', documents: halvedDocuments, evidence: cadenceContract.us.evidence, roster: cadenceContract.us.roster } })
+assert.equal(halved.data.cadence.medianLagDays, 15, 'a different cache answers a different median — no constant is in the path')
+
+/** ⚠️ Under the floor it refuses to estimate rather than falling back on the precedent. The existing catalyst fixture's cache holds four pairs. */
+covers('research/catalyst-axis-producer')
+const belowFloor = execute({ operation: 'catalystCadence', asOf: catalystAsOf, input: { market: 'us', documents: catalystContract.documents, evidence: { 'intc-2026Q2': ['ev-intc-q2'] }, roster: catalystContract.roster } })
+assert.equal(belowFloor.data.cadence, null)
+assert.deepEqual(belowFloor.data.estimated, [])
+assert.ok(belowFloor.diagnostics.some((row) => row.code === 'cadence_basis_insufficient'))
+assert.ok(belowFloor.diagnostics.find((row) => row.code === 'cadence_basis_insufficient').message.includes('45'), 'the refusal names the precedent it is declining to use as a fallback')
+
+/** ⛔ A basis nobody can go and check derives nothing, exactly as an uncited reading registers nothing. */
+covers('research/catalyst-axis-producer')
+const uncitedCadence = execute({ operation: 'catalystCadence', asOf: cadenceContract.asOf, input: { market: 'us', documents: cadenceContract.us.documents, roster: cadenceContract.us.roster } })
+assert.deepEqual(uncitedCadence.data.estimated, [])
+assert.equal(uncitedCadence.data.coverage.uncited, 30)
+assert.ok(uncitedCadence.diagnostics.some((row) => row.code === 'cadence_basis_uncited'))
+/**
+ * ⚠️ And what a derived row cites is the **past filings its cadence was
+ * measured over** — the thing checked moves from a document that does not exist
+ * yet to a basis that does, and the discipline does not move at all. Every id is
+ * one of that symbol's own cached filings; ⛔ never another filer's, which would
+ * make «go and check it» a sentence about somebody else's calendar.
+ */
+for (const row of usCadence.data.estimated) {
+  const own = cadenceContract.us.documents[row.symbol].flatMap((document) => cadenceContract.us.evidence[document.documentKey])
+  assert.ok(row.evidenceIds.length > 0 && row.evidenceIds.every((id) => own.includes(id)), `${row.symbol} cites only the cached filings its own cadence was read from`)
+}
+
+/**
+ * ⚠️ **A window outside the horizon is counted, never dropped.** At the fixture
+ * instant the KR sleeve's next regular report is 65 days out and the lane reads
+ * 60; a month later the same cache derives. Both are answers and neither is
+ * silence.
+ */
+covers('research/catalyst-axis-producer')
+const krEarly = cadenceOf('kr')
+assert.equal(krEarly.data.estimated.length, 0)
+assert.equal(krEarly.data.coverage.outsideHorizon, 5)
+assert.equal(krEarly.data.cadence.medianLagDays, 45, 'and the KR cadence was still measured — the sleeve is not blind, its next window is simply not near')
+const krLater = cadenceOf('kr', cadenceContract.asOfKrHorizon)
+assert.equal(krLater.data.estimated.length, 5)
+
+/**
+ * ⑵ An estimated row that does not say it is one is refused, and so is an
+ * estimate handed to the argument for readings. ⛔ Two directions of one
+ * defect, because the failure both produce is a projected date registered as a
+ * date somebody read.
+ */
+covers('research/catalyst-axis-producer')
+const derivedRow = usCadence.data.estimated[0]
+const { dateSource: _dateSource, ...unmarkedRow } = derivedRow
+for (const [name, input] of [
+  ['an estimate with no dateSource', { estimated: [unmarkedRow] }],
+  ['an estimate with no cadenceBasis', { estimated: [{ ...derivedRow, cadenceBasis: undefined }] }],
+  ['an estimate on the observed argument', { catalysts: [derivedRow] }],
+  ['an observed row claiming a cadence basis', { catalysts: [{ ...unmarkedRow }] }],
+]) {
+  const refused = execute({ operation: 'catalystRegister', asOf: cadenceContract.asOf, input: { market: 'us', roster: cadenceContract.us.roster, ...input } })
+  assert.equal(refused.status, 'blocked', `${name} is refused rather than registered`)
+  assert.ok(refused.diagnostics.some((row) => row.code === 'catalyst_estimate_unmarked' && row.severity === 'blocked'), name)
+  assert.equal(refused.data.nextState, null, 'and a refused calculation offers no replacement revision')
+}
+
+/* ⑶ registered, the derived window opens the lane — and it ranks below a confirmed one. */
+covers('research/catalyst-axis-producer')
+const derivedRegister = execute({ operation: 'catalystRegister', asOf: cadenceContract.asOf, input: { market: 'us', roster: cadenceContract.us.roster, estimated: usCadence.data.estimated } })
+assert.equal(derivedRegister.status !== 'blocked', true)
+assert.equal(derivedRegister.data.coverage.researched, 0, '⛔ a derived window does not make a name researched — the unresearched finding survives the fix that fed the lane')
+assert.equal(derivedRegister.data.coverage.derived, 5)
+assert.ok(derivedRegister.diagnostics.some((row) => row.code === 'catalyst_window_unresearched'))
+assert.equal(Object.values(derivedRegister.data.catalysts)[0][0].dateSource, 'estimated_from_filing_cadence', 'the map hands the basis through to the radar')
+
+/** ⛔ And it produces no event record: a cadence says when a filer will speak, never what it said. */
+covers('research/catalyst-axis-producer')
+assert.equal(usCadence.data.eventsProduced, false)
+assert.deepEqual(derivedRegister.data.events, {}, 'nothing derived reaches the event map, so no `actual` is ever fabricated from a schedule')
+assert.deepEqual(Object.keys(usCadence.data), ['market', 'estimated', 'cadence', 'coverage', 'horizonDays', 'eventsProduced', 'eventProductionReason', 'asOf'], '⛔ the answer has no events key at all — the absence is structural, not a filter')
+
+/**
+ * ⚠️ The lane opens on a derived window and says which kind it opened on, and
+ * the ranking puts the read date first. Two candidates, identical but for how
+ * their catalyst date was arrived at.
+ */
+covers('research/catalyst-axis-producer')
+const twin = (asset, dateSource) => ({
+  asset,
+  market: 'us',
+  filings: [
+    { periodEnd: '2026-03-28', availableAt: '2026-04-24T00:00:00Z', operatingIncomeYoy: -50, marginDeltaYoy: 1 },
+    { periodEnd: '2026-06-27', availableAt: '2026-07-24T00:00:00Z', operatingIncomeYoy: 156.55, marginDeltaYoy: 1 },
+  ],
+  price: { status: 'confirmed', close: 30, ma50: 28, ma200: 25, offHigh200: -0.1 },
+  catalysts: [{ event: 'x', windowStart: '2026-09-10T00:00:00Z', windowEnd: '2026-09-30T00:00:00Z', dateSource }],
+})
+const ranking = execute({ operation: 'upsideRadar', asOf: '2026-09-08T00:00:00.000Z', input: { candidates: [twin('ZZZ_ESTIMATED', 'estimated_from_filing_cadence'), twin('AAA_CONFIRMED', 'observed')] } })
+assert.equal(ranking.data.ranked[0].asset, 'AAA_CONFIRMED', 'a confirmed catalyst ranks stronger than an estimated one')
+assert.equal(ranking.data.ranked[1].asset, 'ZZZ_ESTIMATED')
+assert.equal(ranking.data.ranked[0].lanes.inflection.reason, 'sign-flip-with-a-registered-catalyst')
+assert.equal(ranking.data.ranked[1].lanes.inflection.reason, 'sign-flip-with-an-estimated-catalyst-window', 'the estimated one is included — the lane is fed — and the sentence says on what')
+assert.equal(ranking.data.ranked[1].lanes.inflection.included, true)
+assert.deepEqual(ranking.data.catalystBasis, { confirmed: 1, estimated: 1, absent: 0 })
+/** ⛔ And it is the rank that moved, not the alphabet: the estimated name sorts first by asset and still ranks second. */
+assert.ok(String('AAA_CONFIRMED') < String('ZZZ_ESTIMATED'))
+assert.equal(execute({ operation: 'upsideRadar', asOf: '2026-09-08T00:00:00.000Z', input: { candidates: [twin('AAA_ESTIMATED', 'estimated_from_filing_cadence'), twin('ZZZ_CONFIRMED', 'observed')] } }).data.ranked[0].asset, 'ZZZ_CONFIRMED')
 
 /**
  * ⛔ A window nobody can go and check is not a registered catalyst. Every

@@ -71,7 +71,7 @@ import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backt
 import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, migrationMap, exitCheck } from './methodology.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { fundamentalsPlan, mapCorporationCodes, dartVendorStatus, radarCandidates, radarFeedDiagnosis } from './fundamentals-feed.mjs'
-import { catalystRegister } from './catalysts.mjs'
+import { catalystRegister, catalystCadence, CATALYST_DATE_ESTIMATED } from './catalysts.mjs'
 import { thesisValuation, thesisGapSources } from './valuation.mjs'
 import { harnessAudit, lessonAudit } from './audit.mjs'
 import { lensEnvelope, clusterBlock, timeStopPolicy, exitDiscipline, ruleVersions, policyLint } from './envelopes.mjs'
@@ -997,22 +997,37 @@ export const OPERATIONS = {
     group: 'feeding',
     surface: 'published',
     canonical: researchMarket('market'),
-    mode: 'strict', keys: { market: STRING, symbols: ARRAY, plan: OBJECT, mapping: OBJECT, responses: ARRAY, candidates: OBJECT, lanes: OBJECT },
+    mode: 'strict', keys: { market: STRING, symbols: ARRAY, plan: OBJECT, mapping: OBJECT, responses: ARRAY, candidates: OBJECT, catalysts: OBJECT, lanes: OBJECT },
     nested: {
       plan: 'The whole fundamentalsPlan data object; its requests carry the cache states this reads.',
       mapping: 'The whole mapCorporationCodes data object. ⚠️ null means the join was never attempted, which is a different finding from a join that returned nothing.',
       'responses[]': { step: STRING, symbol: STRING, feedFailure: STRING, classification: STRING, usable: BOOLEAN },
       candidates: 'The whole radarCandidates data object — the `candidates` rows included, not only `fedCount`. ⚠️ They are the denominator: without them coverage falls back to the roster, and one fed name out of eighty-three reported as `fed` is what #178 measured. ⛔ A reading that can count neither answers `candidateCount: null` rather than assuming it was whole.',
+      catalysts: 'The whole `catalystRegister` data object. ⚠️ Two of the three lanes read the catalyst axis, and this is what splits `never-fed` into **`never-fed-no-catalyst-producer`** (nobody produced it) and **`never-fed-catalyst-producer-empty`** (it ran and registered nothing) — two facts with opposite fixes that were one word until #228. ⛔ Absent, the reading says `producer: "absent"` and raises `catalyst_producer_absent` rather than assuming either.',
       lanes: 'upsideRadar.data.lanes, so the reading can say fed-and-empty rather than starved.',
     },
-    describe: 'which stage lost the input — registry, mapping, request, response, normalization — so a starved lane names its cause instead of repeating *unfed*',
+    describe: 'which stage lost the input — registry, mapping, request, response, normalization — so a starved lane names its cause instead of repeating *unfed*; and, given the register, whether a starved catalyst lane had **no producer** or a producer that **answered nothing**',
     run: (input, asOf) => radarFeedDiagnosis({ ...input, asOf }),
+  },
+  catalystCadence: {
+    group: 'feeding',
+    surface: 'published',
+    canonical: researchMarket('market'),
+    mode: 'strict', keys: { market: STRING, documents: OBJECT, evidence: OBJECT, roster: ARRAY, horizonDays: NUMBER },
+    nested: {
+      'documents.<symbol>': 'The same CachedDocument array `radarCandidates` is given — { publishedAt, version, normalized: { period, currency, metrics } }. ⚠️ One map, passed to both, so the two operations cannot disagree about what this branch read.',
+      evidence: 'documentKey → the Aumos evidence id(s) that document was filed under. ⚠️ **The CachedDocument shape this package has measured carries none**, so the join comes from `evidence_search` and arrives here; `HOST-FOLLOWUPS.md` records the debt. ⛔ A document with no id derives no window — the discipline that refuses an uncited catalyst is not relaxed for a derived one, it is repointed at the basis.',
+      roster: 'The same `symbols` argument `radarCandidates` and `catalystRegister` are given; the coverage denominator.',
+      horizonDays: 'How far ahead a derived window may open and still be worth registering. Defaults to the 60 days `upsideRadar` reads, and a window past it is counted rather than returned.',
+    },
+    describe: `the cadence stage the axis never had (#228): cached filings in, **estimated** disclosure windows out. The period-end→published lag is **measured from this book's own cache at run time** and reported with its count — ⛔ the ported-from harness's KR 45 / US 30 are the precedent for the method and are never a fallback; under the floor it refuses to estimate. Every row carries \`dateSource: "${CATALYST_DATE_ESTIMATED}"\` and the past filings' evidence ids. ⛔ It derives **no** event record: a cadence says when a filer will probably speak, never what it said`,
+    run: (input, asOf) => catalystCadence({ ...input, asOf }),
   },
   catalystRegister: {
     group: 'feeding',
     surface: 'published',
     canonical: researchMarket('market'),
-    mode: 'strict', keys: { market: STRING, previous: OBJECT, catalysts: ARRAY, events: ARRAY, roster: ARRAY },
+    mode: 'strict', keys: { market: STRING, previous: OBJECT, catalysts: ARRAY, estimated: ARRAY, events: ARRAY, roster: ARRAY },
     /**
      * ⚠️ Both row shapes are published because both were **absent inputs**, not
      * wrong ones (#169): a caller that has never sent a catalyst has no wrong
@@ -1021,6 +1036,7 @@ export const OPERATIONS = {
      */
     nested: {
       'catalysts[]': { symbol: STRING, market: STRING, event: STRING, windowStart: STRING, windowEnd: STRING, observedAt: STRING, evidenceIds: ARRAY },
+      'estimated[]': `The \`estimated\` rows \`catalystCadence\` answered, verbatim — the same window shape plus \`dateSource: "${CATALYST_DATE_ESTIMATED}"\` and the \`cadenceBasis\` it was derived from. ⛔ **A separate argument on purpose**: an estimate and a reading are different claims, and an estimate arriving on \`catalysts\` — or on this one without saying it is an estimate — is \`catalyst_estimate_unmarked\` and blocked. Neither array's discipline is weakened; what an estimated row cites is the past filings its cadence was measured over.`,
       'events[]': { symbol: STRING, market: STRING, announcedAt: STRING, sue: NUMBER, day1ExcessPct: NUMBER, preAnnouncementClose: NUMBER, guidanceSurprise: NUMBER, evidenceIds: ARRAY },
       evidenceIds: 'Required on every row of both arrays, and this is the whole discipline of the operation: a catalyst window nobody can go and check is not a registered catalyst, it is a claim. File the reading with `observation_file` and put the returned id here — the same route `consensusRefs` takes.',
       previous: 'The whole value read from `state/research/catalyst-window.json` — { schemaVersion: 1, updatedAsOf, rows[] }. ⚠️ Its rows carry `windowStartEpochMs` / `windowEndEpochMs` as **numbers**: a catalyst window ends after `asOf` by construction, and `memory_read` refused a payload carrying a later **string** timestamp. That guard does not reach a file (`untilled/aumos#743`), and the encoding stays anyway as this package\'s own canon — every reader here expects it. Persist `nextState` verbatim; do not rewrite the instants as RFC 3339.',

@@ -1313,7 +1313,17 @@ assert.ok(feedHas(bare, 'radar_starvation_cause_unreported'))
 const neverFed = feedRun('radarFeedDiagnosis', { market: 'kr', symbols: thirteen.map((row) => row.asset), plan: { requests: [] }, lanes: bare.data.lanes })
 assert.equal(neverFed.data.stage, 'registry')
 assert.equal(neverFed.data.cause, 'registry-never-requested')
-assert.equal(neverFed.data.verdict, 'never-fed')
+/**
+ * ⚠️ **`never-fed` split in #228 and this run is on the near side of the
+ * split.** `post-event-continuation` starved on `no-event-in-the-last-30-days`
+ * and no register was passed, so the reading now says *which* never-fed this
+ * is: nobody produced the catalyst axis. ⛔ The stage and the cause did not
+ * move — they are about the filing path, which really did lose its input at the
+ * registry, and the two facts stay two.
+ */
+assert.equal(neverFed.data.verdict, 'never-fed-no-catalyst-producer')
+assert.equal(neverFed.data.catalystAxis.producer, 'absent')
+assert.ok(feedHas(neverFed, 'catalyst_producer_absent'))
 assert.ok(feedHas(neverFed, 'radar_feed_broken'))
 const named = execute({ operation: 'upsideRadar', asOf: feedAsOf, input: { candidates: thirteen, feed: neverFed.data } })
 assert.equal(named.data.lanes.inflection.feedCause, 'registry-never-requested')
@@ -1346,12 +1356,37 @@ assert.notEqual(
  * things. The verdict says which, on the same object.
  */
 const freshPlan = feedRun('fundamentalsPlan', { ...planInput, cache: cacheFor({ state: 'fresh', documents: [{}] }, { state: 'fresh', documents: [{}] }) })
-const fedButEmpty = feedRun('radarFeedDiagnosis', { market: 'kr', symbols: ['005930'], plan: freshPlan.data, mapping: joined, candidates: { fedCount: 1, comparableCount: 1 }, lanes: bare.data.lanes })
+const emptyDiagnosis = (catalystsIn) => feedRun('radarFeedDiagnosis', { market: 'kr', symbols: ['005930'], plan: freshPlan.data, mapping: joined, candidates: { fedCount: 1, comparableCount: 1 }, lanes: bare.data.lanes, ...(catalystsIn === undefined ? {} : { catalysts: catalystsIn }) })
+/**
+ * ── #228: and `fed-and-genuinely-empty` was itself a mixture ───────────────
+ *
+ * These lanes starve on `no-event-in-the-last-30-days`, which is the catalyst
+ * axis and not the filing path — so the run that said *the branch was fed and
+ * the market is empty* was describing an axis nothing had ever produced. The
+ * three answers are asserted against each other here, because the middle one
+ * only exists once the axis has a producer at all.
+ */
+const noProducer = emptyDiagnosis(undefined)
+assert.equal(noProducer.data.fed, true, 'the filing path really was fed; the catalyst axis is the one that was not')
+assert.equal(noProducer.data.verdict, 'never-fed-no-catalyst-producer')
+assert.ok(feedHas(noProducer, 'catalyst_producer_absent'))
+
+const registerCoverage = (row) => ({ coverage: { rosterCount: 1, researched: 0, derived: 0, eventsResearched: 0, withCatalystInHorizon: 0, ...row } })
+const producerEmpty = emptyDiagnosis(registerCoverage({}))
+assert.equal(producerEmpty.data.verdict, 'never-fed-catalyst-producer-empty', 'a register that ran and registered nothing is a different fact from no register at all')
+assert.equal(producerEmpty.data.catalystAxis.producer, 'ran')
+assert.equal(feedHas(producerEmpty, 'catalyst_producer_absent'), false, '⛔ and the producer is not reported absent when it answered')
+assert.notEqual(producerEmpty.data.verdict, noProducer.data.verdict, 'two words, because they have two fixes')
+
+/** ⚠️ A register that did register windows leaves the verdict alone: the axis was fed and the emptiness is then an answer about the horizon. */
+const fedButEmpty = emptyDiagnosis(registerCoverage({ researched: 1, withCatalystInHorizon: 1 }))
 assert.equal(fedButEmpty.data.fed, true)
 assert.equal(fedButEmpty.data.verdict, 'fed-and-genuinely-empty')
 assert.ok(feedHas(fedButEmpty, 'radar_lane_empty_not_starved'))
 assert.equal(feedHas(fedButEmpty, 'radar_feed_broken'), false)
 assert.notEqual(fedButEmpty.data.verdict, neverFed.data.verdict)
+/** ⚠️ And a derived window counts as produced too — the split is about the producer, not about how the window was arrived at, which `catalystAxis` reports separately. */
+assert.equal(emptyDiagnosis(registerCoverage({ derived: 1, withCatalystInHorizon: 1 })).data.verdict, 'fed-and-genuinely-empty')
 
 /**
  * ── #178: one fed name out of eighty-three is not «fed» ─────────────────────
@@ -1367,7 +1402,15 @@ assert.notEqual(fedButEmpty.data.verdict, neverFed.data.verdict)
 const eightyThree = Array.from({ length: 83 }, (_, index) => ({ asset: `US${index}`, market: 'us', filings: [] }))
 eightyThree[0].filings = [{ periodEnd: '2026-06-30', operatingIncomeYoy: 0.2 }]
 const partialLanes = execute({ operation: 'upsideRadar', asOf: feedAsOf, input: { candidates: eightyThree.map((row) => ({ symbol: row.asset })) } }).data.lanes
+/**
+ * ⚠️ **The register is passed on purpose, and #228 is why.** These lanes starve
+ * on `no-event-in-the-last-30-days` too, so without a catalyst reading every
+ * verdict below would be the catalyst axis's `never-fed-no-catalyst-producer`
+ * rather than the filing-path answer this block is about. Handing it a register
+ * that registered a window keeps the subject where #178 put it.
+ */
 const feedOf = (rows, lanesIn = partialLanes) => feedRun('radarFeedDiagnosis', {
+  catalysts: { coverage: { rosterCount: 83, researched: 83, derived: 0, eventsResearched: 83, withCatalystInHorizon: 83 } },
   market: 'us',
   symbols: eightyThree.map((row) => row.asset),
   plan: { requests: [{ step: 'ticker-registry' }, { step: 'facts', cacheState: 'fresh' }] },

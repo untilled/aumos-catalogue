@@ -642,7 +642,29 @@ export function radarCandidates({ market, symbols = [], financials = {}, facts =
  */
 const FEED_STAGES = ['registry', 'mapping', 'request', 'response', 'normalization', 'partially-fed', 'fed']
 
-export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping = null, responses = [], candidates = null, lanes = null, asOf } = {}) {
+/**
+ * ── `never-fed` was one word for two facts (issue #228, ask 5) ─────────────
+ *
+ * Two of the three lanes read the catalyst axis, and until #228 nothing in this
+ * package produced it automatically — so a branch whose filings arrived whole
+ * and whose catalyst axis had never been touched came back **`never-fed`**, or
+ * worse `fed-and-genuinely-empty`, with one cause about the filing path and
+ * nothing at all about the axis that was actually missing. *«No catalyst
+ * producer ran»* and *«the producer ran and registered nothing»* have opposite
+ * fixes — call `catalystCadence`/`catalystRegister`, versus go and find out why
+ * a sleeve with a cache full of filings derived no window — and they were the
+ * same word.
+ *
+ * ⚠️ They are two verdicts now, and the split reads the register's own answer
+ * rather than inferring one: `catalysts === null` is *nobody produced*, a
+ * register whose coverage counts no researched and no derived name is *produced
+ * and empty*. ⛔ A register that did register windows leaves the verdict alone —
+ * the axis was fed and the lane's emptiness is then a real answer about the
+ * horizon.
+ */
+const CATALYST_LANE_REASONS = /no-catalyst-registered|no-event-in-the-last-30-days/
+
+export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping = null, responses = [], candidates = null, catalysts = null, lanes = null, asOf } = {}) {
   const diagnostics = []
   if (market !== 'kr' && market !== 'us') {
     return { data: null, diagnostics: [diagnostic('feed_market_invalid', 'blocked', 'Expected kr or us — the sleeve, the same argument researchUniverse takes. ⚠️ The MIC (XKRX/XNAS/XNYS) is read too and converted at the one input boundary (#212 ⑥), so a value refused here is neither spelling', 'market', { received: market ?? null })] }
@@ -764,7 +786,30 @@ export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping 
    */
   const partial = stage === 'partially-fed'
   const coverage = candidateCount === null || !finite(candidates?.fedCount) ? null : { fed: candidates.fedCount, of: candidateCount, unfed: candidateCount - candidates.fedCount }
-  const verdict = !laneRows.length ? 'unevaluated' : partial ? 'partially-fed' : fed && !starvedLanes.length ? 'fed-and-evaluated' : fed ? 'fed-and-genuinely-empty' : 'never-fed'
+  let verdict = !laneRows.length ? 'unevaluated' : partial ? 'partially-fed' : fed && !starvedLanes.length ? 'fed-and-evaluated' : fed ? 'fed-and-genuinely-empty' : 'never-fed'
+
+  /* ── the catalyst axis, told from the filing path (#228) ─────────────── */
+  const catalystStarved = laneRows.some(([, row]) => row?.starved && Object.keys(row?.reasons ?? {}).some((reason) => CATALYST_LANE_REASONS.test(reason)))
+  const registerCoverage = catalysts?.coverage ?? null
+  const catalystProducerRan = catalysts !== null && catalysts !== undefined && registerCoverage !== null
+  const registeredNames = catalystProducerRan ? (registerCoverage.researched ?? 0) + (registerCoverage.derived ?? 0) + (registerCoverage.eventsResearched ?? 0) : null
+  const catalystAxis = {
+    producer: catalystProducerRan ? 'ran' : 'absent',
+    starvedLanesReadIt: catalystStarved,
+    researched: registerCoverage?.researched ?? null,
+    derived: registerCoverage?.derived ?? null,
+    eventsResearched: registerCoverage?.eventsResearched ?? null,
+    withCatalystInHorizon: registerCoverage?.withCatalystInHorizon ?? null,
+  }
+  /** ⚠️ Only these two verdicts are overridden. `partially-fed` is a count on the filing path and `fed-and-evaluated` is a lane that answered; neither is a sentence about the catalyst axis. */
+  if (catalystStarved && (verdict === 'never-fed' || verdict === 'fed-and-genuinely-empty')) {
+    if (!catalystProducerRan) {
+      verdict = 'never-fed-no-catalyst-producer'
+      diagnostics.push(diagnostic('catalyst_producer_absent', 'unevaluated', 'Lanes that read the catalyst and event axis are starved and no catalystRegister answer was supplied, so this branch cannot tell «nobody produced the axis» from «the axis was produced and holds nothing» — run catalystCadence and catalystRegister, and pass the register\'s answer here as catalysts', 'catalysts', { market, starvedLanes }))
+    } else if (!registeredNames) {
+      verdict = 'never-fed-catalyst-producer-empty'
+    }
+  }
   if (!fed) {
     diagnostics.push(diagnostic(
       'radar_feed_broken',
@@ -802,6 +847,8 @@ export function radarFeedDiagnosis({ market, symbols = [], plan = null, mapping 
       candidateCount,
       coverage,
       comparableCount: candidates?.comparableCount ?? null,
+      /** ⚠️ Reported whether or not it changed the verdict: «the producer ran and registered 40 windows» is the fact that keeps a later reading from re-deriving it from the verdict alone. */
+      catalystAxis,
       starvedLanes,
       asOf: asOf ?? null,
     },

@@ -56,9 +56,19 @@ const head = (market) =>
  * `catalystRegister → radarCandidates` is one fact, so it is written once.
  */
 const tail = [
+  /**
+   * ⚠️ **The stage that fills the axis, and it is a step for the reason #146
+   * is** (#228). `catalystRegister` was built with no automatic producer for
+   * its input, so «research the window for every roster name» was a sentence in
+   * a checklist and the axis stayed empty run after run. A derivation that is
+   * not a numbered step of the flow is the same defect one level down.
+   */
+  { calls: ['catalystCadence'], kind: 'operation' },
   {
     calls: ['catalystRegister'],
     kind: 'operation',
+    /** ⛔ `estimated`, never `catalysts`: the two arrive on different arguments because they are different claims. */
+    feeds: [feed('catalystCadence', 'estimated')],
     /** The bounded revision this step's `nextState` is carried in. */
     carriedIn: 'research/catalyst-window',
   },
@@ -67,7 +77,7 @@ const tail = [
     kind: 'operation',
     feeds: [feed('catalystRegister', 'catalysts'), feed('catalystRegister', 'events')],
   },
-  { calls: ['radarFeedDiagnosis'], kind: 'operation', feeds: [feed('radarCandidates', 'candidates')] },
+  { calls: ['radarFeedDiagnosis'], kind: 'operation', feeds: [feed('radarCandidates', 'candidates'), feed('catalystRegister', '*', 'catalysts')] },
   {
     calls: ['upsideRadar'],
     kind: 'operation',

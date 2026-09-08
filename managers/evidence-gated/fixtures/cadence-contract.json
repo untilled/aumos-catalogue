@@ -1,0 +1,1255 @@
+{
+  "spec": "EvidenceGatedCadenceContract/1",
+  "note": "⛔ No live key and no network, so these are constructed period-end→published pairs on the KR and US regular reporting calendars — they are not observations of this book's cache, and the PR that added them says so. What the fixture measures is the property that matters: the median lag and its count come out of the pairs supplied, so changing the pairs changes the answer and no constant survives their removal. ⚠️ The `belowFloor` case is the existing `catalyst-contract.json` cache, which holds four pairs — under MIN_BASIS_FILINGS, where the operation refuses to estimate rather than falling back on the ported-from harness's KR 45 / US 30.",
+  "asOf": "2026-09-08T00:00:00.000Z",
+  "asOfKrHorizon": "2026-10-10T00:00:00.000Z",
+  "kr": {
+    "market": "kr",
+    "roster": [
+      "000660",
+      "005930",
+      "006400",
+      "035420",
+      "051910"
+    ],
+    "documents": {
+      "005930": [
+        {
+          "documentKey": "005930-2025-03-31",
+          "version": 1,
+          "publishedAt": "2025-05-15",
+          "normalized": {
+            "period": {
+              "start": "2025-01-01",
+              "end": "2025-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1000,
+              "revenue": 10000
+            }
+          }
+        },
+        {
+          "documentKey": "005930-2025-06-30",
+          "version": 1,
+          "publishedAt": "2025-08-13",
+          "normalized": {
+            "period": {
+              "start": "2025-04-02",
+              "end": "2025-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1010,
+              "revenue": 10100
+            }
+          }
+        },
+        {
+          "documentKey": "005930-2025-09-30",
+          "version": 1,
+          "publishedAt": "2025-11-15",
+          "normalized": {
+            "period": {
+              "start": "2025-07-03",
+              "end": "2025-09-30",
+              "fiscalPeriod": "Q3"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1020,
+              "revenue": 10200
+            }
+          }
+        },
+        {
+          "documentKey": "005930-2025-12-31",
+          "version": 1,
+          "publishedAt": "2026-02-14",
+          "normalized": {
+            "period": {
+              "start": "2025-10-03",
+              "end": "2025-12-31",
+              "fiscalPeriod": "Q4"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1030,
+              "revenue": 10300
+            }
+          }
+        },
+        {
+          "documentKey": "005930-2026-03-31",
+          "version": 1,
+          "publishedAt": "2026-05-17",
+          "normalized": {
+            "period": {
+              "start": "2026-01-01",
+              "end": "2026-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1040,
+              "revenue": 10400
+            }
+          }
+        },
+        {
+          "documentKey": "005930-2026-06-30",
+          "version": 1,
+          "publishedAt": "2026-08-14",
+          "normalized": {
+            "period": {
+              "start": "2026-04-02",
+              "end": "2026-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1050,
+              "revenue": 10500
+            }
+          }
+        }
+      ],
+      "000660": [
+        {
+          "documentKey": "000660-2025-03-31",
+          "version": 1,
+          "publishedAt": "2025-05-14",
+          "normalized": {
+            "period": {
+              "start": "2025-01-01",
+              "end": "2025-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1001,
+              "revenue": 10000
+            }
+          }
+        },
+        {
+          "documentKey": "000660-2025-06-30",
+          "version": 1,
+          "publishedAt": "2025-08-14",
+          "normalized": {
+            "period": {
+              "start": "2025-04-02",
+              "end": "2025-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1011,
+              "revenue": 10100
+            }
+          }
+        },
+        {
+          "documentKey": "000660-2025-09-30",
+          "version": 1,
+          "publishedAt": "2025-11-15",
+          "normalized": {
+            "period": {
+              "start": "2025-07-03",
+              "end": "2025-09-30",
+              "fiscalPeriod": "Q3"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1021,
+              "revenue": 10200
+            }
+          }
+        },
+        {
+          "documentKey": "000660-2025-12-31",
+          "version": 1,
+          "publishedAt": "2026-02-14",
+          "normalized": {
+            "period": {
+              "start": "2025-10-03",
+              "end": "2025-12-31",
+              "fiscalPeriod": "Q4"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1031,
+              "revenue": 10300
+            }
+          }
+        },
+        {
+          "documentKey": "000660-2026-03-31",
+          "version": 1,
+          "publishedAt": "2026-05-18",
+          "normalized": {
+            "period": {
+              "start": "2026-01-01",
+              "end": "2026-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1041,
+              "revenue": 10400
+            }
+          }
+        },
+        {
+          "documentKey": "000660-2026-06-30",
+          "version": 1,
+          "publishedAt": "2026-08-14",
+          "normalized": {
+            "period": {
+              "start": "2026-04-02",
+              "end": "2026-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1051,
+              "revenue": 10500
+            }
+          }
+        }
+      ],
+      "035420": [
+        {
+          "documentKey": "035420-2025-03-31",
+          "version": 1,
+          "publishedAt": "2025-05-15",
+          "normalized": {
+            "period": {
+              "start": "2025-01-01",
+              "end": "2025-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1002,
+              "revenue": 10000
+            }
+          }
+        },
+        {
+          "documentKey": "035420-2025-06-30",
+          "version": 1,
+          "publishedAt": "2025-08-13",
+          "normalized": {
+            "period": {
+              "start": "2025-04-02",
+              "end": "2025-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1012,
+              "revenue": 10100
+            }
+          }
+        },
+        {
+          "documentKey": "035420-2025-09-30",
+          "version": 1,
+          "publishedAt": "2025-11-15",
+          "normalized": {
+            "period": {
+              "start": "2025-07-03",
+              "end": "2025-09-30",
+              "fiscalPeriod": "Q3"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1022,
+              "revenue": 10200
+            }
+          }
+        },
+        {
+          "documentKey": "035420-2025-12-31",
+          "version": 1,
+          "publishedAt": "2026-02-14",
+          "normalized": {
+            "period": {
+              "start": "2025-10-03",
+              "end": "2025-12-31",
+              "fiscalPeriod": "Q4"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1032,
+              "revenue": 10300
+            }
+          }
+        },
+        {
+          "documentKey": "035420-2026-03-31",
+          "version": 1,
+          "publishedAt": "2026-05-17",
+          "normalized": {
+            "period": {
+              "start": "2026-01-01",
+              "end": "2026-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1042,
+              "revenue": 10400
+            }
+          }
+        },
+        {
+          "documentKey": "035420-2026-06-30",
+          "version": 1,
+          "publishedAt": "2026-08-14",
+          "normalized": {
+            "period": {
+              "start": "2026-04-02",
+              "end": "2026-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1052,
+              "revenue": 10500
+            }
+          }
+        }
+      ],
+      "051910": [
+        {
+          "documentKey": "051910-2025-03-31",
+          "version": 1,
+          "publishedAt": "2025-05-14",
+          "normalized": {
+            "period": {
+              "start": "2025-01-01",
+              "end": "2025-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1003,
+              "revenue": 10000
+            }
+          }
+        },
+        {
+          "documentKey": "051910-2025-06-30",
+          "version": 1,
+          "publishedAt": "2025-08-14",
+          "normalized": {
+            "period": {
+              "start": "2025-04-02",
+              "end": "2025-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1013,
+              "revenue": 10100
+            }
+          }
+        },
+        {
+          "documentKey": "051910-2025-09-30",
+          "version": 1,
+          "publishedAt": "2025-11-15",
+          "normalized": {
+            "period": {
+              "start": "2025-07-03",
+              "end": "2025-09-30",
+              "fiscalPeriod": "Q3"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1023,
+              "revenue": 10200
+            }
+          }
+        },
+        {
+          "documentKey": "051910-2025-12-31",
+          "version": 1,
+          "publishedAt": "2026-02-14",
+          "normalized": {
+            "period": {
+              "start": "2025-10-03",
+              "end": "2025-12-31",
+              "fiscalPeriod": "Q4"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1033,
+              "revenue": 10300
+            }
+          }
+        },
+        {
+          "documentKey": "051910-2026-03-31",
+          "version": 1,
+          "publishedAt": "2026-05-18",
+          "normalized": {
+            "period": {
+              "start": "2026-01-01",
+              "end": "2026-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1043,
+              "revenue": 10400
+            }
+          }
+        },
+        {
+          "documentKey": "051910-2026-06-30",
+          "version": 1,
+          "publishedAt": "2026-08-14",
+          "normalized": {
+            "period": {
+              "start": "2026-04-02",
+              "end": "2026-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1053,
+              "revenue": 10500
+            }
+          }
+        }
+      ],
+      "006400": [
+        {
+          "documentKey": "006400-2025-03-31",
+          "version": 1,
+          "publishedAt": "2025-05-15",
+          "normalized": {
+            "period": {
+              "start": "2025-01-01",
+              "end": "2025-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1004,
+              "revenue": 10000
+            }
+          }
+        },
+        {
+          "documentKey": "006400-2025-06-30",
+          "version": 1,
+          "publishedAt": "2025-08-13",
+          "normalized": {
+            "period": {
+              "start": "2025-04-02",
+              "end": "2025-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1014,
+              "revenue": 10100
+            }
+          }
+        },
+        {
+          "documentKey": "006400-2025-09-30",
+          "version": 1,
+          "publishedAt": "2025-11-15",
+          "normalized": {
+            "period": {
+              "start": "2025-07-03",
+              "end": "2025-09-30",
+              "fiscalPeriod": "Q3"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1024,
+              "revenue": 10200
+            }
+          }
+        },
+        {
+          "documentKey": "006400-2025-12-31",
+          "version": 1,
+          "publishedAt": "2026-02-14",
+          "normalized": {
+            "period": {
+              "start": "2025-10-03",
+              "end": "2025-12-31",
+              "fiscalPeriod": "Q4"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1034,
+              "revenue": 10300
+            }
+          }
+        },
+        {
+          "documentKey": "006400-2026-03-31",
+          "version": 1,
+          "publishedAt": "2026-05-17",
+          "normalized": {
+            "period": {
+              "start": "2026-01-01",
+              "end": "2026-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1044,
+              "revenue": 10400
+            }
+          }
+        },
+        {
+          "documentKey": "006400-2026-06-30",
+          "version": 1,
+          "publishedAt": "2026-08-14",
+          "normalized": {
+            "period": {
+              "start": "2026-04-02",
+              "end": "2026-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "KRW",
+            "metrics": {
+              "operatingIncome": 1054,
+              "revenue": 10500
+            }
+          }
+        }
+      ]
+    },
+    "evidence": {
+      "005930-2025-03-31": [
+        "ev-kr-005930-2025-03-31"
+      ],
+      "005930-2025-06-30": [
+        "ev-kr-005930-2025-06-30"
+      ],
+      "005930-2025-09-30": [
+        "ev-kr-005930-2025-09-30"
+      ],
+      "005930-2025-12-31": [
+        "ev-kr-005930-2025-12-31"
+      ],
+      "005930-2026-03-31": [
+        "ev-kr-005930-2026-03-31"
+      ],
+      "005930-2026-06-30": [
+        "ev-kr-005930-2026-06-30"
+      ],
+      "000660-2025-03-31": [
+        "ev-kr-000660-2025-03-31"
+      ],
+      "000660-2025-06-30": [
+        "ev-kr-000660-2025-06-30"
+      ],
+      "000660-2025-09-30": [
+        "ev-kr-000660-2025-09-30"
+      ],
+      "000660-2025-12-31": [
+        "ev-kr-000660-2025-12-31"
+      ],
+      "000660-2026-03-31": [
+        "ev-kr-000660-2026-03-31"
+      ],
+      "000660-2026-06-30": [
+        "ev-kr-000660-2026-06-30"
+      ],
+      "035420-2025-03-31": [
+        "ev-kr-035420-2025-03-31"
+      ],
+      "035420-2025-06-30": [
+        "ev-kr-035420-2025-06-30"
+      ],
+      "035420-2025-09-30": [
+        "ev-kr-035420-2025-09-30"
+      ],
+      "035420-2025-12-31": [
+        "ev-kr-035420-2025-12-31"
+      ],
+      "035420-2026-03-31": [
+        "ev-kr-035420-2026-03-31"
+      ],
+      "035420-2026-06-30": [
+        "ev-kr-035420-2026-06-30"
+      ],
+      "051910-2025-03-31": [
+        "ev-kr-051910-2025-03-31"
+      ],
+      "051910-2025-06-30": [
+        "ev-kr-051910-2025-06-30"
+      ],
+      "051910-2025-09-30": [
+        "ev-kr-051910-2025-09-30"
+      ],
+      "051910-2025-12-31": [
+        "ev-kr-051910-2025-12-31"
+      ],
+      "051910-2026-03-31": [
+        "ev-kr-051910-2026-03-31"
+      ],
+      "051910-2026-06-30": [
+        "ev-kr-051910-2026-06-30"
+      ],
+      "006400-2025-03-31": [
+        "ev-kr-006400-2025-03-31"
+      ],
+      "006400-2025-06-30": [
+        "ev-kr-006400-2025-06-30"
+      ],
+      "006400-2025-09-30": [
+        "ev-kr-006400-2025-09-30"
+      ],
+      "006400-2025-12-31": [
+        "ev-kr-006400-2025-12-31"
+      ],
+      "006400-2026-03-31": [
+        "ev-kr-006400-2026-03-31"
+      ],
+      "006400-2026-06-30": [
+        "ev-kr-006400-2026-06-30"
+      ]
+    }
+  },
+  "us": {
+    "market": "us",
+    "roster": [
+      "AMD",
+      "AVGO",
+      "INTC",
+      "MU",
+      "TXN"
+    ],
+    "documents": {
+      "INTC": [
+        {
+          "documentKey": "intc-2025-03-31",
+          "version": 1,
+          "publishedAt": "2025-04-30",
+          "normalized": {
+            "period": {
+              "start": "2025-01-01",
+              "end": "2025-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1000,
+              "revenue": 10000
+            }
+          }
+        },
+        {
+          "documentKey": "intc-2025-06-30",
+          "version": 1,
+          "publishedAt": "2025-07-28",
+          "normalized": {
+            "period": {
+              "start": "2025-04-02",
+              "end": "2025-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1010,
+              "revenue": 10100
+            }
+          }
+        },
+        {
+          "documentKey": "intc-2025-09-30",
+          "version": 1,
+          "publishedAt": "2025-10-31",
+          "normalized": {
+            "period": {
+              "start": "2025-07-03",
+              "end": "2025-09-30",
+              "fiscalPeriod": "Q3"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1020,
+              "revenue": 10200
+            }
+          }
+        },
+        {
+          "documentKey": "intc-2025-12-31",
+          "version": 1,
+          "publishedAt": "2026-01-30",
+          "normalized": {
+            "period": {
+              "start": "2025-10-03",
+              "end": "2025-12-31",
+              "fiscalPeriod": "Q4"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1030,
+              "revenue": 10300
+            }
+          }
+        },
+        {
+          "documentKey": "intc-2026-03-31",
+          "version": 1,
+          "publishedAt": "2026-04-29",
+          "normalized": {
+            "period": {
+              "start": "2026-01-01",
+              "end": "2026-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1040,
+              "revenue": 10400
+            }
+          }
+        },
+        {
+          "documentKey": "intc-2026-06-30",
+          "version": 1,
+          "publishedAt": "2026-08-01",
+          "normalized": {
+            "period": {
+              "start": "2026-04-02",
+              "end": "2026-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1050,
+              "revenue": 10500
+            }
+          }
+        }
+      ],
+      "AMD": [
+        {
+          "documentKey": "amd-2025-03-31",
+          "version": 1,
+          "publishedAt": "2025-04-30",
+          "normalized": {
+            "period": {
+              "start": "2025-01-01",
+              "end": "2025-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1001,
+              "revenue": 10000
+            }
+          }
+        },
+        {
+          "documentKey": "amd-2025-06-30",
+          "version": 1,
+          "publishedAt": "2025-07-31",
+          "normalized": {
+            "period": {
+              "start": "2025-04-02",
+              "end": "2025-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1011,
+              "revenue": 10100
+            }
+          }
+        },
+        {
+          "documentKey": "amd-2025-09-30",
+          "version": 1,
+          "publishedAt": "2025-10-28",
+          "normalized": {
+            "period": {
+              "start": "2025-07-03",
+              "end": "2025-09-30",
+              "fiscalPeriod": "Q3"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1021,
+              "revenue": 10200
+            }
+          }
+        },
+        {
+          "documentKey": "amd-2025-12-31",
+          "version": 1,
+          "publishedAt": "2026-01-30",
+          "normalized": {
+            "period": {
+              "start": "2025-10-03",
+              "end": "2025-12-31",
+              "fiscalPeriod": "Q4"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1031,
+              "revenue": 10300
+            }
+          }
+        },
+        {
+          "documentKey": "amd-2026-03-31",
+          "version": 1,
+          "publishedAt": "2026-05-03",
+          "normalized": {
+            "period": {
+              "start": "2026-01-01",
+              "end": "2026-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1041,
+              "revenue": 10400
+            }
+          }
+        },
+        {
+          "documentKey": "amd-2026-06-30",
+          "version": 1,
+          "publishedAt": "2026-07-29",
+          "normalized": {
+            "period": {
+              "start": "2026-04-02",
+              "end": "2026-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1051,
+              "revenue": 10500
+            }
+          }
+        }
+      ],
+      "MU": [
+        {
+          "documentKey": "mu-2025-03-31",
+          "version": 1,
+          "publishedAt": "2025-04-30",
+          "normalized": {
+            "period": {
+              "start": "2025-01-01",
+              "end": "2025-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1002,
+              "revenue": 10000
+            }
+          }
+        },
+        {
+          "documentKey": "mu-2025-06-30",
+          "version": 1,
+          "publishedAt": "2025-07-28",
+          "normalized": {
+            "period": {
+              "start": "2025-04-02",
+              "end": "2025-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1012,
+              "revenue": 10100
+            }
+          }
+        },
+        {
+          "documentKey": "mu-2025-09-30",
+          "version": 1,
+          "publishedAt": "2025-10-31",
+          "normalized": {
+            "period": {
+              "start": "2025-07-03",
+              "end": "2025-09-30",
+              "fiscalPeriod": "Q3"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1022,
+              "revenue": 10200
+            }
+          }
+        },
+        {
+          "documentKey": "mu-2025-12-31",
+          "version": 1,
+          "publishedAt": "2026-01-30",
+          "normalized": {
+            "period": {
+              "start": "2025-10-03",
+              "end": "2025-12-31",
+              "fiscalPeriod": "Q4"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1032,
+              "revenue": 10300
+            }
+          }
+        },
+        {
+          "documentKey": "mu-2026-03-31",
+          "version": 1,
+          "publishedAt": "2026-04-29",
+          "normalized": {
+            "period": {
+              "start": "2026-01-01",
+              "end": "2026-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1042,
+              "revenue": 10400
+            }
+          }
+        },
+        {
+          "documentKey": "mu-2026-06-30",
+          "version": 1,
+          "publishedAt": "2026-08-01",
+          "normalized": {
+            "period": {
+              "start": "2026-04-02",
+              "end": "2026-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1052,
+              "revenue": 10500
+            }
+          }
+        }
+      ],
+      "TXN": [
+        {
+          "documentKey": "txn-2025-03-31",
+          "version": 1,
+          "publishedAt": "2025-04-30",
+          "normalized": {
+            "period": {
+              "start": "2025-01-01",
+              "end": "2025-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1003,
+              "revenue": 10000
+            }
+          }
+        },
+        {
+          "documentKey": "txn-2025-06-30",
+          "version": 1,
+          "publishedAt": "2025-07-31",
+          "normalized": {
+            "period": {
+              "start": "2025-04-02",
+              "end": "2025-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1013,
+              "revenue": 10100
+            }
+          }
+        },
+        {
+          "documentKey": "txn-2025-09-30",
+          "version": 1,
+          "publishedAt": "2025-10-28",
+          "normalized": {
+            "period": {
+              "start": "2025-07-03",
+              "end": "2025-09-30",
+              "fiscalPeriod": "Q3"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1023,
+              "revenue": 10200
+            }
+          }
+        },
+        {
+          "documentKey": "txn-2025-12-31",
+          "version": 1,
+          "publishedAt": "2026-01-30",
+          "normalized": {
+            "period": {
+              "start": "2025-10-03",
+              "end": "2025-12-31",
+              "fiscalPeriod": "Q4"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1033,
+              "revenue": 10300
+            }
+          }
+        },
+        {
+          "documentKey": "txn-2026-03-31",
+          "version": 1,
+          "publishedAt": "2026-05-03",
+          "normalized": {
+            "period": {
+              "start": "2026-01-01",
+              "end": "2026-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1043,
+              "revenue": 10400
+            }
+          }
+        },
+        {
+          "documentKey": "txn-2026-06-30",
+          "version": 1,
+          "publishedAt": "2026-07-29",
+          "normalized": {
+            "period": {
+              "start": "2026-04-02",
+              "end": "2026-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1053,
+              "revenue": 10500
+            }
+          }
+        }
+      ],
+      "AVGO": [
+        {
+          "documentKey": "avgo-2025-03-31",
+          "version": 1,
+          "publishedAt": "2025-04-30",
+          "normalized": {
+            "period": {
+              "start": "2025-01-01",
+              "end": "2025-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1004,
+              "revenue": 10000
+            }
+          }
+        },
+        {
+          "documentKey": "avgo-2025-06-30",
+          "version": 1,
+          "publishedAt": "2025-07-28",
+          "normalized": {
+            "period": {
+              "start": "2025-04-02",
+              "end": "2025-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1014,
+              "revenue": 10100
+            }
+          }
+        },
+        {
+          "documentKey": "avgo-2025-09-30",
+          "version": 1,
+          "publishedAt": "2025-10-31",
+          "normalized": {
+            "period": {
+              "start": "2025-07-03",
+              "end": "2025-09-30",
+              "fiscalPeriod": "Q3"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1024,
+              "revenue": 10200
+            }
+          }
+        },
+        {
+          "documentKey": "avgo-2025-12-31",
+          "version": 1,
+          "publishedAt": "2026-01-30",
+          "normalized": {
+            "period": {
+              "start": "2025-10-03",
+              "end": "2025-12-31",
+              "fiscalPeriod": "Q4"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1034,
+              "revenue": 10300
+            }
+          }
+        },
+        {
+          "documentKey": "avgo-2026-03-31",
+          "version": 1,
+          "publishedAt": "2026-04-29",
+          "normalized": {
+            "period": {
+              "start": "2026-01-01",
+              "end": "2026-03-31",
+              "fiscalPeriod": "Q1"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1044,
+              "revenue": 10400
+            }
+          }
+        },
+        {
+          "documentKey": "avgo-2026-06-30",
+          "version": 1,
+          "publishedAt": "2026-08-01",
+          "normalized": {
+            "period": {
+              "start": "2026-04-02",
+              "end": "2026-06-30",
+              "fiscalPeriod": "Q2"
+            },
+            "currency": "USD",
+            "metrics": {
+              "operatingIncome": 1054,
+              "revenue": 10500
+            }
+          }
+        }
+      ]
+    },
+    "evidence": {
+      "intc-2025-03-31": [
+        "ev-us-intc-2025-03-31"
+      ],
+      "intc-2025-06-30": [
+        "ev-us-intc-2025-06-30"
+      ],
+      "intc-2025-09-30": [
+        "ev-us-intc-2025-09-30"
+      ],
+      "intc-2025-12-31": [
+        "ev-us-intc-2025-12-31"
+      ],
+      "intc-2026-03-31": [
+        "ev-us-intc-2026-03-31"
+      ],
+      "intc-2026-06-30": [
+        "ev-us-intc-2026-06-30"
+      ],
+      "amd-2025-03-31": [
+        "ev-us-amd-2025-03-31"
+      ],
+      "amd-2025-06-30": [
+        "ev-us-amd-2025-06-30"
+      ],
+      "amd-2025-09-30": [
+        "ev-us-amd-2025-09-30"
+      ],
+      "amd-2025-12-31": [
+        "ev-us-amd-2025-12-31"
+      ],
+      "amd-2026-03-31": [
+        "ev-us-amd-2026-03-31"
+      ],
+      "amd-2026-06-30": [
+        "ev-us-amd-2026-06-30"
+      ],
+      "mu-2025-03-31": [
+        "ev-us-mu-2025-03-31"
+      ],
+      "mu-2025-06-30": [
+        "ev-us-mu-2025-06-30"
+      ],
+      "mu-2025-09-30": [
+        "ev-us-mu-2025-09-30"
+      ],
+      "mu-2025-12-31": [
+        "ev-us-mu-2025-12-31"
+      ],
+      "mu-2026-03-31": [
+        "ev-us-mu-2026-03-31"
+      ],
+      "mu-2026-06-30": [
+        "ev-us-mu-2026-06-30"
+      ],
+      "txn-2025-03-31": [
+        "ev-us-txn-2025-03-31"
+      ],
+      "txn-2025-06-30": [
+        "ev-us-txn-2025-06-30"
+      ],
+      "txn-2025-09-30": [
+        "ev-us-txn-2025-09-30"
+      ],
+      "txn-2025-12-31": [
+        "ev-us-txn-2025-12-31"
+      ],
+      "txn-2026-03-31": [
+        "ev-us-txn-2026-03-31"
+      ],
+      "txn-2026-06-30": [
+        "ev-us-txn-2026-06-30"
+      ],
+      "avgo-2025-03-31": [
+        "ev-us-avgo-2025-03-31"
+      ],
+      "avgo-2025-06-30": [
+        "ev-us-avgo-2025-06-30"
+      ],
+      "avgo-2025-09-30": [
+        "ev-us-avgo-2025-09-30"
+      ],
+      "avgo-2025-12-31": [
+        "ev-us-avgo-2025-12-31"
+      ],
+      "avgo-2026-03-31": [
+        "ev-us-avgo-2026-03-31"
+      ],
+      "avgo-2026-06-30": [
+        "ev-us-avgo-2026-06-30"
+      ]
+    }
+  },
+  "asOfKrHorizonNote": "⚠️ The same KR cache one month later. At the fixture asOf the KR sleeve's next regular report is 65 days out — outside the 60 the inflection lane reads — so the operation counts five names as outsideHorizon and derives nothing, which is the honest answer and one the fixture asserts. This instant is where the same cache does derive."
+}
