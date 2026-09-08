@@ -20,6 +20,13 @@
  * ⚠️ **It is a vendor payload, so it is read defensively.** Anything this cannot
  * parse is allowed through: a guard that refused on a shape it did not
  * recognise would take down every run the day the payload gains a field.
+ *
+ * ⚠️ **Checked against #221 and unaffected.** The sibling guard's roster broke
+ * when the host began namespacing plugin agents as `<plugin>:<name>`, because it
+ * compared that value against a list of file stems. Nothing here compares a
+ * name: the discriminator is the *presence* of `agent_id`, and `agent_type` is
+ * read only to address the refusal to whoever made the call. A namespaced value
+ * changes the wording of a message and no verdict.
  */
 let raw = ''
 process.stdin.setEncoding('utf8')
