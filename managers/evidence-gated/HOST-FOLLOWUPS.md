@@ -242,6 +242,48 @@ The #136 claim that correctly supplied `previous.armed` never deduped was refute
 own conclusion that the journal is authoritative about arming was refuted in #156. Do not carry
 either forward as a confirmed rule — `refutedMemoryRules` retracts the second from durable memory.
 
+## Which promise opened this run (`untilled/aumos#622` landed; the window is what is left)
+
+⚠️ **This package used to answer that question with a regex over a host sentence.** The flow a wake
+was armed for rode inside the watch's `intent`, and `intent` reaches a woken run only as part of the
+event `summary` the wake engine composes — `` `${verdict.reason} — watching for: ${intent}` ``. So
+`resolveWakeFlow` read `market-review:<flow>:<at>` out of that sentence, and out of `watchId` as
+well, which is Aumos's opaque `eventId` and has never contained a marker in any version of this
+package. Two consequences: the dispatch decision was a copy of host-owned state recovered from
+prose, and a rewording upstream would have taken it silently.
+
+✅ **The host already answers it structurally.** `decisions[].armed` carries
+`fate: 'fired'` with `review: 'this-run'` (`untilled/aumos#622`) — *this is what woke you* — beside
+the `planId` and the instant the condition was met. This package now reads that first and reports
+which channel answered (`basis`), and the `armed` scan is confined to that one pair: ⛔ never a
+length, never a receipt. The refusal in `reconcileArmedReviews`
+(`armed_journal_not_a_receipt`) is unchanged, because *"is it armed"* is a question that field does
+not answer in any tense. (`untilled/aumos-catalogue#212` ⑤)
+
+### ⛔ Still owed by the host: the wake does not name its own plan
+
+`armed` hangs off `history.recentDecisions`, and that is a **window** (`untilled/aumos#688`). The
+judgement that armed a review can fall out of it, and then the host's attribution is absent for a
+wake the host did attribute. `standingPlans` is not the substitute: a promise that has fired is no
+longer standing at `asOf`, by construction.
+
+So the prose path stays as a **boundary adapter** — one fall-through, after the host has been asked
+— and every use of it is reported by name: `wake_attribution_unreadable` (no `armed` was handed
+over, which the caller can fix) or `wake_flow_unattributed` (handed over and naming nothing of this
+manager's, which it cannot).
+
+⚠️ **The removal condition is a host fact rather than a release date.** Delete the adapter — the
+marker scan, `wake_marker_unreadable` on the prose path, and both fallback codes — when the
+invocation names the fired plan **on the wake itself**: a `planId` on the `plan-trigger` event, or
+any equivalent field not bounded by the `recentDecisions` window. `AumosEvent` is a strict object of
+`eventId`, `kind`, `subject`, `occurredAt`, `detectedAt`, `summary`, `materiality` and `evidenceIds`,
+so this is a host schema change and not something this side can arrange. ⛔ Until then, deleting the
+adapter would make a wake whose arming judgement has aged out dispatch all three flows — three times
+the work and each sleeve judged twice, which is the `#87` state.
+
+⚠️ **`engines.aumos` does not move for this.** `>=0.3.34` already carries `#622`, and the fallback is
+what covers the window rather than an older host.
+
 ## Where a holding came from (`untilled/aumos#688`, landed in `#691`)
 
 `harnessAudit` used to read `history.recentDecisions` as though it were the journal. It is a

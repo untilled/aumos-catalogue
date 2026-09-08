@@ -58,8 +58,17 @@ carried across in the rewrite rather than dropped; `#209` names that explicitly.
 **All three flows ran on every wake (#87).** The three schedules were minted with a `flow` apiece
 and nothing read it: the 05:45 KST wake judged Korea on yesterday's bar, the 16:00 KST wake judged
 the US before its market opened, and `allocate` ran three times a day. Three times the work, and
-each sleeve judged twice a day on data it had already read. `resolveWakeFlow` reads the marker out
-of the fired plan's event summary, which is the one place the manager's own words come back.
+each sleeve judged twice a day on data it had already read. `resolveWakeFlow` answers which flow
+woke this run.
+
+⚠️ **From #87 until #212 ⑤ it answered out of prose.** The flow was recovered by regex from the
+event `summary` the wake engine composes — and from `watchId`, an opaque host `eventId` no version
+of this package ever wrote into — so the dispatch decision was a copy of host-owned state read back
+out of a host sentence. It is read from `decisions[].armed` now (`fate: 'fired'` /
+`review: 'this-run'`, `untilled/aumos#622`), which carries the `planId` and the instant as fields.
+The prose path survives as one reported fallback, because the judgement that armed a review can be
+older than the `history.recentDecisions` window; `HOST-FOLLOWUPS.md` states what has to be true
+before it is deleted.
 
 **A flow that is not told its tools goes looking.** Measured 2026-08-27: a flow dispatched without
 its tool list spent its whole turn discovering the session, reached for `Bash`, and the run ended

@@ -179,12 +179,12 @@ carry, and the 2026-09-06 run never asked for it.
 | `zonedDateTimeToUtc` | a local date/time in an IANA zone → one instant |
 | `nextMarketReview` | the next real open session close plus buffer |
 | `nextReviewSequence` | the three flows' reviews in order, owned by one manager, each with the `intent` it must be armed with and the `{ cron, timeZone }` `rule` that goes beside `at` on the trigger. The rule draws the calendar forward and wakes nothing; `at` is still the whole schedule, and a review whose buffer crosses local midnight returns `rule: null` |
-| `resolveWakeFlow` | which flow a fired plan's event summary was armed for — `null` for a wake this manager did not arm |
+| `resolveWakeFlow` | which flow opened this run, from the host's own record: hand it `armed` — the `armed` entries of `history.recentDecisions`, flattened — and the entry the host marked `fate: 'fired'` / `review: 'this-run'` answers with the flow, the `planId` and the instant the host recorded. `basis` says which channel answered. ⛔ An empty `armed` is not a failed arm: it means the host attributed nothing, and the flow falls back to the event `summary` through the legacy adapter, reported by name (`wake_flow_unattributed`, or `wake_attribution_unreadable` when no `armed` was handed over). `null` for a wake this manager did not arm, and `null` with `wake_flow_ambiguous` when the host folded two flows into one wake |
 | `resolveTrancheWake` | whether a fired plan's event summary is a rung of an unfinished staged entry, and which one |
 | `reconcileArmedReviews` | the reviews to arm — every one of them, because the published rule is to re-arm at every judgement and nothing this operation is handed could suppress one anyway — plus which of them this instance has already promised at this instant, and which flow it promised at a **different** instant, which is the one duplicate the host does not fold — reported with that older promise's `planId` where `standingPlans` names it, and with which silence it is where it does not. Hand it the invocation's `standingPlans` and it also reports `standingArms: { atLeast }`, the floor of what stood at `asOf` — report-only, and absent from it means unreadable while `[]` means a floor of zero |
 | `earningsCheckpoint` | BMO/AMC/date-only → an at-time checkpoint |
 | `boundedRetry` | the bounded retry after a wake found nothing published |
-| `classifyScheduledWake` | why this run woke |
+| `classifyScheduledWake` | why this run woke — pass `armed` here too and the `flow` it returns beside the due/duplicate/late verdict is the host's attribution rather than a marker read out of prose |
 | `scheduleDrift` | late, missing, duplicated and outage-shaped fires |
 | `deduplicateObservations` | the same observation arriving twice |
 | `themeRadarDue` | whether the forward-research interval has elapsed |
