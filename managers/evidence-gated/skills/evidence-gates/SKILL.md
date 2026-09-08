@@ -194,6 +194,14 @@ what checks it.** Call it for every non-core holding and for every entry this ru
   owes — a `price-below` at the stop and an `at-time` at the time stop — and they are copied into
   the same `DecisionProposal` as the BUY. A missing stop or review date is
   `exit_rules_unregistered` / `blocked`.
+- **And the stop is stated as a price with a purpose on it, not only armed.** `priceLevelsToRegister`
+  returns the same number as a `priceLevels` row with `purpose: 'stop'` — because one `price-below`
+  is a stop under a holding *and* an entry somebody is waiting for, so a direction cannot say which
+  and `reason: 'exit-discipline-hard-stop'` is our word rather than a field Aumos reads
+  (`untilled/aumos#756`). ⚠️ The level and the watch are built by one call and hold **one** `Money`
+  and one `key`, so the host's link check cannot fail on a rounding disagreement — ⛔ do not retype
+  either of them. Pass `asset` in full or the level cannot be stated at all
+  (`stop_level_unstated` / `unevaluated`); the discipline itself is unaffected either way.
 - **A reported stop that nobody acts on is the prose it replaced.** Pass this run's exits as
   `proposedExits`; a due stop with no exit proposed for that symbol is `exit_due_unactioned` /
   `blocked` — the proposal, never the run.

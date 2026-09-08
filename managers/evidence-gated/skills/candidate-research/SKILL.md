@@ -165,7 +165,7 @@ Call `entryTranchePlan`. It holds the same shape the Core DCA row states, addres
 
 | | |
 |---|---|
-| plan | T1/T2/T3, each with its size and its `immediate`, `at-time`, `price-below` or `price-above` condition. **"We will add on weakness" is not a tranche** — the same discriminant, on this side of the line |
+| plan | T1/T2/T3, each with its size and its `immediate`, `at-time`, `price-below` or `price-above` condition. **"We will add on weakness" is not a tranche** — the same discriminant, on this side of the line. ⚠️ Each priced rung also comes back as an `entry` price level (`priceLevelsToRegister`), so pass `asset` in full; ⛔ the rungs are points and never one band — a band is a range worked across, and this plan acts at its rungs and nowhere between them |
 | when it is required | an `insufficient` or `observing` lens enters in stages. `reviewable` and `promoted` may enter at once; an unstated maturity leaves the requirement unjudged and says so |
 | the sizes | they add up to the position the plan says it is building, or the plan is describing two different positions |
 | the rungs | a tranche within 5% of its level raises `tranche_approach` — the entry-side counterpart of `exitCheck`'s `trim_approach`, and re-read before it fires for the same reason |

@@ -60,6 +60,7 @@ import { normalizeBars, indicatorPacket } from './indicators.mjs'
 import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
 import { sleeveNav, targetWeight, minimumExecutableWeight, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { proposalDisclosure } from './proposal.mjs'
+import { priceLevelSet } from './price-levels.mjs'
 import { executionRecord } from './execution-record.mjs'
 import { coverageState, discoveryCapacity, validateWatch, evaluateWatch, watchAlertState } from './coverage.mjs'
 import { validateConsensus, researchGate, crossCheckPrice, validateMacroObservations } from './evidence.mjs'
@@ -323,6 +324,43 @@ export const OPERATIONS = {
     describe: 'whether the assembled proposal carries the disclosures its own sizing said it owes — the reduced cap, the manager-attested main lane — and, when it does not, which half is silent',
     run: proposalDisclosure,
   },
+  /**
+   * ── The one place the standing set is assembled (#756) ───────────────────
+   *
+   * `priceLevels` **replaces**: the host's own words are that *"a list you send
+   * replaces every level you had standing on this book, so one you drop is
+   * released and `[]` releases them all"*. So the field is not «what this run
+   * computed» — it is every level this manager still stands behind on this
+   * book, and a run that submits only its own fresh arithmetic silently
+   * releases the rest. That is the obligation `standingPlans` carries for
+   * promises (`untilled/aumos#690`, `#704`) and it fails the same way.
+   *
+   * ⚠️ **Which is why folding it is an operation and not a sentence.** Three
+   * flows return levels — `exitDiscipline` per holding, `entryTranchePlan` per
+   * ladder — and the orchestrator has to hand over one set. Doing that in prose
+   * is how the erasure #136 and #137 measured happened twice: a collection
+   * carried under a key nobody read came back empty and the run wrote the
+   * erasure down while following canon exactly.
+   *
+   * ⛔ **Absent stays absent.** `levels: null` answers `intent: 'unstated'` and
+   * never `[]` — «I said nothing about levels» and «I release them all» are
+   * opposite statements, and this is the one field of the proposal where an
+   * empty array and an absent field differ.
+   */
+  priceLevels: {
+    group: 'sizing',
+    surface: 'published',
+    mode: 'strict', keys: { levels: ARRAY, watches: ARRAY, plans: ARRAY },
+    nested: {
+      levels: { purpose: STRING, asset: OBJECT, price: OBJECT, point: NUMBER, low: NUMBER, high: NUMBER, reason: STRING, thesisRefs: ARRAY, expiresAt: STRING, armedKey: STRING },
+    },
+    describe: 'the complete `priceLevels` set this proposal will carry, built or checked row by row, with the `armedKey` links to its own watches verified the way the host verifies them — a level Aumos would refuse, refused here where it can still be fixed',
+    run: (input) => priceLevelSet({
+      levels: input?.levels === undefined ? null : input.levels,
+      watches: input?.watches ?? [],
+      plans: input?.plans ?? [],
+    }),
+  },
   effectiveCashFloor: {
     group: 'sizing',
     surface: 'published',
@@ -409,8 +447,11 @@ export const OPERATIONS = {
     group: 'sizing',
     surface: 'published',
     canonical: all(triggerKind('tranches[].condition.kind'), moneyAmount('price')),
-    mode: 'named', keys: { symbol: STRING, lens: STRING, maturity: STRING, price: NUMBER, plannedTotalWeight: NUMBER, tranches: ARRAY, execution: OBJECT },
-    describe: 'a single name\'s T1/T2/T3 ladder: which rung is due, which is within 5%, which lapsed with the plan unfinished — and that the whole plan is one sample',
+    mode: 'named', keys: { symbol: STRING, asset: OBJECT, lens: STRING, maturity: STRING, price: NUMBER, plannedTotalWeight: NUMBER, tranches: ARRAY, execution: OBJECT },
+    nested: {
+      asset: { class: STRING, symbol: STRING, market: STRING, currency: STRING },
+    },
+    describe: 'a single name\'s T1/T2/T3 ladder: which rung is due, which is within 5%, which lapsed with the plan unfinished, and the `entry` price level each unfilled priced rung states — and that the whole plan is one sample',
     run: (input, asOf) => entryTranchePlan({ ...input, asOf }),
   },
   /**
@@ -801,14 +842,15 @@ export const OPERATIONS = {
     surface: 'published',
     mode: 'strict',
     keys: {
-      symbol: STRING, lane: STRING, entryDate: STRING, tradingDaysHeld: NUMBER, entryPrice: NUMBER, price: NUMBER,
+      symbol: STRING, asset: OBJECT, lane: STRING, entryDate: STRING, tradingDaysHeld: NUMBER, entryPrice: NUMBER, price: NUMBER,
       positionWeight: NUMBER, mandateMaxDrawdown: NUMBER, heldPortfolioHeat: NUMBER, registration: OBJECT,
       entryProposed: BOOLEAN, proposedExits: ARRAY,
     },
     nested: {
       registration: { stopPct: NUMBER, stopPrice: NUMBER, reviewBy: STRING },
+      asset: { class: STRING, symbol: STRING, market: STRING, currency: STRING },
     },
-    describe: 'the unconditional time stop and the stop distance this position may carry, and the two WATCH rows an entry registers',
+    describe: 'the unconditional time stop and the stop distance this position may carry, the two WATCH rows an entry registers, and the `stop` price level the price-below row is watching',
     run: (input, asOf) => exitDiscipline({ ...input, asOf }),
   },
   ruleVersions: {

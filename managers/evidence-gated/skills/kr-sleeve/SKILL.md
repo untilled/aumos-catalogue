@@ -17,6 +17,11 @@ marked in KRW, and the answer says so (`fxBasis: "not-required"`). A budget larg
 book holds is `sleeve_budget_not_fundable_in_currency`, which is a warning to report in
 `uncertainty` and a gap only `allocate` and the investor can close.
 
+⚠️ **Hand up your `priceLevelsToRegister` rows with your targets.** `exitDiscipline` and
+`entryTranchePlan` return them per name once you pass `asset` in full, and the orchestrator folds
+both sleeves' rows through `priceLevels` **once** — ⛔ you never fold your own, because that field
+replaces every level this manager has standing on the book and is not scoped to a market.
+
 Run steps 1–5 of `PROMPT.md` over XKRX only, then hand back what §"What a flow must return"
 of `skills/orchestrate/SKILL.md` asks for.
 

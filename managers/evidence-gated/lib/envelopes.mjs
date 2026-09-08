@@ -1,4 +1,5 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
+import { stopRegistration } from './price-levels.mjs'
 import { INPUT_VOCABULARY } from './vocabulary.mjs'
 import { METHODOLOGY } from './constants.mjs'
 
@@ -308,6 +309,18 @@ function weekdaysBetween(fromDay, toDay) {
 
 export function exitDiscipline({
   symbol = null,
+  /**
+   * The asset in full, when the caller has it (#756).
+   *
+   * ⚠️ **`symbol` cannot answer what `priceLevels` asks.** A level belongs to
+   * the currency its asset is quoted in and this package derives that from the
+   * market (`MARKET_CURRENCIES`, and the host's own rule at
+   * `untilled/aumos#689`), so a bare ticker leaves the level unstateable — and
+   * the same ticker is two assets on two boards. ⛔ Optional, and its absence
+   * changes no verdict: the time stop, the stop distance and the registration
+   * are exactly what they were, and only the *stating* of the level is lost.
+   */
+  asset = null,
   lane = null,
   entryDate = null,
   tradingDaysHeld = null,
@@ -512,7 +525,56 @@ export function exitDiscipline({
    * being avoided, not a grace period anybody chose.
    */
   const watchExpiry = dueAt === null ? null : new Date(Date.parse(dueAt) + TRADING_DAY_MS).toISOString().slice(0, 10)
-  if (stopLevel !== null) watchesToRegister.push({ kind: 'price-below', threshold: stopLevel, expiresAt: watchExpiry, reason: 'exit-discipline-hard-stop' })
+
+  /**
+   * ── The stop, said out loud rather than left to be inferred (#756) ────────
+   *
+   * The `price-below` row above is the registration and it was also, until now,
+   * the **only** statement of the number. That is the defect
+   * `untilled/aumos#756` opens with: one `price-below` is a stop under a holding
+   * and an entry somebody is waiting for on a name they do not own, so a host
+   * reading a direction cannot tell which — and `reason: 'exit-discipline-hard-stop'`
+   * is this package's own word, not a field Aumos reads. So the level goes into
+   * `priceLevels` with `purpose: 'stop'` stated, and the two travel as a pair.
+   *
+   * ⚠️ **One `Money`, two rows, one `key`.** `stopRegistration` mints the key,
+   * builds the price once and puts the same object on both, so the host's
+   * `armed-price-mismatch` is unreachable by construction rather than avoided
+   * by care. ⛔ The `at-time` row gets no level: a time stop is a date and
+   * `priceLevels` holds prices.
+   *
+   * ⚠️ **An unstated asset leaves the level unsaid, and says so.** The level
+   * needs the market and the currency (`untilled/aumos#689` — a level belongs to
+   * the currency its asset is quoted in, and this package derives that from the
+   * market), and `symbol` alone cannot give either. ⛔ Not `blocked`: the every-run
+   * sweep over holdings would then refuse every position, which is the mistake
+   * #155 already made here once. The registration itself is unchanged either way.
+   */
+  const priceLevelsToRegister = []
+  if (stopLevel !== null) {
+    const registration = stopRegistration({
+      symbol,
+      asset,
+      stopLevel,
+      reason: stopSource === 'control-arm-approved'
+        ? `The control arm's approved ${round(stopPct * 100, 4)}% from an entry of ${entryPrice}: its 1% cell is the size that number was computed against.`
+        : `${round(stopPct * 100, 4)}% from an entry of ${entryPrice}, the widest this position may carry — the drawdown budget left for it divided by its weight, capped at the methodology's ${METHODOLOGY.exitDiscipline.maximumHardStopPct * 100}%.`,
+      ...(watchExpiry ? { expiresAt: watchExpiry } : {}),
+    })
+    if (registration.level === null) {
+      diagnostics.push(diagnostic(
+        'stop_level_unstated',
+        'unevaluated',
+        'The stop distance is computed and the level it puts on the chart cannot be stated: a price level belongs to the currency its asset is quoted in, and that is derived from the market, which this call did not give. The registration is unaffected — pass `asset` to state the level as well',
+        'asset',
+        { symbol, stopLevel, causes: registration.diagnostics.map((row) => row.code) },
+      ))
+      watchesToRegister.push({ kind: 'price-below', threshold: stopLevel, expiresAt: watchExpiry, reason: 'exit-discipline-hard-stop' })
+    } else {
+      watchesToRegister.push(registration.watch)
+      priceLevelsToRegister.push(registration.level)
+    }
+  }
   if (dueAt !== null) watchesToRegister.push({ kind: 'at-time', at: dueAt, expiresAt: watchExpiry, reason: 'exit-discipline-time-stop' })
 
   return {
@@ -539,6 +601,12 @@ export function exitDiscipline({
         judged: missingRegistration.length === 0 ? true : entryProposed === null && registration === null ? null : entryProposed === false ? null : false,
       },
       watchesToRegister,
+      /**
+       * The `stop` level the `price-below` row above is watching, for the
+       * proposal's `priceLevels`. Empty when the level could not be stated —
+       * ⛔ never a level with a guessed currency.
+       */
+      priceLevelsToRegister,
       exitDue: due,
       exitProposed,
       /** ⛔ A candidate for the one proposal the investor still approves, never an order. */
