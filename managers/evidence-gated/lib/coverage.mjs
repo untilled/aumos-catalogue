@@ -111,6 +111,15 @@ export function coverageState({ scannerUniverses = [], extensions = [], holdings
     data: {
       declaredUniverseCount: union.size,
       screenedUniverseCount: screened.size,
+      /**
+       * ⚠️ The extensions on their own, published because `discoveryCapacity`
+       * reads them (#227) and until now they existed only inside a diagnostic's
+       * detail bag — a count a caller could reach only on the run where the
+       * universe was undeclared, which is the one run it says nothing about.
+       * It is the theme radar's half of `screenedUniverseCount`: what this run
+       * carried across the declared boundary, and `0` is the ordinary reading.
+       */
+      extensionsCount: new Set(extensions).size,
       dispositionCount: bySymbol.size,
       uncovered,
       complete: screened.size ? uncovered.length === 0 : null,
@@ -169,8 +178,51 @@ export function coverageState({ scannerUniverses = [], extensions = [], holdings
  *
  * Omitting `uncertainty` leaves the disclosure unjudged rather than passed:
  * a call made before the proposal exists has nothing to read.
+ *
+ * ── The boundary that never moved, counted (issue #227) ────────────────────
+ *
+ * `PROMPT.md` §3 states that the mechanical sweep looks inside the declared
+ * universe and nowhere else, and that the theme radar is the **only** path
+ * across that boundary. So `coverage.extensionsCount` is the whole record of
+ * whether the boundary moved — and on the book that measured #227 it was `0` on
+ * ten consecutive runs while both lanes read `open`. Nothing anywhere added that
+ * up, for the same reason nothing added up the two dark lanes before #140: each
+ * run's zero is an ordinary outcome, and only the **streak** is a finding.
+ *
+ * ⚠️ **A run counts its own zero and carries the count forward.** `boundary` is
+ * what `run/theme-radar-last` held, `nextBoundary` is what to write back — the
+ * `nextState` idiom `researchState` and `signalPaper` already use, so the count
+ * is this operation's arithmetic rather than a number a run maintains by hand.
+ * A non-zero `extensionsCount` resets the streak to zero, because the boundary
+ * moved.
+ *
+ * ⚠️ **`radarOpenRunsInStreak` is the half that makes the report readable.**
+ * *«the boundary has not moved in five runs and the radar was due in none of
+ * them»* and *«…and it was due in all five»* are opposite findings — the first
+ * is a clock problem, which is what #227 fixed, and the second is a market
+ * this methodology is not finding anything in. One count cannot say both.
+ *
+ * ⛔ **Never blocked, and never registered in `CAUSE_CODE_REGISTRY`.** A
+ * hardened boundary is not a stage that lost an input — the radar ran, the
+ * sources answered, and nothing survived — and it is not a code that refuses
+ * both conclusions either. Filing it in a lane would let *«we looked and found
+ * nothing»* count as a cause of an empty book, which is the positive claim #171
+ * spent a whole registry taking away from codes that had not earned it.
+ *
+ * ⛔ **And it is not an instruction to relax anything.** Zero extensions is a
+ * valid outcome of an honest radar; what the streak reports is that the outcome
+ * has been the same for long enough to be a fact about this run's reach.
  */
-export function discoveryCapacity({ radar = null, coverage = null, uncertainty = null } = {}) {
+
+/**
+ * Three runs, and the number is read off the interval rather than chosen.
+ * `themeRadarDue`'s interval is three days and the source cadence it was ported
+ * from is ~2–3 runs a week, so three consecutive runs is the first streak that
+ * cannot be one radar interval's ordinary silence.
+ */
+export const BOUNDARY_HARDENED_RUNS = 3
+
+export function discoveryCapacity({ radar = null, coverage = null, uncertainty = null, boundary = null, asOf = null } = {}) {
   const diagnostics = []
   const laneOf = (value) => (value === null ? 'unstated' : value ? 'open' : 'dark')
   const radarDue = typeof radar?.due === 'boolean' ? radar.due : null
@@ -210,6 +262,30 @@ export function discoveryCapacity({ radar = null, coverage = null, uncertainty =
       { open: Object.entries(lanes).filter(([, lane]) => lane === 'open').map(([name]) => name) },
     ))
   }
+  const extensionsCount = Number.isFinite(coverage?.extensionsCount) ? coverage.extensionsCount : null
+  const priorEmpty = Number.isInteger(boundary?.emptyExtensionRuns) && boundary.emptyExtensionRuns >= 0 ? boundary.emptyExtensionRuns : 0
+  const priorOpen = Number.isInteger(boundary?.radarOpenRunsInStreak) && boundary.radarOpenRunsInStreak >= 0 ? boundary.radarOpenRunsInStreak : 0
+  const moved = extensionsCount !== null && extensionsCount > 0
+  const emptyExtensionRuns = extensionsCount === null ? null : moved ? 0 : priorEmpty + 1
+  const radarOpenRunsInStreak = extensionsCount === null ? null : moved ? 0 : priorOpen + (radarDue === true ? 1 : 0)
+  const streakSince = extensionsCount === null ? null : moved ? null : (boundary?.streakSince ?? asOf ?? null)
+  const hardened = emptyExtensionRuns === null ? null : emptyExtensionRuns >= BOUNDARY_HARDENED_RUNS
+  if (extensionsCount === null) {
+    diagnostics.push(diagnostic(
+      'discovery_boundary_uncounted',
+      'unevaluated',
+      'Whether the declared boundary moved this run is read from the coverage answer’s `extensionsCount`; without it the streak is not advanced, because a run nobody counted is not a run that found nothing',
+      'coverage',
+    ))
+  } else if (hardened) {
+    diagnostics.push(diagnostic(
+      'discovery_boundary_hardened',
+      'info',
+      'The declared universe has not gained an extension for this many consecutive runs; theme radar is the only path across that boundary, so a hardened boundary is a fact about this methodology’s reach and is reported rather than inferred',
+      'coverage.extensionsCount',
+      { emptyExtensionRuns, radarOpenRunsInStreak, streakSince, threshold: BOUNDARY_HARDENED_RUNS },
+    ))
+  }
   const disclosed = Array.isArray(uncertainty)
     ? uncertainty.some((entry) => typeof entry === 'string' && entry.includes('discovery_lane_dark'))
     : null
@@ -231,6 +307,8 @@ export function discoveryCapacity({ radar = null, coverage = null, uncertainty =
       mustReport: dark,
       disclosed,
       waitCharacter: dark ? 'cannot-adjudicate' : null,
+      boundary: { extensionsCount, emptyExtensionRuns, radarOpenRunsInStreak, streakSince, hardened, threshold: BOUNDARY_HARDENED_RUNS },
+      nextBoundary: extensionsCount === null ? null : { schemaVersion: 1, updatedAsOf: asOf, emptyExtensionRuns, radarOpenRunsInStreak, streakSince },
       meaning: 'zero discovery capacity is reported and never blocks; what is blocked is a proposal that had none and does not say so',
     },
     diagnostics,

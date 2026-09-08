@@ -267,6 +267,21 @@ shape as #141's unread `parkedLiquidity`, from the other side. Hence `gates: fal
 `run/theme-radar-last` generalised from the first case to the second on 2026-09-04;
 `refutedMemoryRules` retracts that row.
 
+**A run that found nothing locked the next three days** (#227). `themeRadarDue`'s clock was
+`run/theme-radar-last.lastRunAt` — the last time the radar **ran** — where the methodology it was
+ported from measures from the last `thesis_call`, so an empty radar reset an interval a productive
+one would have kept running. Measured on this book: the radar ran **2 times across 10 runs**, the
+second only because `ageDays` had drifted past the interval (3.5218 against 3), and
+`coverage/research-index.extensions` was `[]` in all ten — on the branch §3 names as the only path
+across the declared universe boundary. The verdict is `lastThesisCallAt`'s from 0.6.0, and the
+streak of runs that moved nothing is counted by `discoveryCapacity` rather than left to be noticed.
+
+**An override with no producer, for the life of the port** (#227). `themeRadarDue` has taken a
+`dislocation` argument since it was written — the source runs the radar regardless of staleness in
+dislocation weeks, the richest thesis environment it names — and nothing in this package ever set
+it. `dislocationSignal` is the producer: an index 5% or more off its own window high, or a VIX
+spike, both read from rows `validateMacro` had already dated and tiered.
+
 **`entryQualityGate` was documented as needing a scan history it does not read** (#147). Its input
 is `bars` — 60 minimum, 200+ for the long indicators — so a first run that fetches enough dated bars
 evaluates the gate on that run. #146 recorded the opposite reading and withdrew it.

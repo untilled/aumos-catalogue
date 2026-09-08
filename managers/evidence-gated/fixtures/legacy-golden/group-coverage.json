@@ -146,6 +146,7 @@
       "baseline-signals-are-admissible"
     ],
     "schedule": [
+      "dislocation-signal",
       "dst-holiday-early-close",
       "late-missing-duplicate-outage",
       "theme-radar-due",

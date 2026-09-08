@@ -421,10 +421,37 @@ for (const [name, fixture] of Object.entries(globalIntegration.wakes)) {
   else assert.equal(output.data.submitDecision, true, `${name} wake remains observable through one Decision`)
 }
 covers('schedule/theme-radar-due')
-for (const fixture of Object.values(globalIntegration.themeRadar)) {
-  const output = execute({ operation: 'themeRadarDue', asOf: globalIntegration.asOf, input: fixture })
-  assert.equal(output.data.due, fixture.expectedDue)
+for (const [name, fixture] of Object.entries(globalIntegration.themeRadar)) {
+  const { expectedDue, expectedReason, ...input } = fixture
+  const output = execute({ operation: 'themeRadarDue', asOf: globalIntegration.asOf, input })
+  assert.equal(output.data.due, expectedDue, `${name} is judged on the thesis-call clock`)
+  assert.equal(output.data.reason, expectedReason, `${name} says which reading answered`)
 }
+/**
+ * ⚠️ **The clock is the last `thesis_call` and not the last run** (#227), and
+ * this is the pair that separates them: the two fixtures below ran on the same
+ * day, and under the run clock both were `not-due` for three more days. The one
+ * that produced nothing is due, which is the direction the source methodology
+ * designed — finding nothing keeps the pressure on.
+ */
+assert.equal(globalIntegration.themeRadar.recent.lastRunAt, globalIntegration.themeRadar.ranYesterdayAndFoundNothing.lastRunAt)
+assert.equal(globalIntegration.themeRadar.ranYesterdayAndFoundNothing.lastThesisCallAt, null, 'the radar ran and produced no call, said out loud')
+assert.equal(
+  execute({ operation: 'themeRadarDue', asOf: globalIntegration.asOf, input: { lastRunAt: globalIntegration.themeRadar.recent.lastRunAt } }).data.due,
+  true,
+  'and a record written before this clock existed is due rather than silently not-due',
+)
+covers('schedule/dislocation-signal')
+for (const [name, fixture] of Object.entries(globalIntegration.dislocation)) {
+  const output = execute({ operation: 'dislocationSignal', asOf: globalIntegration.asOf, input: { macro: fixture.macro } })
+  assert.equal(output.data.dislocated, fixture.expectedDislocated, `${name} is judged from validateMacro's retained rows`)
+  assert.deepEqual(output.data.reasons, fixture.expectedReasons, `${name} names which reading fired`)
+}
+/** ⛔ An unasked macro lane is never a calm one: no rows is `unevaluated`, and the override stays off. */
+const unaskedMacro = execute({ operation: 'dislocationSignal', asOf: globalIntegration.asOf, input: {} })
+assert.equal(unaskedMacro.data.dislocated, false)
+assert.equal(unaskedMacro.data.unread, 'macro-absent')
+assert.ok(unaskedMacro.diagnostics.some((row) => row.code === 'dislocation_macro_unread'))
 const dedupe = execute({ operation: 'deduplicateObservations', asOf: globalIntegration.asOf, input: { rows: globalIntegration.dedupe } })
 assert.equal(dedupe.data.duplicateCount, 1, 'duplicate articles/filings are collapsed')
 assert.equal(dedupe.data.retained.length, 2, 'unique observations remain')
@@ -2867,7 +2894,7 @@ assert.equal(new Set(tabledOperations).size, tabledOperations.length, 'no operat
  * that a row which cannot fill all four is refused by name rather than
  * published half-wired.
  */
-assert.equal(Object.keys(OPERATIONS).length, 107, 'every operation the package answers has a definition row')
+assert.equal(Object.keys(OPERATIONS).length, 108, 'every operation the package answers has a definition row')
 assert.equal(PUBLISHED_OPERATIONS.length + INTERNAL_OPERATIONS.length, Object.keys(OPERATIONS).length, 'surface partitions the table; there is no third state')
 assert.deepEqual([...supportedOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'operation_unknown lists the published surface, projected from the definition')
 assert.deepEqual([...tabledOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'and the skill table is that same surface')

@@ -77,7 +77,7 @@ import { harnessAudit, lessonAudit } from './audit.mjs'
 import { lensEnvelope, clusterBlock, timeStopPolicy, exitDiscipline, ruleVersions, policyLint } from './envelopes.mjs'
 import { signalPaper, paperAdmission, shadowTrack, baselineTrack, verdictReport, controlArmLane } from './learning.mjs'
 import { refutedMemoryRules } from './memory-rules.mjs'
-import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, nextReviewSequence, resolveWakeFlow, resolveTrancheWake, reconcileArmedReviews } from './schedule.mjs'
+import { zonedDateTimeToUtc, nextMarketReview, earningsCheckpoint, boundedRetry, classifyScheduledWake, scheduleDrift, deduplicateObservations, themeRadarDue, dislocationSignal, nextReviewSequence, resolveWakeFlow, resolveTrancheWake, reconcileArmedReviews } from './schedule.mjs'
 import { MARKET_CURRENCIES, MANAGER_ID } from './diagnostics.mjs'
 import { MACRO_INDICATORS } from './evidence.mjs'
 import { ANY, ARRAY, ARRAY_OF_ARRAYS, OBJECT, NUMBER, STRING, BOOLEAN, INPUT_VOCABULARY, PAPER_SETUP_COHORTS } from './vocabulary.mjs'
@@ -453,9 +453,12 @@ export const OPERATIONS = {
   discoveryCapacity: {
     group: 'preflight',
     surface: 'published',
-    mode: 'strict', keys: { radar: OBJECT, coverage: OBJECT, uncertainty: ARRAY },
-    describe: 'which discovery branches were open this run — and whether both were shut, which is a report and never a stop',
-    run: discoveryCapacity,
+    mode: 'strict', keys: { radar: OBJECT, coverage: OBJECT, uncertainty: ARRAY, boundary: OBJECT },
+    nested: {
+      boundary: 'What `run/theme-radar-last` held under `boundary` — the running count of consecutive runs in which the declared universe gained no extension (#227). The answer returns `nextBoundary` to write back, so the count is this operation\u2019s arithmetic and never a run\u2019s. Absent reads as a fresh streak, which is the right reading for a book that has never counted.',
+    },
+    describe: 'which discovery branches were open this run — whether both were shut, which is a report and never a stop, and how long the declared boundary has stood still',
+    run: (input, asOf) => discoveryCapacity({ ...input, asOf }),
   },
   validateWatch: {
     group: 'evidence',
@@ -1110,9 +1113,25 @@ export const OPERATIONS = {
   themeRadarDue: {
     group: 'schedule',
     surface: 'published',
-    mode: 'named', keys: { lastRunAt: STRING, intervalDays: NUMBER, dislocation: BOOLEAN },
-    describe: 'whether the forward-research interval has elapsed',
+    mode: 'named', keys: { lastThesisCallAt: STRING, lastRunAt: STRING, intervalDays: NUMBER, dislocation: BOOLEAN },
+    nested: {
+      lastThesisCallAt: 'When this radar last produced a `thesis_call` — the clock the interval is measured on, and the one the source methodology names (#227). ⛔ Not when it last ran: a run that looked and found nothing would then lock the next three days, which is the inverse of the design. `null` is a value and says the radar has run and produced none, which is due; omitting it on a record that carries `lastRunAt` is the pre-0.6.0 shape and answers `theme_radar_clock_unstated` / `unevaluated`, also due.',
+      lastRunAt: 'When the radar last ran. It is an observation and decides nothing — it comes back as `runAgeDays` so a radar that has run six times and produced nothing stays distinguishable from one that has never run.',
+      dislocation: 'True runs the radar regardless of staleness — the source runs it in dislocation weeks because they are the richest thesis environment. ⚠️ Its producer is `dislocationSignal`, over what `validateMacro` returned; ⛔ it is never a run’s own adjective.',
+    },
+    describe: 'whether the forward-research interval has elapsed — measured from the last `thesis_call`, not the last run',
     run: (input, asOf) => themeRadarDue({ ...input, asOf }),
+  },
+  dislocationSignal: {
+    group: 'schedule',
+    surface: 'published',
+    mode: 'named', keys: { macro: OBJECT, regime: ANY, lookbackDays: NUMBER },
+    nested: {
+      macro: 'What `validateMacro` returned. Its `retained` rows are read, and only two indicators of them — `index-level` for the move and `vix` for the spike. ⛔ A bare array of observations is not read: the rows this judges on are the dated, tiered ones that operation kept.',
+      regime: 'What `regimeTag` returned, or its `regime` string. It is carried and never decisive: a `risk-off` regime can stand for months and this answers a question about weeks.',
+    },
+    describe: 'whether this is a dislocation week — the producer `themeRadarDue`’s `dislocation` argument never had',
+    run: (input, asOf) => dislocationSignal({ ...input, asOf }),
   },
   nextReviewSequence: {
     group: 'schedule',
