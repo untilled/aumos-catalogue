@@ -3,11 +3,14 @@ import './verify-evidence-gated-input-regressions.mjs'
 /** #171: the cause vocabulary has to be the codes the siblings emit, proven. */
 import './verify-evidence-gated-diagnostic-codes.mjs'
 import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { execute } from '../managers/evidence-gated/lib/index.mjs'
 import { handleMcpRequest } from '../managers/evidence-gated/lib/mcp-server.mjs'
 import { METHODOLOGY } from '../managers/evidence-gated/lib/constants.mjs'
 import { GRANDFATHER_DEFAULTS } from '../managers/evidence-gated/lib/diagnostics.mjs'
+import { OPERATIONS, PUBLISHED_OPERATIONS, INTERNAL_OPERATIONS, SUBSUMED_BY, assertRegistered } from '../managers/evidence-gated/lib/operations.mjs'
+import { labelAxes, sessionRows } from '../managers/evidence-gated/lib/input-shapes.mjs'
+import { renderOperations, checkOperations } from './generate-evidence-gated-operations.mjs'
 import { loadParity, comparePort } from './legacy-parity.mjs'
 
 /**
@@ -2741,10 +2744,14 @@ assert.ok(
  *
  * 44 of the 64 appeared in no skill and no prompt. The only way to learn one
  * was to call a wrong name and read the `operation_unknown` diagnostic, while
- * all three flow skills instruct the run not to go looking. So the table in
- * `deterministic-metrics` is checked in both directions: an operation missing
- * from it is unreachable, and a name in it that no longer exists is a call
- * that will fail at runtime.
+ * all three flow skills instruct the run not to go looking.
+ *
+ * ⚠️ **The check is no longer a set comparison of names (#212 ③).** Comparing
+ * names let a row name one operation and describe another, and it could not
+ * see a `describe` that had gone stale — the failure this package records most
+ * often, one document away. The section is **regenerated from
+ * `lib/operations.mjs` and compared whole**, so the skill cannot differ from
+ * the definition by one character.
  */
 const supportedOperations = execute({ operation: null, asOf: methodology.asOf }).diagnostics[0].details.supported
 const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKILL.md', fixtureRoot), 'utf8')
@@ -2756,13 +2763,183 @@ const metricsSkill = await readFile(new URL('../skills/deterministic-metrics/SKI
  */
 const operationsSection = metricsSkill.slice(metricsSkill.indexOf('## The operations'), metricsSkill.indexOf('## Inputs that are not guessable'))
 const tabledOperations = [...operationsSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
-assert.equal(supportedOperations.length, 107)
-assert.deepEqual(
-  [...tabledOperations].sort(),
-  [...supportedOperations].sort(),
-  'the operation table and the registered operations agree in both directions',
-)
+assert.equal(await checkOperations(), null, 'the skill\'s operations section is what lib/operations.mjs renders — run node tools/generate-evidence-gated-operations.mjs --write')
 assert.equal(new Set(tabledOperations).size, tabledOperations.length, 'no operation is listed twice')
+
+/**
+ * ── The definition is the only place any of the four is written (#212 ③) ───
+ *
+ * Registration, contract, nested shape and skill sentence are projections of
+ * `OPERATIONS`. Structure carries most of that — `index.mjs` maps `run`,
+ * `input-contracts.mjs` projects `mode`/`keys`/`nested`, the generator renders
+ * `describe` — so what has to be **executed** is the part structure cannot
+ * prove: that each projection actually moves when the definition does, and
+ * that a row which cannot fill all four is refused by name rather than
+ * published half-wired.
+ */
+assert.equal(Object.keys(OPERATIONS).length, 107, 'every operation the package answers has a definition row')
+assert.equal(PUBLISHED_OPERATIONS.length + INTERNAL_OPERATIONS.length, Object.keys(OPERATIONS).length, 'surface partitions the table; there is no third state')
+assert.deepEqual([...supportedOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'operation_unknown lists the published surface, projected from the definition')
+assert.deepEqual([...tabledOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'and the skill table is that same surface')
+
+/** ⑴ A `describe` changed in the definition moves the line the skill carries. */
+const mutatedDescribe = { ...OPERATIONS, scan: { ...OPERATIONS.scan, describe: 'a sentence nobody wrote in the skill' } }
+assert.notEqual(renderOperations(mutatedDescribe), operationsSection, 'a describe the definition changed is a describe the skill has to change — otherwise the comparison above asserts nothing')
+assert.ok(renderOperations(mutatedDescribe).includes('a sentence nobody wrote in the skill'), 'and the rendered table is where it lands')
+
+/** ⑵ A `surface` changed in the definition adds or removes a row of the table. */
+const mutatedSurface = { ...OPERATIONS, scan: { ...OPERATIONS.scan, surface: 'internal', subsumedBy: 'indicators', subsumedAt: 'indicators.mjs' } }
+assert.equal(renderOperations(mutatedSurface).includes('| `scan` |'), false, 'an operation moved off the published surface leaves the table')
+
+/**
+ * ⑶ A row that cannot fill all four projections is refused **by name**, at
+ * module load. Each mutation below is one of the ways the four used to be able
+ * to disagree quietly.
+ */
+const refuses = (row, fragment) => {
+  assert.throws(() => assertRegistered({ ...OPERATIONS, scan: { ...OPERATIONS.scan, ...row } }), (error) => {
+    assert.match(error.message, /^scan: /, 'the refusal names the operation')
+    assert.match(error.message, fragment)
+    return true
+  })
+}
+refuses({ run: undefined }, /no run/)
+refuses({ describe: '' }, /no describe/)
+refuses({ mode: 'lenient' }, /mode must be/)
+refuses({ keys: undefined }, /no keys/)
+refuses({ group: 'nowhere' }, /group nowhere is not one of/)
+refuses({ surface: 'half-published' }, /surface must be/)
+refuses({ surface: 'internal' }, /subsumedBy undefined is not a registered operation/)
+refuses({ surface: 'internal', subsumedBy: 'brier', subsumedAt: 'x' }, /is itself internal/)
+refuses({ surface: 'internal', subsumedBy: 'indicators' }, /subsumedAt must name the call site/)
+refuses({ subsumedBy: 'indicators' }, /a published operation names no subsumedBy/)
+refuses({ shape: 'labelAxes' }, /shape must be a function/)
+assert.doesNotThrow(() => assertRegistered(OPERATIONS), 'and the committed table passes its own guard')
+
+/**
+ * ⑷ The nested shape checks are named by the row, not found by comparing the
+ * operation name to a string. ⛔ `input-contracts.mjs` and `input-shapes.mjs`
+ * hold no `operation === ` test at all now — that chain was the fourth writing
+ * of the same per-operation table, and a branch in it could outlive the
+ * operation it was written for.
+ */
+for (const file of ['input-contracts.mjs', 'input-shapes.mjs', 'operations.mjs']) {
+  const source = await readFile(new URL(`../lib/${file}`, fixtureRoot), 'utf8')
+  /**
+   * ⚠️ Comment lines are dropped first: the three files each **describe** the
+   * chain they replaced, and a check that could not tell a sentence about the
+   * old dispatch from the old dispatch would forbid saying what changed.
+   */
+  const code = source.split('\n').filter((line) => !/^\s*(\*|\/\*|\/\/)/.test(line)).join('\n')
+  const tests = [...code.matchAll(/operation !?===/g)]
+  assert.equal(tests.length, 0, `${file} dispatches shape checks by definition row, not by comparing the operation name`)
+}
+assert.equal(OPERATIONS.concentration.shape, labelAxes, 'concentration names the label-axis check in its own row')
+assert.equal(OPERATIONS.nextMarketReview.shape, sessionRows, 'and two operations that need the same shape name the same function')
+assert.ok(
+  execute({ operation: 'concentration', asOf: methodology.asOf, input: { positions: [{ symbol: 'A', weight: 0.1, sectors: ['kr-broad-equity'] }] } })
+    .diagnostics.some((row) => row.code === 'input_shape_invalid' && row.path === 'input.positions[0].sectors'),
+  'and the check the row names is the check that runs',
+)
+
+/**
+ * ── The internal surface is measured, not chosen (#212 ③) ──────────────────
+ *
+ * Two conditions, both checked here: another registered operation's
+ * implementation already calls it, and nothing in `PROMPT.md` or any flow skill
+ * names it. ⛔ And it still runs — the issue asks for the existing functions to
+ * be kept behind a task-unit API, so an internal operation answers a call by
+ * name exactly as it did.
+ */
+assert.equal(INTERNAL_OPERATIONS.length, 8)
+const flowProse = (await Promise.all(
+  ['../PROMPT.md', ...(await readdir(new URL('../skills', fixtureRoot)))
+    .filter((name) => name !== 'deterministic-metrics')
+    .map((name) => `../skills/${name}/SKILL.md`)]
+    .map((path) => readFile(new URL(path, fixtureRoot), 'utf8')),
+)).join('\n')
+for (const name of INTERNAL_OPERATIONS) {
+  const { operation: by, at } = SUBSUMED_BY[name]
+  assert.ok(PUBLISHED_OPERATIONS.includes(by), `${name} is subsumed by ${by}, which is on the published surface`)
+  /**
+   * ⚠️ The call site is **read**, not taken on trust: `<file> <caller>() →
+   * <callee>()` is parsed, the caller is found in that file, and the callee has
+   * to appear inside its body. A claim that the answer is already computed
+   * elsewhere is the whole ground for not showing the operation, so it is
+   * checked the way a number would be.
+   */
+  const site = /^([\w-]+\.mjs) (\w+)\(\) → (\w+)\(\)$/.exec(at)
+  assert.ok(site, `${name}: subsumedAt is «<file>.mjs <caller>() → <callee>()», not ${at}`)
+  const [, file, caller, callee] = site
+  const source = await readFile(new URL(`../lib/${file}`, fixtureRoot), 'utf8')
+  const from = source.indexOf(`export function ${caller}(`)
+  assert.ok(from >= 0, `${at}: ${caller} is exported from ${file}`)
+  const next = source.indexOf('\nexport function ', from + 1)
+  const body = source.slice(from, next < 0 ? source.length : next)
+  assert.match(body, new RegExp(`[^.\\w]${callee}\\(`), `${at}: ${caller} really calls ${callee}, so ${name} is a step of ${by} and not a separate answer`)
+  assert.equal(flowProse.includes(name), false, `no flow skill and no section of PROMPT.md names ${name}, so nothing tells a run to reach for it`)
+  assert.equal(
+    execute({ operation: name, asOf: methodology.asOf, input: {} }).diagnostics.some((row) => row.code === 'operation_unknown'),
+    false,
+    `${name} still runs when it is called by name — internal is a discovery decision, not a removal`,
+  )
+}
+const redirect = execute({ operation: 'brier', asOf: methodology.asOf, input: { probabilities: [0.2, 0.8], outcomeIndex: 1 } })
+assert.equal(redirect.status === 'blocked', false, 'an internal operation answers rather than refusing')
+assert.equal(execute({ operation: null, asOf: methodology.asOf }).diagnostics[0].details.internal, 8, 'and the refusal for an unknown name says how many operations are steps of the published ones')
+assert.equal(execute({ operation: null, asOf: methodology.asOf }).diagnostics[0].details.subsumedBy.brier.operation, 'calibration', 'naming what returns each of their answers instead')
+
+/**
+ * ⛔ **`subsumedBy` is not in the `inputContracts` payload** — that answer is
+ * read by every run and the redirect is only wanted by a run that has just been
+ * refused, which is where it is.
+ */
+const contractsAnswer = execute({ operation: 'inputContracts', asOf: methodology.asOf, input: {} }).data
+assert.equal(contractsAnswer.subsumedBy, undefined)
+assert.equal(Object.keys(contractsAnswer.contracts).length, PUBLISHED_OPERATIONS.length, 'the published contracts are the published surface')
+assert.equal(Object.keys(contractsAnswer.internalContracts).length, INTERNAL_OPERATIONS.length, 'and the steps of those keep their published shape, so a run that already calls one can still read it')
+for (const name of INTERNAL_OPERATIONS) assert.equal(contractsAnswer.keys[name], undefined, `${name} is not offered in the key list a run composes from`)
+
+/**
+ * ── The one table still written by hand, and what constrains it (#212 ③) ───
+ *
+ * «Inputs that are not guessable from the operation name» is 31KB of prose
+ * keyed by operation and field, and it says of itself that it is *"the prose
+ * reading of `inputContracts`, not a second source"*. ⛔ It is **not** generated
+ * from the definition and this PR does not move it: it is per-*field* prose
+ * about wrong spellings a real run sent, its owner is #212 ⑦ — the issue that
+ * moves sentence-fixing tests to behaviour tests — and rewriting it here would
+ * put 31KB of prose in a diff about where a definition lives.
+ *
+ * ⚠️ **What it does get is a constraint it did not have.** Every operation it
+ * addresses has to be one the definition publishes. A row for an operation that
+ * no longer exists, or for one that has moved off the published surface, is an
+ * instruction pointing at a call a run should not compose — and nothing said so
+ * before.
+ */
+const guessableSection = metricsSkill.slice(metricsSkill.indexOf('## Inputs that are not guessable'))
+const guessableRows = [...guessableSection.matchAll(/^\| `([a-zA-Z]+)` \| /gm)].map((match) => match[1])
+assert.ok(guessableRows.length > 0, 'the table is read, not silently missed — the scoping mistake this file has made three times')
+for (const name of guessableRows) {
+  assert.ok(PUBLISHED_OPERATIONS.includes(name), `the not-guessable table addresses ${name}, which the definition does not publish`)
+}
+
+/**
+ * ── A sentence is not an input to a calculation (#212 ③) ───────────────────
+ *
+ * `describe` and `nested` are prose. Rewriting all of it must not move a
+ * number, which is the completion criterion this issue states — and after #212
+ * ② moved the disclosure checks out of `effectivePositionCap`, it is a property
+ * the package can actually hold rather than one it hopes for.
+ */
+const proseFree = Object.fromEntries(Object.entries(OPERATIONS).map(([name, row]) => [name, { ...row, describe: 'rewritten', ...(row.nested ? { nested: { rewritten: 'rewritten' } } : {}) }]))
+assert.doesNotThrow(() => assertRegistered(proseFree), 'prose rewritten wholesale still registers')
+for (const [name, row] of Object.entries(proseFree)) {
+  assert.equal(row.run, OPERATIONS[name].run, `${name}: the sentence and the calculation are different members, so rewriting one cannot reach the other`)
+  assert.deepEqual(row.keys, OPERATIONS[name].keys)
+  assert.equal(row.mode, OPERATIONS[name].mode)
+  assert.equal(row.shape, OPERATIONS[name].shape)
+}
 
 /**
  * ⛔ **No operation re-derives who may read private memory (#212 ①).** The
@@ -4675,4 +4852,5 @@ assert.deepEqual(
 
 assertCoverageWasEarned()
 
+console.log(`evidence-gated operations: ${Object.keys(OPERATIONS).length} defined in one table — ${PUBLISHED_OPERATIONS.length} published, ${INTERNAL_OPERATIONS.length} steps of those, and the skill's table is rendered from it`)
 console.log(`evidence-gated contract fixtures passed (${parity.cases.length} legacy-parity cases)`)

@@ -36,7 +36,7 @@ import { METHODOLOGY } from './constants.mjs'
  * oversold scanners. Beating the index is not the bar; beating the index *and*
  * the bot is.
  */
-import { PAPER_SETUP_COHORTS as SETUP_COHORTS } from './input-contracts.mjs'
+import { PAPER_SETUP_COHORTS as SETUP_COHORTS } from './vocabulary.mjs'
 
 /**
  * The challenge verdict decides the setup, and there is exactly one mapping.

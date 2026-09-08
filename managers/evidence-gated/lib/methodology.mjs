@@ -1,5 +1,5 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
-import { PAPER_SETUP_COHORTS } from './input-contracts.mjs'
+import { PAPER_SETUP_COHORTS } from './vocabulary.mjs'
 import { attestationCounts, attestationOf, MANAGER_OBSERVATION_SOURCE, strongestAttestation } from './observation.mjs'
 
 /**

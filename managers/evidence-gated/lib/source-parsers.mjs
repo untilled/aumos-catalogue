@@ -1,5 +1,5 @@
 import { diagnostic, finite } from './diagnostics.mjs'
-import { laneOutcome } from './input-contracts.mjs'
+import { laneOutcome } from './vocabulary.mjs'
 
 export function filterPointInTime(rows, { asOf, timestampField = 'availableAt', freshnessHours }) {
   const diagnostics = []

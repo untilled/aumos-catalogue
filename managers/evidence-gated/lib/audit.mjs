@@ -1,5 +1,5 @@
 import { diagnostic, finite, round, grandfatherPolicy } from './diagnostics.mjs'
-import { laneOutcome } from './input-contracts.mjs'
+import { laneOutcome } from './vocabulary.mjs'
 
 /**
  * ── Pre-flight: what has to be true before a run plans a trade (issue #70 §7) ─

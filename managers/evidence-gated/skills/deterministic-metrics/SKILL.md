@@ -37,9 +37,21 @@ the JSON remains the canonical explanation.
 
 ## The operations
 
-All 107, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
+All 99, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
 calling it wrong is not a discovery path — every flow skill tells you not to go looking, so the
 names have to be here. A name absent from this table is a name you cannot call.
+
+⚠️ **8 further operations are steps of the ones below and are deliberately not listed.**
+Each is already computed inside a table entry, so calling one directly re-assembles by hand an
+answer a single call returns whole. They still run, and `operation_unknown` names what returns
+each of their answers instead — so a call that reaches for one is redirected, never refused for
+a name that does not exist.
+
+### Reading the contract before composing a call
+
+| operation | what it decides |
+|---|---|
+| `inputContracts` | every operation's input keys and their types, which of them are guarded, the nested shapes, and the evaluator vocabulary |
 
 ### Scanners and lenses — what to look at
 
@@ -51,7 +63,6 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `opportunityMetrics` | the five oversold axes for one candidate |
 | `opportunityUniverse` | the declared universe, with held and pending excluded |
 | `trendState` | core ETF trend gate: `full` / `half` / `small_or_wait` / `stop` — over bars validated by the same rule `indicators` applies, so an unreadable row is `state: "insufficient_data"` and never a guidance. ⚠️ Bars are `{date, open, high, low, close, volume}` with **numeric** prices; a vendor candle payload (`closePrice` as a string) is refused row by row |
-| `blendedSectorStrength` | one sector's weighted RS against one benchmark |
 | `sectorStrength` | L1: lane ranking, rank moves, regime, `researchQueue`, bot baselines |
 | `regimeTag` | a Brief regime call, canonicalized, attributed, and compared with the sector reading |
 | `entryQualityGate` | `falling_knife` blocks; eq-v2 and `no_new_low` dual lenses |
@@ -66,61 +77,55 @@ names have to be here. A name absent from this table is a name you cannot call.
 | `targetWeight` | desired portfolio weight under maturity and caps |
 | `experimentalCeiling` | the ceiling an unpromoted lens is held to — the ratio or the venue's minimum executable amount, whichever is larger, bounded |
 | `effectivePositionCap` | the cap the investor declared against the cap that actually binds, what reduced it, and what lifts it — plus the venue floor that sits above the control arm's single-name cell |
+| `proposalDisclosure` | whether the assembled proposal carries the disclosures its own sizing said it owes — the reduced cap, the manager-attested main lane — and, when it does not, which half is silent |
 | `effectiveCashFloor` | the cash floor the investor declared against the one that binds, and whether the plan still clears it *after* it executes |
 | `singleNameBudget` | what the Mandate's own two numbers leave the single-name lanes to hold — `cashFloor` sets the range, `maxPositionWeight` the per name — and what is left of it |
-| `inputContracts` | every operation's input keys and their types, which of them are guarded, the nested shapes, and the evaluator vocabulary |
-| `researchUniverse` | pinned KR/US curated roster plus dated, evidenced extensions; current eligibility must be checked |
-| `researchState` | bounded research roster and Evidence references; no source payload cache |
 | `legacySizeSuggestion` | the ported Kelly-gated heuristic and its mode label |
 | `concentration` | position/sector/theme/factor caps and portfolio heat |
 | `executionRecord` | what this run's data preparation actually did, as counts read off the host's own research job and result — was the roster prepared, did the recipe answer, and how many of the answers cleared the gates. ⛔ Reads no diagnostic |
 | `mandateExecution` | the share of the book that is cash, parked and risk-bearing, set beside the Mandate's declared `objective` — and, when no single name is held at all, whether that is a run that found nothing worth owning or one whose gates never received their inputs |
-| `proposalDisclosure` | whether the assembled proposal carries the disclosures its own sizing said it owes — the reduced cap, the manager-attested main lane — and, when it does not, which half is silent |
 | `newSinglePacing` | three approved pacing warnings; never blocks |
 | `entryTranchePlan` | a single name's T1/T2/T3 ladder: which rung is due, which is within 5%, which lapsed with the plan unfinished — and that the whole plan is one sample |
 | `specialistBudget` | a sleeve flow inside its Brief budget and market lane, and whether that budget can be paid for in the currency the sleeve settles in |
 | `globalAllocation` | the one cross-market denominator; refuses double-spend |
+| `researchState` | bounded research roster and Evidence references; no source payload cache |
+| `researchUniverse` | pinned KR/US curated roster plus dated, evidenced extensions; current eligibility must be checked |
 
 ### Evidence admission and research gates
 
 | operation | what it decides |
 |---|---|
-| `validateConsensus` | a quoted figure is dated, sourced, typed and unit-bearing |
-| `crossCheckPrice` | vendor vs web price; conflict retained, never averaged |
-| `validateMacro` | macro observations are dated and tiered; there is no macro score |
-| `observationLedger` | of what this run read on the web and filed with `observation_file`, which readings the proposal actually cites — and, for each value used in judgement, whether any submitted evidence id supports it |
-| `researchGate` | lens, why-cheap, traps, variant view, scenarios, active-return gate |
-| `validateThesis` | the thesis metadata contract; `complete` with gaps is refused |
-| `laneCoverage` | which lane a missing source closes, and what it degrades to |
-| `validateAdjustment` | split/dividend adjustment conflicts between vendors |
 | `coverage` | every declared-universe candidate has a current disposition |
 | `validateWatch` | kind, futurity, already-met, expiry and reachability |
 | `evaluateWatch` | a standing WATCH scored met / near / not-met / blocked / unevaluable, with the cadence its kind requires |
 | `watchAlertState` | one session's already-alerted WATCH keys, replaced when the session rolls |
+| `validateConsensus` | a quoted figure is dated, sourced, typed and unit-bearing |
+| `researchGate` | lens, why-cheap, traps, variant view, scenarios, active-return gate |
+| `crossCheckPrice` | vendor vs web price; conflict retained, never averaged |
+| `validateMacro` | macro observations are dated and tiered; there is no macro score |
+| `observationLedger` | of what this run read on the web and filed with `observation_file`, which readings the proposal actually cites — and, for each value used in judgement, whether any submitted evidence id supports it |
+| `validateThesis` | the thesis metadata contract; `complete` with gaps is refused |
+| `laneCoverage` | which lane a missing source closes, and what it degrades to |
+| `validateAdjustment` | split/dividend adjustment conflicts between vendors |
 
 ### Position watch and outcomes
 
 | operation | what it decides |
 |---|---|
-| `thesisSentinel` | `intact` / `watch` / `threatened`, and the escalation it forces |
-| `exitCheck` | L2.5: price and fundamental lanes → SELL / TRIM / REVIEW |
 | `netReturnBreakdown` | fill-based gross, net-local and net-KRW return |
 | `outcomeClassification` | the computed failure axis and the judged one |
-| `forwardOutcome` | d5/d20/d60 forward return, excess and MFE/MAE |
 | `earningsActual` | a released result against consensus and guidance |
+| `thesisSentinel` | `intact` / `watch` / `threatened`, and the escalation it forces |
+| `exitCheck` | L2.5: price and fundamental lanes → SELL / TRIM / REVIEW |
 
 ### Calibration, promotion and attribution
 
 | operation | what it decides |
 |---|---|
 | `calibration` | per-lens sample, cluster and maturity summary |
-| `clusters` | independent date clusters under the five-day transitive rule |
-| `brier` | categorical Brier score for declared probabilities |
-| `bhFdr` | Benjamini–Hochberg false-discovery control across lenses |
-| `quintileSpread` | top-minus-bottom quintile spread |
-| `bootstrapClusterCi` | cluster bootstrap interval (`mulberry32-v1` when seeded) |
-| `promotionGate` | every promotion condition, and which one is missing |
 | `closedOutcomeSamples` | closed real decisions turned into the calibration samples that move lens maturity — and which axis they reach, which they do not |
+| `clusters` | independent date clusters under the five-day transitive rule |
+| `promotionGate` | every promotion condition, and which one is missing |
 | `attribution` | core beta, non-core, selection, cash and FX — additive |
 | `twr` | time-weighted return across flows |
 | `mwr` | money-weighted return, annualized |
@@ -130,12 +135,12 @@ names have to be here. A name absent from this table is a name you cannot call.
 
 | operation | what it decides |
 |---|---|
-| `paperAdmission` | promote / watch / rejected, and refuses a promote on stale price history |
 | `signalPaper` | forward scoring of the paper log, aggregated per setup and per cohort |
+| `paperAdmission` | promote / watch / rejected, and refuses a promote on stale price history |
 | `shadowTrack` | same decisions at unconstrained size — is the cap what costs return? |
 | `baselineTrack` | what buying the index and waiting would have returned |
-| `verdictReport` | the §6 verdict against pre-registered criteria, and the proposals it raises |
 | `controlArmLane` | the bounded lane whose product is closed outcomes, and which may never be expanded on its own result |
+| `verdictReport` | the §6 verdict against pre-registered criteria, and the proposals it raises |
 | `exitDiscipline` | the unconditional time stop and the stop distance this position may carry, and the two WATCH rows an entry registers |
 
 ### Mechanical backtests — baselines, not signals
@@ -152,10 +157,10 @@ names have to be here. A name absent from this table is a name you cannot call.
 |---|---|
 | `filterPointInTime` | drops rows that were not public at `asOf` |
 | `normalizeSecFacts` | SEC company facts with their availability dates |
-| `normalizeSecSubmissions` | SEC submissions index |
 | `normalizeDartFilings` | OpenDART receipts — the receipt is when a fact became public |
-| `normalizeDartFinancials` | OpenDART statements |
 | `parseDartCorpCodes` | the OpenDART corp-code registry |
+| `normalizeDartFinancials` | OpenDART statements |
+| `normalizeSecSubmissions` | SEC submissions index |
 
 ### The fundamental feeding path
 
@@ -168,9 +173,9 @@ carry, and the 2026-09-06 run never asked for it.
 | `fundamentalsPlan` | the ordered source calls that feed the branch, each with its host cache state — and whether that state means *read it*, *refresh it* or *the refresh failed* |
 | `mapCorporationCodes` | roster symbol → the vendor's own filer id (OpenDART `corp_code`, SEC CIK); reports unmapped names one by one |
 | `dartVendorStatus` | which OpenDART status arrived on an HTTP 200 — ⛔ `013` (matched nothing) and `020` (quota; **we were not allowed to look**) are never the same finding |
-| `catalystRegister` | the catalyst and event axis, which had **no producer at all** until #169: researched windows and event records in — each carrying the `evidenceIds` the reading was filed under — the two maps `radarCandidates` takes out, plus the bounded `research/catalyst-window` revision they are carried in. ⛔ It counts the names nobody researched separately from the names researched with nothing scheduled |
 | `radarCandidates` | vendor rows or cached normalized documents → `upsideRadar` candidates, with every unfed name still returned and counted |
 | `radarFeedDiagnosis` | which stage lost the input — registry, mapping, request, response, normalization — so a starved lane names its cause instead of repeating *unfed* |
+| `catalystRegister` | the catalyst and event axis, which had **no producer at all** until #169: researched windows and event records in — each carrying the `evidenceIds` the reading was filed under — the two maps `radarCandidates` takes out, plus the bounded `research/catalyst-window` revision they are carried in. ⛔ It counts the names nobody researched separately from the names researched with nothing scheduled |
 | `thesisValuation` | `fairValueRange` and `expectedUpsidePct` out of the bear/base/bull table, with each case's target tied to the filing facts under it — ⛔ this package publishes no multiple and no discount rate of its own |
 | `thesisGapSources` | for each `validateThesis` gap: which source fills it, and whether that source **does not exist for this instrument** or **exists and was never called** — the two the same `gaps` list has been hiding |
 
@@ -178,18 +183,16 @@ carry, and the 2026-09-06 run never asked for it.
 
 | operation | what it decides |
 |---|---|
-| `zonedDateTimeToUtc` | a local date/time in an IANA zone → one instant |
-| `nextMarketReview` | the next real open session close plus buffer |
+| `earningsCheckpoint` | BMO/AMC/date-only → an at-time checkpoint |
+| `boundedRetry` | the bounded retry after a wake found nothing published |
+| `classifyScheduledWake` | why this run woke |
+| `scheduleDrift` | late, missing, duplicated and outage-shaped fires |
+| `deduplicateObservations` | the same observation arriving twice |
+| `themeRadarDue` | whether the forward-research interval has elapsed |
 | `nextReviewSequence` | the three flows' reviews in order, owned by one manager, each with the `intent` it must be armed with and the `{ cron, timeZone }` `rule` that goes beside `at` on the trigger. The rule draws the calendar forward and wakes nothing; `at` is still the whole schedule, and a review whose buffer crosses local midnight returns `rule: null` |
 | `resolveWakeFlow` | which flow opened this run, from the host's own record: hand it `armed` — the `armed` entries of `history.recentDecisions`, flattened — and the entry the host marked `fate: 'fired'` / `review: 'this-run'` answers with the flow, the `planId` and the instant the host recorded. `basis` says which channel answered. ⛔ An empty `armed` is not a failed arm: it means the host attributed nothing, and the flow falls back to the event `summary` through the legacy adapter, reported by name (`wake_flow_unattributed`, or `wake_attribution_unreadable` when no `armed` was handed over). `null` for a wake this manager did not arm, and `null` with `wake_flow_ambiguous` when the host folded two flows into one wake |
 | `resolveTrancheWake` | whether a fired plan's event summary is a rung of an unfinished staged entry, and which one |
 | `reconcileArmedReviews` | the reviews to arm — every one of them, because the published rule is to re-arm at every judgement and nothing this operation is handed could suppress one anyway — plus which of them this instance has already promised at this instant, and which flow it promised at a **different** instant, which is the one duplicate the host does not fold — reported with that older promise's `planId` where `standingPlans` names it, and with which silence it is where it does not. Hand it the invocation's `standingPlans` and it also reports `standingArms: { atLeast }`, the floor of what stood at `asOf` — report-only, and absent from it means unreadable while `[]` means a floor of zero |
-| `earningsCheckpoint` | BMO/AMC/date-only → an at-time checkpoint |
-| `boundedRetry` | the bounded retry after a wake found nothing published |
-| `classifyScheduledWake` | why this run woke — pass `armed` here too and the `flow` it returns beside the due/duplicate/late verdict is the host's attribution rather than a marker read out of prose |
-| `scheduleDrift` | late, missing, duplicated and outage-shaped fires |
-| `deduplicateObservations` | the same observation arriving twice |
-| `themeRadarDue` | whether the forward-research interval has elapsed |
 
 ### Declared thresholds — the numbers, and the drift they catch
 
@@ -205,8 +208,8 @@ carry, and the 2026-09-06 run never asked for it.
 
 | operation | what it decides |
 |---|---|
-| `harnessAudit` | orphaned WATCHes, mismatched positions, stale gates, order-ready decisions with no exit; and, as warnings, the holdings no decision explains — read from `positions[].origin` over the whole journal, not from the decision window — and a discovery universe nobody declared |
 | `discoveryCapacity` | which discovery branches were open this run — and whether both were shut, which is a report and never a stop |
+| `harnessAudit` | orphaned WATCHes, mismatched positions, stale gates, order-ready decisions with no exit; and, as warnings, the holdings no decision explains — read from `positions[].origin` over the whole journal, not from the decision window — and a discovery universe nobody declared |
 | `lessonAudit` | what is already waiting for the investor, so this run does not propose it again |
 | `refutedMemoryRules` | which rows of `failures/repeated-patterns` this package has since refuted, and the retraction to write in their place |
 
@@ -217,9 +220,10 @@ carry, and the 2026-09-06 run never asked for it.
 | `validateMemory` | the memory value contract; refuses copied source prose |
 | `migrationMap` | a legacy record → its canonical Aumos owner |
 
-A `check` in `tools/verify-evidence-gated-allocator.mjs` fails when this table and the registered
-operations disagree in either direction, so a new operation is unusable until it is named here.
-
+A `check` in `tools/verify-evidence-gated-allocator.mjs` regenerates this section from
+`lib/operations.mjs` and fails on any difference, so the table cannot describe one operation
+under another's name and a new operation is unusable until its definition row carries a
+`describe`.
 ## Inputs that are not guessable from the operation name
 
 Most operations take the object their subject implies. These do not, and calling them without the
