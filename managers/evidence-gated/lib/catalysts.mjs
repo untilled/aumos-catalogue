@@ -84,6 +84,19 @@ const DAY = 86_400_000
 /** The register's memory key. Published so a caller does not have to spell it. */
 export const CATALYST_MEMORY_KEY = 'research/catalyst-window'
 
+/**
+ * The three instants the revision carries, and it carries them as **numbers**:
+ * a catalyst window ends after `asOf` by construction and `memory_read` refuses
+ * a payload holding a later **string** timestamp, so RFC 3339 here makes the
+ * key unreadable rather than wrong.
+ *
+ * ⚠️ Published because the encoding is a contract with two readers outside this
+ * file — the memory contract a run reads, and the verifier that proves every
+ * carried row holds numbers. A second hand-written copy of this list is a list
+ * that can disagree with the writer below.
+ */
+export const CATALYST_EPOCH_FIELDS = ['windowStartEpochMs', 'windowEndEpochMs', 'observedAtEpochMs']
+
 const finite = (value) => typeof value === 'number' && Number.isFinite(value)
 
 /**

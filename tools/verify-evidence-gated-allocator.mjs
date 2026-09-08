@@ -11,7 +11,10 @@ import { GRANDFATHER_DEFAULTS } from '../managers/evidence-gated/lib/diagnostics
 import { OPERATIONS, PUBLISHED_OPERATIONS, INTERNAL_OPERATIONS, SUBSUMED_BY, assertRegistered } from '../managers/evidence-gated/lib/operations.mjs'
 import { labelAxes, sessionRows } from '../managers/evidence-gated/lib/input-shapes.mjs'
 import { canonicalizeInput, INPUT_VOCABULARY } from '../managers/evidence-gated/lib/input-contracts.mjs'
+import { FLOWS, numberedSteps, stepOf, wiringFaults, applyFeeds } from '../managers/evidence-gated/lib/flows.mjs'
+import { CATALYST_MEMORY_KEY, CATALYST_EPOCH_FIELDS } from '../managers/evidence-gated/lib/catalysts.mjs'
 import { renderOperations, checkOperations } from './generate-evidence-gated-operations.mjs'
+import { renderFlowSteps, checkFlowSteps } from './generate-evidence-gated-flow-steps.mjs'
 import { loadParity, comparePort } from './legacy-parity.mjs'
 
 /**
@@ -3147,6 +3150,13 @@ for (const name of INTERNAL_OPERATIONS) assert.equal(contractsAnswer.keys[name],
  * moves sentence-fixing tests to behaviour tests — and rewriting it here would
  * put 31KB of prose in a diff about where a definition lives.
  *
+ * ⚠️ **#212 ⑦ leaves the prose where it is, and this is its answer.** That
+ * item moves *tests*, and the two assertions below are already the shape it
+ * asks for: they read the table's rows and check each names an operation the
+ * definition **publishes**, which no rewording can satisfy or break. The prose
+ * itself is documentation with no check pinning a sentence in it, so there is
+ * nothing here for a behaviour test to replace.
+ *
  * ⚠️ **What it does get is a constraint it did not have.** Every operation it
  * addresses has to be one the definition publishes. A row for an operation that
  * no longer exists, or for one that has moved off the published surface, is an
@@ -4892,17 +4902,28 @@ assert.ok(
   'and the engine floor is at least the release that introduced it — a manifest declaring `observation:file` stops parsing on any older binary',
 )
 
-const observationProse = [
-  await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8'),
-  await readFile(new URL('../skills/kr-sleeve/SKILL.md', fixtureRoot), 'utf8'),
-  await readFile(new URL('../skills/us-sleeve/SKILL.md', fixtureRoot), 'utf8'),
-]
-for (const text of observationProse) {
-  assert.ok(text.includes('observation_file'), 'the filing step is named where a run reads, not only in this package’s own source')
-  assert.ok(text.includes('observationLedger'), 'and so is the check that it was cited — #146 measured what happens to a step that lives only in prose')
-}
-for (const text of observationProse.slice(1)) {
-  assert.ok(/^1[01]\. \*\*/m.test(text), 'and in the sleeve skills it is a numbered step in the branch checklist, which is the shape #146 had to be rewritten into')
+/**
+ * ⚠️ **The filing step is a declared step, not a substring (#212 ⑦).** What
+ * stood here read `observation_file` and `observationLedger` out of three
+ * documents and then asserted that one of them was numbered 10 or 11 — a
+ * numbering pin, satisfied by a document that prints the number and skips the
+ * call, and failed by one that renumbers the list correctly. Both are steps of
+ * both sleeve flows in `lib/flows.mjs` now, the checklist's numbering is
+ * rendered from that declaration, and the assertion is about the declaration.
+ *
+ * ⛔ `PROMPT.md` keeps its check: it is not a generated document, and #146
+ * measured what happens to a step named nowhere a run reads.
+ */
+assert.ok(prompt.includes('observation_file'), 'the filing step is named where a run reads, not only in this package’s own source')
+assert.ok(prompt.includes('observationLedger'), 'and so is the check that it was cited — #146 measured what happens to a step that lives only in prose')
+for (const flow of Object.keys(FLOWS)) {
+  for (const call of ['observation_file', 'observationLedger']) {
+    assert.ok(stepOf(flow, call), `${call} is a numbered step of ${flow}, which is the shape #146 had to be rewritten into`)
+  }
+  assert.ok(
+    stepOf(flow, 'observation_file').n < stepOf(flow, 'observationLedger').n,
+    'and the ledger that checks the filings comes after them — an order the declaration holds and the checklist is rendered from',
+  )
 }
 
 /**
@@ -5008,8 +5029,21 @@ covers('research/catalyst-register-encoding')
 const persisted = register.data.nextState
 assert.equal(persisted.schemaVersion, 1)
 assert.equal(persisted.updatedAsOf, catalystAsOf)
+/**
+ * ⚠️ **The list is the writer's own export, and it has to be the whole of it.**
+ * Three field names were written out here by hand, which cannot disagree with
+ * the writer but also cannot notice a fourth instant added beside them. Reading
+ * `CATALYST_EPOCH_FIELDS` closes that and opens the reverse — a name dropped
+ * from the export would drop the assertion with it — so the export is compared
+ * against every epoch-shaped key a carried row actually holds.
+ */
+assert.deepEqual(
+  [...new Set(persisted.rows.flatMap((row) => Object.keys(row).filter((key) => key.endsWith('EpochMs'))))].sort(),
+  [...CATALYST_EPOCH_FIELDS].sort(),
+  'the published encoding names every instant the revision carries and no others — a name added or dropped moves this set',
+)
 for (const row of persisted.rows) {
-  for (const field of ['windowStartEpochMs', 'windowEndEpochMs', 'observedAtEpochMs']) {
+  for (const field of CATALYST_EPOCH_FIELDS) {
     assert.equal(typeof row[field], 'number', `${field} is a number — written as a string later than asOf it is the one shape memory_read refuses`)
   }
   assert.ok(row.evidenceIds.length, 'and every carried row still names what it was read from')
@@ -5035,43 +5069,170 @@ assert.deepEqual(Object.keys(krRun.data.catalysts), [], 'and the map it hands ra
  * ── And it is a step a flow is told to take, not a function that exists ────
  *
  * The whole of #146 was that a written operation nobody was instructed to call
- * is not a stage of the run loop. Before this issue the only sentence about
- * this axis was *"`earningsCheckpoint` fills the rolling event window these
- * lanes read"* — a description of a window, not a step that fills one.
+ * is not a stage of the run loop. Before #169 the only sentence about this axis
+ * was *"`earningsCheckpoint` fills the rolling event window these lanes read"* —
+ * a description of a window, not a step that fills one.
+ *
+ * ⚠️ **What stood here until #212 ⑦ was a set of regular expressions over
+ * markdown.** They read the numbers off the two sleeve checklists — *"which
+ * number is the bold `catalystRegister` marker, which is `radarCandidates`"* —
+ * asserted the first was smaller, and checked five documents for the substring
+ * `catalystRegister`, one sentence about passing two maps, two more substrings,
+ * and the absence of the superseded sentence. Every one of those pins
+ * **wording, numbering and order in a document** and measures nothing that
+ * runs: reword a marker and it fails while the run is unchanged; move the
+ * wiring in the code and leave the sentence alone and it passes while the run
+ * is broken.
+ *
+ * The spine is a declaration now (`lib/flows.mjs`) and it is checked three
+ * ways, none of which reads a sentence:
+ *
+ *  1. the wiring is **runnable** — every declared feed names an earlier step;
+ *  2. the pipeline is **executed through the declaration**, so «pass
+ *     `catalysts` and `events` from the step above» is a fact about what
+ *     `radarCandidates` receives rather than a sentence a flow is asked to obey;
+ *  3. the checklist's numbering and order are **rendered** from it, so a
+ *     document cannot fail to name the step and cannot name it out of order.
  */
 covers('audit/catalyst-research-is-a-numbered-step')
-const catalystProse = {
-  'PROMPT.md': await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8'),
-  'skills/kr-sleeve/SKILL.md': await readFile(new URL('../skills/kr-sleeve/SKILL.md', fixtureRoot), 'utf8'),
-  'skills/us-sleeve/SKILL.md': await readFile(new URL('../skills/us-sleeve/SKILL.md', fixtureRoot), 'utf8'),
-  'skills/orchestrate/SKILL.md': await readFile(new URL('../skills/orchestrate/SKILL.md', fixtureRoot), 'utf8'),
-  'skills/memory-contract/SKILL.md': await readFile(new URL('../skills/memory-contract/SKILL.md', fixtureRoot), 'utf8'),
+for (const flow of Object.keys(FLOWS)) {
+  assert.deepEqual(wiringFaults(flow), [], `${flow}'s declared wiring is runnable: every feed names a step that has already answered`)
 }
-for (const [name, text] of Object.entries(catalystProse)) {
-  assert.ok(text.includes('catalystRegister'), `${name} names the producer — an operation no document sends a flow to is exactly the #146 defect`)
+/**
+ * ⚠️ **And the emptiness is not vacuous.** A consumer moved above its producer
+ * is the defect the old number comparison was reaching for, and it is now a
+ * property of the declaration rather than of a bold marker.
+ */
+const swappedSteps = numberedSteps('us-sleeve').slice()
+const registerAt = swappedSteps.findIndex((step) => step.call === 'catalystRegister')
+const radarAt = swappedSteps.findIndex((step) => step.call === 'radarCandidates')
+;[swappedSteps[registerAt], swappedSteps[radarAt]] = [{ ...swappedSteps[radarAt], n: registerAt + 1 }, { ...swappedSteps[registerAt], n: radarAt + 1 }]
+const swappedFaults = swappedSteps.flatMap((step) =>
+  (step.feeds ?? [])
+    .filter((row) => swappedSteps.find((other) => other.call === row.from).n >= step.n)
+    .map((row) => `${step.call}<-${row.from}`),
+)
+assert.deepEqual(
+  [...new Set(swappedFaults)],
+  ['radarCandidates<-catalystRegister'],
+  'swapping the producer past its consumer breaks the wiring by construction, and names the pair — ⚠️ the set rather than the count, so a wire added or removed is diagnosed by the assertions below instead of here',
+)
+
+/**
+ * ⚠️ **The step order, executed.** `catalystRegister` before `radarCandidates`
+ * is asserted by running them in the declared order and threading the declared
+ * feeds, not by comparing two integers printed in markdown. The starved and fed
+ * verdicts above are the same fixture; what is added here is that the input the
+ * consumer receives is the one the declaration wires.
+ */
+covers('audit/catalyst-research-is-a-numbered-step')
+assert.ok(stepOf('us-sleeve', 'catalystRegister').n < stepOf('us-sleeve', 'radarCandidates').n, 'the producer is a step of the flow, and an earlier one than its consumer')
+const wired = applyFeeds('us-sleeve', 'radarCandidates', radarInput, { catalystRegister: register.data })
+assert.deepEqual(wired.applied, ['catalysts', 'events'], 'both declared feeds are applied — an unapplied wire is reported, never dropped in silence')
+assert.deepEqual(wired.unfed, [], 'and nothing the declaration promises the radar is missing')
+assert.deepEqual(wired.input.catalysts, register.data.catalysts, 'what the consumer is called with is byte-for-byte what the producer answered')
+assert.deepEqual(wired.input.events, register.data.events, 'both maps, separately, because they are separate arguments')
+const wiredCandidates = execute({ operation: 'radarCandidates', asOf: catalystAsOf, input: wired.input })
+const wiredRadar = execute({ operation: 'upsideRadar', asOf: catalystAsOf, input: { candidates: wiredCandidates.data.candidates } })
+const wiredIntc = [...wiredRadar.data.ranked, ...wiredRadar.data.unranked].find((row) => row.asset === 'INTC')
+assert.deepEqual(wiredIntc.lensesEntered, fedIntc.lensesEntered, 'the pipeline assembled from the declaration reaches the fed verdict')
+assert.equal(wiredIntc.lanes.inflection.reason, 'sign-flip-with-a-registered-catalyst')
+
+/**
+ * ⚠️ **The counterfactual is the whole guard, and it is what the deleted
+ * sentence stood in for.** A run reaching `radarCandidates` without the
+ * register's answer — the order wrong, or the two maps not passed — hands the
+ * radar an empty catalyst axis, and the lanes report that as a finding about the
+ * company. ⛔ The unfed wires are **named**, so a caller cannot drop one quietly
+ * the way a flow skipping a paragraph did.
+ */
+covers('audit/catalyst-research-is-a-numbered-step')
+const unwired = applyFeeds('us-sleeve', 'radarCandidates', radarInput, {})
+assert.deepEqual(unwired.unfed, ['catalysts', 'events'], 'the producer absent, both wires are reported unfed by name')
+assert.deepEqual(unwired.input, radarInput, 'and nothing is invented in their place')
+const unwiredCandidates = execute({ operation: 'radarCandidates', asOf: catalystAsOf, input: unwired.input })
+const unwiredRadar = execute({ operation: 'upsideRadar', asOf: catalystAsOf, input: { candidates: unwiredCandidates.data.candidates } })
+const unwiredIntc = [...unwiredRadar.data.ranked, ...unwiredRadar.data.unranked].find((row) => row.asset === 'INTC')
+assert.equal(
+  unwiredIntc.lanes.inflection.reason,
+  'no-catalyst-registered-within-60-days',
+  'and the lane reports the absent input as a fact about the company — the 2026-09-06 run, reproduced from the wiring rather than from a sentence',
+)
+assert.notDeepEqual(unwiredIntc.lensesEntered, wiredIntc.lensesEntered, 'so the order and the input passing change the answer, which is what makes the assertions above measurements')
+
+/**
+ * ⚠️ **`earningsCheckpoint` is not a producer of this axis**, which is what the
+ * superseded sentence claimed. ⛔ The check is that no step of either flow feeds
+ * either map from it — a property of the declaration — rather than the absence
+ * of a sentence from `PROMPT.md`, which is satisfied by rewording it.
+ */
+covers('audit/catalyst-research-is-a-numbered-step')
+const axisProducers = (steps) => [
+  ...new Set(steps.flatMap((step) => (step.feeds ?? []).filter((row) => row.as === 'catalysts' || row.as === 'events').map((row) => row.from))),
+].sort()
+for (const flow of Object.keys(FLOWS)) {
+  assert.deepEqual(axisProducers(numberedSteps(flow)), ['catalystRegister'], `${flow} has exactly one producer for the catalyst axis, and it is the operation that registers windows`)
 }
-assert.ok(
-  !catalystProse['PROMPT.md'].includes('`earningsCheckpoint` fills the rolling event window these lanes read.'),
-  'and the sentence that stood in for the step is gone, rather than left beside it to be read as the instruction',
+/** ⚠️ Not vacuous: a second producer written into a copy is counted, so «one» is a reading and not an empty list. */
+assert.deepEqual(
+  axisProducers(numberedSteps('us-sleeve').map((step) => (step.call === 'radarCandidates' ? { ...step, feeds: [...step.feeds, { from: 'earningsCheckpoint', pick: 'events', as: 'events' }] } : step))),
+  ['catalystRegister', 'earningsCheckpoint'],
+  'and the operation the superseded sentence named would be seen if it were wired here',
 )
-for (const flow of ['skills/kr-sleeve/SKILL.md', 'skills/us-sleeve/SKILL.md']) {
-  const text = catalystProse[flow]
-  const step = text.match(/^(\d+)\. \*\*`catalystRegister`\*\*/m)
-  assert.ok(step, `${flow} carries it as a numbered step in the branch checklist`)
-  const radar = text.match(/^(\d+)\. \*\*`radarCandidates`\*\*/m)
-  assert.ok(Number(step[1]) < Number(radar[1]), 'and it comes before the operation that consumes what it produces')
-  assert.ok(/Pass `catalysts` and `events` from the step above/.test(text), 'the consuming step says where the two maps come from')
-  assert.ok(text.includes('research/catalyst-window'), 'and the flow is told where the register is carried')
-  assert.ok(text.includes('evidenceIds'), 'and that a row with no citation is refused rather than registered')
-}
-assert.ok(
-  catalystProse['skills/memory-contract/SKILL.md'].includes('- `research/catalyst-window`'),
-  'the key is in the closed stable-key list, because a key that is not is a key a run may not write',
+
+/**
+ * The revision the step's answer is carried in, round-tripped. ⚠️ The key is
+ * `lib/catalysts.mjs`' own constant, so the flow declaration and the writer
+ * cannot name two keys — which is what an `includes('research/catalyst-window')`
+ * over a skill could not tell apart from a document mentioning it in passing.
+ */
+covers('research/catalyst-register-encoding')
+assert.equal(stepOf('us-sleeve', 'catalystRegister').carriedIn, CATALYST_MEMORY_KEY, 'the flow carries the register under the key the operation writes')
+const reread = execute({
+  operation: 'catalystRegister',
+  asOf: catalystAsOf,
+  input: { market: catalystContract.market, roster: catalystContract.roster, previous: register.data.nextState },
+})
+assert.deepEqual(
+  reread.data.nextState.rows.map((row) => row.symbol).sort(),
+  register.data.nextState.rows.map((row) => row.symbol).sort(),
+  'and the next run reading that revision back gets the same rows — the carry is a round trip, not a sentence about one',
 )
-assert.ok(
-  /windowEndEpochMs/.test(catalystProse['skills/memory-contract/SKILL.md']),
-  'and the encoding is stated where a run reads it, since RFC 3339 here makes the key unreadable rather than wrong',
+
+/**
+ * ── The document side, which is a generation contract and nothing else ────
+ *
+ * ⚠️ The two checklists' **numbering and order** are rendered from
+ * `lib/flows.mjs`; the prose inside a step is copied through byte-for-byte. So
+ * this is the only assertion left about those two documents' checklists, and it
+ * cannot be satisfied or broken by a rewording.
+ */
+covers('audit/catalyst-research-is-a-numbered-step')
+assert.equal(await checkFlowSteps(), null, 'both sleeve checklists are the declared spine — run `node tools/generate-evidence-gated-flow-steps.mjs --write` after changing a step')
+/** ⚠️ And it is not vacuous: a step moved in the declaration has to move the file. */
+const krChecklist = await readFile(new URL('../skills/kr-sleeve/SKILL.md', fixtureRoot), 'utf8')
+const krSection = krChecklist.slice(
+  krChecklist.indexOf('\n\n', krChecklist.indexOf('Do these in order and report each one:')) + 2,
+  krChecklist.indexOf('\nAlso run the price-pattern'),
 )
+const reordered = numberedSteps('kr-sleeve').slice()
+;[reordered[5], reordered[6]] = [{ ...reordered[6], n: 6 }, { ...reordered[5], n: 7 }]
+assert.notEqual(
+  renderFlowSteps(krSection, reordered, 'a mutated kr-sleeve'),
+  krSection,
+  'rendering from a declaration with two steps exchanged differs from the committed checklist, so the comparison above is a measurement',
+)
+
+/**
+ * ⛔ **What was deleted without a replacement, and why it had nothing to
+ * catch.** `text.includes('evidenceIds')` over the two sleeve skills asserted
+ * that a flow is told an uncited row is refused. The refusal itself is asserted
+ * directly, on every shape `catalyst-contract.json` lists, a few dozen lines
+ * above: a row with no citation answers `blocked` with
+ * `catalyst_observation_invalid` and offers no replacement revision. A document
+ * repeating that is documentation; a check on the substring is a check that a
+ * word appears.
+ */
 
 /**
  * ⚠️ **§37: nothing new is asked of the investor.** The inputs come from tools
@@ -5089,4 +5250,5 @@ assert.deepEqual(
 assertCoverageWasEarned()
 
 console.log(`evidence-gated operations: ${Object.keys(OPERATIONS).length} defined in one table — ${PUBLISHED_OPERATIONS.length} published, ${INTERNAL_OPERATIONS.length} steps of those, and the skill's table is rendered from it`)
+console.log(`evidence-gated flows: ${Object.keys(FLOWS).length} sleeve pipelines declared, ${FLOWS['kr-sleeve'].steps.length} steps each — the wiring is executed and the checklists' numbering is rendered from it`)
 console.log(`evidence-gated contract fixtures passed (${parity.cases.length} legacy-parity cases)`)
