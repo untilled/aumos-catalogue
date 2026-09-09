@@ -54,6 +54,7 @@ Use only:
 - `state/coverage/universe-state.json`
 - `state/coverage/research-index.json`
 - `state/research/catalyst-window.json`
+- `state/research/evidence-carry.json`
 - `state/learning/paper-cohorts.json`
 
 Do not generate a path per run, asset or date — with the one exception §Write names, which is a
@@ -132,6 +133,18 @@ re-encoding a stored record to celebrate a lifted restriction is a migration wit
 readable-history cost. `catalystRegister` reads either that or the RFC 3339 rows a caller hands it,
 and the map it returns to `radarCandidates` is RFC 3339 because that is what `Date.parse` is given
 there. Write `nextState` verbatim and do not re-encode it.
+
+`research/evidence-carry` is the third bounded exception, and it exists because the host cannot
+answer for this run what it will answer for the next one. Evidence issued during a run is uncommitted
+and uncitable until that run ends (`untilled/aumos#727`, `#453`), so a receipt this run paid for —
+an `observation_file` consensus reading above all — is citable only from the next wake. This key is
+what survives the gap: `{ schemaVersion: 1, updatedAsOf, rows: [{ evidenceId, contentHash, url,
+publishedAt, subject, issuedAsOf }] }`, written in §6 before submitting and read in §1 beside
+everything else. ⛔ **It is a list of references and never a cache of what they said** — no excerpt,
+no payload, no prices — which is the same line `research/catalyst-window` is held to, and it is
+bounded by what one run can be issued rather than by a ceiling. ⚠️ Confirm a carried id with
+`evidence_get` before citing it: a run that died before it ended committed nothing, and its rows name
+ids that will be refused again.
 
 ⛔ **Event records are not persisted, and that is this contract rather than an omission.** `sue`,
 `day1ExcessPct` and `preAnnouncementClose` are numbers copied off a vendor's answer, which the Write

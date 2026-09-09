@@ -371,13 +371,15 @@ about **1.91 million characters** of tool argument, 29 subagents opened to carry
 judgement submitted at the end of it (`untilled/aumos-catalogue#209`). The arithmetic was never the
 expensive part; the model in the middle of it was.
 
-This package declares its own two computations in `aumos.json` under `recipes`, and the host runs
-them in its own process over the inputs it already stores:
+This package declares its own three computations in `aumos.json` under `recipes`, and the host runs
+them in its own process over the inputs it already stores. The first two are this roster sweep; the
+third is the lane ranking `skills/theme-radar/SKILL.md` owns and is not run over the roster:
 
 | recipe | what it is | what it is not |
 |---|---|---|
 | `roster-scan` | `scan` for one symbol, plus `entryQualityGate` when that symbol named a lens | not an aggregate — one process is one symbol |
 | `opportunity-metrics` | `opportunityMetrics` for one symbol | not the ranking; `opportunityUniverse` folds the rows afterwards |
+| `sector-series` | one symbol's series reduced to what the lane fold reads — run over a lane's benchmark and its sector proxies, never over the roster | not the ranking; `sectorStrength` folds the rows afterwards |
 
 Both call `execute()` from `lib/index.mjs` — **the same function `mcp__evidence-gated-metrics__calculate`
 calls**, with the same `normalizeBars`, the same `LENS_ENVELOPES` thresholds and the same

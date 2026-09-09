@@ -57,7 +57,7 @@
  */
 import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
-import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
+import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, sectorSeries, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
 import { sleeveNav, targetWeight, minimumExecutableWeight, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { proposalDisclosure } from './proposal.mjs'
 import { priceLevelSet } from './price-levels.mjs'
@@ -191,16 +191,54 @@ export const OPERATIONS = {
     group: 'scanners',
     surface: 'internal',
     subsumedBy: 'sectorStrength',
-    subsumedAt: 'scanners.mjs sectorStrength() → blendedSectorStrength()',
+    /**
+     * ⚠️ **The step both of them are** (#247). `sectorStrength` folds a lane out
+     * of reduced rows and this operation folds one pair out of bars, and since
+     * the bars are reduced through the same `sectorSeries`, the excess itself is
+     * computed in one place. That place is what the fold calls.
+     */
+    subsumedAt: 'scanners.mjs sectorStrength() → blendedFromSeries()',
     mode: 'named', keys: { assetBars: ARRAY, benchmarkBars: ARRAY, weights: ARRAY },
     describe: 'one sector\'s weighted RS against one benchmark',
     run: (input) => blendedSectorStrength(input?.assetBars ?? [], input?.benchmarkBars ?? [], input?.weights),
   },
+  sectorSeries: {
+    group: 'scanners',
+    surface: 'internal',
+    subsumedBy: 'sectorStrength',
+    subsumedAt: 'scanners.mjs sectorStrength() → sectorSeries()',
+    mode: 'named', keys: { symbol: STRING, market: STRING, sector: STRING, bars: ARRAY, periods: ARRAY },
+    /**
+     * ⛔ **Internal because a manager able to call it would have to hand it
+     * bars** — the relay #247 exists to delete. `recipes/sector-series.mjs` is
+     * how it is reached in a run: the host holds the series, spawns one process
+     * per symbol, and the row that comes back carries no bars at all.
+     */
+    describe: 'one symbol\'s series reduced to what the lane fold reads — the weighted horizons\' returns, three moving averages, the last close and the two highs the bot baseline compares against',
+    run: (input, asOf) => {
+      const normalized = normalizeBars(input?.bars, asOf)
+      const reduced = sectorSeries({ ...input, bars: normalized.bars })
+      return { data: reduced.data, diagnostics: [...normalized.diagnostics, ...reduced.diagnostics] }
+    },
+  },
   sectorStrength: {
     group: 'scanners',
     surface: 'published',
-    mode: 'named', keys: { benchmarkBars: ARRAY, sectors: ARRAY, previousRanks: OBJECT, lane: STRING, weights: ARRAY },
-    describe: 'L1: lane ranking, rank moves, regime, `researchQueue`, bot baselines',
+    mode: 'named', keys: { benchmarkBars: ARRAY, benchmark: OBJECT, sectors: ARRAY, previousRanks: OBJECT, lane: STRING, weights: ARRAY },
+    /**
+     * ⚠️ **`benchmark` and `sectors[].series` are the bar-free spelling** (#247).
+     * A lane's series live in the host and a recipe process is one symbol, so
+     * what a flow holds is a page of reduced rows read back out of the sweep's
+     * answer files — never a roster of bars typed back as arguments, which both
+     * `PROMPT.md` §The delegation budget and `skills/orchestrate/SKILL.md`
+     * refuse. `benchmarkBars` and `sectors[].bars` still answer, and reach the
+     * same numbers, because bars are reduced through the same function.
+     */
+    nested: {
+      'sectors[]': { name: STRING, etf: STRING, risk: STRING, series: OBJECT, bars: ARRAY, leaders: ARRAY },
+      seriesShape: 'A reduced row from the `sector-series` recipe, read back with `files_read` from `<outputPath>/<itemId>.json` as `data`: `{ closeCount, close, maxClose, maxClose60, ma20, ma50, ma200, returns }`, with `returns` keyed by horizon as a **string** (`"60"`). ⛔ Never assembled by hand and never a bar array — `sectors[].bars` is the second spelling and exists for a single hand-collected series and for fixtures. A row reduced under weights other than this call\'s is missing those horizons and says so as `sector_series_period_unreduced` rather than scoring them as zero.',
+    },
+    describe: 'L1: lane ranking, rank moves, regime, `researchQueue`, bot baselines — over the reduced rows the `sector-series` recipe wrote (`benchmark`, `sectors[].series`, `leaders[].series`), so the lane\'s bars never leave the host',
     run: (input, asOf) => sectorStrength({ ...input, asOf }),
   },
   regimeTag: {

@@ -3033,7 +3033,7 @@ assert.equal(new Set(tabledOperations).size, tabledOperations.length, 'no operat
  * that a row which cannot fill all four is refused by name rather than
  * published half-wired.
  */
-assert.equal(Object.keys(OPERATIONS).length, 110, 'every operation the package answers has a definition row')
+assert.equal(Object.keys(OPERATIONS).length, 111, 'every operation the package answers has a definition row')
 assert.equal(PUBLISHED_OPERATIONS.length + INTERNAL_OPERATIONS.length, Object.keys(OPERATIONS).length, 'surface partitions the table; there is no third state')
 assert.deepEqual([...supportedOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'operation_unknown lists the published surface, projected from the definition')
 assert.deepEqual([...tabledOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'and the skill table is that same surface')
@@ -3321,7 +3321,7 @@ assert.deepEqual(canonicalizeInput('indicators', untouched).diagnostics, [])
  * be kept behind a task-unit API, so an internal operation answers a call by
  * name exactly as it did.
  */
-assert.equal(INTERNAL_OPERATIONS.length, 8)
+assert.equal(INTERNAL_OPERATIONS.length, 9)
 const flowProse = (await Promise.all(
   ['../PROMPT.md', ...(await readdir(new URL('../skills', fixtureRoot)))
     .filter((name) => name !== 'deterministic-metrics')
@@ -3356,7 +3356,7 @@ for (const name of INTERNAL_OPERATIONS) {
 }
 const redirect = execute({ operation: 'brier', asOf: methodology.asOf, input: { probabilities: [0.2, 0.8], outcomeIndex: 1 } })
 assert.equal(redirect.status === 'blocked', false, 'an internal operation answers rather than refusing')
-assert.equal(execute({ operation: null, asOf: methodology.asOf }).diagnostics[0].details.internal, 8, 'and the refusal for an unknown name says how many operations are steps of the published ones')
+assert.equal(execute({ operation: null, asOf: methodology.asOf }).diagnostics[0].details.internal, 9, 'and the refusal for an unknown name says how many operations are steps of the published ones')
 assert.equal(execute({ operation: null, asOf: methodology.asOf }).diagnostics[0].details.subsumedBy.brier.operation, 'calibration', 'naming what returns each of their answers instead')
 
 /**

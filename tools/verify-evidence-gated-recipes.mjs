@@ -273,6 +273,113 @@ for (const entrypoint of ['recipes/roster-scan.mjs', 'recipes/opportunity-metric
   }
 }
 
+/**
+ * ── The lane fold, and the only reason it is reachable at all (#247) ────────
+ *
+ * `sectorStrength` ranks a lane against one benchmark and emits the
+ * `researchQueue` `skills/theme-radar/SKILL.md` calls its first input. Its
+ * published shape asked for a bar array per sector while `PROMPT.md` §The
+ * delegation budget forbids a flow to carry one, and both sleeves of
+ * `run_bb689b6199084b04afd8b0e1d1528cda` refused it for exactly that reason.
+ *
+ * ⚠️ **One process cannot be the fold**, because one process is one item and one
+ * item is one store coordinate — so what is checked here is the *join*: the
+ * recipe reduces one symbol, and a lane folded from those rows reaches the same
+ * numbers as the lane folded from the bars they were reduced from. Not close.
+ * The same, because it is the same function on both sides; a difference here is
+ * a second copy of the arithmetic having appeared.
+ */
+{
+  const entrypoint = 'recipes/sector-series.mjs'
+  const answered = run(entrypoint, { ...request(bars), recipeId: 'sector-series' })
+  assert.equal(answered.ok, true, `${entrypoint} answers ok over a readable series`)
+  assert.equal(
+    answered.output.data.returns['60'],
+    execute({ operation: 'sectorSeries', asOf, input: { symbol: '005930', market: 'XKRX', sector: 'technology', bars, periods: [60, 120, 200] } }).data.returns['60'],
+    'the entrypoint is a shell over execute(); the reduction is the operation\'s and not the shell\'s',
+  )
+  assert.ok(
+    !JSON.stringify(answered).includes('"open"') && JSON.stringify(answered).length < 20_000,
+    'the reduction returns a row and no series; a route that echoed its readings would move the cost rather than remove it',
+  )
+  assert.equal(answered.output.evaluatedAsOf, asOf, 'the row is dated against the pin it was handed')
+
+  /**
+   * ⚠️ **The whole claim of the slice, executed.** A lane assembled out of
+   * recipe rows and the same lane assembled out of the bars behind them must be
+   * one answer; if they were not, the bar-free route would be a second
+   * methodology wearing the first one's name.
+   */
+  const lane = (rate, count = 240) => {
+    const rows = []
+    let price = 100
+    for (let index = 0; index < count; index += 1) {
+      price *= 1 + rate
+      rows.push({
+        timestamp: new Date(Date.parse('2025-10-01T00:00:00.000Z') + index * 86_400_000).toISOString(),
+        open: price, high: price * 1.01, low: price * 0.99, close: price, volume: 1_000 + index,
+      })
+    }
+    return rows
+  }
+  /** One symbol through the host route, exactly as a flow reads it back with `files_read`. */
+  const reduce = (rows) => run(entrypoint, { ...request(rows), recipeId: 'sector-series' }).output.data
+  const benchmarkBars = lane(0.0004)
+  const semisBars = lane(0.0016)
+  const softwareBars = lane(0.0011)
+  const leaderBars = lane(0.0018)
+  const fromBars = {
+    lane: 'us',
+    benchmarkBars,
+    previousRanks: { Semis: 4 },
+    sectors: [
+      { name: 'Semis', etf: 'SOXX', risk: 'on', bars: semisBars, leaders: [{ symbol: 'LEAD', bars: leaderBars }] },
+      { name: 'Software', etf: 'IGV', risk: 'on', bars: softwareBars },
+      { name: 'Unread', etf: 'XXX', bars: [] },
+    ],
+  }
+  const fromRows = {
+    lane: 'us',
+    benchmark: reduce(benchmarkBars),
+    previousRanks: { Semis: 4 },
+    sectors: [
+      { name: 'Semis', etf: 'SOXX', risk: 'on', series: reduce(semisBars), leaders: [{ symbol: 'LEAD', series: reduce(leaderBars) }] },
+      { name: 'Software', etf: 'IGV', risk: 'on', series: reduce(softwareBars) },
+      { name: 'Unread', etf: 'XXX' },
+    ],
+  }
+  const barsAnswer = execute({ operation: 'sectorStrength', asOf, input: fromBars })
+  const rowsAnswer = execute({ operation: 'sectorStrength', asOf, input: fromRows })
+  assert.deepEqual(
+    rowsAnswer.data,
+    barsAnswer.data,
+    'a lane folded from the recipe\'s rows is the lane folded from the bars they were reduced from — ranking, rank moves, regime, researchQueue and the bot baseline alike',
+  )
+  assert.ok(rowsAnswer.data.researchQueue.length > 0, 'and the queue theme-radar reads as its first input is actually produced — an equal pair of empty answers would prove nothing')
+  assert.ok(rowsAnswer.data.baselineSignals.length > 0, 'including the control arm, which needs the leader\'s own reduced row')
+  assert.deepEqual(
+    rowsAnswer.diagnostics.map((row) => row.code).sort(),
+    barsAnswer.diagnostics.map((row) => row.code).sort(),
+    'and it reports the same things, so a sector nobody could read is still named unread on the bar-free route',
+  )
+  assert.ok(
+    !JSON.stringify(fromRows).includes('"open"'),
+    'the fold\'s whole input carries no bar — this is the argument the delegation budget makes, executed on the call it was blocking',
+  )
+
+  /**
+   * ⛔ A horizon nobody reduced is not an outperformance of zero. A row reduced
+   * for the default weights and folded under a weight the recipe never saw is
+   * the one way this route can silently disagree with the bars it replaced, so
+   * it is reported by name.
+   */
+  const shifted = execute({ operation: 'sectorStrength', asOf, input: { ...fromRows, weights: [[30, 1]] } })
+  assert.ok(
+    shifted.diagnostics.some((row) => row.code === 'sector_series_period_unreduced'),
+    'a fold weighting a horizon the rows do not carry says so rather than scoring the gap',
+  )
+}
+
 /** A bar later than the pin never reaches a metric, and the drop is reported. */
 const future = series()
 future.push({ timestamp: '2026-12-01T00:00:00.000Z', open: 1, high: 1, low: 1, close: 1, volume: 1 })
@@ -302,7 +409,7 @@ assert.equal(JSON.parse(malformed.stdout.trim()).ok, false, 'and it is ok: false
  * because it cannot be checked by running — a recipe that consulted the clock
  * would answer identically today and differently in a month.
  */
-for (const file of ['recipes/request.mjs', 'recipes/roster-scan.mjs', 'recipes/opportunity-metrics.mjs']) {
+for (const file of ['recipes/request.mjs', 'recipes/roster-scan.mjs', 'recipes/opportunity-metrics.mjs', 'recipes/sector-series.mjs']) {
   const source = (await readFile(new URL(file, packageRoot), 'utf8'))
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/(^|[^:])\/\/.*$/gm, '$1')
