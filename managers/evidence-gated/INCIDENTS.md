@@ -207,6 +207,54 @@ after the close holds a same-day bar that is complete, and refusing there would 
 reading into no reading. On the corrected prescription the row does not appear at all, so it fires
 exactly when a run did not follow it.
 
+**A series whose shape was valid and whose history was wrong** (#248). #224 above closed the case
+of one bar that has not closed. This is the case of two hundred bars that all closed and do not
+belong to one price history, and the sentence that was supposed to cover it — *"adjusted and
+unadjusted series are never mixed"* — had nothing behind it: no check in this package compared a
+derived level against the price it was derived from. Measured on the 2026-09-09 US roster sweep (83
+names, `roster-scan` answers): **BKNG** `close` 193.29 against `ma200` **2,316.55**, `offHigh200`
+**−96.5%**, `ma200Discount: true`, `discoveryScore` **20**; **VZ** `close` 50.14 against `low200`
+**10.5999**, `aboveLow200` **+373%**. Neither is a drawdown, and BKNG's score of 20 came entirely
+from the artifact — `discoveryScore` reads `offHigh200` and `ma200Distance`, so the price branch's
+ranking was partly made of it, and nothing in the run could say how many of the other eight names
+that scored 20 had the same cause. ⛔ **Every existing defence passed it, and for #224's reason**:
+`bar_value_invalid` asks whether the row parsed and all of them did, and
+`trend_moving_average_unavailable` asks whether the average computed and 2,316.55 is a finite
+number. `price_series_discontinuity_suspected` (`info`) reports three readings over the last 200
+bars — the window the corrupted numbers are read from — and `indicators.discontinuity` carries the
+count of adjacent sessions beyond ±50% on a clean name too, because a field that appears only when
+something is broken is a field whose absence has to be interpreted. ⚠️ **It refuses nothing, and
+that is the finding rather than a compromise**: a name that really did split has exactly this shape
+and its history is exactly right. The defect was never that the artifact was allowed through; it
+was that the reader had no way to tell one from the other. ⛔ And the series is not repaired — a
+factor re-derived from the step would make this package the second author of a price history whose
+first author is the vendor.
+
+**A producer that worked and a registration path that could not be found** (#249). #228 built
+`catalystCadence` so the catalyst axis would stop being starved, and on
+`run_bb689b6199084b04afd8b0e1d1528cda` (2026-09-09, us-sleeve) it worked exactly as designed: status
+ok, no diagnostics, `medianLagDays` **32** over **21** filings with `basisSymbols` 2 and
+`measuredFrom: "host-source-cache"` — measured from this book's own cache and close to, but
+deliberately not borrowed from, the ported-from harness's US 30. **It was this book's first derived
+window, and it was computed and thrown away.** us-sleeve tried three shapes on `catalystRegister`
+and reported all three: the cadence row on `catalysts` → `catalyst_estimate_unmarked` / blocked; the
+window on `estimated` alone → refused for a shape reason; **the window on both arrays with the
+markers stripped from the `catalysts` copy → registered, with `dateSource` reading `"observed"`**
+(`withConfirmedCatalystInHorizon: 1` / `withEstimatedCatalystInHorizon: 0`). The third is the worst
+of the three and it was the only one that got through, and the flow read the result and correctly
+declined to store it. ⚠️ **The cause was published prose beside a published table.** `catalysts[]`
+was a field table and `estimated[]` was a paragraph saying *"a separate argument on purpose"* — the
+purpose without the shape — and a caller that has never sent an estimate has no wrong spelling to
+learn from, which is #169's own argument for publishing `catalysts[]` in the first place. Three
+things moved: the row is published field for field, 1:1 with what `catalystCadence` answers, and the
+`cadenceBasis` under it; `catalystCadence` hands back `registerAs: { estimated }`, the same array
+under the argument name that takes it, which is the `priceLevelsToRegister` pattern; and the same
+`(market, symbol, event)` on both arrays is now `catalyst_estimate_unmarked` / **blocked**. ⛔ **No
+new code for the third shape**, because `catalyst_estimate_unmarked` exists to prevent precisely
+that reading and the fix a reader needs is the same one. ⚠️ The key is `(market, symbol, event)` and
+not the window instants: a caller that rounded one copy's `windowEnd` by a millisecond would have
+escaped the check while producing the identical record.
+
 **A source that existed and a procedure that did not** (#229). `variantViewCheck` has four
 requirements and one of them — `consensusRefs` — takes an input that is in no filing and on no
 exchange feed. The session held `WebSearch`, `WebFetch` and `observation_file` throughout; what it

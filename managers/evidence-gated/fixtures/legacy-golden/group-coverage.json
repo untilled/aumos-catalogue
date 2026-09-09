@@ -125,7 +125,8 @@
       "tranche-plan-not-cash-deployment",
       "consensus-ref-attestation",
       "catalyst-axis-producer",
-      "catalyst-register-encoding"
+      "catalyst-register-encoding",
+      "catalyst-estimate-registration-path"
     ],
     "scanner": [
       "buy-radar",
@@ -144,7 +145,8 @@
       "lens-envelope-reachability",
       "lens-envelope-is-the-scanner-source",
       "regime-tag-provenance",
-      "baseline-signals-are-admissible"
+      "baseline-signals-are-admissible",
+      "price-series-discontinuity"
     ],
     "schedule": [
       "dislocation-signal",

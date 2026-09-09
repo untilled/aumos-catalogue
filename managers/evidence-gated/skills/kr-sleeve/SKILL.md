@@ -107,6 +107,14 @@ been fed. Do these in order and report each one:
      `preAnnouncementClose` are reported figures about an announcement that happened; a cadence says
      when a filer will probably speak and never what it said. `post-event-continuation` stays fed by
      the corporate-actions route and stays honestly empty until it is.
+   - **Hand `registerAs.estimated` straight to step 7 and compose nothing** (#249). The answer
+     carries the rows under the argument name that takes them, the way `priceLevelsToRegister` does.
+     ⚠️ **This is the step that was unreachable.** On `run_bb689b6199084b04afd8b0e1d1528cda` this
+     operation answered status ok with no diagnostics — `medianLagDays` 32 over 21 filings, measured
+     from this book's own cache — and the window was **computed and thrown away**, because the row
+     shape was described in prose and every shape the run guessed was refused. ⛔ Do not rebuild the
+     row: `registerAs` is that array by reference, and a row you retype is a row that can disagree
+     with it.
 7. **`catalystRegister`** — the catalyst and event axis, which until #169 had **no producer at
    all**. `radarCandidates` takes `catalysts` and `events`; `upsideRadar` reads a window open
    inside 60 days and an event announced inside 30; nothing in this package ever built either, so
@@ -123,6 +131,15 @@ been fed. Do these in order and report each one:
      one is refused rather than registered — a catalyst nobody can go and check is a claim. Use
      `observation_file` for a web reading (the same route `consensusRefs` takes) and the Aumos
      evidence id for a vendor answer.
+   - ⛔ **One window goes on one array, and never on both** (#249). A derived window arrives on
+     `estimated` carrying `dateSource: "estimated_from_filing_cadence"` and its `cadenceBasis`; a
+     read one arrives on `catalysts` carrying neither. Sending the same `(market, symbol, event)` on
+     both is `catalyst_estimate_unmarked` / **blocked**, and it is blocked because it used to
+     *work*: the fold keeps a confirmed window over an estimate under that key, so a second copy with
+     the markers stripped registered the projection as a **date somebody read**
+     (`withConfirmedCatalystInHorizon: 1` / `withEstimatedCatalystInHorizon: 0`, measured). ⚠️ The
+     estimated row shape is published field for field on `inputContracts` — read it there rather
+     than guessing, which is what cost this book its first derived window.
    - **Pass `roster`** — the same `symbols` you give `radarCandidates` — so the counts have a
      denominator. `catalyst_window_unresearched` and `event_record_unresearched` are how many names
      nobody looked at; a name that **was** researched and simply has nothing scheduled is not
@@ -265,6 +282,16 @@ the same call and an omitted `before` both answered with the same partial row an
 meant**. ⛔ No shape check catches this — a partial bar's OHLCV parses and the moving averages
 compute — so `newest_bar_may_be_unclosed` (`info`) is what reports it and it refuses nothing.
 `skills/data-source-contract/SKILL.md` carries the measurement.
+⛔ **And read `discontinuity` on the packet before you read any of its distances as a fall** (#248).
+`offHigh200`, `aboveLow200`, `ma60Distance` and `ma200Distance` are all a price divided by a level
+taken over the same 200 bars, so a series carrying an unadjusted split makes every one of them wrong
+in the same direction. Measured on the 2026-09-09 sweep of this roster: BKNG `ma200` **2,316.55**
+against a `close` of 193.29 — `ma200Discount: true`, `discoveryScore` **20**, all of it the artifact
+— and VZ `aboveLow200` **+373%** off a `low200` of 10.5999. `price_series_discontinuity_suspected`
+(`info`) reports it and `indicators.discontinuity.jumpCount` is carried on every name, clean ones
+included. ⚠️ It refuses nothing and neither should you: a name that really did split has this shape
+and its history is right. What it asks is that you check the series against an adjusted source
+before you rank on the distance, and say which you did.
 ⚠️ Read `unprepared` as **blindness, never as an absence of opportunity**: the names come back and
 `source_cache_refresh` is what fixes them. ⚠️ And read `scanner_history_insufficient` the same way
 by asking what **your own refresh** answered for that symbol: not collected, or

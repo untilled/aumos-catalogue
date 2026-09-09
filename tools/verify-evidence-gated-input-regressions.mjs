@@ -6,7 +6,7 @@ import { METHODOLOGY } from '../managers/evidence-gated/lib/constants.mjs'
 import { marketReviewIntent } from '../managers/evidence-gated/lib/schedule.mjs'
 import { MACRO_INDICATORS } from '../managers/evidence-gated/lib/evidence.mjs'
 import { MANAGER_ID } from '../managers/evidence-gated/lib/diagnostics.mjs'
-import { BAR_CLOSE_LAG_MS, unclosedNewestBar } from '../managers/evidence-gated/lib/indicators.mjs'
+import { BAR_CLOSE_LAG_MS, unclosedNewestBar, PRICE_DISCONTINUITY_BOUNDS, priceSeriesDiscontinuity } from '../managers/evidence-gated/lib/indicators.mjs'
 
 const configSchema = JSON.parse(await readFile(new URL('../managers/evidence-gated/config.schema.json', import.meta.url), 'utf8'))
 
@@ -3224,6 +3224,93 @@ assert.equal(
 )
 
 console.log('evidence-gated issue #224 partial-bar regression tests passed')
+
+/**
+ * ── #248: the series whose shape is valid and whose *history* is wrong ─────
+ *
+ * #224 above is one bar that has not closed. This is two hundred bars that all
+ * closed and do not belong to one price history. Measured on the 2026-09-09 US
+ * sweep: BKNG `close` 193.29 against `ma200` **2,316.55**, VZ `close` 50.14
+ * against `low200` **10.5999** — and `discoveryScore` reads `offHigh200` and
+ * `ma200Distance`, so BKNG's 20 was made of the artifact.
+ *
+ * ⛔ The three readings are asserted **at their bounds** here rather than
+ * inferred from a series, for the reason `unclosedNewestBar`'s boundary is: a
+ * threshold measured only through a fixture is a threshold nobody can move
+ * without rebuilding the fixture, and the fixture would then be the
+ * specification.
+ */
+const flatSeries = (close, count = 200) => Array.from({ length: count }, (_, index) => ({
+  timestamp: new Date(Date.parse(partialAsOf) - (count - index) * 86_400_000).toISOString(),
+  open: close, high: close, low: close, close, volume: 1,
+}))
+
+/* ── ⑴ the bounds, at the boundary ────────────────────────────────────────── */
+assert.deepEqual(PRICE_DISCONTINUITY_BOUNDS.closeToMa200, { min: 0.1, max: 10 }, 'the ratio bounds are the ones #248 named')
+assert.deepEqual(PRICE_DISCONTINUITY_BOUNDS.high200ToLow200, { min: 1, max: 20 })
+assert.equal(PRICE_DISCONTINUITY_BOUNDS.adjacentLogReturn, 0.5)
+assert.equal(PRICE_DISCONTINUITY_BOUNDS.windowBars, 200, 'the window is the one the corrupted numbers are read from')
+
+/** Exactly ±0.5 is an ordinary session; a hair beyond it is a step. */
+const stepBy = (factor) => {
+  const bars = flatSeries(100, 10)
+  for (const bar of bars.slice(-5)) {
+    bar.open = 100 * factor; bar.high = 100 * factor; bar.low = 100 * factor; bar.close = 100 * factor
+  }
+  return priceSeriesDiscontinuity(bars)
+}
+assert.equal(stepBy(Math.exp(0.5)).jumpCount, 0, 'a log return of exactly 0.5 is inside the bound')
+assert.equal(stepBy(Math.exp(0.5000001)).jumpCount, 1, 'and a hair beyond it is counted')
+
+/* ── ⑵ absence, and what is not a step ───────────────────────────────────── */
+assert.equal(priceSeriesDiscontinuity([]), null, 'no series is not an incoherent series')
+assert.equal(priceSeriesDiscontinuity(undefined), null)
+const single = priceSeriesDiscontinuity(flatSeries(100, 1))
+assert.equal(single.jumpCount, 0, 'one bar has no adjacent bar to step from')
+assert.equal(single.closeToMa200, null, '⛔ and no ma200 to disagree with — a missing average is #224\'s family, not this one')
+assert.equal(single.suspected, false, 'so nothing is suspected, because nothing was compared')
+/** ⛔ A zero or unreadable close is skipped rather than counted: a ratio against nothing is not a step. */
+const zeroed = flatSeries(100, 10)
+zeroed[4].close = 0
+assert.equal(priceSeriesDiscontinuity(zeroed).jumpCount, 0, 'a zero close is refused as a step rather than reported as an infinite one')
+
+/* ── ⑶ it fires on every operation that reads a bar array, and reports only ── */
+const bkngShape = flatSeries(2300, 260)
+for (const [index, bar] of bkngShape.entries()) {
+  if (index < 240) continue
+  bar.open = 193; bar.high = 193; bar.low = 193; bar.close = 193
+}
+for (const operation of barOperations) {
+  const answer = barRun(operation, bkngShape.map((bar) => ({ ...bar, date: bar.timestamp })))
+  const row = answer.diagnostics.find((item) => item.code === 'price_series_discontinuity_suspected')
+  assert.ok(row, `${operation} reports a series whose derived level disagrees with its own price by a factor — this is the gap #248 measured`)
+  assert.equal(row.severity, 'info', `${operation}: ⛔ a name that really did split has this shape and its history is right, so the judgement is the reader's`)
+  assert.equal(row.path, 'bars')
+  assert.ok(row.details.reasons.includes('close-to-ma200-outside-bounds'), `${operation}: BKNG's own reading — 193 against a 200-day mean above 2,000`)
+  assert.notEqual(answer.status, 'blocked', `${operation}: nothing is refused`)
+}
+/** ⛔ And `trendState` still answers a state: the row is `info`, so it is not one of the `unevaluated` rows that make a trend `insufficient_data`. */
+assert.notEqual(
+  barRun('trendState', bkngShape.map((bar) => ({ ...bar, date: bar.timestamp }))).data.state,
+  'insufficient_data',
+  'the gate that stops capital deployment is not stopped by a suspicion — #248 asks for a report and this is where refusing would have become one',
+)
+
+/* ── ⑷ and the clean series says so, in the same field ────────────────────── */
+for (const operation of barOperations) {
+  const answer = barRun(operation, closedSeries)
+  assert.equal(
+    answer.diagnostics.some((item) => item.code === 'price_series_discontinuity_suspected'),
+    false,
+    `${operation} says nothing about a coherent series`,
+  )
+}
+const cleanPacket = barRun('indicators', closedSeries).data.indicators.discontinuity
+assert.equal(cleanPacket.suspected, false)
+assert.equal(cleanPacket.jumpCount, 0, '⚠️ carried on a clean name too: «no adjacent session moved by more than 50%» is the fact that makes offHigh200 readable, and a field that appears only when it is bad is a field whose absence has to be interpreted')
+assert.deepEqual(cleanPacket.reasons, [])
+
+console.log('evidence-gated issue #248 price-series-discontinuity regression tests passed')
 
 /**
  * ── #227: the radar's clock, its override's producer, and the boundary ─────
