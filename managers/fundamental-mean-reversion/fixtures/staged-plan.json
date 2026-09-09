@@ -1,0 +1,631 @@
+{
+ "note": "The ledger, and the six ways a stage is refused. The second case is the one the whole file exists for.",
+ "asOf": "2026-08-29T00:00:00Z",
+ "cases": [
+  {
+   "name": "first-stage-fires",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": []
+   },
+   "stageId": "stage-1",
+   "satisfied": [
+    "stabilisation-held",
+    "thesis-evidence"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "ok"
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "committedWeight": 0.015,
+    "remainingWeight": 0.02
+   }
+  },
+  {
+   "name": "re-run-does-not-double-add",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "filledAt": "2026-08-20T00:00:00Z",
+      "satisfied": [
+       "stabilisation-held"
+      ]
+     }
+    ]
+   },
+   "stageId": "stage-1",
+   "satisfied": [
+    "stabilisation-held",
+    "thesis-evidence"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "refused",
+    "code": "stage_already_filled"
+   },
+   "measured": {
+    "status": "refused",
+    "code": "stage_already_filled",
+    "committedWeight": 0.015,
+    "remainingWeight": 0.02
+   }
+  },
+  {
+   "name": "price-alone-is-not-a-stage",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": []
+   },
+   "stageId": "stage-2",
+   "satisfied": [
+    "price"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "refused",
+    "code": "stage_condition_price_or_time_only"
+   },
+   "measured": {
+    "status": "refused",
+    "code": "stage_condition_price_or_time_only",
+    "committedWeight": 0,
+    "remainingWeight": 0.035
+   }
+  },
+  {
+   "name": "elapsed-time-alone-is-not-a-stage",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": []
+   },
+   "stageId": "stage-2",
+   "satisfied": [
+    "price",
+    "elapsed-time"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "refused",
+    "code": "stage_condition_price_or_time_only"
+   },
+   "measured": {
+    "status": "refused",
+    "code": "stage_condition_price_or_time_only",
+    "committedWeight": 0,
+    "remainingWeight": 0.035
+   }
+  },
+  {
+   "name": "stabilisation-must-still-hold",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": []
+   },
+   "stageId": "stage-2",
+   "satisfied": [
+    "earnings-confirmation"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "falling-knife",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "refused",
+    "code": "stage_stabilisation_not_holding"
+   },
+   "measured": {
+    "status": "refused",
+    "code": "stage_stabilisation_not_holding",
+    "committedWeight": 0,
+    "remainingWeight": 0.035
+   }
+  },
+  {
+   "name": "loss-budget-must-cover-it",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": []
+   },
+   "stageId": "stage-2",
+   "satisfied": [
+    "earnings-confirmation"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0
+   },
+   "expect": {
+    "status": "refused",
+    "code": "risk_limit_exceeded"
+   },
+   "measured": {
+    "status": "refused",
+    "code": "risk_limit_exceeded",
+    "committedWeight": 0,
+    "remainingWeight": 0.035
+   }
+  },
+  {
+   "name": "cumulative-target-is-a-ceiling",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "filledAt": "2026-08-20T00:00:00Z",
+      "satisfied": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "filledAt": "2026-08-24T00:00:00Z",
+      "satisfied": [
+       "earnings-confirmation"
+      ]
+     }
+    ]
+   },
+   "stageId": "stage-3",
+   "satisfied": [
+    "thesis-evidence"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "refused",
+    "code": "staged_total_exceeded"
+   },
+   "measured": {
+    "status": "refused",
+    "code": "staged_total_exceeded",
+    "committedWeight": 0.027,
+    "remainingWeight": 0.008
+   }
+  },
+  {
+   "name": "expired-plan-is-re-judged",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-07-01T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": []
+   },
+   "stageId": "stage-1",
+   "satisfied": [
+    "thesis-evidence"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "refused",
+    "code": "plan_expired"
+   },
+   "measured": {
+    "status": "refused",
+    "code": "plan_expired",
+    "committedWeight": 0,
+    "remainingWeight": 0.035
+   }
+  },
+  {
+   "name": "staged-trim-on-the-target",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "filledAt": "2026-08-20T00:00:00Z",
+      "satisfied": [
+       "thesis-evidence"
+      ]
+     }
+    ]
+   },
+   "stageId": "trim-1",
+   "satisfied": [
+    "target-reached"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "ok"
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "committedWeight": 0,
+    "remainingWeight": 0.035
+   }
+  }
+ ]
+}

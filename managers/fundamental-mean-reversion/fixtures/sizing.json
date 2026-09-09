@@ -1,0 +1,315 @@
+{
+ "note": "What the sizing arithmetic answers, including the two things it refuses to forget: a stop price is not a fill, and the account's limit is the account's.",
+ "asOf": "2026-08-29T00:00:00Z",
+ "cases": [
+  {
+   "name": "calm-series",
+   "series": "shock-then-base",
+   "input": {
+    "symbol": "FMR001",
+    "entryPrice": 172000,
+    "invalidationPrice": 145000,
+    "nav": 400000000,
+    "mandate": {
+     "singleNameCap": 0.1,
+     "grossCap": 0.9
+    },
+    "book": {
+     "holdings": [],
+     "openProposals": []
+    }
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "lossToInvalidation": 0.15697674,
+    "gapHaircut": 0.03,
+    "effectiveLoss": 0.18697674,
+    "riskBudget": 0.0075,
+    "riskWeight": 0.04011194,
+    "liquidityCap": 56.75560069,
+    "existingWeight": 0,
+    "bindingConstraint": "risk-budget",
+    "targetWeight": 0.04011194,
+    "downsideFraction": 0.0075,
+    "diagnostics": []
+   }
+  },
+  {
+   "name": "gap-down-series",
+   "series": "shock-then-base-with-gap",
+   "input": {
+    "symbol": "FMR001",
+    "entryPrice": 172000,
+    "invalidationPrice": 145000,
+    "nav": 400000000,
+    "mandate": {
+     "singleNameCap": 0.1,
+     "grossCap": 0.9
+    },
+    "book": {
+     "holdings": [],
+     "openProposals": []
+    }
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "lossToInvalidation": 0.15697674,
+    "gapHaircut": 0.13670174,
+    "effectiveLoss": 0.29367848,
+    "riskBudget": 0.0075,
+    "riskWeight": 0.02553813,
+    "liquidityCap": 48.80983125,
+    "existingWeight": 0,
+    "bindingConstraint": "risk-budget",
+    "targetWeight": 0.02553813,
+    "downsideFraction": 0.0075,
+    "diagnostics": []
+   }
+  },
+  {
+   "name": "halted-name",
+   "series": "shock-then-base",
+   "input": {
+    "symbol": "FMR001",
+    "entryPrice": 172000,
+    "invalidationPrice": 145000,
+    "nav": 400000000,
+    "mandate": {
+     "singleNameCap": 0.1,
+     "grossCap": 0.9
+    },
+    "book": {
+     "holdings": [],
+     "openProposals": []
+    },
+    "execution": {
+     "halted": true
+    }
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "lossToInvalidation": 0.15697674,
+    "gapHaircut": 0.05,
+    "effectiveLoss": 0.20697674,
+    "riskBudget": 0.0075,
+    "riskWeight": 0.03623596,
+    "liquidityCap": 56.75560069,
+    "existingWeight": 0,
+    "bindingConstraint": "risk-budget",
+    "targetWeight": 0.03623596,
+    "downsideFraction": 0.0075,
+    "diagnostics": []
+   }
+  },
+  {
+   "name": "held-by-another-strategy",
+   "series": "shock-then-base",
+   "input": {
+    "symbol": "FMR001",
+    "entryPrice": 172000,
+    "invalidationPrice": 145000,
+    "nav": 400000000,
+    "mandate": {
+     "singleNameCap": 0.1,
+     "grossCap": 0.9
+    },
+    "book": {
+     "holdings": [
+      {
+       "symbol": "FMR001",
+       "weight": 0.06,
+       "strategy": "catalyst-turnaround"
+      }
+     ],
+     "openProposals": [
+      {
+       "symbol": "FMR001",
+       "targetWeight": 0.025,
+       "strategy": "shareholder-rerating"
+      }
+     ]
+    }
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "lossToInvalidation": 0.15697674,
+    "gapHaircut": 0.03,
+    "effectiveLoss": 0.18697674,
+    "riskBudget": 0.0075,
+    "riskWeight": 0.04011194,
+    "liquidityCap": 56.75560069,
+    "existingWeight": 0.085,
+    "bindingConstraint": "single-name-headroom",
+    "targetWeight": 0.015,
+    "downsideFraction": 0.00280465,
+    "diagnostics": []
+   }
+  },
+  {
+   "name": "per-strategy-cap-cannot-raise-the-account-cap",
+   "series": "shock-then-base",
+   "input": {
+    "symbol": "FMR001",
+    "entryPrice": 172000,
+    "invalidationPrice": 145000,
+    "nav": 400000000,
+    "mandate": {
+     "singleNameCap": 0.1,
+     "grossCap": 0.9,
+     "strategyCap": 0.2
+    },
+    "book": {
+     "holdings": [
+      {
+       "symbol": "FMR001",
+       "weight": 0.06,
+       "strategy": "catalyst-turnaround"
+      }
+     ],
+     "openProposals": [
+      {
+       "symbol": "FMR001",
+       "targetWeight": 0.025,
+       "strategy": "shareholder-rerating"
+      }
+     ]
+    }
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "lossToInvalidation": 0.15697674,
+    "gapHaircut": 0.03,
+    "effectiveLoss": 0.18697674,
+    "riskBudget": 0.0075,
+    "riskWeight": 0.04011194,
+    "liquidityCap": 56.75560069,
+    "existingWeight": 0.085,
+    "bindingConstraint": "single-name-headroom",
+    "targetWeight": 0.015,
+    "downsideFraction": 0.00280465,
+    "diagnostics": [
+     "strategy_cap_exceeds_account_cap"
+    ]
+   }
+  },
+  {
+   "name": "no-headroom-left",
+   "series": "shock-then-base",
+   "input": {
+    "symbol": "FMR001",
+    "entryPrice": 172000,
+    "invalidationPrice": 145000,
+    "nav": 400000000,
+    "mandate": {
+     "singleNameCap": 0.1,
+     "grossCap": 0.9
+    },
+    "book": {
+     "holdings": [
+      {
+       "symbol": "FMR001",
+       "weight": 0.1,
+       "strategy": "catalyst-turnaround"
+      }
+     ],
+     "openProposals": []
+    }
+   },
+   "measured": {
+    "status": "refused",
+    "code": "risk_limit_exceeded",
+    "lossToInvalidation": 0.15697674,
+    "gapHaircut": 0.03,
+    "effectiveLoss": 0.18697674,
+    "riskBudget": 0.0075,
+    "riskWeight": 0.04011194,
+    "liquidityCap": 56.75560069,
+    "existingWeight": 0.1,
+    "bindingConstraint": "single-name-headroom",
+    "targetWeight": 0,
+    "downsideFraction": 0,
+    "diagnostics": [
+     "risk_limit_exceeded"
+    ]
+   }
+  },
+  {
+   "name": "config-may-not-widen-the-risk-budget",
+   "series": "shock-then-base",
+   "input": {
+    "symbol": "FMR001",
+    "entryPrice": 172000,
+    "invalidationPrice": 145000,
+    "nav": 400000000,
+    "mandate": {
+     "singleNameCap": 0.1,
+     "grossCap": 0.9
+    },
+    "book": {
+     "holdings": [],
+     "openProposals": []
+    },
+    "config": {
+     "perThesisRiskBudget": 0.05
+    }
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "lossToInvalidation": 0.15697674,
+    "gapHaircut": 0.03,
+    "effectiveLoss": 0.18697674,
+    "riskBudget": 0.0075,
+    "riskWeight": 0.04011194,
+    "liquidityCap": 56.75560069,
+    "existingWeight": 0,
+    "bindingConstraint": "risk-budget",
+    "targetWeight": 0.04011194,
+    "downsideFraction": 0.0075,
+    "diagnostics": [
+     "config_loosens_preregistered_threshold"
+    ]
+   }
+  },
+  {
+   "name": "invalidation-above-entry",
+   "series": "shock-then-base",
+   "input": {
+    "symbol": "FMR001",
+    "entryPrice": 172000,
+    "invalidationPrice": 180000,
+    "nav": 400000000,
+    "mandate": {
+     "singleNameCap": 0.1,
+     "grossCap": 0.9
+    },
+    "book": {
+     "holdings": [],
+     "openProposals": []
+    }
+   },
+   "measured": {
+    "status": "refused",
+    "code": "research_incomplete",
+    "lossToInvalidation": null,
+    "gapHaircut": null,
+    "effectiveLoss": null,
+    "riskBudget": null,
+    "riskWeight": null,
+    "liquidityCap": null,
+    "existingWeight": null,
+    "bindingConstraint": null,
+    "targetWeight": null,
+    "downsideFraction": null,
+    "diagnostics": [
+     "invalidation_not_below_entry"
+    ]
+   }
+  }
+ ]
+}

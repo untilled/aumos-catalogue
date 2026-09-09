@@ -1,0 +1,174 @@
+{
+ "note": "Which kind of claim a target is, derived from its basis and never accepted from the caller.",
+ "asOf": "2026-08-29T00:00:00Z",
+ "cases": [
+  {
+   "name": "moving-average-band",
+   "series": "shock-then-base",
+   "input": {
+    "basis": "moving-average",
+    "movingAverage": "ma200"
+   },
+   "expect": {
+    "status": "ok",
+    "kind": "technical"
+   },
+   "measured": {
+    "status": "ok",
+    "kind": "technical",
+    "low": 197251.1695,
+    "mid": 207632.81,
+    "high": 218014.4505,
+    "upsideToMid": 0.21048931,
+    "diagnostics": []
+   }
+  },
+  {
+   "name": "moving-average-called-a-valuation",
+   "series": "shock-then-base",
+   "input": {
+    "basis": "moving-average",
+    "movingAverage": "ma200",
+    "claimedKind": "valuation"
+   },
+   "expect": {
+    "status": "refused",
+    "code": "technical_target_labelled_as_valuation"
+   },
+   "measured": {
+    "status": "refused",
+    "kind": null,
+    "low": null,
+    "mid": null,
+    "high": null,
+    "upsideToMid": null,
+    "diagnostics": [
+     "technical_target_labelled_as_valuation"
+    ]
+   }
+  },
+  {
+   "name": "historical-price-band",
+   "series": "shock-then-base",
+   "input": {
+    "basis": "historical-price-band",
+    "referenceWindow": {
+     "from": "2025-08-01",
+     "to": "2026-03-01"
+    }
+   },
+   "expect": {
+    "status": "ok",
+    "kind": "price-history"
+   },
+   "measured": {
+    "status": "ok",
+    "kind": "price-history",
+    "low": 237921.5,
+    "mid": 248358,
+    "high": 256027.5,
+    "upsideToMid": 0.44791521,
+    "diagnostics": []
+   }
+  },
+  {
+   "name": "earning-power-without-its-inputs",
+   "series": "shock-then-base",
+   "input": {
+    "basis": "normalised-earning-power",
+    "earningPower": {
+     "normalisedEps": 12000
+    }
+   },
+   "expect": {
+    "status": "refused",
+    "code": "target_basis_unsupported"
+   },
+   "measured": {
+    "status": "refused",
+    "kind": null,
+    "low": null,
+    "mid": null,
+    "high": null,
+    "upsideToMid": null,
+    "diagnostics": [
+     "target_basis_unsupported"
+    ]
+   }
+  },
+  {
+   "name": "earning-power-complete",
+   "series": "shock-then-base",
+   "input": {
+    "basis": "normalised-earning-power",
+    "earningPower": {
+     "normalisedEps": 12000,
+     "multipleRange": {
+      "low": 15,
+      "high": 19
+     },
+     "derivation": "median of the four pre-shock years of operating profit per share, at the 25th-75th percentile of this name's own ten-year multiple",
+     "evidenceIds": [
+      "ev_fmr_filing_04"
+     ]
+    }
+   },
+   "expect": {
+    "status": "ok",
+    "kind": "valuation"
+   },
+   "measured": {
+    "status": "ok",
+    "kind": "valuation",
+    "low": 180000,
+    "mid": 204000,
+    "high": 228000,
+    "upsideToMid": 0.1893102,
+    "diagnostics": []
+   }
+  },
+  {
+   "name": "band-above-the-prior-high",
+   "series": "flat-range",
+   "input": {
+    "basis": "moving-average",
+    "movingAverage": "ma200"
+   },
+   "expect": {
+    "status": "refused",
+    "code": "target_assumes_prior_high_recovered"
+   },
+   "measured": {
+    "status": "refused",
+    "kind": null,
+    "low": null,
+    "mid": null,
+    "high": null,
+    "upsideToMid": null,
+    "diagnostics": [
+     "target_assumes_prior_high_recovered"
+    ]
+   }
+  },
+  {
+   "name": "basis-not-stated",
+   "series": "shock-then-base",
+   "input": {},
+   "expect": {
+    "status": "refused",
+    "code": "target_basis_unstated"
+   },
+   "measured": {
+    "status": "refused",
+    "kind": null,
+    "low": null,
+    "mid": null,
+    "high": null,
+    "upsideToMid": null,
+    "diagnostics": [
+     "target_basis_unstated"
+    ]
+   }
+  }
+ ]
+}

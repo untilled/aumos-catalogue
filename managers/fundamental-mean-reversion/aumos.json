@@ -1,0 +1,97 @@
+{
+  "manifestVersion": 1,
+  "id": "fundamental-mean-reversion",
+  "publisher": "aumos",
+  "name": "Fundamental Mean Reversion",
+  "version": "0.1.0",
+  "description": "Korea-listed single names whose price has fallen further than the damage to the business justifies. Researches the fall's causes before the chart, takes the recovery only after pre-registered stabilisation evidence, and names a target range that says whether it is a price band, a moving average or a valuation.",
+  "readme": "./README.md",
+  "prompt": "./PROMPT.md",
+  "schedule": [
+    {
+      "cron": "0 17 * * 1-5",
+      "timeZone": "Asia/Seoul",
+      "label": "post-close-review"
+    }
+  ],
+  "runtimes": ["claude"],
+  "license": "MIT",
+  "provenance": {
+    "sourceRepo": "https://github.com/morethanmin/trading-harness",
+    "commit": "1fa18c595baa742f7323366a3c220fec5c6535a7",
+    "license": "MIT",
+    "licenseHolder": "Lee Sang Min",
+    "notice": "./NOTICE.md"
+  },
+  "engines": {
+    "aumos": ">=0.4.0"
+  },
+  "ampVersion": 1,
+  "contributes": {
+    "managers": [
+      {
+        "id": "fundamental-mean-reversion",
+        "name": "Fundamental Mean Reversion",
+        "description": "Finds Korea-listed companies whose share price has fallen further than the damage to the business justifies, and takes the recovery toward a normal range only after stabilisation is confirmed. The technical state sets the order of work; the buy case is the business.",
+        "tasks": ["PORTFOLIO_REVIEW", "ASSET_REVIEW", "THESIS_REVIEW", "EVENT_REVIEW"],
+        "assetClasses": ["equity"],
+        "markets": ["XKRX"]
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "portfolio:read",
+      "reason": "Holdings, cash and open proposals are the denominator of every weight this package proposes, and they are also how it counts exposure to one name across the whole fund rather than within its own sleeve."
+    },
+    {
+      "kind": "thesis:read",
+      "reason": "A held name's existing claim and its invalidation conditions are read before the position is touched, so a broken low is judged against what was written in advance rather than against what the run would prefer today."
+    },
+    {
+      "kind": "evidence:read",
+      "reason": "The business half of a thesis rests on filings and observations that were already filed; this reads them back by id so a review can verify what an earlier run cited without re-procuring it."
+    },
+    {
+      "kind": "source:passthrough",
+      "sources": ["open-dart"],
+      "reason": "OpenDART receipts and statements are how a one-off impairment is separated from operating deterioration, and rising investment from failed monetisation. That separation is the whole of this methodology's buy case."
+    },
+    {
+      "kind": "connection:passthrough",
+      "connectors": ["toss"],
+      "reason": "The adjusted daily bars every reading here is taken over, plus the market calendar that says which session is complete. This package refuses an undeclared or unadjusted price basis, so it needs a vendor that states one."
+    },
+    {
+      "kind": "manager-memory:read",
+      "reason": "The staged plan's ledger — which rung of an entry this manager has already proposed, under which original decision — and how far a research pass got. Without reading it a re-run that finds the same conditions still true proposes the same stage a second time."
+    },
+    {
+      "kind": "manager-memory:write",
+      "reason": "The same ledger, written back after a stage is recorded or a research pass is left unfinished with its re-review condition. Aggregates and research progress only: holdings, cash and executions are Aumos Portfolio's and are never copied here."
+    }
+  ],
+  "requires": {
+    "skills": ["source_request", "connection_request"],
+    "optionalSkills": [
+      "portfolio_read",
+      "thesis_list",
+      "thesis_get",
+      "evidence_get",
+      "evidence_search",
+      "files_list",
+      "files_read",
+      "files_write",
+      "files_mkdir"
+    ]
+  },
+  "network": {
+    "mode": "deny"
+  },
+  "config": {
+    "schema": "config.schema.json"
+  },
+  "memory": {
+    "persistent": true
+  }
+}

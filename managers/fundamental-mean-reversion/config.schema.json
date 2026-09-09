@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fundamental Mean Reversion instance configuration",
+  "description": "Reaches the manager as ManagerInvocation.config. ⚠️ Nothing here can loosen this methodology: the discovery gate, the stabilisation test and the target-basis rules are not configurable at all, and the two settings that touch risk may only be narrowed — a value looser than the pre-registered one is refused, reported, and the pre-registered one governs. Every value here is also written into PROMPT.md, because an invocation may carry no config block at all.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "perThesisRiskBudget": {
+      "type": "number",
+      "minimum": 0.001,
+      "maximum": 0.0075,
+      "default": 0.0075,
+      "description": "Fraction of the fund's net asset value this methodology is willing to lose on one thesis reaching its invalidation, after the gap and halt haircuts. The ceiling is the pre-registered 0.0075 and a larger value is refused: at a 20% effective loss it produces a 3.75% position, so eight open theses put roughly 6% of the book at risk. Lower it to run smaller; there is no way to raise it here."
+    },
+    "maxWaitDays": {
+      "type": "integer",
+      "minimum": 20,
+      "maximum": 120,
+      "default": 120,
+      "description": "Calendar days a thesis may wait for the recovery before the position is re-judged in the open. The ceiling is the pre-registered 120 — roughly the upper end of the weeks-to-months window this methodology researches — and each thesis still names its own shorter deadline first. This is the ceiling on what a thesis may name, not a default the run may fall back to instead of naming one."
+    },
+    "maxOpenTheses": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 12,
+      "default": 6,
+      "description": "How many mean-reversion theses this manager will carry at once. It is a ceiling on attention rather than on risk: a thesis this methodology cannot review properly after the close is a stop nobody is watching. The account's own concentration and gross limits are the Mandate's and are never derived from this number."
+    },
+    "researchShortlistSize": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 3,
+      "description": "How many candidates a discovery pass carries forward. Deliberately small: #256 forbids ending a run with a shallow pass over many promising names, so the shortlist is sized to what one run can finish rather than to what the screen returned."
+    }
+  }
+}

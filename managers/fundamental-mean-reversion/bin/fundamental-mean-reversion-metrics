@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+/**
+ * One JSON object on stdin, one JSON line on stdout. No arguments, no
+ * environment, no clock — `asOf` is a field of the request because it is a fact
+ * about the invocation and never about the machine this runs on.
+ */
+import { execute } from '../lib/index.mjs'
+
+let body = ''
+for await (const chunk of process.stdin) body += chunk
+
+let request
+try {
+  request = JSON.parse(body)
+} catch (error) {
+  request = { operation: null, asOf: null, input: { parseError: error.message } }
+}
+
+const output = execute(request)
+process.stdout.write(`${JSON.stringify(output)}\n`)
+if (output.status === 'refused') process.exitCode = 2
