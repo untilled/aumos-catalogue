@@ -511,6 +511,47 @@ approval. ⛔ What is not allowed is silence — a call carrying no procurement 
 `budgetFundableInSleeveCurrency: null` beside `withinBriefBudget`, where it used to be `status: ok`
 and an empty diagnostics array.
 
+**And then it could not come out true.** (#250) Two defects, and each of them alone was enough to
+make the funding verdict useless. `sleeveCashByCurrency` was the **only** numerator, so a sleeve
+fundable entirely out of its own same-currency parking — short-duration and T-bill holdings, the rows
+already carrying `parkedLiquidity: true` for the concentration axes since #141 — was told
+`budgetFundableInSleeveCurrency: false` on every run, four runs running. The measurement that settles
+it: write the budget down to the fundable amount, call again, and the «shortfall» matches that
+sleeve's own parked market value **to the cent**. The money was there and the route was not a
+conversion; it was a sale inside one currency. `sleeveParkedLiquidity` is now read per currency and
+sits in the numerator, and the answer reports `fundableFromCash` and `fundableFromParking` **apart** —
+because selling parking is an act that needs a proposal and holding cash is not, so a bare sum would
+price the one as the other. `fundingRoute` names which of the four it is: `cash`,
+`sell-parking-same-currency`, `fx-conversion`, `cross-market-sale`; the last two are still
+`allocate`'s and the investor's, and the second is the sleeve's own.
+The other half was arithmetic. The comparison was made in **weight** space against a `1e-9` epsilon
+while the answer was printed in **cents**, and every weight in these runs is written to eight decimal
+places — which carries up to five times that tolerance in rounding error. One control:
+`requiredAmount 294.02`, `fundableAmount 294.02`, `shortfallAmount 0`, and
+`budgetFundableInSleeveCurrency: false` with the code fired. **No budget value could pass this code
+quietly**, so `mandateExecution` booked an unresolved code on every run of the flow. The verdict is
+decided on the printed shortfall now — `<= 0` of the number the answer publishes — so the two cannot
+disagree, and the fix is not a wider tolerance but a comparison made where the answer is stated.
+
+**Two inputs were shape-valid and answered the opposite question.** (#251) Four traps were met in one
+run; two were refused honestly and two came back confident and reversed. The `concentration` caps
+are five and only two of them are the Mandate's, so a run put the other three where its settings
+declare them — `config` — and got `concentration_cap_missing` / `unevaluated` three times. ⛔
+`unevaluated` is not a pass, and that answer reads as one anyway: `breaches` comes back empty and
+`exposures` comes back populated, so three unmeasured axes look measured and clear. They are now
+`concentration_caps_misplaced` / **blocked**, naming both wrong places — the top of `config`, and the
+settings block handed straight through as `config.concentration` — and `unmeasuredAxes` says outright
+which axes an answer did not measure. And `specialistBudget`'s requested weight was the sleeve
+**total** under a name that reads as the increment: a sleeve at 0.31471199 taking on a new 3% name
+passed `0.03`, which was read as *cut this sleeve to three per cent* and came back
+`increaseWeight: −0.28471199`, `allowed: true`, no diagnostic — met twice in the same run, by the
+sleeve flow and by `allocate` independently. The key is `requestedSleeveTotalWeight`; the retired
+spelling is refused by name, and ⛔ never read as the new one, because aliasing it would keep
+answering the same reversed question. `executionRecord` was reading `data` non-null and nothing was
+reading `rows[].evaluated`, which published a record saying «25 names eligible» beside «nothing was
+evaluated»; either field settles it now, and a row saying neither is named rather than counted as an
+answer that found nothing.
+
 **Four more calls came back as answers about something else.** (#177) The pattern this package
 records most often — *a wrong input is not refused and comes back looking like a pass* — was measured
 four more times on one run, and the costliest was a **1,338.848×** NAV. `sleeveNav` read a position

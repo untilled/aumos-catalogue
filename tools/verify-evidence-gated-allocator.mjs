@@ -567,9 +567,9 @@ const strata = execute({ operation: 'oversoldStrata', asOf: '2026-12-31T00:00:00
 assert.equal(strata.data.symbolsUsed, backtest.expected.symbolsUsed)
 
 covers('sizing/specialist-budget')
-const krBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.4 } })
+const krBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedSleeveTotalWeight: 0.4 } })
 assert.equal(krBudget.status, 'blocked', 'specialist cannot spend beyond its Brief sleeve')
-const urgentExit = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'us-sleeve', market: 'XNAS', currentSleeveWeight: 0.4, sleeveBudgetWeight: 0.4, requestedTargetWeight: 0.2, emergencyExit: true } })
+const urgentExit = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'us-sleeve', market: 'XNAS', currentSleeveWeight: 0.4, sleeveBudgetWeight: 0.4, requestedSleeveTotalWeight: 0.2, emergencyExit: true } })
 assert.equal(urgentExit.data.allowed, true, 'urgent exit does not wait for Global')
 covers('sizing/global-denominator')
 const globalBudget = execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'kr-sleeve', weight: 0.4 }, { key: 'us-sleeve', weight: 0.5 }, { key: 'cash', weight: 0.1 }] } })
@@ -1171,11 +1171,11 @@ assert.ok(copiedMemory.diagnostics.some((row) => row.code === 'memory_raw_source
  * One manager, three flows — the pre-2026-08-27 package ids are gone. (issue #70 §5)
  */
 covers('owner-cutover/flow-lane-ownership')
-const realIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: manifest.id, flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+const realIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: manifest.id, flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedSleeveTotalWeight: 0.32 } })
 assert.equal(realIdBudget.data.allowed, true, 'the published manager id is the one specialistBudget accepts')
-const staleIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-kr', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+const staleIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-kr', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedSleeveTotalWeight: 0.32 } })
 assert.ok(staleIdBudget.diagnostics.some((row) => row.code === 'manager_id_unknown'), 'a retired package id is rejected rather than silently owning a lane')
-const wrongLane = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XNAS', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+const wrongLane = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XNAS', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedSleeveTotalWeight: 0.32 } })
 assert.ok(wrongLane.diagnostics.some((row) => row.code === 'specialist_market_not_owned'), 'a sleeve flow still cannot allocate outside its market')
 assert.equal(
   execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'cash', weight: 1 }] } }).data.owner,
@@ -3260,14 +3260,14 @@ assert.deepEqual(cashRows.data, cashObject.data, 'per-currency cash is one fact 
 assert.deepEqual(cashRows.diagnostics, cashObject.diagnostics, 'and neither shape is reported as a problem')
 assert.equal(cashObject.data.globalNavKrw, 27000, 'the arithmetic is the arithmetic — the conversion does not round, total or re-denominate')
 assert.deepEqual(
-  canonicalRun('specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02, sleeveCashByCurrency: [{ currency: 'KRW', amount: 11115231 }], portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }).data,
-  canonicalRun('specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02, sleeveCashByCurrency: { KRW: 11115231 }, portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }).data,
+  canonicalRun('specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedSleeveTotalWeight: 0.02, sleeveCashByCurrency: [{ currency: 'KRW', amount: 11115231 }], portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }).data,
+  canonicalRun('specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedSleeveTotalWeight: 0.02, sleeveCashByCurrency: { KRW: 11115231 }, portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }).data,
   'and the other operation that takes per-currency cash reads both the same way',
 )
 /** ⛔ The aggregate #174 is about is still refused by name, on both keys. */
 for (const [operation, input, path] of [
   ['sleeveNav', { cash: 8596.1, positions: [], fx: { USDKRW: 1300 } }, 'input.cash'],
-  ['specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02, sleeveCashByCurrency: 8596.1, portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }, 'input.sleeveCashByCurrency'],
+  ['specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedSleeveTotalWeight: 0.02, sleeveCashByCurrency: 8596.1, portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }, 'input.sleeveCashByCurrency'],
 ]) {
   const refused = canonicalRun(operation, input)
   assert.equal(refused.status, 'blocked', `${operation}: a bare amount names no currency`)

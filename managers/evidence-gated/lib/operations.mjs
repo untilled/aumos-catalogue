@@ -407,6 +407,7 @@ export const OPERATIONS = {
       caps: { position: NUMBER, sector: NUMBER, theme: NUMBER, factor: NUMBER, portfolioHeat: NUMBER },
       'positions[]': { symbol: STRING, weight: NUMBER, core: BOOLEAN, parkedLiquidity: BOOLEAN, stopLossPct: NUMBER, sector: STRING, themes: ARRAY, factors: ARRAY },
       'proposed[]': 'The same row shape as positions[]. ⚠️ A row for a symbol the book already holds is the target state for that symbol and replaces the holding; it does not stack on it.',
+      capsPlacement: 'All five caps go in `caps` and nowhere else: `position` and `portfolioHeat` are the Mandate\'s `maxPositionWeight` and `maxDrawdown`, and `sector`, `theme` and `factor` are the investor\'s, declared at `config.concentration.{sector,theme,factor}` in this package\'s own settings — which the caller reads out and passes **as caps**. ⚠️ Passing them in `config` instead is concentration_caps_misplaced / blocked (#251 ①), and it is blocked because the alternative reads as a pass: an unread cap leaves its axis accumulated into `exposures` and compared against nothing, so `breaches` comes back empty for it and three unmeasured axes look measured and clear. Both wrong places are named — `config.<axis>` at the top, and `config.concentration.<axis>` handed straight through from the settings block. ⛔ An axis with no cap anywhere is the older, narrower concentration_cap_missing / unevaluated, which is also not a pass; `data.unmeasuredAxes` names either case.',
       rowShape: 'The three label axes are not spelled alike and the difference is read: sector is a single string — a listing has one — while themes and factors are arrays, because a name sits on several shared loss paths. ⛔ sectors (plural), theme (singular) and factor (singular) are refused as input_shape_invalid rather than ignored; before #173 the plural sectors was read by nothing, the sector axis accumulated empty, and its cap applied to no weight while the answer stayed status: ok. ⚠️ A row that carries no label on an axis whose cap is declared is reported as concentration_labels_unstated / unevaluated: unlabelled is not under the cap.',
     },
     shape: labelAxes,
@@ -431,6 +432,9 @@ export const OPERATIONS = {
     group: 'sizing',
     surface: 'published',
     mode: 'strict', keys: { started: OBJECT, run: OBJECT, rows: ARRAY, eligibleSymbols: ARRAY },
+    nested: {
+      'rows[]': 'One recipe answer as `files_read` returned it. Two fields are read: **`sourced`** — a boolean, whether this fund held anything readable for the name — and whether the recipe arrived at anything, which **`data` non-null** states and which a plain boolean **`evaluated`** also states. ⚠️ Until #251 ③ only `data` was read, so a caller who wrote `evaluated: true` on every row came back `counts.evaluated: 0` and `candidateEvaluation: "none"` with no diagnostic — a record reading «25 names eligible» beside «nothing was evaluated». ⛔ A row saying neither is a third answer and never a `false`: it is research_record_unreadable / unevaluated, and `counts.evaluationUnstated` counts it. When both are present `data` decides, because it is the field the recipe itself writes, and the disagreement is reported.',
+    },
     describe: 'what this run\'s data preparation actually did — the host\'s own item counts from the task run, set beside what the recipe answers themselves report about how many names this fund held anything readable for, and how many of the answers cleared the gates. ⛔ Reads no diagnostic',
     run: executionRecord,
   },
@@ -475,12 +479,19 @@ export const OPERATIONS = {
   specialistBudget: {
     group: 'sizing',
     surface: 'published',
-    canonical: cashByCurrency('sleeveCashByCurrency'),
+    canonical: all(cashByCurrency('sleeveCashByCurrency'), cashByCurrency('sleeveParkedLiquidity')),
     mode: 'strict',
+    /**
+     * ⚠️ `requestedTargetWeight` stays **declared and refused** (#251 ④). The
+     * key is `requestedSleeveTotalWeight`; the retired spelling is kept in the
+     * contract only so that a call carrying it gets the sentence that says what
+     * the number means, rather than the generic unknown-key refusal — and it is
+     * never read as the new one, because the reversed answer was the defect.
+     */
     keys: {
       managerId: STRING, flow: STRING, market: STRING,
-      currentSleeveWeight: NUMBER, sleeveBudgetWeight: NUMBER, requestedTargetWeight: NUMBER, emergencyExit: BOOLEAN,
-      sleeveCashByCurrency: ANY, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
+      currentSleeveWeight: NUMBER, sleeveBudgetWeight: NUMBER, requestedSleeveTotalWeight: NUMBER, requestedTargetWeight: NUMBER, emergencyExit: BOOLEAN,
+      sleeveCashByCurrency: ANY, sleeveParkedLiquidity: ANY, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
     },
     /**
      * ⚠️ The budget was published as three weights and answered `withinBriefBudget`
@@ -488,12 +499,15 @@ export const OPERATIONS = {
      */
     nested: {
       sleeveCashByCurrency: 'This book\'s cash stated per currency — { KRW: 11115231, USD: 294.02 }, or the { currency, amount } rows `portfolio.cashByCurrency` carries. ⛔ Never the aggregate `portfolio.cash`: on the book that measured this it read USD 8,596.10 and 96.6% of it was won. A bare amount is input_shape_invalid, and a currency with no row is read as zero of it rather than as unknown.',
+      sleeveParkedLiquidity: 'The market value of this book\'s parked liquidity — short-duration and T-bill holdings, the rows carrying `parkedLiquidity: true` — stated per currency in the same two representations as `sleeveCashByCurrency`. ⚠️ It is **in the funding numerator**: money the sleeve already holds in its own currency is money the budget can be paid with, and before #250 there was nowhere to write it, so a sleeve fundable entirely out of its own parking reported `budgetFundableInSleeveCurrency: false` on every run with a «shortfall» equal to that parking. ⚠️ **Reported apart from the cash all the same** — `fundableFromCash` and `fundableFromParking`, because spending parking is a sale and a sale is a proposal the investor approves; read `fundingRoute` for which act pays. ⛔ Optional, and absent is `{}` rather than a missing key: a book that parks nothing is the ordinary book.',
+      fundingRoute: 'Not an input. Which act pays for the budget, so that a reader does not have to compare a shortfall against a parked market value by hand — `cash` (idle in the sleeve\'s own currency, or nothing to procure at all), `sell-parking-same-currency`, `fx-conversion`, `cross-market-sale`. The last two are the allocate flow\'s judgement and the investor\'s approval, and this names them rather than choosing.',
+      requestedSleeveTotalWeight: 'The weight the **sleeve** is to stand at once the order fills — a total, never the increment being added. ⚠️ A sleeve at 0.31471199 taking on a new 3% name states **0.34471199**; stating `0.03` asks for the sleeve to be cut to three per cent, and until #251 that call came back `increaseWeight: −0.28471199` and `allowed: true` with no diagnostic. It was measured twice in one run, by the us-sleeve flow and by allocate independently. ⛔ The old name `requestedTargetWeight` is refused as sleeve_requested_weight_renamed / blocked and is never read as this key.',
       fx: { USDKRW: NUMBER },
       sleeveCurrency: `Not an input. The sleeve is paid in the currency its market quotes — ${Object.entries(MARKET_CURRENCIES).map(([market, currency]) => `${market} → ${currency}`).join(', ')} — derived from \`market\` and never declared, because a run that could name it could name the wrong one. ⛔ It is neither mandate.constraints.baseCurrency nor portfolio.baseCurrency: those two may disagree and both be right, and neither says what a US buy settles in.`,
       managerId: `The literal id this package publishes — \`${MANAGER_ID}\`, also in inputContracts.vocabulary.managerIds — and **not** the instance id the host addresses this manager by. An \`inst_…\` is manager_id_unknown / blocked, which is the whole answer refused; \`managerId: "string"\` was all the contract said, and \`skills/deterministic-metrics\` named only the retired pre-2026-08-27 package ids as rejected. ⚠️ It defaults to the published id, so the safe call omits it. The market roles are **flows** of this one manager — \`flow\` carries them — not ids of their own.`,
       budget: 'The budget itself stays a plain weight and carries no currency: one FX rate scales a ratio\'s numerator and denominator alike, so a ratio has none. What has a currency is the cash that pays for it — which is why the shortfall is reported in the sleeve currency while `sleeveBudgetWeight` is not.',
     },
-    shape: sleeveCash('sleeveCashByCurrency'),
+    shape: both(sleeveCash('sleeveCashByCurrency'), sleeveCash('sleeveParkedLiquidity')),
     describe: 'a sleeve flow inside its Brief budget and market lane, and whether that budget can be paid for in the currency the sleeve settles in',
     run: specialistBudget,
   },

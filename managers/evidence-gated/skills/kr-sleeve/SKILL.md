@@ -16,6 +16,14 @@ a cross-market `REBALANCE` — that is `allocate`'s, and this run has one of it.
 marked in KRW, and the answer says so (`fxBasis: "not-required"`). A budget larger than the won this
 book holds is `sleeve_budget_not_fundable_in_currency`, which is a warning to report in
 `uncertainty` and a gap only `allocate` and the investor can close.
+⚠️ **Pass `sleeveParkedLiquidity` too** — the won market value of your `parkedLiquidity: true` rows.
+It is money this sleeve already holds in its own currency, so it is in the funding numerator; omit
+it and a sleeve that can pay for its whole budget out of its own short-duration holding is reported
+as unfundable. ⛔ Read `fundingRoute` before you report anything: `sell-parking-same-currency` means
+the money is here and has to be **sold**, which is a proposal you make, and it is a different
+sentence from the `fx-conversion` and `cross-market-sale` that are `allocate`'s.
+⚠️ **`requestedSleeveTotalWeight` is the weight the sleeve stands at when the order fills**, never
+the increment you are adding: a sleeve at 0.31471199 taking a new 3% name states 0.34471199.
 
 ⚠️ **Hand up your `priceLevelsToRegister` rows with your targets.** `exitDiscipline` and
 `entryTranchePlan` return them per name once you pass `asset` in full, and the orchestrator folds

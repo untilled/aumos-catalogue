@@ -26,6 +26,17 @@ USD 3,979 against USD 294.02 of idle dollars, and `withinBriefBudget: true` said
 ⛔ The gap is closed by an FX conversion or a sale in the KR sleeve, and **both are `allocate`'s and
 the investor's** — report `sleeve_budget_not_fundable_in_currency` in `uncertainty` and size to what
 is procurable, rather than proposing a buy the book cannot settle.
+⚠️ **Pass `sleeveParkedLiquidity` as well** — the dollar market value of your `parkedLiquidity: true`
+rows — because it is in the funding numerator: it is money this sleeve already holds in the currency
+it settles in. Four runs of this flow reported `budgetFundableInSleeveCurrency: false` for want of
+that key, and the «shortfall» each named was the sleeve's own parked market value to the cent (#250).
+⛔ **The route is not the balance.** `fundingRoute: 'sell-parking-same-currency'` means the money is
+here and has to be sold, and that sale is a proposal **you** make; `fx-conversion` and
+`cross-market-sale` are the two that are `allocate`'s. `fundableFromCash` and `fundableFromParking`
+are reported apart so that you never read a sale as idle cash.
+⚠️ **`requestedSleeveTotalWeight` is a total.** It is the weight the sleeve stands at once the order
+fills, not the increment: at 0.31471199, taking on a new 3% name is `0.34471199`. Stating `0.03`
+asked for the sleeve to be cut to three per cent, and this flow made exactly that call (#251 ④).
 
 ⚠️ **Hand up your `priceLevelsToRegister` rows with your targets.** `exitDiscipline` and
 `entryTranchePlan` return them per name once you pass `asset` in full, and the orchestrator folds

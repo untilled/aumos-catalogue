@@ -221,6 +221,25 @@ export const CAUSE_CODE_REGISTRY = Object.freeze([
    */
   { code: 'sleeve_budget_not_fundable_in_currency', operation: 'specialistBudget', module: 'sizing.mjs', lane: 'unresolved' },
   { code: 'sleeve_budget_fundability_unevaluated', operation: 'specialistBudget', module: 'sizing.mjs', lane: 'unresolved' },
+
+  /* ── the cap that was declared somewhere nothing reads (#251 ①) ────────── */
+  /**
+   * ⚠️ **`unresolved`, and the argument is the one two rows up.** A run whose
+   * sector, theme and factor thresholds landed in `config` has not measured
+   * three of its five axes, so it cannot claim the methodology worked — and it
+   * is not `input-path` either: nothing was lost upstream and no fetch fixes
+   * it, the call has to be rewritten with the numbers the caller already holds.
+   * What it does is forbid the `info` answer, which is what this lane is for.
+   *
+   * ⛔ **Its sibling `concentration_cap_missing` is deliberately not
+   * registered, and the asymmetry is the point.** That code fires for every
+   * axis a caller legitimately leaves out — a run asking only about the
+   * position axis raises it four times — so registering it would demote almost
+   * every run to `unreported`. This one fires only when the threshold is
+   * demonstrably declared and demonstrably unread, which is never a call
+   * anybody meant to make.
+   */
+  { code: 'concentration_caps_misplaced', operation: 'concentration', module: 'sizing.mjs', lane: 'unresolved' },
 ])
 
 /** The codes of one lane, sorted, frozen — the only way a consumer gets a list. */

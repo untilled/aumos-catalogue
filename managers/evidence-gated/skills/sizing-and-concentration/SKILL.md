@@ -35,7 +35,16 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    symbols and their weight: an empty axis map is *nobody said what this is*, which is a different
    fact from *measured and under the cap* and used to look identical to it.
 3. Apply the configured sector, theme and factor caps on top of the Mandate's. Configuration may
-   be stricter than the Mandate and never looser. If classification is uncertain, use the more
+   be stricter than the Mandate and never looser. ⚠️ **All five caps go in `caps` and the three
+   configured ones are no exception.** They are declared at `config.concentration.{sector,theme,
+   factor}` in this package's settings, and the caller reads them out and passes them **as `caps`**;
+   passed in `config` — at the top of it, or as the settings block handed straight through — they
+   are read by nothing and the call comes back `concentration_caps_misplaced` / **blocked**. ⛔ That
+   severity is the point: the alternative reads as a pass. An unread cap leaves its axis accumulated
+   into `exposures` and compared against no number, so `breaches` comes back empty for it and three
+   unmeasured axes look measured and clear — which is what one run was told three times over.
+   A cap declared nowhere at all is still the older, narrower `concentration_cap_missing` /
+   `unevaluated`, and `data.unmeasuredAxes` names the axes either way. If classification is uncertain, use the more
    conservative applicable bucket and disclose it. ⚠️ **Declare `parkedLiquidity: true` on a row
    held as a cash equivalent, and it leaves these three axes** — a parking symbol is held to be
    *out* of the market, so it is on no shared loss path and spends none of a sector, theme or

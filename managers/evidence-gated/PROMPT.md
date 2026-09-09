@@ -745,14 +745,17 @@ absence.
 | axis | operation | ⛔ what an undeclared or unpassed input answers |
 |---|---|---|
 | position cap, portfolio heat | `concentration` (`caps.position` = `maxPositionWeight`, `caps.portfolioHeat` = `maxDrawdown`) | `unevaluated`, which is **not a pass** — say so in `uncertainty` rather than sizing as though the limit were absent |
+| sector, theme, factor caps | `concentration`, and **all five caps go in `caps`** — these three are `config.concentration.{sector,theme,factor}`, read out of the settings and passed **as `caps`** | `concentration_caps_misplaced` / **blocked** if they are passed in `config` instead, because the alternative reads as a pass: an unread cap leaves its axis in `exposures` and compared against nothing, so `breaches` comes back empty and three unmeasured axes look clear. Declared nowhere is `concentration_cap_missing` / `unevaluated`, which is also not a pass; `unmeasuredAxes` names either case |
 | sector / theme / factor | `concentration` labels on the rows | `concentration_labels_unstated` / `unevaluated`: an empty axis is *nobody said what this is*, never *measured and under the cap* |
-| sleeve budget | `specialistBudget`, with the procurement side passed | `sleeve_budget_fundability_unevaluated` — `withinBriefBudget: true` without it is a claim about a budget nobody has shown can be bought |
+| sleeve budget | `specialistBudget`, with the procurement side passed — the cash **and** `sleeveParkedLiquidity` | `sleeve_budget_fundability_unevaluated` — `withinBriefBudget: true` without it is a claim about a budget nobody has shown can be bought. ⚠️ Omitting the parking is not a refusal and it *understates* what the sleeve can pay: read `fundingRoute` for which act pays — `cash`, `sell-parking-same-currency`, `fx-conversion`, `cross-market-sale` — and `fundableFromCash` / `fundableFromParking` for the two halves, because selling parking is a proposal the investor approves |
+| the sleeve total | `specialistBudget.requestedSleeveTotalWeight` — the weight the **sleeve** stands at once the order fills, never the increment being added | a sleeve at 0.31471199 taking a new 3% name states **0.34471199**. Stating `0.03` asks for the sleeve to be cut to three per cent; the retired name `requestedTargetWeight` is `sleeve_requested_weight_renamed` / **blocked** and is never read as this key |
 | sleeve NAV | `sleeveNav`, with `valueCurrency` where the mark is in something else | `marketValue` is read as already being in the position's own currency; check `marketValueBasis` for which reading was used |
 | single-name total | `singleNameBudget` | `single_name_budget_unevaluated`, never an unlimited lane |
 | cash | `effectiveCashFloor`, against `projectedCashWeight` — the cash weight **after** everything this run proposes | `cash_floor_unevaluated` (not "no floor"); an uncomputed projection is `cash_floor_projection_missing` rather than a pass |
 
 On top of the Mandate's numbers apply the configured sector/theme/factor thresholds, which may be
-stricter and never looser. ⚠️ **A floor is not a target** — `effectiveCashFloor`'s `headroomWeight` is
+stricter and never looser — **passed in `caps` beside the Mandate's two, never left in `config`**,
+where nothing reads them and the axis comes back looking measured. ⚠️ **A floor is not a target** — `effectiveCashFloor`'s `headroomWeight` is
 what may be deployed, not what should be. ⚠️ **A budget is what the Mandate permits, never what the
 book should hold.** ⚠️ **A sleeve budget is a (weight, currency) pair and only the weight is written
 down**: the ratio has no currency, but the cash that pays for it is the currency the sleeve's market
