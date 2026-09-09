@@ -5412,6 +5412,45 @@ for (const flow of Object.keys(FLOWS)) {
 }
 
 /**
+ * ── The boundary moves during the run, so its verdict is last (#246) ───────
+ *
+ * Both sleeve flows declared a research extension and reported
+ * `coverage.complete: true` / `uncovered: []` **in the same run**, and the
+ * orchestrator's re-call with those names in the universe flipped both.
+ * Measured on `run_bb689b6199084b04afd8b0e1d1528cda` (2026-09-09): KR
+ * `extensions: ["001440"]`, declared 77 / screened 75 / dispositions 74; US
+ * `["LEU"]`, 85 / 84 / 83. ⚠️ **Two flows in one run is a procedure**, and the
+ * procedure was that `coverage` sat in the sleeve's preamble — where
+ * `extensions: []` makes `complete: true` genuinely honest — and the boundary
+ * moved behind the verdict.
+ *
+ * ⛔ The old shape is exactly what #212 ⑦ was written against: «call coverage
+ * after you register the extension» is an adverb in a paragraph, and a
+ * paragraph cannot be executed. Both are declared steps now and this asserts
+ * the order between them.
+ */
+for (const flow of Object.keys(FLOWS)) {
+  for (const call of ['researchState', 'coverage']) {
+    assert.ok(stepOf(flow, call), `${call} is a numbered step of ${flow}: the extension registration and the verdict about the boundary it widens are both on this path`)
+  }
+  assert.ok(
+    stepOf(flow, 'researchState').n < stepOf(flow, 'coverage').n,
+    `${flow} reads coverage after it has registered this run's extensions — a verdict taken before them is a claim about a universe the run then enlarged (#246)`,
+  )
+  /**
+   * ⚠️ **And the verdict is the last thing the flow does**, not merely after
+   * the registration: a step added between them later is a step that can widen
+   * the boundary again. ⛔ Asserted as «nothing after it» rather than as the
+   * literal 18, which is the numbering pin this file replaced.
+   */
+  assert.equal(
+    stepOf(flow, 'coverage').n,
+    numberedSteps(flow).length,
+    `${flow}'s coverage verdict is its last declared step; anything after it could move the boundary the verdict has already been read over`,
+  )
+}
+
+/**
  * ── The discovery axis that had no producer (issue #169) ───────────────────
  *
  * `radarCandidates` takes `catalysts` and `events`, `upsideRadar` reads a

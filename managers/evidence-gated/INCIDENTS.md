@@ -155,13 +155,34 @@ a track the operation cannot see.
 one universe declared, not one candidate generated, and nothing in any proposal that would let an
 investor see it. The circle closed with no error in it — §3 names the lens when there are
 candidates, candidates come out of the sweep, the sweep needs a declared universe, so the run that
-had none never reached the step that would have noticed. `coverage` is therefore called in
-pre-flight, where nothing downstream depends on the answer.
+had none never reached the step that would have noticed. `coverage` is therefore called **every
+run**, and whatever it says is reported. ⚠️ **Where it is called moved** (`#246`): it is the last
+step of the flow's checklist rather than pre-flight, because an extension registered mid-run is part
+of the boundary it measures. What #140 requires is that it is called and reported at all, and that
+is unchanged.
 
 **Coverage complete over the empty set** (run `run_ba37a8f6907a49c3a805a4ce3ee10ec6`, 2026-09-04).
 `coverage` was called with `scannerUniverses: []` and `extensions: []` and answered `complete: true`,
 `uncovered: []`, no diagnostics — on a denominator made entirely of the book's own holdings. Hence
 `complete: null`: `false` would say the run looked and found gaps.
+
+**An extension declared and `complete: true` reported in the same run** (#246,
+`run_bb689b6199084b04afd8b0e1d1528cda`, 2026-09-09). `kr-sleeve` persisted `extensions: ["001440"]`
+and `us-sleeve` `["LEU"]` through `researchState`, and both reported `coverage.complete: true` /
+`uncovered: []`. The orchestrator re-called `coverage` with those names in the universe and both
+flipped — KR declared 77 / screened 75 / dispositions 74, US 85 / 84 / 83 — each with its new name
+in `uncovered`, because neither had a `prices/daily` disposition; both flows had written *price
+series not collected, paper thesis only* about them in the same breath. ⚠️ **Two flows did it in one
+run, so it is a procedure and not an accident.** `coverage` was step 2 of the sleeve's own preamble,
+where `extensions: []` makes `complete: true` genuinely honest — and the boundary then moved behind
+the verdict. It is **step 18** now, after `researchState`, and `lib/flows.mjs` declares that order
+so a verifier executes it instead of a paragraph asserting it. ⛔ Widening the boundary creates the
+obligation to sweep inside it in the same run — that is what makes an extension part of the
+*declared* universe — and a run that cannot produce the disposition reports `coverage` incomplete
+with the name left in `uncovered` rather than dropping the extension. ⚠️ **The curated 74 all
+dispositioned is real and is this book's first**; what this records is that the boundary moved after
+it, not that the achievement was cancelled. ⛔ `discoveryCapacity`'s `emptyExtensionRuns` reset
+(1 → 0) worked correctly and is untouched: gaining an extension is itself a success.
 
 **The close buffers arrived at the wrong nesting.** A run that handed them at the top of `config`
 got the package's own 30/45 with nothing said — #91's *"the number on the install screen governed
@@ -347,6 +368,32 @@ as «there was nothing to judge», and only one of those is evidence the methodo
 `mandateExecution`'s positive answer over a lane whose leading candidate reached no document, and
 blocks nothing — a `WAIT` with every document written and every candidate declined is an honest run,
 and the point of the code is that the two can be told apart.
+
+**242 files in one day's sweep folder, and folding them reports a roster nobody failed to read**
+(`untilled/aumos-catalogue#245`, owner's store, 2026-09-09). `outputPath` is
+`scans/<asOf's calendar day>/<recipeId>`, so the folder is keyed by **date and not by run**:
+`scans/2026-09-09/roster-scan/` held 242 answers — 55 `XNYS:` and 28 `XNAS:` from a discarded
+venue-keyed batch, beside the 83 `us:` and 76 `kr:` answers from the sweep that worked. Folding the
+folder wholesale reads those 83 as `sourced: false` and reports `unprepared 83종`, ⚠️ **a fact that
+does not exist** — they are a coordinate the run threw away, not names it could not read, and it is
+the same misreading as `never-fed` reported as `fed-and-genuinely-empty` one layer up. The
+separating key is each answer's own `evaluatedAsOf` — `00:39:16.609Z` on the discarded batch against
+`11:23:55.210Z` on the live one, written by `recipes/request.mjs` from the host's pin. ⚠️ **The
+instruction is `task_get`'s `outputs` and the check is `evaluatedAsOf`**: `outputs` names this run's
+files and nothing else, so it needs no comparison at all. ⛔ `files_list` answers *what is on disk*,
+which is a question about the folder and not about the run — a flow that lists a directory is
+reading something nobody promised it.
+
+**And the item id that filled that folder twice** (`untilled/aumos-catalogue#245`). `task_start`'s
+item id is the key the store files documents under — the research market, `kr:` / `us:` — and it sat
+one line under a `market` argument that genuinely takes the venue MIC. Six documents instructed the
+MIC; five were corrected with the completion stage and `skills/orchestrate/SKILL.md` was the last.
+⚠️ The US instruction was self-contradictory even inside the MIC reading: it said `XNAS:<symbol>`
+while the roster's real split is XNYS 55 / XNAS 28, so 55 of 83 were wrong on its own terms. ⛔ An
+invented id is **accepted** and the recipe is handed nothing, so the whole batch answers
+`sourced: false` — shaped exactly like a market that offered nothing, and reached by no diagnostic
+in this package, because the roster was declared, the refresh answered and the task settled. The
+recovery is the sleeve skills' two-sided probe: one call, one name, both coordinates.
 
 **`entryQualityGate` was documented as needing a scan history it does not read** (#147). Its input
 is `bars` — 60 minimum, 200+ for the long indicators — so a first run that fetches enough dated bars

@@ -235,8 +235,10 @@ So every dispatch prompt carries this, adjusted to the flow's markets:
 
 ```
 Declare this sleeve's universe for this run before any sweep — call researchUniverse for
-the curated seed, verify current listing eligibility, add persisted research extensions, and pass both to
-`coverage` (`scannerUniverses`, `extensions`) and to `harnessAudit` (`universe`).
+the curated seed, verify current listing eligibility, add persisted research extensions, and pass the
+declared universe to `harnessAudit` (`universe`). Leave `coverage` until after researchState, at the
+end of your checklist: an extension registered mid-run widens the boundary coverage measures, so a
+complete: true read here is a claim about a universe you then enlarged.
 Feed the fundamental branch before running it, in this order (#146): the registry that gives the
 vendor's own filer id (open-dart /api/corpCode.xml for corp_code, sec-edgar
 /files/company_tickers.json for the CIK) → mapCorporationCodes → fundamentalsPlan →
@@ -270,9 +272,18 @@ already stores — so a roster prepared first answers scanner_history_insufficie
 that is blindness, not an empty market. Re-running it over the same closed bar reaches no vendor at
 all, so a previous run having collected them is not a reason to skip it.
 Then run the whole-universe price sweep through task_start over this package's declared recipes
-(roster-scan, opportunity-metrics), with each item id the store coordinate MIC:symbol and
+(roster-scan, opportunity-metrics), with each item id the research market key
+<research market>:<symbol> — kr: or us:, the sleeve that name belongs to, and never the venue MIC
+that source_cache_refresh took one line above — and
 outputPath scans/<asOf date>/<recipeId>; then task_get until it settles, then files_read on
-<outputPath>/<itemId>.json for the answers. The bars stay in the host on every step and never
+the answer files task_get names in its outputs, checking each row's evaluatedAsOf against this run's
+asOf. An invented id is accepted and the recipe is handed nothing, so a venue-keyed sweep answers
+sourced: false on every name and reads exactly like a market that offered nothing; a whole roster of
+sourced: false is the sleeve skills' two-sided probe and never a sentence about this market.
+Never fold the folder: outputPath is a calendar day and holds every sweep run on that date — 242
+files on 2026-09-09, 83 of them a discarded venue-keyed batch — so folding it wholesale reports an
+unprepared count that never happened, and files_list says what is on disk and never which of it is
+this run's. The bars stay in the host on every step and never
 become tool arguments. Read the answer files — a settled run whose files nobody opened is not a
 prepared roster. Report sourced, evaluated and unprepared as three separate counts and never their
 sum; they are derived from the answers' own sourced field, not from the host's item counts. Treat
@@ -288,7 +299,11 @@ Return researchActivity ({source, granted, attempts, succeeded}), each radar lan
 starvation with its feedStage/feedCause, and the feed verdict — fed-and-evaluated,
 fed-and-genuinely-empty, partially-fed or never-fed. fed-and-genuinely-empty and never-fed produce
 an identical empty list and mean opposite things; do not report one as the other. Report
-partially-fed with its counts (feedCoverage: fed of, unfed) and never as either of them. Persist the roster/Evidence references with researchState. If the roster cannot
+partially-fed with its counts (feedCoverage: fed of, unfed) and never as either of them. Persist the roster/Evidence references with researchState, and only then call coverage
+(scannerUniverses, extensions) with the extensions as they finally stand. An extension you declare
+is a name you owe a disposition for in the same run — run its source_cache_refresh on prices/daily
+and carry it into the sweep — and if you could not, report coverage incomplete with that name left
+in uncovered rather than dropping the extension to make the verdict green. If the roster cannot
 be read or eligibility cannot be checked, report that scope gap in uncertainty; never substitute holdings.
 ```
 
