@@ -3033,7 +3033,7 @@ assert.equal(new Set(tabledOperations).size, tabledOperations.length, 'no operat
  * that a row which cannot fill all four is refused by name rather than
  * published half-wired.
  */
-assert.equal(Object.keys(OPERATIONS).length, 110, 'every operation the package answers has a definition row')
+assert.equal(Object.keys(OPERATIONS).length, 112, 'every operation the package answers has a definition row')
 assert.equal(PUBLISHED_OPERATIONS.length + INTERNAL_OPERATIONS.length, Object.keys(OPERATIONS).length, 'surface partitions the table; there is no third state')
 assert.deepEqual([...supportedOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'operation_unknown lists the published surface, projected from the definition')
 assert.deepEqual([...tabledOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'and the skill table is that same surface')
@@ -5858,6 +5858,124 @@ assert.notEqual(
  * repeating that is documentation; a check on the substring is a check that a
  * word appears.
  */
+
+/**
+ * ── #242/#243: three lenses rank apart, and one candidate reaches a document ─
+ *
+ * The two halves of one failure. `discoveryScore` ordered the research queue by
+ * mean-reversion depth, so the lenses that require an intact trend scored zero
+ * and were never reached (#242); and no stage carried whichever candidate *was*
+ * reached to the document the four gates judge, so the run declined four names
+ * at 1, 2 and 3 of 4 and registered nothing (#243).
+ */
+covers('scanner/lens-rank-per-lens')
+const shallowPullback = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'SHALLOW', market: 'us', bars: boundaryBars(-0.06, 3) } })
+const deeperPullback = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'DEEPER', market: 'us', bars: boundaryBars(-0.12, 3) } })
+assert.deepEqual(shallowPullback.data.lenses, ['trend-pullback'])
+assert.deepEqual(deeperPullback.data.lenses, ['trend-pullback'])
+assert.equal(shallowPullback.data.discoveryScore, 0, 'the #242 measurement: a name above its MA200 carries none of the mean-reversion signals, so the score that ordered research was structurally zero for this whole lens')
+assert.equal(deeperPullback.data.discoveryScore, 0, 'and zero for every other member of it, so the order among them was arbitrary and the lens was never reached')
+assert.equal(shallowPullback.data.discoveryScoreMeaning, 'mean-reversion-depth-only', 'the label says which lens the number is about; `research-priority-only` was what a run read while researching in this order')
+assert.equal(shallowPullback.data.lensRanks['trend-pullback'].metric, 'offHigh200')
+assert.equal(shallowPullback.data.lensRanks['trend-pullback'].order, 'desc')
+
+const fallingRow = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'FALLING', market: 'us', bars: stillFalling } })
+assert.deepEqual(fallingRow.data.lenses, ['mean-reversion'])
+const queued = execute({
+  operation: 'candidateQueue',
+  asOf: methodology.asOf,
+  input: { rows: [deeperPullback.data, shallowPullback.data, fallingRow.data], perLens: 1 },
+})
+assert.deepEqual(
+  queued.data.queues['trend-pullback'].map((row) => row.symbol),
+  ['SHALLOW', 'DEEPER'],
+  'the least fallen name inside the band sorts first — the ported original’s own selection reason, and the opposite of what one score paid 60 points for',
+)
+assert.equal(queued.data.queues['mean-reversion'][0].metric, 'meanReversionSignalFraction', 'and depth still orders the lens whose claim depth is')
+assert.equal(queued.data.queues['mean-reversion'][0].value, fallingRow.data.discoveryScore / 100, 'the depth rank is the row’s own number rather than a second measurement of it')
+assert.equal(queued.data.rankScope, 'within-one-lens-only')
+assert.deepEqual(
+  [...new Set(Object.values(queued.data.queues).flat().map((row) => row.metric))].sort(),
+  ['ma200Distance', 'meanReversionSignalFraction', 'offHigh200'].filter((metric) => Object.values(queued.data.queues).flat().some((row) => row.metric === metric)),
+  'the ranks are three different measurements, which is why there is nothing here to sort three lenses by',
+)
+assert.deepEqual(
+  queued.data.owesDocument.map((row) => `${row.lens}:${row.symbol}`),
+  ['mean-reversion:FALLING', 'trend-pullback:SHALLOW'],
+  'one candidate per lens is carried, so a lens that scores zero on another lens’s metric still owes a document',
+)
+
+/** A candidate two lenses name is ranked by each of them, on each lens’s own metric. */
+const dualLens = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'DUAL', market: 'us', bars: boundaryBars(-0.18, 3) } })
+assert.deepEqual(dualLens.data.lenses, ['trend-pullback', 'quality-pullback'])
+assert.equal(dualLens.data.lensRanks['trend-pullback'].metric, 'offHigh200')
+assert.equal(dualLens.data.lensRanks['quality-pullback'].metric, 'ma200Distance', 'the band has already fixed the depth here, so what orders it is how much of the uptrend survived')
+
+/** ⛔ A rank that cannot be read carries the row last; it never shortens the queue. */
+const unreadable = execute({
+  operation: 'candidateQueue',
+  asOf: methodology.asOf,
+  input: { rows: [{ symbol: 'BLIND', market: 'us', eligibleForNewResearch: true, lenses: ['trend-pullback'], indicators: {} }, shallowPullback.data], perLens: 1 },
+})
+assert.deepEqual(unreadable.data.queues['trend-pullback'].map((row) => row.symbol), ['SHALLOW', 'BLIND'])
+assert.equal(unreadable.data.counts.queued, unreadable.data.counts.eligible, 'the queue is never shorter than the eligible set')
+assert.ok(unreadable.diagnostics.some((row) => row.code === 'lens_rank_unavailable' && row.severity === 'unevaluated'), 'and the row that could not be ordered is named rather than dropped')
+
+covers('research/candidate-completion-stage')
+const owedForCompletion = [{ symbol: '267260', market: 'kr', lens: 'mean-reversion', position: 1 }]
+const nothingWritten = execute({ operation: 'candidateCompletion', asOf: observationAsOf, input: { owesDocument: owedForCompletion, records: [] } })
+assert.equal(nothingWritten.data.stageRan, false)
+assert.deepEqual(nothingWritten.data.absent, [{ symbol: '267260', market: 'kr', lens: 'mean-reversion' }])
+assert.ok(
+  nothingWritten.diagnostics.some((row) => row.code === 'candidate_completion_absent' && row.severity === 'unevaluated'),
+  'the stage that produces the document the four gates judge was missing from the run loop, and a lane whose leading candidate reached no document is one this run cannot claim to have judged',
+)
+assert.equal(nothingWritten.status, 'unevaluated', '⛔ and it withdraws the positive answer rather than blocking: a WAIT with every document written is an honest run')
+
+const completed = execute({
+  operation: 'candidateCompletion',
+  asOf: observationAsOf,
+  input: {
+    owesDocument: owedForCompletion,
+    records: [{ symbol: '267260', market: 'kr', lens: 'mean-reversion', thesis: thesisWith(consensusFixtures.managerAttested), challengeVerdict: 'cleared', verdict: 'ready' }],
+  },
+})
+assert.equal(completed.data.stageRan, true)
+assert.deepEqual([...completed.data.completed[0].satisfied].sort(), ['challengeCleared', 'consensusRefs', 'thesisComplete', 'variantView'], 'the four requirements are `variantViewCheck`’s and this operation calls it rather than reimplementing it — there is one answer in this package to whether a variant view is established')
+assert.equal(completed.diagnostics.length, 0)
+
+/**
+ * ⚠️ **The two states this exists to tell apart.** `267260` was declined
+ * correctly — 19 buy / 0 sell, so there was nothing to differ from — and the
+ * answer the run published was `1 of 4`, which reads as «there was nothing to
+ * judge». A decline **with** the document is an outcome of the stage and raises
+ * nothing; the same decline without one is the missing stage.
+ */
+const declinedWithDocument = execute({
+  operation: 'candidateCompletion',
+  asOf: observationAsOf,
+  input: {
+    owesDocument: owedForCompletion,
+    records: [{ symbol: '267260', market: 'kr', lens: 'mean-reversion', thesis: { ...methodology.thesis, evidenceStatus: 'incomplete', consensusRefs: [] }, challengeVerdict: 'conditional_watch', verdict: 'rejected' }],
+  },
+})
+assert.equal(declinedWithDocument.diagnostics.length, 0, 'a candidate carried to a document and then declined is a judged candidate, and this reports it as one')
+assert.equal(declinedWithDocument.data.stageRan, true)
+assert.equal(declinedWithDocument.data.completed[0].verdict, 'rejected', 'the run’s own verdict is carried verbatim and never interpreted')
+assert.ok(declinedWithDocument.data.completed[0].missing.includes('consensusRefs'), 'and what the document was short of is named, so «1 of 4» says which one')
+assert.ok(declinedWithDocument.data.completed[0].thesisGaps.includes('consensusRefs'), 'down to the gap under `thesisComplete`, rather than restating the requirement')
+
+/** ⛔ A document addressed to another name does not answer for the one that was carried. */
+const wrongName = execute({
+  operation: 'candidateCompletion',
+  asOf: observationAsOf,
+  input: {
+    owesDocument: owedForCompletion,
+    records: [{ symbol: '035900', market: 'kr', lens: 'mean-reversion', thesis: thesisWith(consensusFixtures.managerAttested), challengeVerdict: 'cleared', verdict: 'ready' }],
+  },
+})
+assert.equal(wrongName.data.stageRan, false)
+assert.ok(wrongName.diagnostics.some((row) => row.code === 'candidate_completion_absent'), 'a record for a name nobody carried is not the record that was owed')
 
 /**
  * ⚠️ **§37: nothing new is asked of the investor.** The inputs come from tools

@@ -301,6 +301,53 @@ dislocation weeks, the richest thesis environment it names — and nothing in th
 it. `dislocationSignal` is the producer: an index 5% or more off its own window high, or a VIX
 spike, both read from rows `validateMacro` had already dated and tiered.
 
+**One score ordered three lenses, and its sign was backwards against the only thesis that worked**
+(#242). `discoveryScore` is `meanCount / knownMean` — the fraction of the *mean-reversion* signal set
+a name fires — and the flow researched in that order. A `trend-pullback` candidate carries none of
+those five signals by construction: above its MA200 it is not near its 200-day low, not at a 10%
+discount to that average, and rarely under RSI 30. So two of the three price lenses scored
+**structurally zero** and were never reached. Measured on the 2026-09-09 KR sweep, 74 names, reading
+the `roster-scan` answers directly:
+
+| name | eligible | `discoveryScore` | lens | `offHigh200` | `ma200Distance` | what the run did |
+|---|---|---:|---|---:|---:|---|
+| `035900` | ✅ | **60** | mean-reversion | −50.4% | −33.8% | researched → `entry_quality_falling_knife` |
+| `267260` | ✅ | **40** | mean-reversion | −49.1% | −19.9% | researched → declined on consensus |
+| `316140` | ✅ | **0** | trend-pullback | −19.0% | **+7.8%** | **nothing** |
+
+And the ported original wrote its own selection reason down: *200일 고점 대비 −28.6%(스캔 후보 중
+**가장 덜 빠짐**), RSI 44 회복, 바닥다지기.* Least fallen — while this score paid 60 points for most
+fallen. ⛔ The answer was not to flip the sign of one score: a single 0–100 number invites the
+comparison whatever its label says, and the label already said `research-priority-only` while
+pointing the other way. Each lens declares the measurement that orders it, the three are on three
+different scales, and there is nothing left to sort three lenses by.
+
+**157 names screened, four touched, nothing registered — there was no stage that finishes a
+candidate** (#243). Measured on `run_bb689b6199084b04afd8b0e1d1528cda` (2026-09-09). The price branch
+was fed and evaluated on both markets — KR 74 of 74, US 83 of 83, `unprepared` 0 — and produced 17
+eligible KR candidates and 25 US. Four reached `variantViewCheck`: `267260` at **1 of 4**
+(`thesisComplete`, `variantView`, `challengeCleared` outstanding), `LOW` at 2, `NKE` at 3
+(`challengeCleared`, verdict `conditional_watch`), and `MCD` blocked earlier by
+`entry_quality_falling_knife`. ⚠️ `consensusRefs` was satisfied on **both** markets for the first
+time, which confirms #182 closed — and `267260` still stopped at 1 of 4, because the flow reached a
+decline on the consensus and **never wrote the document.**
+
+⛔ **The gates are not too strict, and the evidence is the one result this methodology has.** The
++18.6pp thesis cited above satisfied all four by hand — a named variant-view section, four dated and
+sourced `consensusRefs` rows, one dated challenge cross-check, and bear/base/bull with a
+probability-weighted return, a hard stop and a review date. Its pattern: **one name, deeply, every
+artefact, small.** This run's: **157 names, screened, four touched, all declined, zero registered.**
+The items were already listed in `candidate-research` §Candidate record; what no numbered step did
+was carry one candidate to them.
+
+⚠️ **And the reporting was the sharper half.** `267260` was declined *correctly* — 19 buy / 0 sell,
+so there was nothing to differ from. But *«1 of 4»* does not read as «judged and declined»; it reads
+as «there was nothing to judge», and only one of those is evidence the methodology ran. Hence
+`candidate_completion_absent` as an `input-path` cause rather than a gate finding: it **withdraws**
+`mandateExecution`'s positive answer over a lane whose leading candidate reached no document, and
+blocks nothing — a `WAIT` with every document written and every candidate declined is an honest run,
+and the point of the code is that the two can be told apart.
+
 **`entryQualityGate` was documented as needing a scan history it does not read** (#147). Its input
 is `bars` — 60 minimum, 200+ for the long indicators — so a first run that fetches enough dated bars
 evaluates the gate on that run. #146 recorded the opposite reading and withdrew it.

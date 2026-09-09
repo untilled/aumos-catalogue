@@ -99,6 +99,29 @@ const tail = [
   { calls: ['WebSearch', 'WebFetch'], kind: 'tool' },
   { calls: ['observation_file'], kind: 'tool' },
   { calls: ['observationLedger'], kind: 'operation' },
+  /**
+   * ⛔ **The stage that finishes a candidate, and it was missing from the spine
+   * exactly as the consensus step was (#243).** Every gate that opens a position
+   * has been here since #226 and `variantViewCheck` judges them; nothing
+   * produced **the document they judge.** Measured on
+   * `run_bb689b6199084b04afd8b0e1d1528cda`: 157 names screened across both
+   * markets, 42 eligible, four pushed to `variantViewCheck`, all four declined,
+   * **0 registered** — and `267260` stopped at `1 of 4`.
+   *
+   * ⚠️ **Two steps, because they answer two questions.** `candidateQueue`
+   * decides *which* candidate is carried — per lens, since one score ordering
+   * three lenses is #242 — and `candidateCompletion` reads whether the document
+   * was actually written. ⚠️ The order is the fix, the same way #146's is: the
+   * queue names what this run owes before the run can decide it owes nothing,
+   * and `candidateCompletion` is fed that list rather than a number of its own.
+   *
+   * ⚠️ **It is last on purpose.** The record it checks needs the two steps above
+   * it — a `consensusRefs` row is filed by `observation_file` and ledgered by
+   * `observationLedger` — so a completion stage placed before them would ask for
+   * a document one of whose four requirements could not yet exist.
+   */
+  { calls: ['candidateQueue'], kind: 'operation' },
+  { calls: ['candidateCompletion'], kind: 'operation', feeds: [feed('candidateQueue', 'owesDocument')] },
 ]
 
 export const FLOWS = {

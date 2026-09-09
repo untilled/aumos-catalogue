@@ -57,7 +57,7 @@
  */
 import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
-import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
+import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, candidateQueue, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
 import { sleeveNav, targetWeight, minimumExecutableWeight, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { proposalDisclosure } from './proposal.mjs'
 import { priceLevelSet } from './price-levels.mjs'
@@ -70,6 +70,7 @@ import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetric
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
 import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, migrationMap, exitCheck } from './methodology.mjs'
+import { candidateCompletion } from './completion.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { fundamentalsPlan, mapCorporationCodes, dartVendorStatus, radarCandidates, radarFeedDiagnosis } from './fundamentals-feed.mjs'
 import { catalystRegister, catalystCadence, CATALYST_DATE_ESTIMATED } from './catalysts.mjs'
@@ -168,6 +169,17 @@ export const OPERATIONS = {
     mode: 'named', keys: { rows: ARRAY },
     describe: 'the declared universe, with held and pending excluded',
     run: opportunityUniverse,
+  },
+  candidateQueue: {
+    group: 'scanners',
+    surface: 'published',
+    mode: 'strict', keys: { rows: ARRAY, perLens: NUMBER },
+    nested: {
+      rows: 'The `scan` answers you read back from the sweep\'s answer files — one row per name, carrying `lenses`, `eligibleForNewResearch` and `indicators`. ⛔ Not the `opportunityMetrics` rows: those are the five oversold axes and `opportunityUniverse` folds them. A row this operation cannot read is counted in `counts.rows` and queued nowhere.',
+      perLens: 'How many candidates of **each** lens this run carries to a completed record; the default is 1, and it is the number #243 asks for rather than a ceiling on research. ⛔ There is no argument for «the top N of the roster»: three lenses rank on three different measurements and putting them on one scale is the defect (#242).',
+    },
+    describe: 'the research order **per lens** — each lens ranked by its own measurement, so no one score orders three of them — and which candidates this run therefore owes a completed record for',
+    run: candidateQueue,
   },
   trendState: {
     group: 'scanners',
@@ -887,6 +899,17 @@ export const OPERATIONS = {
     mode: 'named', keys: { proposals: ARRAY, staleDays: NUMBER },
     describe: 'what is already waiting for the investor, so this run does not propose it again',
     run: (input, asOf) => lessonAudit({ ...input, asOf }),
+  },
+  candidateCompletion: {
+    group: 'evidence',
+    surface: 'published',
+    mode: 'strict', keys: { owesDocument: ARRAY, records: ARRAY },
+    nested: {
+      owesDocument: '`candidateQueue`\'s `owesDocument` rows, handed over unchanged — `{ symbol, market, lens, position }`. It is the list this run said it would carry, so the stage is checked against the run\'s own declaration and not against a number this operation chose.',
+      records: 'One row per completed candidate record: `{ symbol, market, lens, thesis, challengeVerdict, verdict }`. `thesis` is the document itself — the same object `variantViewCheck` and `validateThesis` take, which this calls rather than reimplements. ⚠️ `verdict` is what **you** concluded and is carried verbatim: a decline is an outcome of the stage and never a failure of it. ⛔ A record for a name that was not carried is not an error and is simply not read; a carried name with no record is `candidate_completion_absent`.',
+    },
+    describe: 'whether the completion stage ran — for each candidate this run said it would carry, is there a record, and what `variantViewCheck` made of it. ⛔ Not a fifth gate: «judged and declined» and «no document was ever written» are two different states of this book and this is what tells them apart',
+    run: (input, asOf) => candidateCompletion({ ...input, asOf }),
   },
   validateThesis: {
     group: 'evidence',
