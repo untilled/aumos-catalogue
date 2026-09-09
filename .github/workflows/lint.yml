@@ -145,6 +145,28 @@ jobs:
       # identical, because the entrypoints are shells over the same `execute()`.
       - run: npm run check:recipes
 
+      # `shareholder-rerating` is prose with a small deterministic core, and the
+      # core exists because four of #257's completion conditions are claims a
+      # paragraph cannot make: that a dividend trap, a one-off gain, an
+      # under-capitalised balance sheet and an announced-but-unexecuted buyback
+      # reach four **different** answers; that a completed positive thesis
+      # reaches a sized BUY rather than the WAIT every under-specified package
+      # ends in; that a staged plan re-run adds nothing twice; and that
+      # concentration is folded over the whole account, with per-strategy caps
+      # taken by minimum and never by sum.
+      #
+      # Plain Node over committed JSON, like the three steps above it — no
+      # install, no network. It also checks the package's own claims about
+      # itself: that `NOTICE.md` carries the licence holder and the pinned
+      # commit verbatim, and that `PROMPT.md` names the four outcome codes the
+      # arithmetic keeps apart (#254).
+      #
+      # ⚠️ It sits **before** `check:pins` for the reason written below: `steps`
+      # are sequential, the pin step is red by construction on a pull request
+      # that adds a package, and a check placed after it never runs on the pull
+      # requests it was written for.
+      - run: npm run check:shareholder-rerating
+
       # ── Last, and that position is the point ──────────────────────────────
       #
       # The pair to `check:index`, and a different question: `check:index` asks

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Shareholder Rerating">
+  <rect width="64" height="64" rx="14" fill="#1F3A5F"/>
+  <path d="M14 44h36" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity=".5"/>
+  <rect x="17" y="30" width="8" height="14" rx="2" fill="#ffffff" opacity=".85"/>
+  <rect x="30" y="24" width="8" height="20" rx="2" fill="#ffffff" opacity=".85"/>
+  <rect x="43" y="16" width="8" height="28" rx="2" fill="#7FD1A8"/>
+  <circle cx="47" cy="12" r="4" fill="#E7B84B"/>
+</svg>

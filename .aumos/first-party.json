@@ -9,6 +9,7 @@
       "earnings-drift-watcher",
       "evidence-gated",
       "prudent-allocator",
+      "shareholder-rerating",
       "undervalued-now"
     ],
     "sources": [

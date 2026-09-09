@@ -1,0 +1,116 @@
+{
+  "manifestVersion": 1,
+  "id": "shareholder-rerating",
+  "publisher": "aumos",
+  "name": "Shareholder Rerating",
+  "version": "0.1.0",
+  "description": "Korea-listed single equities whose earnings and capital headroom support a shareholder return programme that is actually being executed, held for the discount that closing it should close. Separates re-rating from dividends in every number, and never counts a company's buyback as the investor's income.",
+  "readme": "./README.md",
+  "prompt": "./PROMPT.md",
+  "schedule": [
+    {
+      "cron": "30 16 * * 1-5",
+      "timeZone": "Asia/Seoul",
+      "label": "post-close-review"
+    },
+    {
+      "cron": "0 8 1 * *",
+      "timeZone": "Asia/Seoul",
+      "label": "deep-review"
+    }
+  ],
+  "runtimes": [
+    "claude"
+  ],
+  "license": "MIT",
+  "provenance": {
+    "sourceRepo": "https://github.com/morethanmin/trading-harness",
+    "commit": "1fa18c595baa742f7323366a3c220fec5c6535a7",
+    "license": "MIT",
+    "licenseHolder": "Lee Sang Min",
+    "notice": "./NOTICE.md"
+  },
+  "engines": {
+    "aumos": ">=0.4.0"
+  },
+  "ampVersion": 1,
+  "config": {
+    "schema": "./config.schema.json"
+  },
+  "contributes": {
+    "managers": [
+      {
+        "id": "shareholder-rerating",
+        "name": "Shareholder Rerating",
+        "description": "Finds Korea-listed companies whose profits and capital can pay a shareholder return programme, checks that the programme is being executed rather than announced, and judges whether that closes the discount the shares trade at. Financials are read on capital, non-financials on cash.",
+        "tasks": [
+          "PORTFOLIO_REVIEW",
+          "ASSET_REVIEW",
+          "THESIS_REVIEW",
+          "EVENT_REVIEW"
+        ],
+        "assetClasses": [
+          "equity"
+        ],
+        "markets": [
+          "XKRX"
+        ]
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "portfolio:read",
+      "reason": "Holdings, cash and open proposals are the denominator of every weight this manager computes, and the account-wide concentration check reads them together — a position that is already 9% of the book through another manager is why this one may not add 5%."
+    },
+    {
+      "kind": "thesis:read",
+      "reason": "A staged entry is a route to one cumulative weight owned by one original decision. Before any stage, the existing thesis, its invalidation conditions and its stage ledger are read back, because a stage proposed without them is averaging down with a plan's name on it."
+    },
+    {
+      "kind": "evidence:read",
+      "reason": "A return policy is evidence or it is a press release. Prior observations are inspected by the id the host issued so that a claim about an executed buyback can be traced to the filing it came from, without copying the filing into this manager's own memory."
+    },
+    {
+      "kind": "source:passthrough",
+      "sources": [
+        "open-dart"
+      ],
+      "reason": "OpenDART is where the difference between an announced programme and an executed one is a filed fact: treasury acquisition and cancellation receipts, dividend resolutions, and the quarterly statements the payout and capital ratios are computed from."
+    },
+    {
+      "kind": "connection:passthrough",
+      "connectors": [
+        "toss"
+      ],
+      "reason": "The won price series, the corporate actions and the traded value this methodology checks before entry come from the investor's own broker connection. Aumos relays the vendor's answer unchanged and exposes no credential; nothing here places an order."
+    },
+    {
+      "kind": "observation:file",
+      "reason": "An issuer's investor-relations statement of its return policy, and the broker consensus this desk has to differ from in specific terms, exist on the web and in no filing. Filing the reading — its words, its URL, its publication date — is the only route by which it reaches evidenceIds at all, and every proposal that rests on one says on screen that it is this manager's testimony rather than an Aumos observation."
+    },
+    {
+      "kind": "manager-memory:read",
+      "reason": "This instance reads back its own staged-plan ledger, its research progress on candidates it did not finish, and the review it armed last time — so a run that resumes after a failed one continues instead of starting the same research again."
+    },
+    {
+      "kind": "manager-memory:write",
+      "reason": "Stage completions, unfinished-research notes and the next review are written to stable paths in this instance's private folder. It holds aggregates and progress only: real holdings, cash, fills and evidence stay the host's, and nothing here is a second copy of the account."
+    }
+  ],
+  "requires": {
+    "skills": [
+      "source_request",
+      "connection_request"
+    ],
+    "optionalSkills": [
+      "observation_file",
+      "files_list",
+      "files_read",
+      "files_write"
+    ]
+  },
+  "memory": {
+    "persistent": true
+  }
+}
