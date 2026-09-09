@@ -13,6 +13,27 @@ reading `decisions[].armed` as a receipt for a promise it cannot carry; 0.4.24 s
 lane from the maturity gate, read the Mandate's `cashFloor`, derived the single-name total from the
 Mandate and enforced the source's exit discipline.
 
+## A run cannot cite what it read (`untilled/aumos#773`) — ⚠️ the package half is fixed here
+
+**What is already decided and is not a debt.** Evidence issued during a run is not citable by that
+run, because scope is derived from the `manager_runs` row and that row does not exist until the run
+ends (`untilled/aumos#727`, `#453`). The gateway's own tool description states the absence by name
+(`untilled/aumos#618`'s rule), so this is a published property and not an oversight.
+
+**What was ours and is closed.** `PROMPT.md` §6 told a run to do exactly what the host refuses —
+*"include only Evidence ids actually returned in this run"* — and a run that obeyed it lost its whole
+judgement to `invalid-proposal`. §6 now says «cite the committed set», carries this run's issuances
+forward in `state/research/evidence-carry.json` with their `contentHash`, and requires one
+`proposal_validate` rehearsal before the one door. `INCIDENTS.md` §Submitting holds the measurement.
+
+**What is still the host's, and this package does not depend on it.** The issue's option ③ — have
+`decision_submit` drop uncommitted ids with a warning and seal with the rest, instead of discarding
+the judgement — would let a run cite the reading it paid to file, in the run that paid for it. That
+matters most for `observation_file`, whose stated purpose is making a web reading citable and which
+today cannot do so until the next wake. ⛔ Not a blocker: with the contract fixed the cost is a
+one-run lag on a manager's own testimony, not a lost judgement. If it lands, the change here is a
+relaxation of §6 and nothing else moves.
+
 ## Stated price levels, and when this version may be published (`untilled/aumos#756`)
 
 `untilled/aumos#758` added `DecisionProposal.priceLevels`, and 0.6.0 sends them: `exitDiscipline`

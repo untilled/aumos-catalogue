@@ -669,6 +669,69 @@ plans already standing are not disposed of by this — this package has no withd
 fold on the first re-arm from a run of `0.11.1` **whose stop level is unchanged**, because a level
 that moved is a different promise and correctly stays one.
 
+## Submitting (§6)
+
+**The contract told a run to cite exactly the Evidence the host refuses.** §6 said *"include only
+Evidence ids actually returned in this run"*; the host's rule is the opposite, and it is deliberate —
+Evidence scope is derived from the `manager_runs` row, which does not exist until the run ends
+([`untilled/aumos#727`](https://github.com/untilled/aumos/issues/727),
+[`#453`](https://github.com/untilled/aumos/issues/453)), and the gateway's tool description says so.
+Measured on `run_bb689b6199084b04afd8b0e1d1528cda`: one `proposal_validate` call carrying 27 ids came
+back with **all 24 issued by that run** refused `unknown-evidence` — seven `observation_file` receipts
+for consensus the run had read on the web, the `connection_request` ids, the `task_get` ids and the
+`files_*` ids — while the **3** carried over from the previous run were accepted. So the proposal that
+was actually submitted rested on three ids from a previous day, and the sell-side judgement it made
+off today's close could not cite the close.
+
+⚠️ **Obeying the retracted sentence costs the whole judgement**, not the citation:
+`decision_submit` answers `invalid-proposal` and every gate the run ran is discarded. Hence the two
+rules in §6 and not one — cite the committed set and carry this run's issuances forward in
+`state/research/evidence-carry.json`, *and* rehearse with `proposal_validate` before the one door.
+The measured run escaped `invalid-proposal` only because it happened to validate first; nothing in the
+contract had told it to, and the failure is invisible until the door and total after it.
+
+⛔ **The host half is not this file's to decide.**
+[`untilled/aumos#773`](https://github.com/untilled/aumos/issues/773) option ③ — drop uncommitted ids
+with a warning and seal with the rest — would make a run's own reading citable in the run that paid
+for it. It stays open; the contradiction inside this package does not wait on it.
+
+⚠️ **`observation_filed_not_cited` became the normal reading and stayed a finding.** Under the
+committed-only rule every receipt a run files is uncited by that run, so `observationLedger` reports
+it every time. It is `unevaluated` and refuses nothing, which is what makes that safe;
+`tools/verify-evidence-gated-evidence-citation.mjs` reads the severity out of `lib/` rather than out
+of the prose, because a promotion to `blocked` would block every run that obeyed §6 while §6 still
+read as correct.
+
+## The lane ranking (`sectorStrength`)
+
+**Two contracts of this package were each right and together made L1 uncallable.** `sectorStrength`
+published `benchmarkBars` and a bar array per sector, so the caller had to gather a lane's series;
+§The delegation budget and `skills/orchestrate/SKILL.md` forbid a flow to relay bars at all. On
+`run_bb689b6199084b04afd8b0e1d1528cda` **both** sleeves reported the conflict and skipped the call, in
+the same words — so no ranking, no rank moves, no regime reading and no `researchQueue` were produced,
+and `skills/theme-radar/SKILL.md` names that queue as its **first** input. Forward research therefore
+chose its axis with nothing under it, and the market score and per-name scores the Python this was
+ported from cited in its plans had no successor
+([`untilled/aumos-catalogue#247`](https://github.com/untilled/aumos-catalogue/issues/247)).
+
+⚠️ **A recipe cannot be the fold, which is why the fix is in two pieces.** One recipe process is one
+item and one item is one store coordinate (`untilled/aumos#743` §B), so nothing that ranks a lane can
+run inside one. `sector-series` reduces **one symbol** to the sufficient statistic the fold reads — the
+weighted horizons' returns, three moving averages, the last close, and the two highs the bot baseline
+compares against — and `sectorStrength` folds those rows. The bars stay in the host on both steps.
+
+⛔ **It is not a second copy of the arithmetic and not a second answer.** `sectorStrength` reduces its
+own `bars` through the same function, so a lane folded from rows and a lane folded from bars are one
+call; `tools/verify-evidence-gated-recipes.mjs` runs the recipe as a process and compares the two
+whole answers, which is a claim about parity that can actually fail. ⚠️ The one way the bar-free route
+can silently disagree is a row reduced under weights the fold does not use — a horizon nobody computed
+is not an outperformance of zero — so it is named `sector_series_period_unreduced` instead.
+
+⚠️ **And the answer stopped echoing the leaders' bars.** `sectors[].leaders` was the caller's own input
+handed straight back, which put a bar array per leader on the wire in the one direction nobody was
+watching. It is `leaderCount` now; the signals themselves are `baselineSignals`, which is where they
+always were.
+
 ## Where the rest of the record lives
 
 - `ARCHITECTURE.md` — why the package is shaped this way, and which AMP capabilities it can and

@@ -137,9 +137,10 @@ namespace is this one instance.
 convert or relay price arrays, to walk pages of a vendor listing, or to split a roster into batches,
 and do not type a roster of bars back in as tool arguments: a model retyping bars so another model
 can hand them back is the most expensive way this package has ever failed to reach a judgement.
-The whole-universe sweep is `task_start` over the two recipes this package declares in
+The whole-universe sweep is `task_start` over the two **roster** recipes this package declares in
 `aumos.json` — **`roster-scan`** and **`opportunity-metrics`** — then `task_get`, then `files_read`
-over the answer files. Host code runs this package's own `execute()` over the bars the host stores,
+over the answer files. (The third, **`sector-series`**, is the same route over one lane's benchmark
+and sector proxies; `skills/theme-radar/SKILL.md` owns it.) Host code runs this package's own `execute()` over the bars the host stores,
 one process per name, and **writes one answer file per name into your own folder**; what comes back
 on the wire is counts and a folder. Everything else — a single name, a sizing call, a methodology
 gate — stays `mcp__evidence-gated-metrics__calculate` in your own context, one call per operation.
@@ -261,7 +262,7 @@ front and `.json` behind, so what a run reads and what it used to read are the s
 `state/calibration/inflection.json`, `state/calibration/post-event-continuation.json`,
 `state/failures/repeated-patterns.json`, `state/coverage/universe-state.json`,
 `state/coverage/research-index.json`, `state/research/catalyst-window.json`,
-`state/learning/paper-cohorts.json`.
+`state/research/evidence-carry.json`, `state/learning/paper-cohorts.json`.
 
 ⚠️ **`files_list` with `recursive: true` over `state/` is one call and reads the whole folder's
 shape** — sizes, hashes and what is actually there — so a first run learns it is empty without
@@ -1034,8 +1035,68 @@ multi-asset `REBALANCE`.
   including a sweep the delegation budget stopped, with its refusal code and the unreviewed scope.
 - `WATCH` carries a machine-evaluable revisit promise, not prose pretending to be one.
 
-Include only Evidence ids actually returned in this run. ⛔ There is no `evidence_read` to widen that
-set with.
+#### Which Evidence ids may be cited — the committed ones, which are not this run's
+
+⛔ **Cite only Evidence the host has already committed: ids issued by a run that has *ended*.** An id
+the gateway issued to *you*, this run, cannot be cited yet, and the refusal says so by name:
+
+> `no Evidence ev_… has been committed here. A proposal may only cite Evidence this host already
+> holds — what the gateway filed during a run that has not ended yet is not committed and cannot be
+> cited.`
+
+⚠️ **This reverses the sentence that stood here** (*"include only Evidence ids actually returned in
+this run"*), which was unsatisfiable and expensive: on `run_bb689b6199084b04afd8b0e1d1528cda` all
+**24** ids issued during the run were refused — the seven `observation_file` receipts for the
+consensus this run had read on the web among them — while the **3** carried over from the previous
+run were accepted. Obeying the old sentence and submitting loses the **whole judgement** to
+`invalid-proposal`.
+
+⚠️ **The host behaviour is deliberate and is not a defect to route around.** Evidence scope is derived
+from the `manager_runs` row, and that row does not exist until the run ends
+([`untilled/aumos#727`](https://github.com/untilled/aumos/issues/727),
+[`#453`](https://github.com/untilled/aumos/issues/453)); the gateway's own tool description states the
+absence by name. The package half of
+[`untilled/aumos#773`](https://github.com/untilled/aumos/issues/773) is this section.
+
+So the run's own readings are carried **forward** rather than cited:
+
+1. Cite from the committed set — the ids in the invocation, in `thesis`/`evidence_get`/`evidence_search`
+   answers, and the ones a previous run of yours carried to `state/research/evidence-carry.json`.
+   ⚠️ Confirm a carried id with `evidence_get` before citing it: a run that died before it ended never
+   committed anything, and its carry rows are ids that will still be refused.
+2. Record what *this* run was issued, to `state/research/evidence-carry.json`, before you submit —
+   `{ schemaVersion: 1, updatedAsOf, rows: [{ evidenceId, contentHash, url, publishedAt, subject,
+   issuedAsOf }] }`, one row per id, `contentHash` verbatim from the receipt. That file is what makes
+   your next run able to cite the consensus you paid to file this run; without it the reading is
+   bought once and thrown away every time.
+3. Say it in `uncertainty`. A claim resting on a reading you could not cite is still a claim resting
+   on an uncitable number — name the reading, name the id you recorded, and say the citation follows
+   next run. ⛔ Never drop the claim silently and never present it as evidenced.
+
+⚠️ **`observation_filed_not_cited` is therefore expected for what you filed this run**, and
+`observationLedger` returning it is not a defect: the row is `unevaluated`, it refuses nothing, and it
+is now the *normal* reading for a receipt whose citation is one run away. What it still catches is the
+one that matters — a filing you never carried forward and never mentioned.
+
+⛔ There is no `evidence_read` to widen the committed set with.
+
+#### Rehearse the submission before you spend it
+
+⚠️ **Call `proposal_validate` once, on the proposal you just wrote, before `decision_submit`.** This is
+a working rule and not a suggestion: `decision_submit` is one door called once, and a proposal it
+refuses takes the **entire judgement** with it — every gate this run ran, every flow it dispatched —
+and leaves `invalid-proposal` behind. The failure is silent up to that moment and total after it. The
+run that measured the Evidence rule above escaped it only because it happened to validate first and
+saw 24 of 27 ids refused in advance.
+
+- Point it at `proposals/<asOf's calendar day>-<flow>.json`, the file the section below already makes
+  you write. Validate what you are about to send, ⛔ never a fragment: you get one rehearsal and
+  spending it on part of the proposal tells you nothing about the rest.
+- Read the whole error list and fix all of it, then submit. `unknown-evidence` rows are the rule
+  above; a `price_level_link_unresolved` is fixable here and only reported after sealing.
+- ⛔ **It is not a submission and does not become one.** `decision_submit` is still the only door.
+- ⚠️ If the tool is not served on this host, say so in `uncertainty` and submit anyway — an
+  unrehearsed judgement is worse than none only if you pretend it was rehearsed.
 
 #### The prices you are working to — `priceLevels`
 

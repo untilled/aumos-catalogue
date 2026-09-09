@@ -171,7 +171,7 @@ export function itemCoordinate(request) {
  * roster saying part of the call was not used. It would be **true**, and it
  * would be noise on the one channel that has to stay legible.
  */
-const READS_SECTOR = new Set(['opportunityMetrics'])
+const READS_SECTOR = new Set(['opportunityMetrics', 'sectorSeries'])
 
 /**
  * Everything a scanner operation needs, assembled from the request and nothing else.

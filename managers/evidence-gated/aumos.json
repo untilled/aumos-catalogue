@@ -36,6 +36,12 @@
       "version": "1.0.0",
       "entrypoint": "recipes/opportunity-metrics.mjs",
       "description": "The opportunity metric row (opportunityMetrics) for one symbol, from stored daily bars. The cross-roster fold (opportunityUniverse) stays a calculate call over these rows, which carry no bars."
+    },
+    {
+      "id": "sector-series",
+      "version": "1.0.0",
+      "entrypoint": "recipes/sector-series.mjs",
+      "description": "One symbol's daily series reduced to what the lane ranking reads (sectorSeries) — the weighted horizons' returns, three moving averages, the last close and the two highs the bot baseline compares against. The lane fold (sectorStrength) stays a calculate call over these rows, so the benchmark's and every sector's bars stay in the host."
     }
   ],
   "runtimes": [

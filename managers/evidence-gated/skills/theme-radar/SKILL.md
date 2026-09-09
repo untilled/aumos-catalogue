@@ -33,6 +33,37 @@ an index down 5% or more from the window's own high, or a VIX spike, read off th
 - `sectorStrength.researchQueue` — where to look. It is a list of questions, not of candidates: a
   sector is queued because it leads, jumped rank or sits at a 200-day high, and none of those is a
   reason to own anything.
+
+### How the queue is produced, and why it is not one call
+
+⛔ **You never carry the lane's bars.** `sectorStrength` ranks every sector against one benchmark, so
+its inputs were one price series per sector plus the benchmark's — and gathering those is exactly the
+relay `PROMPT.md` §The delegation budget and `skills/orchestrate/SKILL.md` forbid. Both sleeves of one
+run said so and skipped the call, which left this skill with no ranking and made the axis choice
+arbitrary (`untilled/aumos-catalogue#247`). The series stay in the host instead, in four steps:
+
+1. **Name the lane's proxies.** The benchmark is `config.benchmarks.koreanEquity` /
+   `config.benchmarks.usEquity`; each sector's proxy is the ETF or bellwether the investor's roster
+   carries for it. ⛔ Never a list from model knowledge — a sector with no proxy this run can name is
+   left out and comes back as `status: 'unverified'`, which is the honest answer and not a zero.
+2. **Collect their series** with `source_cache_refresh` on `prices`/`daily`, the same call the roster
+   sweep makes: provider `prices`, document `daily`, `market` the venue MIC, ⛔ no `vendorId`.
+3. **Sweep them** with `task_start` over the **`sector-series`** recipe — one item per symbol, each
+   item id the store coordinate — `kr:<symbol>` / `us:<symbol>`, the research market and ⛔ never the
+   venue MIC, which is the refresh's argument and not the store's key — and `outputPath`
+   `scans/<asOf date>/sector-series`.
+   Poll `task_get`, then `files_read` each `<outputPath>/<itemId>.json`. What comes back per name is a
+   page of numbers and no series.
+4. **Fold once.** One `sectorStrength` call: `benchmark` is the benchmark's row, `sectors[].series` is
+   each sector's row, and `leaders[].series` is the row of any leader you want a baseline signal from.
+   ⚠️ The rank moves need `previousRanks` from the last run, so carry them forward.
+
+⚠️ **If you pass `weights`, pass the same ones to the recipe** (`parameters.weights`): a row carries
+one return per weighted horizon, and a horizon nobody reduced is reported
+`sector_series_period_unreduced` rather than scored as an outperformance of zero.
+
+⚠️ **A lane you could not sweep is a lane you did not read.** Say so in `uncertainty` and take the
+axis outside the universe anyway — the obligation below is to look, and it does not wait on a ranking.
 - The events in the invocation, and the earnings and policy calendar reachable through the source
   contract.
 - Web research. **A silent fallback is forbidden.** If the web lane is unavailable, this run

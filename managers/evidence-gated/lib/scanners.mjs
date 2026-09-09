@@ -688,18 +688,139 @@ export function trendState({ symbol, bars = [], asOf }) {
   }
 }
 
-export function blendedSectorStrength(assetBars, benchmarkBars, weights = [[60, 0.5], [120, 0.3], [200, 0.2]]) {
+/**
+ * ── One symbol's series, reduced to what the lane ranking reads (#247) ──────
+ *
+ * `sectorStrength` below is a **fold over a whole lane**: it ranks every sector
+ * against one benchmark, so it needs all of those series at once. Two contracts
+ * of this package made that impossible to satisfy at the same time, and the
+ * measured cost was the whole L1 layer:
+ *
+ *  - `inputContracts` published `sectorStrength`'s keys as bar arrays, so the
+ *    caller had to gather them.
+ *  - `PROMPT.md` §The delegation budget and `skills/orchestrate/SKILL.md` say
+ *    ⛔ never relay a roster's bars and never type them back as `calculate`
+ *    arguments — the rule bought with 1.91M characters and no judgement.
+ *
+ * Both sleeves of one run refused the call for exactly that reason and named
+ * it; forward research then started with no ranking and picked its axis with
+ * nothing under it. The host route that removes the relay is a recipe, and a
+ * recipe process is **one item**, which `untilled/aumos#743` §B makes one store
+ * coordinate — so no process can hold a lane, and the recipe cannot be the fold.
+ *
+ * This is the join. It is the **sufficient statistic** of everything the fold
+ * reads out of one series and nothing else: the returns at the weighted
+ * horizons, the three moving averages, the last close, and the two highs the
+ * bot baseline compares against. `recipes/sector-series.mjs` runs it in the
+ * host, one process per symbol, and what comes back is a page of numbers.
+ *
+ * ⚠️ **It is not a second copy of the arithmetic.** `sectorStrength` reduces its
+ * own bars through this same function, so a lane folded from recipe rows and a
+ * lane folded from bars are one call reaching one set of numbers — parity is
+ * structural rather than a test result, the property `recipes/request.mjs`
+ * argues for the two sweeps that came before it.
+ *
+ * ⛔ **Not on the published surface, and that is the point.** A manager able to
+ * call this would have to hand it bars, which is the thing it exists to stop.
+ * It is internal and subsumed by `sectorStrength`, exactly as
+ * `blendedSectorStrength` is.
+ */
+export const SECTOR_RS_WEIGHTS = [[60, 0.5], [120, 0.3], [200, 0.2]]
+
+/**
+ * The horizon the bot baseline measures a leader's excess over.
+ *
+ * ⚠️ It is in every reduction whatever the weights say: the leaders' excess is
+ * not a weighted term, so a row reduced only for the weighted horizons would
+ * drop the control arm the research cohort is scored against.
+ */
+const BASELINE_EXCESS_PERIOD = 60
+
+/** The horizons a row must carry to answer a fold run under `weights`. */
+export function sectorSeriesPeriods(weights = SECTOR_RS_WEIGHTS) {
+  const rows = Array.isArray(weights) && weights.length ? weights : SECTOR_RS_WEIGHTS
+  const periods = rows.map((row) => (Array.isArray(row) ? row[0] : null)).filter((period) => Number.isInteger(period) && period > 0)
+  return [...new Set([...periods, BASELINE_EXCESS_PERIOD])].sort((a, b) => a - b)
+}
+
+export function sectorSeries({ symbol = null, market = null, sector = null, bars = [], periods } = {}) {
+  const rows = Array.isArray(bars) ? bars : []
+  if (rows.length === 0) {
+    return {
+      data: null,
+      diagnostics: [diagnostic('sector_series_unverified', 'unevaluated', 'A series that could not be read is named as unread, never reduced to zeroes', 'bars', { symbol })],
+    }
+  }
+  const closes = rows.map((row) => row.close).filter(finite)
+  const mean = (n) => (closes.length >= n ? closes.slice(-n).reduce((sum, value) => sum + value, 0) / n : null)
+  const wanted = Array.isArray(periods) && periods.length ? periods : sectorSeriesPeriods()
+  return {
+    data: {
+      symbol,
+      market,
+      sector,
+      barCount: rows.length,
+      closeCount: closes.length,
+      close: closes.length ? closes.at(-1) : null,
+      maxClose: closes.length ? Math.max(...closes) : null,
+      maxClose60: closes.length ? Math.max(...closes.slice(-60)) : null,
+      ma20: mean(20),
+      ma50: mean(50),
+      ma200: mean(200),
+      /** ⛔ Keyed by the period as a string: this row travels as JSON through a file. */
+      returns: Object.fromEntries(wanted.map((period) => [String(period), returnOver(rows, period)])),
+      meaning: 'series-reduction-not-a-signal',
+    },
+    diagnostics: [],
+  }
+}
+
+/**
+ * One period's return off a reduced row, or `null` where the row does not carry it.
+ *
+ * ⚠️ **`null` is returned rather than `0` and the callers keep the coercion they
+ * always had.** A row reduced under different weights is missing a horizon, and
+ * that is reported by name (`sector_series_period_unreduced`) instead of being
+ * turned into an outperformance of zero.
+ */
+function returnAt(row, period) {
+  const value = row?.returns?.[String(period)]
+  return finite(value) ? value : null
+}
+
+/** Which of these periods the row was never reduced for. */
+function unreducedPeriods(row, periods) {
+  const carried = row?.returns
+  if (carried === null || typeof carried !== 'object') return [...periods]
+  return periods.filter((period) => !Object.hasOwn(carried, String(period)))
+}
+
+/** The weighted excess of one reduced row over another. */
+function blendedFromSeries(assetRow, benchmarkRow, weights) {
   const detail = {}
   let score = 0
   let weight = 0
   for (const [period, allocation] of weights) {
-    const asset = returnOver(assetBars, period)
-    const benchmark = returnOver(benchmarkBars, period)
+    const asset = returnAt(assetRow, period)
+    const benchmark = returnAt(benchmarkRow, period)
     const excess = finite(asset) && finite(benchmark) ? asset - benchmark : null
     detail[`rs${period}`] = finite(excess) ? round(excess * 100, 2) : null
     if (finite(excess)) { score += excess * allocation; weight += allocation }
   }
-  return { data: { scorePct: weight ? round(score / weight * 100, 3) : null, detail, weights: Object.fromEntries(weights.map(([period, value]) => [`d${period}`, value])) }, diagnostics: [] }
+  return { scorePct: weight ? round(score / weight * 100, 3) : null, detail, weights: Object.fromEntries(weights.map(([period, value]) => [`d${period}`, value])) }
+}
+
+export function blendedSectorStrength(assetBars, benchmarkBars, weights = SECTOR_RS_WEIGHTS) {
+  const applied = Array.isArray(weights) && weights.length ? weights : SECTOR_RS_WEIGHTS
+  const periods = sectorSeriesPeriods(applied)
+  return {
+    data: blendedFromSeries(
+      sectorSeries({ bars: assetBars, periods }).data,
+      sectorSeries({ bars: benchmarkBars, periods }).data,
+      applied,
+    ),
+    diagnostics: [],
+  }
 }
 
 /**
@@ -780,37 +901,63 @@ export const BASELINE_RULE_VERSION = 'rs-v1'
  * beat a dumb momentum bot, and not merely the index?" has an answer. They are
  * never traded, and `tradeable: false` travels with every row.
  */
-export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks = {}, lane = null, weights, asOf = null } = {}) {
+export function sectorStrength({ benchmarkBars = [], benchmark = null, sectors = [], previousRanks = {}, lane = null, weights, asOf = null } = {}) {
   const diagnostics = []
-  if (benchmarkBars.length === 0) {
+  const applied = Array.isArray(weights) && weights.length ? weights : SECTOR_RS_WEIGHTS
+  const periods = sectorSeriesPeriods(applied)
+  const unreduced = new Set()
+
+  /**
+   * ⚠️ **The reduced row wins over bars, and neither is required.** A row is
+   * what `recipes/sector-series.mjs` wrote into this lane's answer files; bars
+   * are what a fixture or a single hand-collected series still hands over. They
+   * reach the same numbers because the bars are reduced through the same
+   * function, so nothing downstream branches on which arrived.
+   */
+  const seriesOf = (source, subject) => {
+    const stated = source?.series
+    if (stated !== null && typeof stated === 'object' && !Array.isArray(stated)) return stated
+    return sectorSeries({ ...subject, bars: source?.bars ?? [], periods }).data
+  }
+  const note = (row) => { for (const period of unreducedPeriods(row, periods)) unreduced.add(period) }
+
+  const benchmarkRow = seriesOf({ series: benchmark, bars: benchmarkBars }, {})
+  if (benchmarkRow === null) {
     diagnostics.push(diagnostic('sector_benchmark_missing', 'unevaluated', 'Without the lane benchmark no relative strength is measurable; the lane is unread rather than neutral', 'benchmarkBars'))
     return { data: { lane, regime: null, sectors: [], researchQueue: [], baselineSignals: [], meaning: 'research-priority-only' }, diagnostics }
   }
+  note(benchmarkRow)
+
   const scored = []
   const unread = []
   for (const sector of sectors) {
-    const bars = sector?.bars ?? []
-    if (bars.length === 0) {
+    const row = seriesOf(sector, { symbol: sector?.etf ?? null, sector: sector?.name ?? null })
+    if (row === null) {
       unread.push({ name: sector?.name ?? null, etf: sector?.etf ?? null, status: 'unverified' })
       diagnostics.push(diagnostic('sector_series_unverified', 'unevaluated', 'A sector whose series could not be read is named as unread, never dropped silently', 'sectors', { name: sector?.name ?? null }))
       continue
     }
-    const { data: rs } = blendedSectorStrength(bars, benchmarkBars, weights)
+    note(row)
+    const rs = blendedFromSeries(row, benchmarkRow, applied)
     if (rs.scorePct === null) {
       unread.push({ name: sector?.name ?? null, etf: sector?.etf ?? null, status: 'insufficient-history' })
       continue
     }
-    const closes = bars.map((row) => row.close).filter(finite)
-    const ma200 = closes.length >= 200 ? closes.slice(-200).reduce((sum, value) => sum + value, 0) / 200 : null
-    const high = Math.max(...closes)
     scored.push({
       name: sector.name,
       etf: sector.etf ?? null,
       risk: sector.risk ?? null,
       rsScorePct: rs.scorePct,
       rsDetail: rs.detail,
-      atHigh: closes.at(-1) >= high * AT_HIGH_TOLERANCE,
-      aboveMa200: ma200 !== null ? closes.at(-1) > ma200 : null,
+      atHigh: finite(row.close) && finite(row.maxClose) ? row.close >= row.maxClose * AT_HIGH_TOLERANCE : false,
+      aboveMa200: finite(row.ma200) && finite(row.close) ? row.close > row.ma200 : null,
+      /**
+       * ⛔ **Held for the baseline pass and never returned** (#247). This row
+       * used to carry the caller's `leaders` straight back out, which meant the
+       * answer echoed a bar array per leader — the relay this whole route
+       * deletes, running in the other direction. What the answer says instead is
+       * how many there were; the signals themselves are `baselineSignals`.
+       */
       leaders: sector.leaders ?? [],
     })
   }
@@ -821,9 +968,7 @@ export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks
     row.rankChange = Number.isInteger(previous) ? previous - row.rank : null
   }
 
-  const benchmarkCloses = benchmarkBars.map((row) => row.close).filter(finite)
-  const benchmarkMa200 = benchmarkCloses.length >= 200 ? benchmarkCloses.slice(-200).reduce((sum, value) => sum + value, 0) / 200 : null
-  if (benchmarkMa200 === null) diagnostics.push(diagnostic('regime_trend_unevaluated', 'unevaluated', 'The benchmark trend needs 200 bars; the regime is read without it rather than assumed', 'benchmarkBars'))
+  if (benchmarkRow.ma200 === null) diagnostics.push(diagnostic('regime_trend_unevaluated', 'unevaluated', 'The benchmark trend needs 200 bars; the regime is read without it rather than assumed', 'benchmarkBars'))
   /**
    * Two independent readings, kept apart. The trend is the benchmark against
    * its own MA200; the character is who is leading. A single fused number would
@@ -835,7 +980,7 @@ export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks
   const offVotes = votes.filter((risk) => risk === 'off').length
   const character = onVotes >= 2 ? 'risk-on' : offVotes >= 2 ? 'risk-off' : 'mixed'
   const regime = {
-    benchmarkAboveMa200: benchmarkMa200 === null ? null : benchmarkCloses.at(-1) > benchmarkMa200,
+    benchmarkAboveMa200: benchmarkRow.ma200 === null ? null : benchmarkRow.close > benchmarkRow.ma200,
     leadershipCharacter: character,
     leaders: topThree.map((row) => row.name),
     isJudgementInput: true,
@@ -867,29 +1012,47 @@ export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks
   const baselineSignals = []
   for (const row of topThree) {
     for (const leader of row.leaders) {
-      const closes = (leader?.bars ?? []).map((entry) => entry.close).filter(finite)
-      if (closes.length < 200) {
+      const leaderRow = seriesOf(leader, { symbol: leader?.symbol ?? null, sector: row.name })
+      if (!hasFullHistory(leaderRow)) {
         diagnostics.push(diagnostic('baseline_leader_unverified', 'unevaluated', 'A leader without 200 bars cannot produce a baseline signal', 'sectors', { symbol: leader?.symbol ?? null }))
         continue
       }
-      const excess60 = returnOver(leader.bars, 60) - returnOver(benchmarkBars, 60)
+      note(leaderRow)
+      const excess60 = returnAt(leaderRow, BASELINE_EXCESS_PERIOD) - returnAt(benchmarkRow, BASELINE_EXCESS_PERIOD)
       if (!finite(excess60) || excess60 <= 0) continue
-      const setup = baselineSetup(closes)
+      const setup = baselineSetupFrom(leaderRow)
       /**
        * `ruleVersion` and `signalAt` are what make this row an admission
        * rather than a sentence. `paperAdmission` takes it as-is; without both
        * it is refused, and the control arm the research cohort is measured
        * against has no rows in it.
        */
-      if (setup) baselineSignals.push({ lane, sector: row.name, symbol: leader.symbol, setup, ruleVersion: BASELINE_RULE_VERSION, signalAt: asOf, close: closes.at(-1), excess60Pct: round(excess60 * 100, 2), tradeable: false })
+      if (setup) baselineSignals.push({ lane, sector: row.name, symbol: leader.symbol, setup, ruleVersion: BASELINE_RULE_VERSION, signalAt: asOf, close: leaderRow.close, excess60Pct: round(excess60 * 100, 2), tradeable: false })
     }
+  }
+
+  /**
+   * ⚠️ **A horizon nobody reduced is reported, never read as parity.** A row
+   * written by a recipe run under one set of weights and folded under another
+   * is missing that period, and `returnAt` answers `null` for it — which the
+   * blend treats exactly as it treats a series too short. Those are different
+   * facts and only one of them is about the market, so the second says so.
+   */
+  if (unreduced.size) {
+    diagnostics.push(diagnostic(
+      'sector_series_period_unreduced',
+      'unevaluated',
+      'A reduced series does not carry every horizon this fold weights, so those horizons contributed nothing; re-run `sector-series` with the weights this fold uses rather than reading the gap as a level score',
+      'sectors',
+      { periods: [...unreduced].sort((a, b) => a - b), weights: applied },
+    ))
   }
 
   return {
     data: {
       lane,
       regime,
-      sectors: [...scored, ...unread],
+      sectors: [...scored.map(({ leaders, ...row }) => ({ ...row, leaderCount: leaders.length })), ...unread],
       researchQueue,
       baselineSignals,
       meaning: 'research-priority-only',
@@ -899,19 +1062,26 @@ export function sectorStrength({ benchmarkBars = [], sectors = [], previousRanks
   }
 }
 
+/** A reduced row long enough for the 200-bar rule the bot baseline is written in. */
+function hasFullHistory(row) {
+  return row !== null && Number.isInteger(row?.closeCount) && row.closeCount >= 200
+}
+
 /**
  * The dumb momentum bot the team is measured against: a leader at its 200-bar
  * high, or one pulling back shallowly inside an intact uptrend.
+ *
+ * ⚠️ It reads a **reduced row** since #247 and the rule did not move: every
+ * value it compares is one `sectorSeries` computed from the same closes the
+ * previous shape sliced here, so `BASELINE_RULE_VERSION` is unchanged and the
+ * rows already recorded under it stay comparable.
  */
-function baselineSetup(closes) {
-  const mean = (n) => closes.slice(-n).reduce((sum, value) => sum + value, 0) / n
-  if (closes.length < 200) return null
-  const close = closes.at(-1)
-  const ma20 = mean(20)
-  const ma50 = mean(50)
-  const ma200 = mean(200)
-  if (close >= Math.max(...closes) * AT_HIGH_TOLERANCE) return 'rs_breakout'
-  const offHigh60 = close / Math.max(...closes.slice(-60)) - 1
+function baselineSetupFrom(row) {
+  if (!hasFullHistory(row)) return null
+  const { close, ma20, ma50, ma200, maxClose, maxClose60 } = row
+  if (![close, ma20, ma50, ma200, maxClose, maxClose60].every(finite)) return null
+  if (close >= maxClose * AT_HIGH_TOLERANCE) return 'rs_breakout'
+  const offHigh60 = close / maxClose60 - 1
   if (close > ma200 && ma50 > ma200 && close <= ma20 && close >= ma50 * 0.98 && offHigh60 >= -0.15 && offHigh60 <= -0.03) return 'rs_leader_pullback'
   return null
 }
