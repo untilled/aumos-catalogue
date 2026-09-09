@@ -105,15 +105,22 @@ export function lossToInvalidation(input = {}) {
 }
 
 /**
- * The weight, and every cap it had to pass under.
+ * The weight this name should **be**, and every cap it had to pass under.
+ *
+ * ⛔ **This is a total, not an increment, and that distinction is the whole of
+ * finding ③.** The risk budget and every cap apply to the final holding; what to
+ * propose is that total minus what the account already holds and has already
+ * proposed, and the subtraction happens in `index.mjs` where the account is known.
+ * The earlier version passed a single-name *headroom* in as a cap, so the answer was
+ * a total on a fresh name and an increment on a held one, under one field name — and
+ * a host reading it as either was wrong on the other.
  *
  * @param {object} input
  * @param {number} input.riskBudgetWeight        the Mandate's loss budget for this idea, as a share of the book
  * @param {number} input.lossFraction            from `lossToInvalidation`
  * @param {number} input.mandatePositionCap      the Mandate's single-name ceiling
- * @param {number} [input.sectorHeadroom]        what is left under the sector ceiling
- * @param {number} [input.accountHeadroom]       what is left under the whole-account ceiling
- * @param {number} [input.minimumExecutableWeight] the smallest position this venue can express
+ * @param {number} input.accountNameLimit        `maxTotalWeightForName` from `concentration` — every account axis, folded
+ * @param {number} input.minimumExecutableWeight the smallest position this venue can express
  */
 export function targetWeight(input = {}) {
   const diagnostics = []
@@ -149,14 +156,30 @@ export function targetWeight(input = {}) {
       ),
     )
   }
+  /**
+   * ⛔ **The venue minimum is a refusal gate, so an absent one is not a pass.** Without
+   * it this function cannot say whether the weight it computed is a position that can
+   * be scaled into and trimmed, or a handful of shares whose result is round-trip cost.
+   * It used to be optional and the check was simply skipped, which is the same defect
+   * class as findings ①, ② and ④ wearing a different field name.
+   */
+  if (!finite(input.minimumExecutableWeight)) {
+    diagnostics.push(
+      diagnostic(
+        'minimum_executable_not_stated',
+        'unevaluated',
+        'The smallest position this venue can express was not stated, so whether the computed weight is executable at all is unknown. It is not assumed to be.',
+        'minimumExecutableWeight',
+      ),
+    )
+  }
   if (diagnostics.length > 0) {
     return { data: emptyWeight(), diagnostics }
   }
 
   const caps = [
     ['mandatePositionCap', input.mandatePositionCap],
-    ['sectorHeadroom', input.sectorHeadroom],
-    ['accountHeadroom', input.accountHeadroom],
+    ['accountNameLimit', input.accountNameLimit],
   ].filter(([, value]) => finite(value))
   const binding = caps.reduce(
     (lowest, [name, value]) => (value < lowest.value ? { name, value } : lowest),
@@ -197,13 +220,14 @@ export function targetWeight(input = {}) {
       rawWeight: round(raw),
       bindingCap: round(binding.value),
       bindingCapName: binding.name,
-      targetWeight: blocked ? null : sized,
+      /** ⚠️ A **total**. What to propose is this minus what the account already carries. */
+      targetTotalWeight: blocked ? null : sized,
       riskAtTarget: blocked ? null : round(sized * lossFraction),
       sizing: { mode: 'risk-budget-over-loss-to-invalidation', riskBudgetWeight: round(riskBudgetWeight), lossFraction: round(lossFraction) },
       units: {
         rawWeight: 'portfolio-weight',
         bindingCap: 'portfolio-weight',
-        targetWeight: 'portfolio-weight',
+        targetTotalWeight: 'portfolio-weight',
         riskAtTarget: 'share-of-book-at-risk',
       },
     },
@@ -216,8 +240,8 @@ function emptyWeight() {
     rawWeight: null,
     bindingCap: null,
     bindingCapName: null,
-    targetWeight: null,
+    targetTotalWeight: null,
     riskAtTarget: null,
-    units: { targetWeight: 'portfolio-weight' },
+    units: { targetTotalWeight: 'portfolio-weight' },
   }
 }

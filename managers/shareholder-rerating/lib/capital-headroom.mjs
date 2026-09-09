@@ -111,6 +111,23 @@ function financialHeadroom(financial, diagnostics) {
   const distributableCapital = headroomRatio * financial.riskWeightedAssets
   const returnHeadroomYield = distributableCapital / financial.marketCap
 
+  if (!finite(financial.regulatoryMinimumCet1)) {
+    /**
+     * ⚠️ Same defect class as findings ①②④: a limit that is absent must not read as a
+     * limit that was cleared. It is a `warn` rather than `unevaluated` because the test
+     * below it is strictly tighter — an issuer's own policy target sits above the
+     * supervisor's floor, so headroom over the policy target implies clearance of the
+     * minimum. What the absence costs is the ability to *say* so, and that is reported.
+     */
+    diagnostics.push(
+      diagnostic(
+        'regulatory_minimum_not_stated',
+        'warn',
+        'No regulatory minimum was stated, so this answer cannot say the issuer clears it — only that it is above or below its own policy target. Say so wherever the capital position is quoted.',
+        'financial.regulatoryMinimumCet1',
+      ),
+    )
+  }
   if (finite(financial.regulatoryMinimumCet1) && financial.cet1 < financial.regulatoryMinimumCet1) {
     diagnostics.push(
       diagnostic(
@@ -133,6 +150,16 @@ function financialHeadroom(financial, diagnostics) {
     )
   }
 
+  if (finite(financial.creditCostRatio) && !finite(financial.creditCostGuidance)) {
+    diagnostics.push(
+      diagnostic(
+        'credit_cost_guidance_not_stated',
+        'info',
+        'A credit cost ratio was given and the issuer\'s own guidance was not, so the comparison that would say whether it is running hot was not made rather than passed.',
+        'financial.creditCostGuidance',
+      ),
+    )
+  }
   if (finite(financial.creditCostRatio) && finite(financial.creditCostGuidance) && financial.creditCostRatio > financial.creditCostGuidance) {
     diagnostics.push(
       diagnostic(
@@ -204,17 +231,26 @@ function industrialHeadroom(nonFinancial, diagnostics) {
     return { data: emptyAnswer('non-financial'), diagnostics }
   }
 
-  const requiredInvestment = finite(nonFinancial.requiredInvestment) ? nonFinancial.requiredInvestment : 0
+  /**
+   * ⛔ **An unstated commitment used to be treated as zero, and zero is the answer that
+   * makes the coverage look best.** The number that kills an industrial's dividend is
+   * the plant it has already agreed to build, so defaulting it to nothing is the same
+   * defect as an unread book: the most permissive reading, taken silently. It is
+   * `unevaluated` — state it as `0` when the filings show no commitment, which is a
+   * claim somebody made rather than a gap nobody noticed.
+   */
   if (!finite(nonFinancial.requiredInvestment)) {
     diagnostics.push(
       diagnostic(
         'required_investment_not_stated',
-        'warn',
-        'No committed investment was stated, so the free cash below is measured after maintenance capex only. If there is a committed build, this figure is too high.',
+        'unevaluated',
+        'Committed investment was not stated. Free cash measured after maintenance capex alone is an upper bound, and a coverage ratio computed from an upper bound has not verified the return. State 0 explicitly if the filings show no commitment.',
         'nonFinancial.requiredInvestment',
       ),
     )
+    return { data: emptyAnswer('non-financial'), diagnostics }
   }
+  const requiredInvestment = nonFinancial.requiredInvestment
   const freeCash = nonFinancial.operatingCashFlow - nonFinancial.maintenanceCapex - requiredInvestment
   const coverage = nonFinancial.plannedReturnCash > 0 ? freeCash / nonFinancial.plannedReturnCash : null
   const leverage = finite(nonFinancial.netDebt) && finite(nonFinancial.ebitda) && nonFinancial.ebitda > 0 ? nonFinancial.netDebt / nonFinancial.ebitda : null
@@ -227,6 +263,16 @@ function industrialHeadroom(nonFinancial, diagnostics) {
         'The planned return is larger than the cash left after the investment this business has to make, so it would be paid out of the balance sheet. That is a distribution, not a return programme a thesis can rest on.',
         'nonFinancial.plannedReturnCash',
         { freeCashAfterInvestment: round(freeCash, 2), coverage: round(coverage) },
+      ),
+    )
+  }
+  if (finite(leverage) && !finite(nonFinancial.netDebtToEbitdaCeiling)) {
+    diagnostics.push(
+      diagnostic(
+        'leverage_ceiling_not_stated',
+        'info',
+        'Leverage was computed and no ceiling — covenant, rating threshold or the issuer\'s own target — was stated to compare it against, so that comparison was not made rather than passed.',
+        'nonFinancial.netDebtToEbitdaCeiling',
       ),
     )
   }

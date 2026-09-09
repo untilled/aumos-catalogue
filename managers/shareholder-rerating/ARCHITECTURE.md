@@ -71,13 +71,36 @@ risk budget; a stage that does not fit the remaining budget waits rather than be
 | `bank-metric-on-an-industrial-is-the-runs-mistake` | `research-incomplete`, not a capital finding |
 | `unfinished-research-is-not-a-rejection` | `research-incomplete`, naming the two unwritten outputs |
 | `account-concentration-caps-never-sum` | `risk_limit_exceeded` on 8% binding, not 18% |
-| `account-concentration-thin-headroom-still-buys` | `BUY` sized to the 1% of headroom that is left |
+| `a-cap-binds-the-total-and-the-increment-is-what-is-left` | `BUY` — a 4% cap on the total, 3% already carried, 1% proposed |
 | `position-below-the-venue-minimum-is-refused` | `position_not_executable` — refused, not rounded up |
 | `no-mandate-numbers-is-unevaluated-not-a-default` | `data_missing` — no default risk budget exists |
 
 `fixtures/return-composition.json` — the two legs, the three double counts, the unreceivable
 dividend and the untaxed one. `fixtures/staged-plans.json` — eleven states of one plan, including
 both re-run cases, the price-only stage, the exhausted budget and the expired stage.
+
+`fixtures/boundaries.json` — the review regressions. Each names a base fixture and the mutations
+to apply to a **copy** of it, so the cases above keep passing for the reasons they already passed
+for. They cover the four P1 findings on `d36e32b` and the rest of that defect class: an unread
+book, half an unread book, an unreadable row, absent caps, the declared gross cap in three states,
+a held position below / at / above target, an increment under the venue minimum, an unstated venue
+minimum, and the three classification inputs whose absence used to skip a test silently.
+
+## The two weights, and the rule behind the boundary cases
+
+`targetTotalWeight` is what the name should **be**: the risk budget over the loss to invalidation,
+under the single-name cap and under what the sector and gross ceilings leave once the rest of the
+book is counted. `incrementWeight` is `targetTotalWeight − (held + open)`, which is what a
+proposal carries. At target the run proposes nothing; above target it is a reduction question and
+this manager proposes a reduction only against what is actually held; an increment below the venue
+minimum waits.
+
+⛔ **An absent input is not an input that passed.** `holdings` and `openProposals` are required
+lists — an empty list says *there is nothing* and an absent one says *nobody looked*. A `BUY`
+requires `concentration` to answer `true`; `null` is not a pass. Every staged re-check value is
+required, and an unverified one returns `unevaluated` with an increment of zero. The same rule
+extends to `requiredInvestment` (an unstated commitment is not zero), the venue minimum, and the
+three classification inputs whose absence would otherwise skip the trap, flip and programme tests.
 
 ⛔ **Every figure in every fixture is invented for the arithmetic it exercises.** None is a price
 record; none is copied from the source repository's private files; none was tuned so that the

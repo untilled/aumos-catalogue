@@ -64,6 +64,24 @@ export function stagedIncrement(input = {}) {
     return { data: emptyAnswer(plan, input.stageId), diagnostics }
   }
 
+  /**
+   * ⛔ **The book is read or the stage does not fire.** `heldWeight` and
+   * `openProposalWeight` used to default to zero, and zero is precisely the state in
+   * which a stage proposes its whole weight — so a failed account lookup turned into a
+   * fresh purchase, and a repeated run turned into a doubled position. The two numbers
+   * this arithmetic subtracts are the two it cannot assume.
+   */
+  const bookProblems = ['heldWeight', 'openProposalWeight'].filter((name) => !finite(input.book?.[name]))
+  for (const name of bookProblems) {
+    diagnostics.push(
+      diagnostic(
+        'account_state_unreadable',
+        'unevaluated',
+        `book.${name} is what this stage's increment is measured against, and it is not a number here. An account this run could not read is not an account holding nothing.`,
+        `book.${name}`,
+      ),
+    )
+  }
   const held = finite(input.book?.heldWeight) ? input.book.heldWeight : 0
   const open = finite(input.book?.openProposalWeight) ? input.book.openProposalWeight : 0
   const already = held + open
@@ -153,6 +171,24 @@ export function stagedIncrement(input = {}) {
     )
   }
 
+  /**
+   * ⛔ **A comparison that could not be made is not a comparison that passed.** The
+   * loss to invalidation and the remaining budget were optional, so a run that had
+   * neither skipped the risk test in silence and proposed the stage anyway — the
+   * quietest of the four ways this module used to say yes without checking.
+   */
+  for (const name of ['lossFraction', 'riskBudgetRemaining']) {
+    if (finite(recheck[name])) continue
+    diagnostics.push(
+      diagnostic(
+        'risk_recheck_unavailable',
+        'unevaluated',
+        `recheck.${name} is required to decide whether this stage fits the remaining risk budget. Without it the comparison cannot be made, and a comparison that cannot be made does not pass.`,
+        `recheck.${name}`,
+      ),
+    )
+  }
+
   const increment = stage.toWeight - already
   const requiredRisk = finite(recheck.lossFraction) ? Math.max(0, increment) * recheck.lossFraction : null
   if (finite(requiredRisk) && finite(recheck.riskBudgetRemaining) && requiredRisk > recheck.riskBudgetRemaining + THRESHOLDS.weightTolerance) {
@@ -167,9 +203,19 @@ export function stagedIncrement(input = {}) {
     )
   }
 
-  const blocked = diagnostics.some((row) => row.severity === 'blocked')
-  if (blocked) {
-    return { data: answer(plan, stage, { already, increment: 0, action: 'blocked', reason: diagnostics.find((row) => row.severity === 'blocked').code }), diagnostics }
+  const blocked = diagnostics.find((row) => row.severity === 'blocked')
+  if (blocked !== undefined) {
+    return { data: answer(plan, stage, { already, increment: 0, action: 'blocked', reason: blocked.code }), diagnostics }
+  }
+  /**
+   * ⛔ **`unevaluated` halts too, and it did not used to.** Only a refusal stopped the
+   * stage, so every input this run could not verify — the remaining discount, the risk
+   * numbers, the account itself — left the increment standing. An unverified re-check
+   * is an increment of zero and a finding of `data_missing`, never an addition.
+   */
+  const unverified = diagnostics.find((row) => row.severity === 'unevaluated')
+  if (unverified !== undefined) {
+    return { data: answer(plan, stage, { already, increment: 0, action: 'unevaluated', reason: unverified.code }), diagnostics }
   }
 
   // ── nothing left to add, which is the ordinary re-run ────────────────────
@@ -203,6 +249,15 @@ function answer(plan, stage, { already, increment, action, reason }) {
     cumulativeAfter: round(already + Math.max(0, action === 'propose' ? increment : 0)),
     action,
     reason,
+    /** So a caller can group this the way the ledger groups it, without re-deriving it. */
+    outcomeCode:
+      action === 'unevaluated'
+        ? 'data_missing'
+        : reason === 'risk_budget_exhausted'
+          ? 'risk_limit_exceeded'
+          : action === 'blocked'
+            ? 'thesis_refuted'
+            : null,
     units: { stageTargetWeight: 'portfolio-weight', alreadyOnTheBook: 'portfolio-weight', increment: 'portfolio-weight' },
   }
 }

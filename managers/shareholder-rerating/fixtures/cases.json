@@ -11,10 +11,25 @@
         "strategy": "shareholder-rerating",
         "valuation": {
           "price": 16000,
-          "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
-          "fairValueBasis": { "method": "residual-income-on-policy-cet1", "includesCancellationUplift": true },
-          "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 200000000000, "cancelledAmount": 200000000000, "marketCap": 12000000000000 }
+          "fairValue": {
+            "bear": 13000,
+            "base": 21000,
+            "bull": 25000
+          },
+          "fairValueBasis": {
+            "method": "residual-income-on-policy-cet1",
+            "includesCancellationUplift": true
+          },
+          "cashDividend": {
+            "perShare": 1200,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 200000000000,
+            "cancelledAmount": 200000000000,
+            "marketCap": 12000000000000
+          }
         },
         "financial": {
           "cet1": 0.128,
@@ -35,16 +50,31 @@
           "policyRatio": 0.35,
           "priorPolicyRatio": 0.3
         },
-        "earnings": { "pretaxProfit": 3500000000000, "nonRecurringPretaxGain": 200000000000, "dps": 1200, "eps": 3500, "recurringEps": 3300 },
-        "yieldContext": { "dividendYield": 0.075, "sectorMedianDividendYield": 0.055 },
+        "earnings": {
+          "pretaxProfit": 3500000000000,
+          "nonRecurringPretaxGain": 200000000000,
+          "dps": 1200,
+          "eps": 3500,
+          "recurringEps": 3300
+        },
+        "yieldContext": {
+          "dividendYield": 0.075,
+          "sectorMedianDividendYield": 0.055
+        },
         "invalidationPrice": 13000,
         "mandate": {
           "riskBudgetWeight": 0.01,
           "mandatePositionCap": 0.08,
           "minimumExecutableWeight": 0.005,
-          "caps": { "accountPositionCap": 0.1, "accountSectorCap": 0.25 }
+          "caps": {
+            "accountPositionCap": 0.1,
+            "accountSectorCap": 0.25
+          }
         },
-        "book": { "holdings": [], "openProposals": [] },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        },
         "completedOutputs": [
           "valuationBasis",
           "returnPolicyEvidence",
@@ -64,13 +94,18 @@
         "outcomeCode": "thesis_intact",
         "proposedAction": "BUY",
         "lossFraction": 0.1875,
-        "targetWeight": 0.05333333,
         "discountToBase": 0.3125,
         "investorCashReturn": 0.06345,
         "buybackYield": 0.01666667,
         "returnHeadroomYield": 0.05,
         "totalReturnBase": 0.37595,
-        "diagnosticCodes": ["programme_being_executed", "cancellation_inside_fair_value"]
+        "diagnosticCodes": [
+          "programme_being_executed",
+          "cancellation_inside_fair_value"
+        ],
+        "targetTotalWeight": 0.05333333,
+        "incrementWeight": 0.05333333,
+        "projectedExposure": 0.05333333
       }
     },
     {
@@ -81,13 +116,32 @@
         "sector": "financials",
         "sectorKind": "financial",
         "strategy": "shareholder-rerating",
-        "technical": { "rsi14": 61.4, "aboveMa200": true, "drawdownFromHigh": -0.03 },
+        "technical": {
+          "rsi14": 61.4,
+          "aboveMa200": true,
+          "drawdownFromHigh": -0.03
+        },
         "valuation": {
           "price": 20000,
-          "fairValue": { "bear": 16500, "base": 24000, "bull": 28000 },
-          "fairValueBasis": { "method": "pbr-on-sustainable-roe", "includesCancellationUplift": true },
-          "cashDividend": { "perShare": 1300, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 150000000000, "cancelledAmount": 150000000000, "marketCap": 14000000000000 }
+          "fairValue": {
+            "bear": 16500,
+            "base": 24000,
+            "bull": 28000
+          },
+          "fairValueBasis": {
+            "method": "pbr-on-sustainable-roe",
+            "includesCancellationUplift": true
+          },
+          "cashDividend": {
+            "perShare": 1300,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 150000000000,
+            "cancelledAmount": 150000000000,
+            "marketCap": 14000000000000
+          }
         },
         "financial": {
           "cet1": 0.127,
@@ -105,16 +159,31 @@
           "policyRatio": 0.4,
           "priorPolicyRatio": 0.35
         },
-        "earnings": { "pretaxProfit": 3800000000000, "nonRecurringPretaxGain": 150000000000, "dps": 1300, "eps": 4100, "recurringEps": 3950 },
-        "yieldContext": { "dividendYield": 0.065, "sectorMedianDividendYield": 0.05 },
+        "earnings": {
+          "pretaxProfit": 3800000000000,
+          "nonRecurringPretaxGain": 150000000000,
+          "dps": 1300,
+          "eps": 4100,
+          "recurringEps": 3950
+        },
+        "yieldContext": {
+          "dividendYield": 0.065,
+          "sectorMedianDividendYield": 0.05
+        },
         "invalidationPrice": 16500,
         "mandate": {
           "riskBudgetWeight": 0.008,
           "mandatePositionCap": 0.06,
           "minimumExecutableWeight": 0.004,
-          "caps": { "accountPositionCap": 0.1, "accountSectorCap": 0.25 }
+          "caps": {
+            "accountPositionCap": 0.1,
+            "accountSectorCap": 0.25
+          }
         },
-        "book": { "holdings": [], "openProposals": [] },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        },
         "completedOutputs": [
           "valuationBasis",
           "returnPolicyEvidence",
@@ -143,23 +212,70 @@
         "sectorKind": "financial",
         "valuation": {
           "price": 25000,
-          "fairValue": { "bear": 18000, "base": 24000, "bull": 27000 },
-          "fairValueBasis": { "method": "pbr-on-sustainable-roe" },
-          "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 100000000000, "marketCap": 15000000000000 }
+          "fairValue": {
+            "bear": 18000,
+            "base": 24000,
+            "bull": 27000
+          },
+          "fairValueBasis": {
+            "method": "pbr-on-sustainable-roe"
+          },
+          "cashDividend": {
+            "perShare": 1200,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 100000000000,
+            "marketCap": 15000000000000
+          }
         },
-        "financial": { "cet1": 0.13, "policyTargetCet1": 0.125, "riskWeightedAssets": 190000000000000, "marketCap": 15000000000000, "roe": 0.09 },
-        "programme": { "announcedAmount": 200000000000, "executedAmount": 150000000000, "windowDays": 365, "elapsedDays": 300, "policyRatio": 0.4, "priorPolicyRatio": 0.4 },
-        "earnings": { "pretaxProfit": 3800000000000, "nonRecurringPretaxGain": 100000000000, "dps": 1200, "eps": 4000, "recurringEps": 3900 },
-        "yieldContext": { "dividendYield": 0.048, "sectorMedianDividendYield": 0.05 },
-        "book": { "holdings": [{ "symbol": "000001", "sector": "financials", "weight": 0.04, "strategy": "shareholder-rerating" }], "openProposals": [] }
+        "financial": {
+          "cet1": 0.13,
+          "policyTargetCet1": 0.125,
+          "riskWeightedAssets": 190000000000000,
+          "marketCap": 15000000000000,
+          "roe": 0.09
+        },
+        "programme": {
+          "announcedAmount": 200000000000,
+          "executedAmount": 150000000000,
+          "windowDays": 365,
+          "elapsedDays": 300,
+          "policyRatio": 0.4,
+          "priorPolicyRatio": 0.4
+        },
+        "earnings": {
+          "pretaxProfit": 3800000000000,
+          "nonRecurringPretaxGain": 100000000000,
+          "dps": 1200,
+          "eps": 4000,
+          "recurringEps": 3900
+        },
+        "yieldContext": {
+          "dividendYield": 0.048,
+          "sectorMedianDividendYield": 0.05
+        },
+        "book": {
+          "holdings": [
+            {
+              "symbol": "000001",
+              "sector": "financials",
+              "weight": 0.04,
+              "strategy": "shareholder-rerating"
+            }
+          ],
+          "openProposals": []
+        }
       },
       "expect": {
         "case": "rerated",
         "route": "trim-or-exit-review",
         "proposedAction": "RESIZE",
         "discountToBase": -0.04,
-        "diagnosticCodes": ["discount_closed"]
+        "diagnosticCodes": [
+          "discount_closed"
+        ]
       }
     },
     {
@@ -171,23 +287,70 @@
         "sectorKind": "financial",
         "valuation": {
           "price": 14000,
-          "fairValue": { "bear": 11000, "base": 19000, "bull": 23000 },
-          "fairValueBasis": { "method": "pbr-on-sustainable-roe" },
-          "cashDividend": { "perShare": 900, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 0, "marketCap": 9000000000000 }
+          "fairValue": {
+            "bear": 11000,
+            "base": 19000,
+            "bull": 23000
+          },
+          "fairValueBasis": {
+            "method": "pbr-on-sustainable-roe"
+          },
+          "cashDividend": {
+            "perShare": 900,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 0,
+            "marketCap": 9000000000000
+          }
         },
-        "financial": { "cet1": 0.129, "policyTargetCet1": 0.125, "riskWeightedAssets": 150000000000000, "marketCap": 9000000000000, "roe": 0.08 },
-        "programme": { "announcedAmount": 100000000000, "executedAmount": 60000000000, "windowDays": 365, "elapsedDays": 200, "policyRatio": 0.25, "priorPolicyRatio": 0.35 },
-        "earnings": { "pretaxProfit": 2600000000000, "nonRecurringPretaxGain": 100000000000, "dps": 900, "eps": 3000, "recurringEps": 2900 },
-        "yieldContext": { "dividendYield": 0.064, "sectorMedianDividendYield": 0.05 },
-        "book": { "holdings": [{ "symbol": "000002", "sector": "financials", "weight": 0.03, "strategy": "shareholder-rerating" }], "openProposals": [] }
+        "financial": {
+          "cet1": 0.129,
+          "policyTargetCet1": 0.125,
+          "riskWeightedAssets": 150000000000000,
+          "marketCap": 9000000000000,
+          "roe": 0.08
+        },
+        "programme": {
+          "announcedAmount": 100000000000,
+          "executedAmount": 60000000000,
+          "windowDays": 365,
+          "elapsedDays": 200,
+          "policyRatio": 0.25,
+          "priorPolicyRatio": 0.35
+        },
+        "earnings": {
+          "pretaxProfit": 2600000000000,
+          "nonRecurringPretaxGain": 100000000000,
+          "dps": 900,
+          "eps": 3000,
+          "recurringEps": 2900
+        },
+        "yieldContext": {
+          "dividendYield": 0.064,
+          "sectorMedianDividendYield": 0.05
+        },
+        "book": {
+          "holdings": [
+            {
+              "symbol": "000002",
+              "sector": "financials",
+              "weight": 0.03,
+              "strategy": "shareholder-rerating"
+            }
+          ],
+          "openProposals": []
+        }
       },
       "expect": {
         "case": "return-policy-retreat",
         "route": "trim-or-exit-review",
         "outcomeCode": "thesis_refuted",
         "proposedAction": "RESIZE",
-        "diagnosticCodes": ["return_policy_retreated"]
+        "diagnosticCodes": [
+          "return_policy_retreated"
+        ]
       }
     },
     {
@@ -199,10 +362,23 @@
         "sectorKind": "non-financial",
         "valuation": {
           "price": 9000,
-          "fairValue": { "bear": 5000, "base": 11000, "bull": 14000 },
-          "fairValueBasis": { "method": "ev-ebitda" },
-          "cashDividend": { "perShare": 1170, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 0, "marketCap": 900000000000 }
+          "fairValue": {
+            "bear": 5000,
+            "base": 11000,
+            "bull": 14000
+          },
+          "fairValueBasis": {
+            "method": "ev-ebitda"
+          },
+          "cashDividend": {
+            "perShare": 1170,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 0,
+            "marketCap": 900000000000
+          }
         },
         "nonFinancial": {
           "operatingCashFlow": 260000000000,
@@ -211,17 +387,36 @@
           "plannedReturnCash": 117000000000,
           "marketCap": 900000000000
         },
-        "programme": { "announcedAmount": 0, "executedAmount": 0, "windowDays": 365, "elapsedDays": 200 },
-        "earnings": { "pretaxProfit": 130000000000, "nonRecurringPretaxGain": 10000000000, "dps": 1170, "eps": 880, "recurringEps": 860 },
-        "yieldContext": { "dividendYield": 0.13, "sectorMedianDividendYield": 0.05 },
-        "book": { "holdings": [], "openProposals": [] }
+        "programme": {
+          "announcedAmount": 0,
+          "executedAmount": 0,
+          "windowDays": 365,
+          "elapsedDays": 200
+        },
+        "earnings": {
+          "pretaxProfit": 130000000000,
+          "nonRecurringPretaxGain": 10000000000,
+          "dps": 1170,
+          "eps": 880,
+          "recurringEps": 860
+        },
+        "yieldContext": {
+          "dividendYield": 0.13,
+          "sectorMedianDividendYield": 0.05
+        },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        }
       },
       "expect": {
         "case": "dividend-trap",
         "route": "reject",
         "outcomeCode": "thesis_refuted",
         "proposedAction": "WAIT",
-        "diagnosticCodes": ["yield_is_about_the_price"]
+        "diagnosticCodes": [
+          "yield_is_about_the_price"
+        ]
       }
     },
     {
@@ -233,10 +428,23 @@
         "sectorKind": "non-financial",
         "valuation": {
           "price": 30000,
-          "fairValue": { "bear": 22000, "base": 38000, "bull": 45000 },
-          "fairValueBasis": { "method": "dcf" },
-          "cashDividend": { "perShare": 1000, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 0, "marketCap": 3000000000000 }
+          "fairValue": {
+            "bear": 22000,
+            "base": 38000,
+            "bull": 45000
+          },
+          "fairValueBasis": {
+            "method": "dcf"
+          },
+          "cashDividend": {
+            "perShare": 1000,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 0,
+            "marketCap": 3000000000000
+          }
         },
         "nonFinancial": {
           "operatingCashFlow": 500000000000,
@@ -245,17 +453,36 @@
           "plannedReturnCash": 100000000000,
           "marketCap": 3000000000000
         },
-        "programme": { "announcedAmount": 0, "executedAmount": 0, "windowDays": 365, "elapsedDays": 300 },
-        "earnings": { "pretaxProfit": 600000000000, "nonRecurringPretaxGain": 260000000000, "dps": 1000, "eps": 4000, "recurringEps": 900 },
-        "yieldContext": { "dividendYield": 0.033, "sectorMedianDividendYield": 0.03 },
-        "book": { "holdings": [], "openProposals": [] }
+        "programme": {
+          "announcedAmount": 0,
+          "executedAmount": 0,
+          "windowDays": 365,
+          "elapsedDays": 300
+        },
+        "earnings": {
+          "pretaxProfit": 600000000000,
+          "nonRecurringPretaxGain": 260000000000,
+          "dps": 1000,
+          "eps": 4000,
+          "recurringEps": 900
+        },
+        "yieldContext": {
+          "dividendYield": 0.033,
+          "sectorMedianDividendYield": 0.03
+        },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        }
       },
       "expect": {
         "case": "one-off-earnings",
         "route": "reject",
         "outcomeCode": "thesis_refuted",
         "proposedAction": "WAIT",
-        "diagnosticCodes": ["payout_rests_on_non_recurring_profit"]
+        "diagnosticCodes": [
+          "payout_rests_on_non_recurring_profit"
+        ]
       }
     },
     {
@@ -267,23 +494,64 @@
         "sectorKind": "financial",
         "valuation": {
           "price": 11000,
-          "fairValue": { "bear": 8000, "base": 16000, "bull": 19000 },
-          "fairValueBasis": { "method": "pbr-on-sustainable-roe" },
-          "cashDividend": { "perShare": 800, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 0, "marketCap": 7000000000000 }
+          "fairValue": {
+            "bear": 8000,
+            "base": 16000,
+            "bull": 19000
+          },
+          "fairValueBasis": {
+            "method": "pbr-on-sustainable-roe"
+          },
+          "cashDividend": {
+            "perShare": 800,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 0,
+            "marketCap": 7000000000000
+          }
         },
-        "financial": { "cet1": 0.114, "policyTargetCet1": 0.125, "regulatoryMinimumCet1": 0.105, "riskWeightedAssets": 160000000000000, "marketCap": 7000000000000, "roe": 0.06 },
-        "programme": { "announcedAmount": 150000000000, "executedAmount": 20000000000, "windowDays": 365, "elapsedDays": 200, "policyRatio": 0.35, "priorPolicyRatio": 0.3 },
-        "earnings": { "pretaxProfit": 1400000000000, "nonRecurringPretaxGain": 50000000000, "dps": 800, "eps": 2600, "recurringEps": 2550 },
-        "yieldContext": { "dividendYield": 0.073, "sectorMedianDividendYield": 0.05 },
-        "book": { "holdings": [], "openProposals": [] }
+        "financial": {
+          "cet1": 0.114,
+          "policyTargetCet1": 0.125,
+          "regulatoryMinimumCet1": 0.105,
+          "riskWeightedAssets": 160000000000000,
+          "marketCap": 7000000000000,
+          "roe": 0.06
+        },
+        "programme": {
+          "announcedAmount": 150000000000,
+          "executedAmount": 20000000000,
+          "windowDays": 365,
+          "elapsedDays": 200,
+          "policyRatio": 0.35,
+          "priorPolicyRatio": 0.3
+        },
+        "earnings": {
+          "pretaxProfit": 1400000000000,
+          "nonRecurringPretaxGain": 50000000000,
+          "dps": 800,
+          "eps": 2600,
+          "recurringEps": 2550
+        },
+        "yieldContext": {
+          "dividendYield": 0.073,
+          "sectorMedianDividendYield": 0.05
+        },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        }
       },
       "expect": {
         "case": "capital-inadequate",
         "route": "reject",
         "outcomeCode": "thesis_refuted",
         "proposedAction": "WAIT",
-        "diagnosticCodes": ["return_headroom_absent"]
+        "diagnosticCodes": [
+          "return_headroom_absent"
+        ]
       }
     },
     {
@@ -295,23 +563,63 @@
         "sectorKind": "financial",
         "valuation": {
           "price": 12000,
-          "fairValue": { "bear": 9500, "base": 17000, "bull": 20000 },
-          "fairValueBasis": { "method": "pbr-on-sustainable-roe" },
-          "cashDividend": { "perShare": 700, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 50000000000, "marketCap": 8000000000000 }
+          "fairValue": {
+            "bear": 9500,
+            "base": 17000,
+            "bull": 20000
+          },
+          "fairValueBasis": {
+            "method": "pbr-on-sustainable-roe"
+          },
+          "cashDividend": {
+            "perShare": 700,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 50000000000,
+            "marketCap": 8000000000000
+          }
         },
-        "financial": { "cet1": 0.131, "policyTargetCet1": 0.125, "riskWeightedAssets": 170000000000000, "marketCap": 8000000000000, "roe": 0.088 },
-        "programme": { "announcedAmount": 500000000000, "executedAmount": 50000000000, "windowDays": 365, "elapsedDays": 300, "policyRatio": 0.35, "priorPolicyRatio": 0.35 },
-        "earnings": { "pretaxProfit": 2900000000000, "nonRecurringPretaxGain": 120000000000, "dps": 700, "eps": 2800, "recurringEps": 2720 },
-        "yieldContext": { "dividendYield": 0.058, "sectorMedianDividendYield": 0.05 },
-        "book": { "holdings": [], "openProposals": [] }
+        "financial": {
+          "cet1": 0.131,
+          "policyTargetCet1": 0.125,
+          "riskWeightedAssets": 170000000000000,
+          "marketCap": 8000000000000,
+          "roe": 0.088
+        },
+        "programme": {
+          "announcedAmount": 500000000000,
+          "executedAmount": 50000000000,
+          "windowDays": 365,
+          "elapsedDays": 300,
+          "policyRatio": 0.35,
+          "priorPolicyRatio": 0.35
+        },
+        "earnings": {
+          "pretaxProfit": 2900000000000,
+          "nonRecurringPretaxGain": 120000000000,
+          "dps": 700,
+          "eps": 2800,
+          "recurringEps": 2720
+        },
+        "yieldContext": {
+          "dividendYield": 0.058,
+          "sectorMedianDividendYield": 0.05
+        },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        }
       },
       "expect": {
         "case": "announced-not-executed",
         "route": "watch",
         "outcomeCode": "thesis_refuted",
         "proposedAction": "WATCH",
-        "diagnosticCodes": ["programme_announced_not_executed"]
+        "diagnosticCodes": [
+          "programme_announced_not_executed"
+        ]
       }
     },
     {
@@ -321,11 +629,32 @@
         "symbol": "000007",
         "sector": "financials",
         "sectorKind": "financial",
-        "valuation": { "price": 12000, "fairValue": { "bear": 9000 }, "cashDividend": { "perShare": 700, "receivableWithinHorizon": true } },
-        "financial": { "cet1": 0.129, "policyTargetCet1": 0.125, "riskWeightedAssets": 150000000000000, "marketCap": 8000000000000 },
-        "programme": { "announcedAmount": 200000000000 },
-        "earnings": { "dps": 700 },
-        "book": { "holdings": [], "openProposals": [] }
+        "valuation": {
+          "price": 12000,
+          "fairValue": {
+            "bear": 9000
+          },
+          "cashDividend": {
+            "perShare": 700,
+            "receivableWithinHorizon": true
+          }
+        },
+        "financial": {
+          "cet1": 0.129,
+          "policyTargetCet1": 0.125,
+          "riskWeightedAssets": 150000000000000,
+          "marketCap": 8000000000000
+        },
+        "programme": {
+          "announcedAmount": 200000000000
+        },
+        "earnings": {
+          "dps": 700
+        },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        }
       },
       "expect": {
         "case": "data-missing",
@@ -333,7 +662,11 @@
         "outcomeCode": "data_missing",
         "proposedAction": "WAIT",
         "noBlockedDiagnostics": true,
-        "diagnosticCodes": ["fair_value_range_incomplete", "execution_progress_unknown", "data_missing"]
+        "diagnosticCodes": [
+          "fair_value_range_incomplete",
+          "execution_progress_unknown",
+          "data_missing"
+        ]
       }
     },
     {
@@ -345,21 +678,52 @@
         "sectorKind": "non-financial",
         "valuation": {
           "price": 30000,
-          "fairValue": { "bear": 24000, "base": 40000, "bull": 48000 },
-          "cashDividend": { "perShare": 900, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 }
+          "fairValue": {
+            "bear": 24000,
+            "base": 40000,
+            "bull": 48000
+          },
+          "cashDividend": {
+            "perShare": 900,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          }
         },
-        "financial": { "cet1": 0.14, "policyTargetCet1": 0.125, "riskWeightedAssets": 1000000000000 },
-        "nonFinancial": { "operatingCashFlow": 400000000000, "maintenanceCapex": 90000000000, "plannedReturnCash": 60000000000, "marketCap": 3000000000000 },
-        "programme": { "announcedAmount": 0, "executedAmount": 0 },
-        "earnings": { "dps": 900, "eps": 3200, "recurringEps": 3100, "pretaxProfit": 400000000000, "nonRecurringPretaxGain": 20000000000 },
-        "book": { "holdings": [], "openProposals": [] }
+        "financial": {
+          "cet1": 0.14,
+          "policyTargetCet1": 0.125,
+          "riskWeightedAssets": 1000000000000
+        },
+        "nonFinancial": {
+          "operatingCashFlow": 400000000000,
+          "maintenanceCapex": 90000000000,
+          "plannedReturnCash": 60000000000,
+          "marketCap": 3000000000000
+        },
+        "programme": {
+          "announcedAmount": 0,
+          "executedAmount": 0
+        },
+        "earnings": {
+          "dps": 900,
+          "eps": 3200,
+          "recurringEps": 3100,
+          "pretaxProfit": 400000000000,
+          "nonRecurringPretaxGain": 20000000000
+        },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        }
       },
       "expect": {
         "case": "research-incomplete",
         "route": "wait",
         "outcomeCode": "research_incomplete",
         "proposedAction": "WAIT",
-        "diagnosticCodes": ["bank_metric_out_of_sector"]
+        "diagnosticCodes": [
+          "bank_metric_out_of_sector"
+        ]
       }
     },
     {
@@ -371,24 +735,74 @@
         "sectorKind": "financial",
         "valuation": {
           "price": 16000,
-          "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
-          "fairValueBasis": { "method": "pbr-on-sustainable-roe" },
-          "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 200000000000, "marketCap": 12000000000000 }
+          "fairValue": {
+            "bear": 13000,
+            "base": 21000,
+            "bull": 25000
+          },
+          "fairValueBasis": {
+            "method": "pbr-on-sustainable-roe"
+          },
+          "cashDividend": {
+            "perShare": 1200,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 200000000000,
+            "marketCap": 12000000000000
+          }
         },
-        "financial": { "cet1": 0.128, "policyTargetCet1": 0.125, "riskWeightedAssets": 200000000000000, "marketCap": 12000000000000, "roe": 0.09 },
-        "programme": { "announcedAmount": 300000000000, "executedAmount": 200000000000, "windowDays": 365, "elapsedDays": 200, "policyRatio": 0.35, "priorPolicyRatio": 0.3 },
-        "earnings": { "pretaxProfit": 3500000000000, "nonRecurringPretaxGain": 200000000000, "dps": 1200, "eps": 3500, "recurringEps": 3300 },
-        "yieldContext": { "dividendYield": 0.075, "sectorMedianDividendYield": 0.055 },
-        "book": { "holdings": [], "openProposals": [] },
-        "completedOutputs": ["valuationBasis", "returnPolicyEvidence", "returnComposition", "contraryEvidence", "invalidationConditions", "targetWeightRisk", "nextReview", "evidenceRefs"]
+        "financial": {
+          "cet1": 0.128,
+          "policyTargetCet1": 0.125,
+          "riskWeightedAssets": 200000000000000,
+          "marketCap": 12000000000000,
+          "roe": 0.09
+        },
+        "programme": {
+          "announcedAmount": 300000000000,
+          "executedAmount": 200000000000,
+          "windowDays": 365,
+          "elapsedDays": 200,
+          "policyRatio": 0.35,
+          "priorPolicyRatio": 0.3
+        },
+        "earnings": {
+          "pretaxProfit": 3500000000000,
+          "nonRecurringPretaxGain": 200000000000,
+          "dps": 1200,
+          "eps": 3500,
+          "recurringEps": 3300
+        },
+        "yieldContext": {
+          "dividendYield": 0.075,
+          "sectorMedianDividendYield": 0.055
+        },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        },
+        "completedOutputs": [
+          "valuationBasis",
+          "returnPolicyEvidence",
+          "returnComposition",
+          "contraryEvidence",
+          "invalidationConditions",
+          "targetWeightRisk",
+          "nextReview",
+          "evidenceRefs"
+        ]
       },
       "expect": {
         "case": "research-incomplete",
         "route": "wait",
         "outcomeCode": "research_incomplete",
         "proposedAction": "WAIT",
-        "missingOutputs": ["catalystCalendar", "stagedPlan"]
+        "missingOutputs": [
+          "catalystCalendar",
+          "stagedPlan"
+        ]
       }
     },
     {
@@ -401,25 +815,79 @@
         "strategy": "shareholder-rerating",
         "valuation": {
           "price": 16000,
-          "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
-          "fairValueBasis": { "method": "pbr-on-sustainable-roe" },
-          "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 200000000000, "marketCap": 12000000000000 }
+          "fairValue": {
+            "bear": 13000,
+            "base": 21000,
+            "bull": 25000
+          },
+          "fairValueBasis": {
+            "method": "pbr-on-sustainable-roe"
+          },
+          "cashDividend": {
+            "perShare": 1200,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 200000000000,
+            "marketCap": 12000000000000
+          }
         },
-        "financial": { "cet1": 0.128, "policyTargetCet1": 0.125, "riskWeightedAssets": 200000000000000, "marketCap": 12000000000000, "roe": 0.09 },
-        "programme": { "announcedAmount": 300000000000, "executedAmount": 200000000000, "windowDays": 365, "elapsedDays": 200, "policyRatio": 0.35, "priorPolicyRatio": 0.3 },
-        "earnings": { "pretaxProfit": 3500000000000, "nonRecurringPretaxGain": 200000000000, "dps": 1200, "eps": 3500, "recurringEps": 3300 },
-        "yieldContext": { "dividendYield": 0.075, "sectorMedianDividendYield": 0.055 },
+        "financial": {
+          "cet1": 0.128,
+          "policyTargetCet1": 0.125,
+          "riskWeightedAssets": 200000000000000,
+          "marketCap": 12000000000000,
+          "roe": 0.09
+        },
+        "programme": {
+          "announcedAmount": 300000000000,
+          "executedAmount": 200000000000,
+          "windowDays": 365,
+          "elapsedDays": 200,
+          "policyRatio": 0.35,
+          "priorPolicyRatio": 0.3
+        },
+        "earnings": {
+          "pretaxProfit": 3500000000000,
+          "nonRecurringPretaxGain": 200000000000,
+          "dps": 1200,
+          "eps": 3500,
+          "recurringEps": 3300
+        },
+        "yieldContext": {
+          "dividendYield": 0.075,
+          "sectorMedianDividendYield": 0.055
+        },
         "invalidationPrice": 13000,
         "mandate": {
           "riskBudgetWeight": 0.01,
           "mandatePositionCap": 0.08,
           "minimumExecutableWeight": 0.005,
-          "caps": { "accountPositionCap": 0.1, "strategyPositionCap": 0.08, "accountSectorCap": 0.25 }
+          "caps": {
+            "accountPositionCap": 0.1,
+            "strategyPositionCap": 0.08,
+            "accountSectorCap": 0.25
+          }
         },
         "book": {
-          "holdings": [{ "symbol": "000010", "sector": "financials", "weight": 0.06, "strategy": "evidence-gated" }],
-          "openProposals": [{ "symbol": "000010", "sector": "financials", "weight": 0.03, "strategy": "catalyst-turnaround", "decisionId": "dec_sibling_1" }]
+          "holdings": [
+            {
+              "symbol": "000010",
+              "sector": "financials",
+              "weight": 0.06,
+              "strategy": "evidence-gated"
+            }
+          ],
+          "openProposals": [
+            {
+              "symbol": "000010",
+              "sector": "financials",
+              "weight": 0.03,
+              "strategy": "catalyst-turnaround",
+              "decisionId": "dec_sibling_1"
+            }
+          ]
         },
         "completedOutputs": [
           "valuationBasis",
@@ -438,13 +906,16 @@
         "route": "wait",
         "outcomeCode": "risk_limit_exceeded",
         "proposedAction": "WAIT",
-        "targetWeight": 0,
-        "diagnosticCodes": ["strategy_caps_do_not_sum", "overlapping_open_proposal"]
+        "diagnosticCodes": [
+          "strategy_caps_do_not_sum",
+          "overlapping_open_proposal"
+        ],
+        "incrementWeight": 0
       }
     },
     {
-      "id": "account-concentration-thin-headroom-still-buys",
-      "note": "The same book with 7% held and 2% proposed elsewhere against a 10% account ceiling: 1% of headroom is left and the position is sized to it rather than to the risk arithmetic's 5.3%. The cap is reported as the binding constraint so the proposal does not read as a calculation.",
+      "id": "a-cap-binds-the-total-and-the-increment-is-what-is-left",
+      "note": "The single-name cap this Mandate states is 4% and the risk arithmetic asks for 5.33%, so the cap binds the **total**. The account already carries 3% of the name - 2% held by another manager and 1% this package has proposed and nobody has approved - so what is proposed here is the 1% between them. This fixture replaced one whose premise was finding 3 itself: it previously held 9% of the name and still bought 1% more against a 5.33% target, which is the arithmetic that the split into targetTotalWeight and incrementWeight exists to prevent.",
       "input": {
         "symbol": "000011",
         "sector": "financials",
@@ -452,25 +923,78 @@
         "strategy": "shareholder-rerating",
         "valuation": {
           "price": 16000,
-          "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
-          "fairValueBasis": { "method": "pbr-on-sustainable-roe" },
-          "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 200000000000, "marketCap": 12000000000000 }
+          "fairValue": {
+            "bear": 13000,
+            "base": 21000,
+            "bull": 25000
+          },
+          "fairValueBasis": {
+            "method": "pbr-on-sustainable-roe"
+          },
+          "cashDividend": {
+            "perShare": 1200,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 200000000000,
+            "marketCap": 12000000000000
+          }
         },
-        "financial": { "cet1": 0.128, "policyTargetCet1": 0.125, "riskWeightedAssets": 200000000000000, "marketCap": 12000000000000, "roe": 0.09 },
-        "programme": { "announcedAmount": 300000000000, "executedAmount": 200000000000, "windowDays": 365, "elapsedDays": 200, "policyRatio": 0.35, "priorPolicyRatio": 0.3 },
-        "earnings": { "pretaxProfit": 3500000000000, "nonRecurringPretaxGain": 200000000000, "dps": 1200, "eps": 3500, "recurringEps": 3300 },
-        "yieldContext": { "dividendYield": 0.075, "sectorMedianDividendYield": 0.055 },
+        "financial": {
+          "cet1": 0.128,
+          "policyTargetCet1": 0.125,
+          "riskWeightedAssets": 200000000000000,
+          "marketCap": 12000000000000,
+          "roe": 0.09
+        },
+        "programme": {
+          "announcedAmount": 300000000000,
+          "executedAmount": 200000000000,
+          "windowDays": 365,
+          "elapsedDays": 200,
+          "policyRatio": 0.35,
+          "priorPolicyRatio": 0.3
+        },
+        "earnings": {
+          "pretaxProfit": 3500000000000,
+          "nonRecurringPretaxGain": 200000000000,
+          "dps": 1200,
+          "eps": 3500,
+          "recurringEps": 3300
+        },
+        "yieldContext": {
+          "dividendYield": 0.075,
+          "sectorMedianDividendYield": 0.055
+        },
         "invalidationPrice": 13000,
         "mandate": {
           "riskBudgetWeight": 0.01,
-          "mandatePositionCap": 0.08,
+          "mandatePositionCap": 0.04,
           "minimumExecutableWeight": 0.005,
-          "caps": { "accountPositionCap": 0.1, "accountSectorCap": 0.25 }
+          "caps": {
+            "accountPositionCap": 0.1,
+            "accountSectorCap": 0.25
+          }
         },
         "book": {
-          "holdings": [{ "symbol": "000011", "sector": "financials", "weight": 0.07, "strategy": "evidence-gated" }],
-          "openProposals": [{ "symbol": "000011", "sector": "financials", "weight": 0.02, "strategy": "shareholder-rerating", "decisionId": "dec_own_1" }]
+          "holdings": [
+            {
+              "symbol": "000011",
+              "sector": "financials",
+              "weight": 0.02,
+              "strategy": "evidence-gated"
+            }
+          ],
+          "openProposals": [
+            {
+              "symbol": "000011",
+              "sector": "financials",
+              "weight": 0.01,
+              "strategy": "shareholder-rerating",
+              "decisionId": "dec_own_1"
+            }
+          ]
         },
         "completedOutputs": [
           "valuationBasis",
@@ -489,8 +1013,10 @@
         "case": "shareholder-rerating",
         "route": "buy-path",
         "proposedAction": "BUY",
-        "targetWeight": 0.01,
-        "projectedExposure": 0.1
+        "targetTotalWeight": 0.04,
+        "incrementWeight": 0.01,
+        "existingExposure": 0.03,
+        "projectedExposure": 0.04
       }
     },
     {
@@ -502,23 +1028,64 @@
         "sectorKind": "financial",
         "valuation": {
           "price": 16000,
-          "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
-          "fairValueBasis": { "method": "pbr-on-sustainable-roe" },
-          "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 200000000000, "marketCap": 12000000000000 }
+          "fairValue": {
+            "bear": 13000,
+            "base": 21000,
+            "bull": 25000
+          },
+          "fairValueBasis": {
+            "method": "pbr-on-sustainable-roe"
+          },
+          "cashDividend": {
+            "perShare": 1200,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 200000000000,
+            "marketCap": 12000000000000
+          }
         },
-        "financial": { "cet1": 0.128, "policyTargetCet1": 0.125, "riskWeightedAssets": 200000000000000, "marketCap": 12000000000000, "roe": 0.09 },
-        "programme": { "announcedAmount": 300000000000, "executedAmount": 200000000000, "windowDays": 365, "elapsedDays": 200, "policyRatio": 0.35, "priorPolicyRatio": 0.3 },
-        "earnings": { "pretaxProfit": 3500000000000, "nonRecurringPretaxGain": 200000000000, "dps": 1200, "eps": 3500, "recurringEps": 3300 },
-        "yieldContext": { "dividendYield": 0.075, "sectorMedianDividendYield": 0.055 },
+        "financial": {
+          "cet1": 0.128,
+          "policyTargetCet1": 0.125,
+          "riskWeightedAssets": 200000000000000,
+          "marketCap": 12000000000000,
+          "roe": 0.09
+        },
+        "programme": {
+          "announcedAmount": 300000000000,
+          "executedAmount": 200000000000,
+          "windowDays": 365,
+          "elapsedDays": 200,
+          "policyRatio": 0.35,
+          "priorPolicyRatio": 0.3
+        },
+        "earnings": {
+          "pretaxProfit": 3500000000000,
+          "nonRecurringPretaxGain": 200000000000,
+          "dps": 1200,
+          "eps": 3500,
+          "recurringEps": 3300
+        },
+        "yieldContext": {
+          "dividendYield": 0.075,
+          "sectorMedianDividendYield": 0.055
+        },
         "invalidationPrice": 13000,
         "mandate": {
           "riskBudgetWeight": 0.0005,
           "mandatePositionCap": 0.08,
           "minimumExecutableWeight": 0.01,
-          "caps": { "accountPositionCap": 0.1, "accountSectorCap": 0.25 }
+          "caps": {
+            "accountPositionCap": 0.1,
+            "accountSectorCap": 0.25
+          }
         },
-        "book": { "holdings": [], "openProposals": [] },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        },
         "completedOutputs": [
           "valuationBasis",
           "returnPolicyEvidence",
@@ -536,8 +1103,10 @@
         "route": "wait",
         "outcomeCode": "position_not_executable",
         "proposedAction": "WAIT",
-        "targetWeight": null,
-        "diagnosticCodes": ["minimum_executable_not_met"]
+        "diagnosticCodes": [
+          "minimum_executable_not_met"
+        ],
+        "targetTotalWeight": null
       }
     },
     {
@@ -549,18 +1118,56 @@
         "sectorKind": "financial",
         "valuation": {
           "price": 16000,
-          "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
-          "fairValueBasis": { "method": "pbr-on-sustainable-roe" },
-          "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
-          "buyback": { "executedAmount": 200000000000, "marketCap": 12000000000000 }
+          "fairValue": {
+            "bear": 13000,
+            "base": 21000,
+            "bull": 25000
+          },
+          "fairValueBasis": {
+            "method": "pbr-on-sustainable-roe"
+          },
+          "cashDividend": {
+            "perShare": 1200,
+            "receivableWithinHorizon": true,
+            "withholdingTaxRate": 0.154
+          },
+          "buyback": {
+            "executedAmount": 200000000000,
+            "marketCap": 12000000000000
+          }
         },
-        "financial": { "cet1": 0.128, "policyTargetCet1": 0.125, "riskWeightedAssets": 200000000000000, "marketCap": 12000000000000, "roe": 0.09 },
-        "programme": { "announcedAmount": 300000000000, "executedAmount": 200000000000, "windowDays": 365, "elapsedDays": 200, "policyRatio": 0.35, "priorPolicyRatio": 0.3 },
-        "earnings": { "pretaxProfit": 3500000000000, "nonRecurringPretaxGain": 200000000000, "dps": 1200, "eps": 3500, "recurringEps": 3300 },
-        "yieldContext": { "dividendYield": 0.075, "sectorMedianDividendYield": 0.055 },
+        "financial": {
+          "cet1": 0.128,
+          "policyTargetCet1": 0.125,
+          "riskWeightedAssets": 200000000000000,
+          "marketCap": 12000000000000,
+          "roe": 0.09
+        },
+        "programme": {
+          "announcedAmount": 300000000000,
+          "executedAmount": 200000000000,
+          "windowDays": 365,
+          "elapsedDays": 200,
+          "policyRatio": 0.35,
+          "priorPolicyRatio": 0.3
+        },
+        "earnings": {
+          "pretaxProfit": 3500000000000,
+          "nonRecurringPretaxGain": 200000000000,
+          "dps": 1200,
+          "eps": 3500,
+          "recurringEps": 3300
+        },
+        "yieldContext": {
+          "dividendYield": 0.075,
+          "sectorMedianDividendYield": 0.055
+        },
         "invalidationPrice": 13000,
         "mandate": {},
-        "book": { "holdings": [], "openProposals": [] },
+        "book": {
+          "holdings": [],
+          "openProposals": []
+        },
         "completedOutputs": [
           "valuationBasis",
           "returnPolicyEvidence",
@@ -578,8 +1185,11 @@
         "route": "wait",
         "outcomeCode": "data_missing",
         "proposedAction": "WAIT",
-        "targetWeight": null,
-        "diagnosticCodes": ["risk_budget_not_stated", "position_cap_not_stated"]
+        "diagnosticCodes": [
+          "risk_budget_not_stated",
+          "position_cap_not_stated"
+        ],
+        "targetTotalWeight": null
       }
     }
   ]

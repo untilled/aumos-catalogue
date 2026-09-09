@@ -225,6 +225,43 @@ export function classifyCase(input = {}) {
     return verdict('rerated', 'thesis_intact', diagnostics, upstream, { discountToBase: round(discount) })
   }
 
+  /**
+   * ── The tests that must have **run** before this case can be accepted ────
+   *
+   * Every test above refuses when it finds something. None of them refused, and for
+   * three of them that could mean *the input was never there* — a missing sector
+   * median silently skips the trap test, missing recurring earnings silently skips the
+   * flip, a missing programme silently skips the whole question of whether anything is
+   * being returned at all. Skipping a test is not passing it, and a positive
+   * classification reached that way is this desk's own name on a company it did not
+   * examine. (Same defect class as findings ①②④ on `index.mjs`.)
+   */
+  for (const [path, ran, message] of [
+    [
+      'earnings',
+      finite(reportedPayout) && finite(recurringPayout),
+      'The payout on reported and on recurring earnings is what separates a sustainable return from a one-off, and one of dps, eps or recurringEps is absent.',
+    ],
+    [
+      'earnings.nonRecurringPretaxGain',
+      finite(nonRecurringShare),
+      'The share of pre-tax profit that is non-recurring was not computable, so the corroborating half of the earnings-quality test did not run.',
+    ],
+    [
+      'yieldContext',
+      finite(relativeYield),
+      'The yield could not be read against its own sector, so the dividend-trap test did not run. An absolute yield is not a substitute: it compares a bank against a shipbuilder.',
+    ],
+    [
+      'programme',
+      finite(programme.policyRatio) || finite(programme.executedAmount),
+      'Neither a stated return ratio nor an executed amount is present, so nothing here shows a return programme exists — which is the mechanism this whole methodology rests on.',
+    ],
+  ]) {
+    if (ran) continue
+    diagnostics.push(diagnostic('classification_input_missing', 'unevaluated', message, path))
+  }
+
   // ── the absences, only now that nothing has been measured against ────────
   if (!finite(discount) || isUnevaluated(upstream) || isUnevaluated(diagnostics)) {
     diagnostics.push(

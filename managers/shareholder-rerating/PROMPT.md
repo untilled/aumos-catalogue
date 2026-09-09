@@ -156,16 +156,36 @@ action that changes what one share is, and traded value that can carry the posit
 Judge the entry's headroom against the **conservative** end of your fair-value range and against
 the bear case, not against the bull.
 
-Sizing is `lossToInvalidation` and `targetWeight`:
+Sizing is `lossToInvalidation` and `targetWeight`, and it produces **two** weights that are never
+the same field:
 
 ```
-lossFraction = (entryPrice − invalidationPrice − dividendReceivedBeforeThen) / entryPrice
-rawWeight    = riskBudgetWeight / lossFraction
-targetWeight = min(rawWeight, mandate cap, sector headroom, whole-account headroom)
+lossFraction      = (entryPrice − invalidationPrice − dividendReceivedBeforeThen) / entryPrice
+rawWeight         = riskBudgetWeight / lossFraction
+targetTotalWeight = min(rawWeight, mandate cap, what the sector ceiling leaves, what the gross ceiling leaves)
+incrementWeight   = targetTotalWeight − (already held + already proposed and unapproved)
 ```
+
+⛔ **`targetTotalWeight` is what the position should *be*; `incrementWeight` is what you propose
+adding.** Every cap and the risk budget apply to the *final* holding, and the order is the
+difference. Quoting one as the other is how a book that already holds 4% of a name buys a further
+5.3% of it and calls the result correctly sized.
+
+Three cases have defined answers and you do not improvise a fourth:
+
+- the account is **at** the target — propose nothing, and that is a successful run;
+- the account is **above** it — this is a reduction question, and you propose a reduction only
+  against what is actually held; somebody else's unapproved proposal is theirs to withdraw;
+- the increment is below the venue minimum — it waits. A target that clears the minimum can still
+  be reached by an addition that does not.
 
 ⚠️ **The cap is not the order.** If the cap binds, the proposal says so — a ceiling presented as a
 calculation is how a book fills with maximum positions nobody sized.
+
+⛔ **You may not size against an account you did not read.** Holdings and open proposals are two
+lists that must both arrive; an empty list means *there is nothing*, and an absent one means
+*nobody looked*, and the second is `data_missing`. The same rule governs every cap and every
+staged re-check: a comparison that could not be made has not been passed.
 
 ⛔ **There is no default risk budget and no default cap in this package.** If the Mandate carries
 neither, you cannot size, and the answer is `WAIT` with `data_missing` — never a number you chose.
@@ -179,11 +199,15 @@ fallback from anywhere — this plan's stages are this thesis's catalysts.
 
 ### 6. Concentration, over the whole account
 
-`concentration` folds real holdings and open proposals together, per name and per sector, and
-takes the **minimum** of the caps that apply. ⛔ **Per-strategy limits never sum into an account
-limit.** If this package's ceiling is 8% and the account's is 10%, the answer is 8% and never 18%.
-A name several managers hold is one position with several theses attached, and the quantity is
-one.
+`concentration` folds real holdings and open proposals together — per name, per sector and over
+the whole book — and takes the **minimum** of the caps that apply. ⛔ **Per-strategy limits never
+sum into an account limit.** If this package's ceiling is 8% and the account's is 10%, the answer
+is 8% and never 18%. A name several managers hold is one position with several theses attached,
+and the quantity is one.
+
+⛔ **Every declared limit is read, including the gross one.** Each single-name and sector limit can
+be satisfied by a book that is nevertheless fully committed; if the Mandate states a whole-account
+exposure ceiling, it caps this position too, and it is reported as the binding axis when it is.
 
 If the account is full, the finding is `risk_limit_exceeded`: the claim may be right and the book
 cannot carry it. That is not a refutation of the thesis and you do not record it as one.

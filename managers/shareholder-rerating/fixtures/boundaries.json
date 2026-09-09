@@ -1,0 +1,230 @@
+{
+  "note": "The boundary cases from the review of d36e32b, kept as regressions. Each one names a base fixture and the mutations to apply to a **copy** of it — the fixture files themselves are never edited, which is the property the reviewer's own reproduction script had: a case that passes today has to keep passing for the same reason, and these say what has to keep failing. Every one of them returned a BUY or an increment before the fix.",
+  "cases": [
+    {
+      "id": "an-unread-book-is-not-an-empty-account",
+      "finding": 1,
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "mutations": [{ "op": "delete", "path": "book" }],
+      "expect": {
+        "route": "wait",
+        "outcomeCode": "data_missing",
+        "proposedAction": "WAIT",
+        "incrementWeight": 0,
+        "diagnosticCodes": ["account_state_unreadable"]
+      }
+    },
+    {
+      "id": "half-an-unread-book-is-still-unread",
+      "finding": 1,
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "note": "Holdings were read and open proposals were not. Exposure that is about to exist is exactly the half that was missing.",
+      "mutations": [{ "op": "delete", "path": "book.openProposals" }],
+      "expect": { "route": "wait", "outcomeCode": "data_missing", "proposedAction": "WAIT", "diagnosticCodes": ["account_state_unreadable"] }
+    },
+    {
+      "id": "no-concentration-caps-cannot-be-adjudicated",
+      "finding": 1,
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "mutations": [{ "op": "delete", "path": "mandate.caps" }],
+      "expect": {
+        "route": "wait",
+        "outcomeCode": "data_missing",
+        "proposedAction": "WAIT",
+        "diagnosticCodes": ["position_cap_not_stated"]
+      }
+    },
+    {
+      "id": "an-unreadable-row-is-not-an-adjudicated-account",
+      "finding": 1,
+      "kind": "evaluateCase",
+      "note": "The account was handed over and one open-proposal row has no weight on it. Every Mandate number is present, so the sizing succeeds — and the concentration answer is `null` rather than `false`, which is the state the old `=== false` refusal let straight through. A total this run cannot complete is not a total it may propose against.",
+      "base": "cases[0]",
+      "mutations": [{ "op": "set", "path": "book.openProposals", "value": [{ "symbol": "000000", "sector": "financials" }] }],
+      "expect": {
+        "route": "wait",
+        "outcomeCode": "data_missing",
+        "proposedAction": "WAIT",
+        "incrementWeight": 0,
+        "diagnosticCodes": ["open_proposal_row_unreadable"]
+      }
+    },
+    {
+      "id": "a-declared-gross-cap-binds-the-size",
+      "finding": 4,
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "note": "79% of the account is invested elsewhere against a declared 80% ceiling. The risk arithmetic asks for 5.33%; the gross axis leaves 1%, and 1% is what is proposed.",
+      "mutations": [
+        { "op": "set", "path": "mandate.caps.accountGrossCap", "value": 0.8 },
+        { "op": "set", "path": "book.holdings", "value": [{ "symbol": "OTHER", "sector": "other", "weight": 0.79 }] }
+      ],
+      "expect": {
+        "proposedAction": "BUY",
+        "targetTotalWeight": 0.01,
+        "incrementWeight": 0.01,
+        "projectedGrossExposure": 0.8,
+        "maxTotalWeightBinding": "accountGrossCap"
+      }
+    },
+    {
+      "id": "a-declared-gross-cap-refuses-when-there-is-nothing-left",
+      "finding": 4,
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "mutations": [
+        { "op": "set", "path": "mandate.caps.accountGrossCap", "value": 0.8 },
+        { "op": "set", "path": "book.holdings", "value": [{ "symbol": "OTHER", "sector": "other", "weight": 0.8 }] }
+      ],
+      "expect": { "route": "wait", "outcomeCode": "risk_limit_exceeded", "proposedAction": "WAIT", "incrementWeight": 0 }
+    },
+    {
+      "id": "a-book-already-past-its-gross-cap-refuses-before-sizing",
+      "finding": 4,
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "mutations": [
+        { "op": "set", "path": "mandate.caps.accountGrossCap", "value": 0.8 },
+        { "op": "set", "path": "book.holdings", "value": [{ "symbol": "OTHER", "sector": "other", "weight": 0.85 }] }
+      ],
+      "expect": {
+        "route": "wait",
+        "outcomeCode": "risk_limit_exceeded",
+        "proposedAction": "WAIT",
+        "diagnosticCodes": ["gross_limit_exceeded"]
+      }
+    },
+    {
+      "id": "four-percent-held-is-subtracted-not-added-to",
+      "finding": 3,
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "note": "The regression that names finding ③: the target is 5.33% of the account **in total**, so a book holding 4% is proposed 1.33% and ends at 5.33% — not at 9.33%.",
+      "mutations": [{ "op": "set", "path": "book.holdings", "value": [{ "symbol": "000000", "sector": "financials", "weight": 0.04 }] }],
+      "expect": {
+        "proposedAction": "BUY",
+        "targetTotalWeight": 0.05333333,
+        "incrementWeight": 0.01333333,
+        "existingExposure": 0.04,
+        "projectedExposure": 0.05333333,
+        "projectionEqualsTarget": true
+      }
+    },
+    {
+      "id": "seven-percent-held-is-above-target-and-is-a-reduction-question",
+      "finding": 3,
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "mutations": [{ "op": "set", "path": "book.holdings", "value": [{ "symbol": "000000", "sector": "financials", "weight": 0.07 }] }],
+      "expect": {
+        "route": "trim-or-exit-review",
+        "outcomeCode": "position_above_target",
+        "proposedAction": "RESIZE",
+        "targetTotalWeight": 0.05333333,
+        "incrementWeight": 0,
+        "diagnosticCodes": ["position_above_target_weight"]
+      }
+    },
+    {
+      "id": "already-at-target-proposes-nothing",
+      "finding": 3,
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "mutations": [{ "op": "set", "path": "book.holdings", "value": [{ "symbol": "000000", "sector": "financials", "weight": 0.05333333 }] }],
+      "expect": {
+        "route": "wait",
+        "outcomeCode": "position_at_target",
+        "proposedAction": "WAIT",
+        "incrementWeight": 0,
+        "diagnosticCodes": ["position_at_target_weight"]
+      }
+    },
+    {
+      "id": "an-increment-below-the-venue-minimum-is-refused",
+      "finding": 3,
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "note": "A target that clears the venue minimum can still be reached by an addition that does not. The order is the increment.",
+      "mutations": [{ "op": "set", "path": "book.holdings", "value": [{ "symbol": "000000", "sector": "financials", "weight": 0.05 }] }],
+      "expect": {
+        "route": "wait",
+        "outcomeCode": "position_not_executable",
+        "proposedAction": "WAIT",
+        "diagnosticCodes": ["increment_below_minimum_executable"]
+      }
+    },
+    {
+      "id": "no-venue-minimum-stated-is-not-a-pass",
+      "finding": "defect class",
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "mutations": [{ "op": "delete", "path": "mandate.minimumExecutableWeight" }],
+      "expect": {
+        "route": "wait",
+        "outcomeCode": "data_missing",
+        "proposedAction": "WAIT",
+        "diagnosticCodes": ["minimum_executable_not_stated"]
+      }
+    },
+    {
+      "id": "no-sector-median-means-the-trap-test-did-not-run",
+      "finding": "defect class",
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "mutations": [{ "op": "delete", "path": "yieldContext" }],
+      "expect": {
+        "case": "data-missing",
+        "outcomeCode": "data_missing",
+        "proposedAction": "WAIT",
+        "diagnosticCodes": ["classification_input_missing"]
+      }
+    },
+    {
+      "id": "no-recurring-earnings-means-the-flip-test-did-not-run",
+      "finding": "defect class",
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "mutations": [{ "op": "delete", "path": "earnings.recurringEps" }],
+      "expect": { "case": "data-missing", "outcomeCode": "data_missing", "diagnosticCodes": ["classification_input_missing"] }
+    },
+    {
+      "id": "no-programme-at-all-is-not-a-shareholder-rerating-case",
+      "finding": "defect class",
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "mutations": [{ "op": "delete", "path": "programme" }],
+      "expect": { "case": "data-missing", "outcomeCode": "data_missing", "diagnosticCodes": ["classification_input_missing"] }
+    },
+    {
+      "id": "staged-add-halts-when-the-discount-was-not-measured",
+      "finding": 2,
+      "kind": "stagedIncrement",
+      "base": "staged[0]",
+      "mutations": [{ "op": "delete", "path": "recheck.discountToBase" }],
+      "expect": { "action": "unevaluated", "increment": 0, "reason": "discount_not_measured", "outcomeCode": "data_missing" }
+    },
+    {
+      "id": "staged-add-halts-when-the-risk-comparison-cannot-be-made",
+      "finding": 2,
+      "kind": "stagedIncrement",
+      "base": "staged[0]",
+      "note": "The quietest of the four: with neither the loss to invalidation nor the remaining budget, the old code skipped the comparison and proposed the stage with no diagnostic at all.",
+      "mutations": [
+        { "op": "delete", "path": "recheck.lossFraction" },
+        { "op": "delete", "path": "recheck.riskBudgetRemaining" }
+      ],
+      "expect": { "action": "unevaluated", "increment": 0, "reason": "risk_recheck_unavailable", "outcomeCode": "data_missing" }
+    },
+    {
+      "id": "staged-add-halts-when-the-account-was-not-read",
+      "finding": 2,
+      "kind": "stagedIncrement",
+      "base": "staged[0]",
+      "mutations": [{ "op": "delete", "path": "book" }],
+      "expect": { "action": "unevaluated", "increment": 0, "reason": "account_state_unreadable", "outcomeCode": "data_missing" }
+    }
+  ]
+}

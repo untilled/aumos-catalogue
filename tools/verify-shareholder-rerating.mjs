@@ -45,6 +45,7 @@ import {
   REQUIRED_OUTPUTS,
   ROUTES,
   THRESHOLDS,
+  capitalHeadroom,
   concentration,
   evaluateCase,
   returnComposition,
@@ -57,6 +58,7 @@ const read = async (name) => JSON.parse(await readFile(new URL(name, fixtureRoot
 const cases = await read('cases.json')
 const composition = await read('return-composition.json')
 const staged = await read('staged-plans.json')
+const boundaries = await read('boundaries.json')
 const manifest = JSON.parse(await readFile(new URL('../managers/shareholder-rerating/aumos.json', import.meta.url), 'utf8'))
 
 let checked = 0
@@ -129,7 +131,7 @@ for (const fixture of cases.cases) {
   const expect = fixture.expect
   const where = `cases/${fixture.id}`
 
-  for (const key of ['case', 'route', 'outcomeCode', 'proposedAction', 'targetWeight', 'lossFraction', 'discountToBase', 'investorCashReturn', 'buybackYield', 'returnHeadroomYield', 'projectedExposure']) {
+  for (const key of ['case', 'route', 'outcomeCode', 'proposedAction', 'targetTotalWeight', 'incrementWeight', 'existingExposure', 'lossFraction', 'discountToBase', 'investorCashReturn', 'buybackYield', 'returnHeadroomYield', 'projectedExposure']) {
     if (key in expect) assert.equal(answer.data[key], expect[key], `${where}: ${key}`)
   }
   if ('totalReturnBase' in expect) assert.equal(answer.data.totalReturn.base, expect.totalReturnBase, `${where}: totalReturn.base`)
@@ -222,7 +224,7 @@ for (const fixture of staged.cases) {
     proposed: { symbol: 'A', sector: 'financials', weight: 0.03 },
     holdings: [{ symbol: 'A', sector: 'financials', weight: 0.06, strategy: 'evidence-gated' }],
     openProposals: [{ symbol: 'A', sector: 'financials', weight: 0.03, strategy: 'catalyst-turnaround', decisionId: 'dec_x' }],
-    caps: { accountPositionCap: 0.1, strategyPositionCap: 0.08 },
+    caps: { accountPositionCap: 0.1, strategyPositionCap: 0.08, accountSectorCap: 0.3, accountGrossCap: 0.9 },
     strategy: 'shareholder-rerating',
   })
   assert.equal(answer.data.bindingPositionCap, 0.08, 'the binding cap is the smaller of the two, never their sum')
@@ -234,9 +236,12 @@ for (const fixture of staged.cases) {
   ok('per-strategy and account caps fold by minimum, over holdings and open proposals together')
 }
 {
+  // ⚠️ `openProposals: []` states that nothing is pending. Since the fix, leaving it
+  // out states that nobody looked — see the `unreadable` assertion below.
   const withoutOpen = concentration({
     proposed: { symbol: 'A', weight: 0.03 },
     holdings: [{ symbol: 'A', weight: 0.06 }],
+    openProposals: [],
     caps: { accountPositionCap: 0.1 },
   })
   const withOpen = concentration({
@@ -245,6 +250,13 @@ for (const fixture of staged.cases) {
     openProposals: [{ symbol: 'A', weight: 0.03 }],
     caps: { accountPositionCap: 0.1 },
   })
+  const unreadable = concentration({
+    proposed: { symbol: 'A', weight: 0.03 },
+    holdings: [{ symbol: 'A', weight: 0.06 }],
+    caps: { accountPositionCap: 0.1 },
+  })
+  assert.equal(unreadable.data.withinLimits, null, 'an unread open-proposal list was read as an empty one')
+  assert.equal(unreadable.data.outcomeCode, 'data_missing')
   assert.equal(withoutOpen.data.withinLimits, true, 'the same proposal fits when nothing else is pending')
   assert.equal(withOpen.data.withinLimits, false, 'an unapproved proposal was left out of the account exposure')
   ok('an open proposal changes the answer, which is what makes it exposure rather than paperwork')
@@ -256,11 +268,148 @@ for (const fixture of staged.cases) {
       { symbol: 'A', weight: 0.06, strategy: 'evidence-gated' },
       { symbol: 'A', weight: 0.06, strategy: 'shareholder-rerating' },
     ],
+    openProposals: [],
     caps: { accountPositionCap: 0.1 },
   })
   assert.equal(duplicated.data.held, 0.06, 'one position was counted twice because two theses were attached to it')
   assert.ok(codesOf(duplicated.diagnostics).includes('duplicate_position_rows'))
   ok('a position is one quantity however many theses point at it')
+}
+
+/**
+ * ── The boundary regressions from the review of `d36e32b` ──────────────────
+ *
+ * Four P1 findings, and three of them were one defect: an input that was **absent**
+ * or **declared and never read** behaved as an input that had passed. A missing book
+ * became two empty lists, which is the most permissive account state there is; a
+ * missing cap became no constraint; `accountGrossCap` sat in the input contract and in
+ * nobody's arithmetic; and a staged add proceeded with none of its re-check numbers.
+ * The fourth was one field carrying two meanings — a target total and an increment.
+ *
+ * ⚠️ **These mutate a deep copy and never the fixture files**, which is the property
+ * the reviewer's own reproduction script had: the cases that pass above keep passing
+ * for the reasons they already passed for, and these say what has to keep failing.
+ */
+{
+  const bases = { cases: cases.cases, staged: staged.cases }
+  const baseInput = (reference) => {
+    const [, list, index] = /^(\w+)\[(\d+)\]$/.exec(reference)
+    return structuredClone(bases[list][Number(index)].input)
+  }
+  const walk = (object, path) => {
+    const parts = path.split('.')
+    const last = parts.pop()
+    let node = object
+    for (const part of parts) node = node?.[part]
+    return { node, last }
+  }
+
+  for (const fixture of boundaries.cases) {
+    const input = baseInput(fixture.base)
+    for (const mutation of fixture.mutations) {
+      const { node, last } = walk(input, mutation.path)
+      assert.ok(node !== undefined && node !== null, `boundaries/${fixture.id}: the path ${mutation.path} is not in the base fixture, so this regression is testing nothing`)
+      if (mutation.op === 'delete') {
+        assert.ok(last in node, `boundaries/${fixture.id}: ${mutation.path} is already absent from the base fixture`)
+        delete node[last]
+      } else {
+        node[last] = structuredClone(mutation.value)
+      }
+    }
+
+    const where = `boundaries/${fixture.id}`
+    const expect = fixture.expect
+    const answer =
+      fixture.kind === 'stagedIncrement'
+        ? stagedIncrement({ ...input, plan: staged.plan })
+        : evaluateCase(input)
+
+    for (const [key, value] of Object.entries(expect)) {
+      if (['diagnosticCodes', 'projectionEqualsTarget'].includes(key)) continue
+      assert.equal(answer.data[key], value, `${where}: ${key}`)
+    }
+    for (const code of expect.diagnosticCodes ?? []) {
+      assert.ok(codesOf(answer.diagnostics).includes(code), `${where}: expected diagnostic ${code}, got ${codesOf(answer.diagnostics).join(', ')}`)
+    }
+    if (expect.projectionEqualsTarget === true) {
+      assert.equal(
+        answer.data.projectedExposure,
+        answer.data.targetTotalWeight,
+        `${where}: the increment was added on top of the target instead of taking the position to it — this is finding ③ exactly`,
+      )
+    }
+    /**
+     * ⛔ The property behind all four findings, asserted once per boundary case
+     * regardless of what it expected: nothing proposes a purchase unless the account
+     * was read and every declared limit adjudicated it.
+     */
+    if (answer.data.proposedAction === 'BUY' || answer.data.action === 'propose') {
+      assert.ok(
+        !answer.diagnostics.some((row) => row.severity === 'unevaluated'),
+        `${where}: something was proposed while ${codesOf(answer.diagnostics.filter((row) => row.severity === 'unevaluated')).join(', ')} was unevaluated`,
+      )
+    }
+    ok(`${where} — finding ${fixture.finding}: ${answer.data.proposedAction ?? answer.data.action}${answer.data.outcomeCode ? ` / ${answer.data.outcomeCode}` : ''}`)
+  }
+}
+
+/**
+ * The same rule stated over the whole corpus rather than case by case, because it is
+ * the invariant and not a property of any one input.
+ */
+{
+  const everyInput = [
+    ...cases.cases.map((fixture) => fixture.input),
+    ...boundaries.cases.filter((fixture) => fixture.kind !== 'stagedIncrement').map((fixture) => {
+      const [, list, index] = /^(\w+)\[(\d+)\]$/.exec(fixture.base)
+      const input = structuredClone({ cases: cases.cases, staged: staged.cases }[list][Number(index)].input)
+      for (const mutation of fixture.mutations) {
+        const parts = mutation.path.split('.')
+        const last = parts.pop()
+        let node = input
+        for (const part of parts) node = node?.[part]
+        if (mutation.op === 'delete') delete node[last]
+        else node[last] = structuredClone(mutation.value)
+      }
+      return input
+    }),
+  ]
+  for (const input of everyInput) {
+    const answer = evaluateCase(input)
+    if (answer.data.proposedAction !== 'BUY') continue
+    assert.ok(Array.isArray(input.book?.holdings) && Array.isArray(input.book?.openProposals), 'a BUY was returned for a book that was never read')
+    assert.equal(
+      answer.data.projectedExposure,
+      answer.data.targetTotalWeight,
+      'a BUY whose projected exposure is not its target weight has confused the total with the increment',
+    )
+    assert.ok(
+      !answer.diagnostics.some((row) => row.severity === 'unevaluated'),
+      'a BUY was returned with an unevaluated input',
+    )
+  }
+  ok(`across all ${everyInput.length} inputs, every BUY read the account, adjudicated every limit, and ends at its target weight`)
+}
+
+/**
+ * The rest of the defect class, found by reading this package for every place a limit
+ * or a re-check value was optional-with-a-default or declared-and-unread.
+ */
+{
+  const industrial = capitalHeadroom({
+    sector: 'non-financial',
+    nonFinancial: { operatingCashFlow: 300000000000, maintenanceCapex: 60000000000, plannedReturnCash: 200000000000, marketCap: 3000000000000 },
+  })
+  assert.equal(industrial.data.adequate, null, 'an unstated committed investment was treated as zero, which is the reading that makes coverage look best')
+  assert.ok(codesOf(industrial.diagnostics).includes('required_investment_not_stated'))
+
+  const noMinimum = capitalHeadroom({
+    sector: 'financial',
+    financial: { cet1: 0.128, policyTargetCet1: 0.125, riskWeightedAssets: 200000000000000, marketCap: 12000000000000 },
+  })
+  assert.ok(codesOf(noMinimum.diagnostics).includes('regulatory_minimum_not_stated'), 'an unstated regulatory minimum passed silently')
+  assert.equal(noMinimum.data.adequate, true, 'the policy-target test is the tighter one and still stands on its own')
+  ok('an absent committed investment, regulatory minimum, credit-cost guidance or leverage ceiling is reported rather than skipped')
 }
 
 /**
