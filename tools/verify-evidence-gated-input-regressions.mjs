@@ -1100,6 +1100,28 @@ assert.equal(contracts.contracts.reconcileArmedReviews.keys.journalArmed, 'any',
 // #201: and the report-only one is published, because a strict operation refuses what it does not declare.
 assert.equal(contracts.contracts.reconcileArmedReviews.keys.standingPlans, 'array')
 assert.ok(contracts.keys.reconcileArmedReviews.includes('standingPlans'))
+/**
+ * #136's last residue: the two published keys that are **refused** when passed
+ * read exactly like the three that are accepted, so the only place either was
+ * called refused was `schedule.mjs`, after the call — and a run that wrote the
+ * null `nextState` back erased the record. The contract names them in front of
+ * the call now, and these assertions tie the note to the diagnostic that
+ * answers the key, so the two cannot drift apart in silence.
+ */
+for (const [key, code, slot] of [
+  ['armed', 'armed_state_misplaced', /`previous`/],
+  ['journalArmed', 'armed_journal_not_a_receipt', /`standingPlans`/],
+]) {
+  const note = contracts.nested.reconcileArmedReviews[key]
+  assert.ok(typeof note === 'string' && note.length > 0, `${key} is published as a key and annotated as one`)
+  assert.ok(/refused key/i.test(note), `${key} is named a refused key rather than reading like one this operation accepts`)
+  assert.ok(note.includes(code), `${key}'s note names the diagnostic its caller is actually answered with`)
+  assert.ok(slot.test(note), `${key}'s note names the slot the value belongs in instead`)
+  const answer = run('reconcileArmedReviews', { previous: remembered, sequence, [key]: [] })
+  assert.ok(has(answer, code), `${key} is still refused with the code its contract published`)
+  assert.equal(answer.status, 'blocked')
+  assert.equal(answer.data.nextState, null, 'and a blocked answer writes nothing, which is why the contract has to say so first')
+}
 assert.ok(contracts.guarded.includes('refutedMemoryRules'))
 // ⚠️ `memory` joined it in #160: the second refuted rule is filed under `run/theme-radar-last`.
 assert.deepEqual(contracts.keys.refutedMemoryRules, ['patterns', 'memory'])
