@@ -305,6 +305,62 @@ Reject ready BUY when expected return is non-positive, active expected return is
 trap evidence dominates, evidence quality is inadequate, or challenge is unresolved. Do not fill a
 missing field with model knowledge. Preserve source Evidence ids and web URLs separately.
 
+### Which candidate is carried, and finishing it before declining it
+
+⛔ **This is the stage the run loop did not have** (#243). The nine items above have been on this
+page since the port, and the four gates that judge them — `thesisComplete`, `variantView`,
+`consensusRefs`, `challengeCleared` — have refused an unchecked candidate since #226. What nothing
+did was carry one candidate to the end. Measured on `run_bb689b6199084b04afd8b0e1d1528cda`
+(2026-09-09): both price branches fed and evaluated (KR 74 of 74, US 83 of 83, `unprepared` 0), 42
+eligible candidates, **four** pushed as far as `variantViewCheck` — `267260` at 1 of 4, `LOW` at 2,
+`NKE` at 3, `MCD` blocked earlier by `entry_quality_falling_knife` — every one declined, **nothing
+registered**. 157 names screened, four touched shallowly, zero documents.
+
+⛔ **The gates are not the problem and the measurement says so.** The ported original — the +18.6pp
+thesis `INCIDENTS.md` cites — satisfied all four **by hand**: a named «the market discounts X / our
+differentiated view is Y» section, four `consensusRefs` rows each with `metric`, `period`, `value`,
+`currency`, `source_url` and `captured_at`, one dated challenge cross-check, and bear/base/bull with
+a probability-weighted return, a hard stop and a review date. Its pattern was **one name, deeply,
+every artefact, small.** This one's was **157 names, screened, four touched, all declined.**
+
+**⑴ `candidateQueue({rows, perLens})` — which candidate, and per lens.** Hand it the `scan` answers
+you read back from the sweep. ⛔ **Not `discoveryScore` order.** That number is the fraction of the
+*mean-reversion* signal set a name fires, and a name above its MA200 fires none of them, so the two
+lenses that require an intact trend scored **structurally zero** and were never researched (#242).
+Measured on the same sweep: `035900` at 60 and `267260` at 40 were both researched; `316140`,
+eligible under `trend-pullback` at `offHigh200` −19.0% and `ma200Distance` **+7.8%**, scored 0 and
+was not touched. ⚠️ **And the score's sign is backwards against the original**, which chose its name
+for being *"스캔 후보 중 가장 덜 빠짐"* — the least fallen of the scan candidates. Each lens is
+ordered by its own measurement now: depth for `mean-reversion`, the **shallowest** `offHigh200` with
+the trend intact for `trend-pullback`, the surviving `ma200Distance` for `quality-pullback` (whose
+band has already fixed the depth). ⛔ The three are on three different scales on purpose and there is
+no «top N of the roster». ⚠️ A rank is not a screen: `lenses` still decides eligibility, and a row
+whose rank could not be read is queued **last rather than dropped**, by name, as
+`lens_rank_unavailable`.
+
+**⑵ Write §Candidate record to the end for the top candidate of each lens.** All nine items, and in
+particular the five the gates read: the three scenarios with probabilities totalling 100,
+`thesisValuation` over that table for `expectedUpsidePct` and `fairValueRange`, a `catalystRegister`
+row for the window, the hard stop and the review date you will register, and the `variantView`
+section stating what the market discounts and how your view differs. Then hand that document to
+`variantViewCheck`.
+
+**⑶ `candidateCompletion({owesDocument, records})` — did the stage run.** Pass `candidateQueue`'s
+`owesDocument` unchanged and one `records` row per document —
+`{ symbol, market, lens, thesis, challengeVerdict, verdict }`. It calls `variantViewCheck` itself, so
+there is one answer in this package to whether a variant view is established rather than two.
+⛔ **It is not a fifth gate and it judges no candidate**; it reads whether the document exists.
+
+⚠️ **Decline after the document exists, not instead of it.** `267260` was declined **correctly** —
+the consensus was 19 buy / 0 sell, so there was no view to differ from — and the answer published for
+it was `1 of 4`. That does not read as «judged and declined»; it reads as «there was nothing to
+judge», and only one of those two states is evidence that this methodology ran. A carried name with
+no document is `candidate_completion_absent`, an `input-path` cause that **withdraws**
+`mandateExecution`'s positive answer: this run may not report `no-candidate-cleared-the-gates` over a
+lane whose leading candidate reached no document. ⛔ It blocks nothing — a `WAIT` with every document
+written and every candidate declined is an honest run, and the code exists so that it can be told
+apart from a run that wrote none.
+
 ## Declaring the universe
 
 Do this every run. `skills/data-source-contract/SKILL.md` owns the listing and filing routes.
@@ -457,14 +513,26 @@ result at all, and you read exactly the ones you want.
    `taskRunId` to poll.
 2. `task_get({ taskRunId })` until it settles — `completed`, `partial`, `failed` or `cancelled`. It
    carries the item counts, the folder, what is still pending by name, every answer with **the file
-   it is in**, and every failure with its `kind` (`network` will be retried, `parse` will not read
+   it is in** — that list is `outputs`, and it is the only thing that says which files are *this
+   run's* — and every failure with its `kind` (`network` will be retried, `parse` will not read
    any better next time).
-3. `files_read({ path: "<outputPath>/<itemId>.json" })` for each answer you want. ⚠️ **Read them —
+3. `files_read` on the files `task_get` named in `outputs`. ⚠️ **Read them —
    finishing is not preparing.** A settled run whose files you never opened is `unsettled` to
    `executionRecord`, and rightly: the host counted items and only the answers say what this fund
    could actually read. ⛔ There is no call that hands you the whole roster at once and you should
-   not want one; `files_list` over the folder tells you what is there, and the rows you fold with
-   `opportunityUniverse` are metric rows you read one by one.
+   not want one; the rows you fold with `opportunityUniverse` are metric rows you read one by one.
+
+   ⛔ **Fold `outputs`, never the folder** (`untilled/aumos-catalogue#245`). `outputPath` is a
+   **calendar day**, so `scans/<date>/<recipeId>/` accumulates every sweep run on that date,
+   discarded ones included. Measured in the owner's store, `scans/2026-09-09/roster-scan/` held
+   **242** files — 83 answers on discarded venue-keyed ids beside 83 `us:` and 76 `kr:` answers from
+   the sweep that worked — and folding the folder wholesale reports `unprepared 83종`, ⚠️ **a fact
+   that does not exist**: those 83 are a coordinate this run threw away, not names it could not read.
+   ⚠️ **The separating key is each answer's own `evaluatedAsOf`** — `00:39:16.609Z` on the discarded
+   batch against `11:23:55.210Z` on the live one — which `recipes/request.mjs` writes from the host's
+   pin and ⛔ never from `Date.now()`. So `outputs` is the instruction and `evaluatedAsOf` is the
+   check: ⛔ `files_list` says what is **on disk** and never which of it is **yours**, and a roster
+   read off a directory listing is a roster nobody promised you — the host promised you `outputs`.
 
 ### The counts are reports and are never added together — and you count three of them
 

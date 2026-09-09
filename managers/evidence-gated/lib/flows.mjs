@@ -99,6 +99,59 @@ const tail = [
   { calls: ['WebSearch', 'WebFetch'], kind: 'tool' },
   { calls: ['observation_file'], kind: 'tool' },
   { calls: ['observationLedger'], kind: 'operation' },
+  /**
+   * ⛔ **The stage that finishes a candidate, and it was missing from the spine
+   * exactly as the consensus step was (#243).** Every gate that opens a position
+   * has been here since #226 and `variantViewCheck` judges them; nothing
+   * produced **the document they judge.** Measured on
+   * `run_bb689b6199084b04afd8b0e1d1528cda`: 157 names screened across both
+   * markets, 42 eligible, four pushed to `variantViewCheck`, all four declined,
+   * **0 registered** — and `267260` stopped at `1 of 4`.
+   *
+   * ⚠️ **Two steps, because they answer two questions.** `candidateQueue`
+   * decides *which* candidate is carried — per lens, since one score ordering
+   * three lenses is #242 — and `candidateCompletion` reads whether the document
+   * was actually written. ⚠️ The order is the fix, the same way #146's is: the
+   * queue names what this run owes before the run can decide it owes nothing,
+   * and `candidateCompletion` is fed that list rather than a number of its own.
+   *
+   * ⚠️ **It is last on purpose.** The record it checks needs the two steps above
+   * it — a `consensusRefs` row is filed by `observation_file` and ledgered by
+   * `observationLedger` — so a completion stage placed before them would ask for
+   * a document one of whose four requirements could not yet exist.
+   */
+  { calls: ['candidateQueue'], kind: 'operation' },
+  { calls: ['candidateCompletion'], kind: 'operation', feeds: [feed('candidateQueue', 'owesDocument')] },
+  /**
+   * ⛔ **The boundary moves during the run, so the verdict about it is last
+   * (#246).** `coverage` was step 2 of the sleeve's own preamble — before this
+   * branch had run and therefore before any extension it discovers exists — and
+   * at that moment `extensions: []` makes `complete: true` *honest*. Then the
+   * run registers an extension and the record and the verdict disagree.
+   *
+   * ⚠️ **Two flows did it in the same run, which is what makes it a procedure
+   * rather than an accident.** Measured on `run_bb689b6199084b04afd8b0e1d1528cda`
+   * (2026-09-09): `kr-sleeve` persisted `extensions: ["001440"]` and `us-sleeve`
+   * `["LEU"]`, and both reported `coverage.complete: true` / `uncovered: []`.
+   * The orchestrator re-called `coverage` with those names in the universe and
+   * both flipped — KR 77/75/74 → `complete: false`, `uncovered: ["001440"]`;
+   * US 85/84/83 → `uncovered: ["LEU"]` — because neither name had a
+   * `prices/daily` disposition and `coverageState` counts exactly that.
+   *
+   * ⚠️ **`researchState` is a step for the reason `catalystRegister` is.** It was
+   * a sentence in a paragraph below the checklist, so nothing ordered it against
+   * anything; declaring it here is what makes «after» a fact a verifier can
+   * execute rather than an adverb in prose.
+   *
+   * ⛔ **No `feed` between them, and the absence is deliberate.** `researchState`
+   * answers `nextState.rows[]` — `{symbol, market, observedAt, evidenceIds,
+   * sector, extension}` — and `coverage` takes `extensions` as bare symbol
+   * strings; a declared wire between two shapes that do not match would be the
+   * vacuous kind of assertion this file exists to replace. What is declared here
+   * is the **order**, which is the whole of what #246 asks for.
+   */
+  { calls: ['researchState'], kind: 'operation', carriedIn: 'coverage/research-index' },
+  { calls: ['coverage'], kind: 'operation' },
 ]
 
 export const FLOWS = {

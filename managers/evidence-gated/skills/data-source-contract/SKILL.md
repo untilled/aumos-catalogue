@@ -186,6 +186,21 @@ complete, and this package holds no market-hours table with which to tell the tw
 *«say which session this verdict stands on»*, and note that on the corrected prescription above it
 does not appear at all.
 
+⛔ **A second family the same shape check misses: the series, not the bar** (#248). Every bar can be
+complete and the two hundred of them still not belong to one price history — an unadjusted split, or
+a vendor adjustment factor that stops part-way through the window. Measured on the 2026-09-09 US
+sweep: **BKNG** `close` 193.29 against `ma200` **2,316.55** (`offHigh200` −96.5%, `discoveryScore`
+20, all of it the artifact) and **VZ** `close` 50.14 against `low200` **10.5999** (`aboveLow200`
+**+373%**). What reports it is **`price_series_discontinuity_suspected`** (`info`), from the same
+four operations, over the last 200 bars — `close/ma200` outside [0.1, 10], `high200/low200` outside
+[1, 20], and the count of adjacent sessions whose log return exceeds ±50%. `indicators.discontinuity`
+carries that count on a clean name too, so *«nothing stepped»* is a fact you can read rather than an
+absence you have to interpret. ⚠️ It refuses nothing — a real 1:10 split has exactly this shape and
+its history is exactly right — so the prescription is a **procedure**: when the row appears, check
+the series against an adjusted source before reading any distance as a fall, and say in the thesis
+which source answered. ⛔ Do not re-derive the factor yourself and do not rescale the rows; a series
+you re-based is one nobody downstream can attribute.
+
 ⚠️ **None of this touches the whole-universe sweep.** `source_cache_refresh` on `prices`/`daily`
 never hands back a bar that has not closed — that route's own rule is *«the newest bar you can read
 is yesterday's»* — and it is the route the sleeves require. This section is about the bars a run

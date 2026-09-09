@@ -1523,6 +1523,21 @@ function portfolioHeat({ positions, proposed, cap, grandfather, diagnostics }) {
  * axis is the Mandate's `maxPositionWeight` and is untouched. The comment in
  * `accumulate` states the boundary and why it stops there.
  */
+/**
+ * The three caps that have a wrong place to be declared in, and where those
+ * places are. ⛔ `position` and `portfolioHeat` are the Mandate's and
+ * `config.schema.json` declares neither, so neither is here (#251 ①).
+ */
+export const MISPLACEABLE_CAPS = Object.freeze(['sector', 'theme', 'factor'])
+
+/** Where this axis's threshold was declared instead of `caps`, or `null`. */
+function misplacedCapPath(kind, config) {
+  if (!MISPLACEABLE_CAPS.includes(kind)) return null
+  if (finite(config?.[kind])) return `config.${kind}`
+  if (finite(config?.concentration?.[kind])) return `config.concentration.${kind}`
+  return null
+}
+
 export function concentration({ positions = [], proposed = [], caps = {}, config = {}, portfolioNav = null, portfolioNavCurrency = null }) {
   const diagnostics = []
   const grandfather = grandfatherPolicy(config)
@@ -1597,10 +1612,55 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
   const finalNonCore = accumulate([...standing, ...proposed], { nonCoreOnly: true })
 
   const breaches = []
+  const unmeasuredAxes = []
   for (const [kind, map] of Object.entries(totals)) {
     const cap = caps[kind]
     if (!finite(cap)) {
-      diagnostics.push(diagnostic('concentration_cap_missing', 'unevaluated', `Missing ${kind} cap`, `caps.${kind}`))
+      /**
+       * ── «Nobody declared it» and «it is in the wrong place» are two facts
+       *    (#251 ①) ────────────────────────────────────────────────────────
+       *
+       * `concentration_cap_missing` said only the first, and a run that had
+       * declared all three thresholds — and put them in `config` — was answered
+       * with it three times. ⚠️ **`unevaluated` is not a pass, and that answer
+       * reads as one anyway**: `breaches` comes back empty and `exposures`
+       * comes back populated, so sector, theme and factor look measured and
+       * clear. Measured on `run_bb689b6199084b04afd8b0e1d1528cda`, where
+       * `caps` carried the two Mandate numbers and the other three sat in
+       * `config`.
+       *
+       * ⚠️ **Two wrong places, and the second is the likelier one.** The
+       * investor's numbers genuinely live at `config.concentration.{sector,
+       * theme,factor}` — that is `config.schema.json`, and it says so — and a
+       * caller who hands its `config` block straight through has put them
+       * somewhere real that this operation does not read. `config.<axis>` at
+       * the top is the other, and it is the shape `scheduleBuffers` already
+       * refuses one operation over.
+       *
+       * ⛔ **`blocked`, on the same judgement `scheduleBuffers` made.** No
+       * legitimate call is refused by it: nothing in this package reads a
+       * threshold from either of those two paths, so a call that carries one
+       * has already lost the axis whatever this says. Answering `unevaluated`
+       * a fourth way would leave the reversed reading — three clean axes —
+       * standing beside it.
+       *
+       * ⛔ Only the three. `position` is the Mandate's `maxPositionWeight` and
+       * `portfolioHeat` its `maxDrawdown`; `config.schema.json` deliberately
+       * declares neither, so neither has a wrong place in `config` to be found
+       * in.
+       */
+      const declaredAt = misplacedCapPath(kind, config)
+      if (declaredAt === null) diagnostics.push(diagnostic('concentration_cap_missing', 'unevaluated', `Missing ${kind} cap`, `caps.${kind}`))
+      else {
+        diagnostics.push(diagnostic(
+          'concentration_caps_misplaced',
+          'blocked',
+          `The ${kind} threshold is declared at \`${declaredAt}\` and this operation reads the caps from \`caps\`. Passed there it is read by nothing: the ${kind} axis is accumulated, reported in \`exposures\`, and compared against no cap — so \`breaches\` comes back empty for it and the answer reads as measured and clear. Put all five in \`caps\`: position and portfolioHeat from the Mandate, sector, theme and factor from config.concentration`,
+          `caps.${kind}`,
+          { axis: kind, declaredAt, declaredValue: config?.[kind] ?? config?.concentration?.[kind] ?? null, expected: `caps.${kind}`, misplaceableCaps: MISPLACEABLE_CAPS },
+        ))
+      }
+      unmeasuredAxes.push(kind)
       continue
     }
     for (const [key, weight] of map.entries()) {
@@ -1796,6 +1856,17 @@ export function concentration({ positions = [], proposed = [], caps = {}, config
        * whether or not that axis has a cap to be measured against.
        */
       unlabelled,
+      /**
+       * ⚠️ **The axes this answer did not measure, by name** (#251 ①). An empty
+       * `breaches` over a populated `exposures` is what a clean book looks
+       * like and also what an uncapped axis looks like, and a reader comparing
+       * five axes against two caps had to notice the absence to tell them
+       * apart. ⛔ Not a severity and not a refusal — those are
+       * `concentration_cap_missing` and `concentration_caps_misplaced` above;
+       * this is so the fact survives into a record that kept the data and
+       * dropped the diagnostics.
+       */
+      unmeasuredAxes,
       /** ⚠️ `null` unless the position cap is the **only** thing refusing this proposal. (#230) */
       unlockDelta: concentrationUnlock,
       /** The obligation that recommendation owes the proposal, in `effectivePositionCap`'s shape. (#230) */
@@ -2222,12 +2293,45 @@ export function mandateExecution({ mandateObjective = null, positions = [], prop
  * ⛔ An emergency exit is not funded, it produces cash: the whole section is
  * skipped rather than answered with a warning nobody can act on.
  */
-export function specialistBudget({ managerId = MANAGER_ID, flow, market, currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight, emergencyExit = false, sleeveCashByCurrency, portfolioNav, portfolioNavCurrency, fx }) {
+export function specialistBudget({ managerId = MANAGER_ID, flow, market, currentSleeveWeight, sleeveBudgetWeight, requestedSleeveTotalWeight, requestedTargetWeight, emergencyExit = false, sleeveCashByCurrency, sleeveParkedLiquidity, portfolioNav, portfolioNavCurrency, fx }) {
   const diagnostics = []
   /** ⚠️ The literal id, never the host's instance id — an `inst_…` refused the whole call against a contract that said only `managerId: "string"` (#177). */
   if (managerId !== MANAGER_ID) diagnostics.push(diagnostic('manager_id_unknown', 'blocked', `This package publishes one manager id and it is the literal \`${MANAGER_ID}\`, not the instance id the host addresses this manager by; the market roles are flows of it, named in \`flow\`, and omitting managerId is the safe call`, 'managerId', { managerId, expected: MANAGER_ID, supported: [MANAGER_ID] }))
   if (!SLEEVE_FLOW_MARKETS[flow]) diagnostics.push(diagnostic('flow_unknown', 'blocked', 'A sleeve flow is required; the allocator flow does not take a sleeve budget', 'flow', { flow, supported: Object.keys(SLEEVE_FLOW_MARKETS) }))
   else if (!SLEEVE_FLOW_MARKETS[flow].includes(market)) diagnostics.push(diagnostic('specialist_market_not_owned', 'blocked', 'Sleeve flow cannot allocate outside its market lane', 'market', { flow, market }))
+  /**
+   * ── ⛔ The key that read as an increment and meant a total (#251 ④) ────────
+   *
+   * `requestedTargetWeight` was the sleeve's **total** target weight and its
+   * name said «target», which a caller adding to a sleeve reads as the thing
+   * being added. Measured, in one run, by two subjects independently: the
+   * `us-sleeve` flow wanted a new 3% name on a sleeve standing at 0.31471199
+   * and passed `0.03`, which was read as *shrink this sleeve to three per
+   * cent* and came back `increaseWeight: −0.28471199`, `allowed: true`, **no
+   * diagnostic** — the reversed question answered confidently. The correct
+   * call was `0.34471199`, and it is refused as
+   * `specialist_sleeve_budget_exceeded` / `blocked`, which is the answer the
+   * run needed. `allocate` reached the same trap on its own and corrected
+   * itself.
+   *
+   * ⛔ **The old spelling is refused and never aliased.** Reading it as the new
+   * key would keep answering the reversed question — the defect is the *name*,
+   * so a silent alias preserves it exactly. Reading it as an increment would
+   * be worse still: two callers would then mean two things by one contract.
+   * So it stays **declared**, purely so that this sentence can be specific
+   * rather than the generic `input_shape_invalid` an undeclared key gets, and
+   * it is `blocked`, so `allowed` can never come back `true` for a call whose
+   * question this operation could not establish.
+   */
+  if (requestedTargetWeight !== undefined) {
+    diagnostics.push(diagnostic(
+      'sleeve_requested_weight_renamed',
+      'blocked',
+      'The key is `requestedSleeveTotalWeight`, and the rename is the whole correction: this number is the weight the **sleeve** is to stand at when the order fills — not the weight being added to it. A sleeve at 0.31 asking for a new 3% name states 0.34; stating 0.03 asked for the sleeve to be cut to three per cent, and that call came back allowed. ⛔ The old spelling is not read as the new one, because reading it would answer the same reversed question it always did',
+      'requestedTargetWeight',
+      { given: requestedTargetWeight, key: 'requestedSleeveTotalWeight', meaning: 'sleeve-total', retired: 'requestedTargetWeight' },
+    ))
+  }
   /**
    * ⚠️ **Which of the three is missing, by name** (issue #158). `kr-sleeve`
    * tried three spellings of the budget key against one `sleeve_budget_missing`
@@ -2235,17 +2339,21 @@ export function specialistBudget({ managerId = MANAGER_ID, flow, market, current
    * so the run's compliance with its own sleeve budget was never checked at
    * all. The unknown key is refused by the published contract; this says which
    * declared key the operation is still waiting for.
+   *
+   * ⛔ The retired spelling suppresses this row for its own key rather than
+   * adding a second one: one mistake, one sentence, and the sentence above
+   * already names the key that is waiting.
    */
-  const missingWeights = Object.entries({ currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight })
-    .filter(([, value]) => !finite(value))
+  const missingWeights = Object.entries({ currentSleeveWeight, sleeveBudgetWeight, requestedSleeveTotalWeight })
+    .filter(([key, value]) => !finite(value) && !(key === 'requestedSleeveTotalWeight' && requestedTargetWeight !== undefined))
     .map(([key]) => key)
-  if (missingWeights.length) diagnostics.push(diagnostic('sleeve_budget_missing', 'unevaluated', 'Current sleeve, Brief budget and requested target are required, and the sleeve budget is the Brief\'s `sleeveBudgetWeight`', missingWeights[0], { missing: missingWeights }))
-  if ([currentSleeveWeight, sleeveBudgetWeight, requestedTargetWeight].filter(finite).some((value) => value < 0)) diagnostics.push(diagnostic('sleeve_weight_negative', 'blocked', 'Sleeve weights cannot be negative', 'input'))
-  const increase = finite(requestedTargetWeight) && finite(currentSleeveWeight) ? requestedTargetWeight - currentSleeveWeight : null
-  if (!emergencyExit && finite(requestedTargetWeight) && finite(sleeveBudgetWeight) && requestedTargetWeight > sleeveBudgetWeight) diagnostics.push(diagnostic('specialist_sleeve_budget_exceeded', 'blocked', 'Specialist must ask Global for cross-market budget', 'requestedTargetWeight', { sleeveBudgetWeight }))
-  if (emergencyExit && finite(increase) && increase > 0) diagnostics.push(diagnostic('emergency_exit_cannot_increase', 'blocked', 'Emergency invalidation bypass only permits SELL/RESIZE down', 'requestedTargetWeight'))
+  if (missingWeights.length) diagnostics.push(diagnostic('sleeve_budget_missing', 'unevaluated', 'Current sleeve, Brief budget and the requested sleeve total are required, and the sleeve budget is the Brief\'s `sleeveBudgetWeight`', missingWeights[0], { missing: missingWeights }))
+  if ([currentSleeveWeight, sleeveBudgetWeight, requestedSleeveTotalWeight].filter(finite).some((value) => value < 0)) diagnostics.push(diagnostic('sleeve_weight_negative', 'blocked', 'Sleeve weights cannot be negative', 'input'))
+  const increase = finite(requestedSleeveTotalWeight) && finite(currentSleeveWeight) ? requestedSleeveTotalWeight - currentSleeveWeight : null
+  if (!emergencyExit && finite(requestedSleeveTotalWeight) && finite(sleeveBudgetWeight) && requestedSleeveTotalWeight > sleeveBudgetWeight) diagnostics.push(diagnostic('specialist_sleeve_budget_exceeded', 'blocked', 'Specialist must ask Global for cross-market budget', 'requestedSleeveTotalWeight', { sleeveBudgetWeight }))
+  if (emergencyExit && finite(increase) && increase > 0) diagnostics.push(diagnostic('emergency_exit_cannot_increase', 'blocked', 'Emergency invalidation bypass only permits SELL/RESIZE down', 'requestedSleeveTotalWeight'))
 
-  const funding = sleeveFunding({ market, sleeveCashByCurrency, portfolioNav, portfolioNavCurrency, fx })
+  const funding = sleeveFunding({ market, sleeveCashByCurrency, sleeveParkedLiquidity, portfolioNav, portfolioNavCurrency, fx })
   const judged = !emergencyExit && finite(sleeveBudgetWeight)
   if (judged && funding.missing.length) {
     diagnostics.push(diagnostic(
@@ -2259,16 +2367,22 @@ export function specialistBudget({ managerId = MANAGER_ID, flow, market, current
   const unfundable = (subject, path, needWeight, needAmount) => diagnostics.push(diagnostic(
     'sleeve_budget_not_fundable_in_currency',
     'unevaluated',
-    `The sleeve is paid in ${funding.sleeveCurrency} and this book does not hold that much of it; the difference exists only after an FX conversion or a sale in the other currency, and both are the allocate flow's judgement and the investor's approval`,
+    `The sleeve is paid in ${funding.sleeveCurrency} and this book does not hold that much of it, in cash or in parking; the difference exists only after an FX conversion or a sale in the other currency, and both are the allocate flow's judgement and the investor's approval`,
     path,
     {
       subject,
       sleeveCurrency: funding.sleeveCurrency,
       fundableAmount: round(funding.fundableAmount, 2),
+      /** ⚠️ Split, never summed away: the second is a sale and the first is not. */
+      fundableFromCash: round(funding.fundableFromCash, 2),
+      fundableFromParking: round(funding.fundableFromParking, 2),
       fundableWeight: round(funding.fundableWeight),
       requiredAmount: round(needAmount, 2),
-      shortfallAmount: round(needAmount - funding.fundableAmount, 2),
+      /** ⚠️ The number the verdict is decided on, at the precision it is printed in (#250 ②). */
+      shortfallAmount: funding.shortfallOf(needAmount),
       shortfallWeight: round(needWeight - funding.fundableWeight),
+      fundingRoute: funding.routeOf(needAmount),
+      fundingRoutes: SLEEVE_FUNDING_ROUTES,
       fxUsed: funding.fxUsed,
       fxBasis: funding.fxBasis,
     },
@@ -2281,15 +2395,40 @@ export function specialistBudget({ managerId = MANAGER_ID, flow, market, current
    * there. Reporting only the second would have said nothing on the run that
    * found this; reporting only the first would go quiet on a book whose budget
    * fits and whose particular order does not.
+   *
+   * ── The comparison is made where the answer is printed (#250 ②) ───────────
+   *
+   * ⚠️ **It was made in weight space against a 1e-9 tolerance, and that
+   * tolerance is finer than any budget a caller can express.** Measured, one
+   * control: `requiredAmount 294.02`, `fundableAmount 294.02`,
+   * `shortfallAmount 0` — and `budgetFundableInSleeveCurrency: false` with the
+   * code fired. Every weight in these runs is written to eight decimal places,
+   * which carries up to 5e-9 of error, five times the epsilon; at that book's
+   * NAV 5e-9 of weight is four hundredths of a cent. So **no budget value could
+   * pass this code quietly**, and `mandateExecution` booked an unresolved code
+   * on every run of the flow.
+   *
+   * The fix is not a larger epsilon — it is deciding the question on the number
+   * the answer reports. `shortfallOf` rounds the difference to the sleeve
+   * currency's printed precision and the verdict is `<= 0` of that, so the
+   * published `shortfallAmount` and the published verdict are one answer and
+   * cannot disagree. ⛔ `BUDGET_EPSILON` still guards `withinBriefBudget`,
+   * which is a ratio against a ratio and has no amount to be rounded to.
    */
+  const budgetNeedWeight = finite(sleeveBudgetWeight) && finite(currentSleeveWeight) ? sleeveBudgetWeight - currentSleeveWeight : null
+  const budgetNeedAmount = funding.amountOf(budgetNeedWeight)
+  const budgetShortfall = funding.shortfallOf(budgetNeedAmount)
   const fundableBudget = finite(currentSleeveWeight) && finite(funding.fundableWeight) ? currentSleeveWeight + funding.fundableWeight : null
-  if (judged && finite(fundableBudget) && sleeveBudgetWeight > fundableBudget + BUDGET_EPSILON) {
-    unfundable('sleeveBudget', 'sleeveBudgetWeight', sleeveBudgetWeight - currentSleeveWeight, funding.amountOf(sleeveBudgetWeight - currentSleeveWeight))
+  const budgetFundable = judged && finite(budgetShortfall) ? budgetShortfall <= 0 : null
+  if (budgetFundable === false) {
+    unfundable('sleeveBudget', 'sleeveBudgetWeight', budgetNeedWeight, budgetNeedAmount)
   }
-  const requestFundable = !emergencyExit && finite(increase) && finite(funding.fundableWeight)
-    ? increase <= funding.fundableWeight + BUDGET_EPSILON
+  const requestNeedAmount = funding.amountOf(increase)
+  const requestShortfall = funding.shortfallOf(requestNeedAmount)
+  const requestFundable = !emergencyExit && finite(increase) && finite(requestShortfall)
+    ? requestShortfall <= 0
     : null
-  if (requestFundable === false) unfundable('requestedTarget', 'requestedTargetWeight', increase, funding.amountOf(increase))
+  if (requestFundable === false) unfundable('requestedTarget', 'requestedSleeveTotalWeight', increase, requestNeedAmount)
 
   return {
     data: {
@@ -2298,18 +2437,51 @@ export function specialistBudget({ managerId = MANAGER_ID, flow, market, current
       market,
       allowed: !diagnostics.some((row) => row.severity === 'blocked'),
       increaseWeight: round(increase),
-      withinBriefBudget: finite(requestedTargetWeight) && finite(sleeveBudgetWeight) ? requestedTargetWeight <= sleeveBudgetWeight : null,
+      withinBriefBudget: finite(requestedSleeveTotalWeight) && finite(sleeveBudgetWeight) ? requestedSleeveTotalWeight <= sleeveBudgetWeight : null,
       emergencyExit,
       /** ⚠️ Derived from the market, never taken from the caller — aumos#689. */
       sleeveCurrency: funding.sleeveCurrency,
       sleeveCurrencyBasis: funding.sleeveCurrency ? 'market' : null,
       /** What this book actually holds in that currency, and the same as a weight. */
       fundableAmount: round(funding.fundableAmount, 2),
+      /**
+       * ── ⚠️ Two numbers and never their sum alone (#250 ①) ─────────────────
+       *
+       * Parking is in the numerator because it is money this sleeve already has
+       * in its own currency — the run that measured this had a sleeve fundable
+       * **entirely** out of its own short-duration holding and was told
+       * `budgetFundableInSleeveCurrency: false` four runs running, with the
+       * «shortfall» matching that sleeve's parked market value to the cent. But
+       * spending it is a **sale**, and a sale is a proposal the investor
+       * approves, so the two are reported apart: a reader who needs to know
+       * whether anything has to be sold reads `fundableFromParking` and
+       * `fundingRoute`, not the total.
+       *
+       * ⛔ `concentration` already takes `parkedLiquidity` off the sector, theme,
+       * factor and heat axes (#141); this operation was the one that did not
+       * know the concept at all.
+       */
+      fundableFromCash: round(funding.fundableFromCash, 2),
+      fundableFromParking: round(funding.fundableFromParking, 2),
       fundableWeight: round(funding.fundableWeight),
       /** The budget that can be reached without converting or selling the other sleeve. */
       fundableSleeveBudgetWeight: round(fundableBudget),
-      budgetFundableInSleeveCurrency: judged && finite(fundableBudget) ? sleeveBudgetWeight <= fundableBudget + BUDGET_EPSILON : null,
+      /** ⚠️ `<= 0` of the printed shortfall, so the two can never disagree (#250 ②). */
+      budgetFundableInSleeveCurrency: budgetFundable,
+      budgetShortfallAmount: budgetShortfall,
       requestFundableInSleeveCurrency: requestFundable,
+      /**
+       * ⚠️ **Which act pays for the budget, rather than the reader deriving it.**
+       * Before #250 a run had to compare the shortfall against the sleeve's
+       * parked market value by hand to learn that the money was there and only
+       * had to be sold. `cash` is also the answer when nothing has to be
+       * procured at all — a budget at or below the sleeve's current weight buys
+       * nothing — because that is the member of these four that names no sale
+       * and no conversion.
+       */
+      fundingRoute: funding.routeOf(budgetNeedAmount),
+      requestFundingRoute: funding.routeOf(requestNeedAmount),
+      fundingRoutes: SLEEVE_FUNDING_ROUTES,
       /** ⚠️ Where the rate came from; this package never sources one. */
       fxUsed: funding.fxUsed,
       fxBasis: funding.fxBasis,
@@ -2318,13 +2490,56 @@ export function specialistBudget({ managerId = MANAGER_ID, flow, market, current
         fundableWeight: 'portfolio-weight',
         fundableSleeveBudgetWeight: 'portfolio-weight',
         fundableAmount: 'sleeve-currency-major-units',
+        fundableFromCash: 'sleeve-currency-major-units',
+        fundableFromParking: 'sleeve-currency-major-units',
+        budgetShortfallAmount: 'sleeve-currency-major-units',
       },
     },
     diagnostics,
   }
 }
 
+/**
+ * ⚠️ **The tolerance for a ratio compared against a ratio, and nothing else.**
+ * `withinBriefBudget` is `requestedSleeveTotalWeight` against
+ * `sleeveBudgetWeight` — two weights, no amount, nothing to round to — so a
+ * float epsilon is the right instrument there. ⛔ It is **not** the instrument
+ * for fundability: that question has an amount and a currency, and deciding it
+ * here is what made a printed `shortfallAmount: 0` sit beside
+ * `budgetFundableInSleeveCurrency: false` (#250 ②).
+ */
 const BUDGET_EPSILON = 1e-9
+
+/**
+ * The precision the funding answer is printed in, and therefore the precision
+ * it is decided in. Both halves read this one number.
+ */
+const SLEEVE_AMOUNT_DIGITS = 2
+
+/**
+ * ── How the sleeve's next order gets paid for (#250 ③) ─────────────────────
+ *
+ * Four acts, ordered by what they cost the investor, and the answer is the
+ * first one that reaches:
+ *
+ * | route | what has to happen |
+ * |---|---|
+ * | `cash` | nothing. The sleeve's own currency is sitting idle — or the budget is at or below the sleeve's current weight and buys nothing at all |
+ * | `sell-parking-same-currency` | the sleeve sells its own short-duration holding. Same currency, no rate, **and a proposal the investor approves** |
+ * | `fx-conversion` | the book converts idle cash held in the other currency |
+ * | `cross-market-sale` | something in the other market has to be sold, and then converted |
+ *
+ * ⚠️ **The last two are `allocate`'s judgement and this operation says so
+ * rather than choosing.** What it does is stop a reader having to compare a
+ * shortfall against a parked market value by hand to find out which of the four
+ * they are in — which is the arithmetic the run that measured #250 did, four
+ * runs in a row, after being told the money was not there.
+ *
+ * ⛔ **Other-currency parking is `cross-market-sale` and not `fx-conversion`.**
+ * Reaching it needs a sale *and* a rate; calling it a conversion would price
+ * the more expensive act as the cheaper one.
+ */
+export const SLEEVE_FUNDING_ROUTES = Object.freeze(['cash', 'sell-parking-same-currency', 'fx-conversion', 'cross-market-sale'])
 
 /**
  * The procurement side of a sleeve budget: what this book holds in the currency
@@ -2334,8 +2549,21 @@ const BUDGET_EPSILON = 1e-9
  * inputs fail independently — a run may carry the cash and not the NAV — and
  * #158's whole finding is that a caller told only *something is missing* tries
  * spellings until it gives up.
+ *
+ * ⚠️ **Parking is a funding source and there was nowhere to write it** (#250 ①).
+ * `sleeveCashByCurrency` was the only numerator, so a sleeve fundable entirely
+ * out of its own same-currency short-duration holding reported
+ * `budgetFundableInSleeveCurrency: false` on every run — and the «shortfall»
+ * it named was that sleeve's parked market value. It is now read, in the same
+ * per-currency representation and through the same boundary folding, and split
+ * out in the answer because spending it is a sale and spending the cash is not.
+ *
+ * ⛔ **Absent parking is `{}` and never `missing`.** A book that parks nothing
+ * is the ordinary book, and demanding the key would answer
+ * `sleeve_budget_fundability_unevaluated` for every one of them. A key that was
+ * *handed over* and cannot be read is a different fact and is named.
  */
-function sleeveFunding({ market, sleeveCashByCurrency, portfolioNav, portfolioNavCurrency, fx }) {
+function sleeveFunding({ market, sleeveCashByCurrency, sleeveParkedLiquidity, portfolioNav, portfolioNavCurrency, fx }) {
   const sleeveCurrency = MARKET_CURRENCIES[market] ?? null
   /**
    * ⚠️ Per-currency cash is one internal type by the time it arrives (#212 ⑥):
@@ -2343,24 +2571,41 @@ function sleeveFunding({ market, sleeveCashByCurrency, portfolioNav, portfolioNa
    * `portfolio.cashByCurrency` carries were folded onto it at the boundary, and
    * the bare amount #174 is about is still refused by name — by
    * `input-shapes.mjs`' `sleeveCash`, which this operation's row already names.
+   * Parking arrives the same way, through the same two functions named a second
+   * time, so neither representation is read in two places.
    */
-  const totals = sleeveCashByCurrency === undefined || sleeveCashByCurrency === null ||
-    Array.isArray(sleeveCashByCurrency) || typeof sleeveCashByCurrency !== 'object' ||
-    Object.values(sleeveCashByCurrency).some((amount) => !finite(amount))
+  const perCurrency = (value) => value === undefined || value === null ||
+    Array.isArray(value) || typeof value !== 'object' ||
+    Object.values(value).some((amount) => !finite(amount))
     ? null
-    : sleeveCashByCurrency
+    : value
+  const totals = perCurrency(sleeveCashByCurrency)
+  const parked = sleeveParkedLiquidity === undefined || sleeveParkedLiquidity === null ? {} : perCurrency(sleeveParkedLiquidity)
   const navCurrency = typeof portfolioNavCurrency === 'string' && portfolioNavCurrency ? portfolioNavCurrency : null
   const usdKrw = finite(fx?.USDKRW) && fx.USDKRW > 0 ? fx.USDKRW : null
   const needsFx = sleeveCurrency !== null && navCurrency !== null && sleeveCurrency !== navCurrency
   const missing = []
   if (sleeveCurrency === null) missing.push('market')
   if (totals === null) missing.push('sleeveCashByCurrency')
+  if (parked === null) missing.push('sleeveParkedLiquidity')
   if (!finite(portfolioNav) || portfolioNav <= 0) missing.push('portfolioNav')
   if (navCurrency === null) missing.push('portfolioNavCurrency')
   if (needsFx && usdKrw === null) missing.push('fx.USDKRW')
   const fxBasis = missing.length ? null : needsFx ? 'input.fx.USDKRW' : 'not-required'
   if (missing.length) {
-    return { sleeveCurrency, missing, fundableAmount: null, fundableWeight: null, fxUsed: null, fxBasis, amountOf: () => null }
+    return {
+      sleeveCurrency,
+      missing,
+      fundableAmount: null,
+      fundableFromCash: null,
+      fundableFromParking: null,
+      fundableWeight: null,
+      fxUsed: null,
+      fxBasis,
+      amountOf: () => null,
+      shortfallOf: () => null,
+      routeOf: () => null,
+    }
   }
   /**
    * ⚠️ A currency this book holds nothing in is `0`, not «unknown». The cash
@@ -2368,17 +2613,48 @@ function sleeveFunding({ market, sleeveCashByCurrency, portfolioNav, portfolioNa
    * an absent row is the book saying there are no dollars, which is the finding
    * rather than a gap in it.
    */
-  const fundableAmount = totals[sleeveCurrency] ?? 0
+  const fundableFromCash = totals[sleeveCurrency] ?? 0
+  const fundableFromParking = parked[sleeveCurrency] ?? 0
+  const fundableAmount = fundableFromCash + fundableFromParking
+  /**
+   * What a conversion alone could reach: idle cash held in the **other**
+   * currencies, priced in the sleeve's. ⛔ Parking held elsewhere is not in this
+   * sum — reaching it is a sale as well as a rate, which is the fourth route.
+   */
+  const convertibleCash = Object.entries(totals)
+    .filter(([currency]) => currency !== sleeveCurrency)
+    .reduce((total, [currency, amount]) => {
+      const priced = convertCurrency(amount, currency, sleeveCurrency, usdKrw)
+      return finite(priced) ? total + priced : total
+    }, 0)
   const inNav = convertCurrency(fundableAmount, sleeveCurrency, navCurrency, usdKrw)
+  /** A portfolio weight priced in the sleeve's own currency. */
+  const amountOf = (weight) => (finite(weight) ? convertCurrency(weight * portfolioNav, navCurrency, sleeveCurrency, usdKrw) : null)
+  /**
+   * ⚠️ **The published number and the verdict are one value.** Rounded to the
+   * printed precision, so `shortfallAmount: 0` and «not fundable» cannot appear
+   * in the same answer — which they did, on every call this flow made (#250 ②).
+   */
+  const shortfallOf = (needAmount) => (finite(needAmount) ? round(needAmount - fundableAmount, SLEEVE_AMOUNT_DIGITS) : null)
+  const routeOf = (needAmount) => {
+    if (!finite(needAmount)) return null
+    if (round(needAmount - fundableFromCash, SLEEVE_AMOUNT_DIGITS) <= 0) return 'cash'
+    if (round(needAmount - fundableAmount, SLEEVE_AMOUNT_DIGITS) <= 0) return 'sell-parking-same-currency'
+    if (round(needAmount - (fundableAmount + convertibleCash), SLEEVE_AMOUNT_DIGITS) <= 0) return 'fx-conversion'
+    return 'cross-market-sale'
+  }
   return {
     sleeveCurrency,
     missing,
     fundableAmount,
+    fundableFromCash,
+    fundableFromParking,
     fundableWeight: finite(inNav) ? inNav / portfolioNav : null,
     fxUsed: needsFx ? usdKrw : null,
     fxBasis,
-    /** A portfolio weight priced in the sleeve's own currency. */
-    amountOf: (weight) => (finite(weight) ? convertCurrency(weight * portfolioNav, navCurrency, sleeveCurrency, usdKrw) : null),
+    amountOf,
+    shortfallOf,
+    routeOf,
   }
 }
 

@@ -539,6 +539,27 @@ three-way split.
   single-name variant view.
 - `existing-position`: thesis/weight/exit review, not a new-entry scanner result.
 
+⛔ **Research in each lens's own order, never in `discoveryScore` order.** That number is the
+fraction of the **mean-reversion** signal set a name fires, so a candidate above its MA200 scores
+**structurally zero** — and researching by score spent every run on the deepest drawdowns and never
+reached the two lenses that require an intact trend (#242, measured: `316140` eligible under
+`trend-pullback` at `ma200Distance` +7.8%, score 0, nothing done). ⚠️ **The sign was also backwards
+against the one result this methodology has**: the ported original chose its name for being the
+*least* fallen of the scan candidates. Call **`candidateQueue`** with the `scan` rows and take the
+top of **each** lens's queue; each lens declares the measurement that orders it and the three are
+deliberately not on one scale. ⛔ There is no «top N of the roster», and a rank is not a screen.
+
+⛔ **Then carry the top candidate of each lens to a complete record, and decline it only after that
+record exists** (#243). Call **`candidateCompletion`** with `candidateQueue`'s `owesDocument` and one
+`records` row per document written. The gates below are not too strict — the +18.6pp original
+satisfied all four by hand — and what was missing was the stage that produces what they judge:
+measured on `run_bb689b6199084b04afd8b0e1d1528cda`, 157 names screened, 42 eligible, four pushed to
+`variantViewCheck`, all four declined, **0 registered**. ⚠️ A decline is an outcome of this stage and
+never a failure of it; a *carried* name with no document is `candidate_completion_absent`, and this
+run may then not report `no-candidate-cleared-the-gates` over that lane. «1 of 4» does not say
+«judged and declined» — it says «there was nothing to judge», and those are two different states of
+this book. `skills/candidate-research/SKILL.md` §Candidate record owns what goes in the document.
+
 ⚠️ **This branch is the control arm, not the strategy.** Oversold and pullback are the most
 arbitraged signals there are, run by institutions at lower cost over large caps where there is no
 capacity advantage to hide in. `controlArmLane` requires the exit discipline registered before
@@ -638,7 +659,12 @@ CIK) → `mapCorporationCodes` → `fundamentalsPlan` → `source_cache_read` / 
   from a future document to a basis that exists. ⛔ The ported-from harness's measured medians
   (KR 45 days, US 30) are the precedent for the *method*: under the floor this refuses to estimate
   rather than borrowing them. ⛔ An estimate on `catalysts`, or on `estimated` without saying it is
-  one, is `catalyst_estimate_unmarked` and blocked. ⛔ **And nothing derived reaches `actual`** —
+  one, is `catalyst_estimate_unmarked` and blocked; ⛔ **and so is the same `(market, symbol, event)` on
+  both arrays** — the fold keeps the confirmed copy under that key, so a second copy with the markers
+  stripped registers the projection as a date somebody read, which is the one shape that used to get
+  through (#249). ⚠️ **Hand over `registerAs.estimated` and compose nothing**: the cadence answer
+  carries its rows under the argument name that takes them, and `estimated[]` is published field for
+  field on `inputContracts`. ⛔ **And nothing derived reaches `actual`** —
   `post-event-continuation` needs a real announcement record from the corporate-actions route and
   stays honestly empty until it has one; a cadence says when a filer will probably speak, never what
   it said. ⚠️ A derived window does not make a name researched: `coverage.researched` and
@@ -720,14 +746,17 @@ absence.
 | axis | operation | ⛔ what an undeclared or unpassed input answers |
 |---|---|---|
 | position cap, portfolio heat | `concentration` (`caps.position` = `maxPositionWeight`, `caps.portfolioHeat` = `maxDrawdown`) | `unevaluated`, which is **not a pass** — say so in `uncertainty` rather than sizing as though the limit were absent |
+| sector, theme, factor caps | `concentration`, and **all five caps go in `caps`** — these three are `config.concentration.{sector,theme,factor}`, read out of the settings and passed **as `caps`** | `concentration_caps_misplaced` / **blocked** if they are passed in `config` instead, because the alternative reads as a pass: an unread cap leaves its axis in `exposures` and compared against nothing, so `breaches` comes back empty and three unmeasured axes look clear. Declared nowhere is `concentration_cap_missing` / `unevaluated`, which is also not a pass; `unmeasuredAxes` names either case |
 | sector / theme / factor | `concentration` labels on the rows | `concentration_labels_unstated` / `unevaluated`: an empty axis is *nobody said what this is*, never *measured and under the cap* |
-| sleeve budget | `specialistBudget`, with the procurement side passed | `sleeve_budget_fundability_unevaluated` — `withinBriefBudget: true` without it is a claim about a budget nobody has shown can be bought |
+| sleeve budget | `specialistBudget`, with the procurement side passed — the cash **and** `sleeveParkedLiquidity` | `sleeve_budget_fundability_unevaluated` — `withinBriefBudget: true` without it is a claim about a budget nobody has shown can be bought. ⚠️ Omitting the parking is not a refusal and it *understates* what the sleeve can pay: read `fundingRoute` for which act pays — `cash`, `sell-parking-same-currency`, `fx-conversion`, `cross-market-sale` — and `fundableFromCash` / `fundableFromParking` for the two halves, because selling parking is a proposal the investor approves |
+| the sleeve total | `specialistBudget.requestedSleeveTotalWeight` — the weight the **sleeve** stands at once the order fills, never the increment being added | a sleeve at 0.31471199 taking a new 3% name states **0.34471199**. Stating `0.03` asks for the sleeve to be cut to three per cent; the retired name `requestedTargetWeight` is `sleeve_requested_weight_renamed` / **blocked** and is never read as this key |
 | sleeve NAV | `sleeveNav`, with `valueCurrency` where the mark is in something else | `marketValue` is read as already being in the position's own currency; check `marketValueBasis` for which reading was used |
 | single-name total | `singleNameBudget` | `single_name_budget_unevaluated`, never an unlimited lane |
 | cash | `effectiveCashFloor`, against `projectedCashWeight` — the cash weight **after** everything this run proposes | `cash_floor_unevaluated` (not "no floor"); an uncomputed projection is `cash_floor_projection_missing` rather than a pass |
 
 On top of the Mandate's numbers apply the configured sector/theme/factor thresholds, which may be
-stricter and never looser. ⚠️ **A floor is not a target** — `effectiveCashFloor`'s `headroomWeight` is
+stricter and never looser — **passed in `caps` beside the Mandate's two, never left in `config`**,
+where nothing reads them and the axis comes back looking measured. ⚠️ **A floor is not a target** — `effectiveCashFloor`'s `headroomWeight` is
 what may be deployed, not what should be. ⚠️ **A budget is what the Mandate permits, never what the
 book should hold.** ⚠️ **A sleeve budget is a (weight, currency) pair and only the weight is written
 down**: the ratio has no currency, but the cash that pays for it is the currency the sleeve's market
@@ -886,6 +915,19 @@ row — it folds at arming time, comparing `kind`, `subject`, `intent` and `trig
 wrote, with `expiresAt` deliberately not part of it. ⬜ Merged is not shipped: an older host keeps the
 duplicate, which is why the depth read from `standingPlans` is something to **report** and never a
 reason to arm less.
+
+⚠️ **So arm a stop with the `intent`, `subject` and `trigger` `exitDiscipline` returns on the row —
+verbatim, and never a sentence of your own.** The four fields the fold compares are all on
+`watchesToRegister` now; composing any of them yourself is composing them differently next run.
+Measured: one `SGOV` stop stood **twice** because the prose beside a byte-identical trigger had grown
+from 162 characters to 231 — and the added sentence was an explanation of the fold, naming the plan id
+the fold was meant to retire. ⛔ **Everything about *this* judgement belongs elsewhere**: why this
+price is the level goes in `priceLevels[].reason`, and what you concluded this run goes in
+`rationale`. Both are read by the investor; neither is part of any identity. ⛔ And never rewrite the
+`Money`: the same ₩104,254.40 written `exponent: 2` by one run and `exponent: 1` by the next is two
+promises to a host that compares structure, so copy `trigger.price` rather than building it from
+`threshold`. ⚠️ A `price-below` is **not** folded when it fires either, so a duplicate stop opens two
+wakes on one breach.
 
 **Reconcile before you arm.** Read `run/armed-reviews` and pass **the whole value you read** as
 `previous`, the sequence as `sequence`, and the invocation's `standingPlans` **verbatim** as

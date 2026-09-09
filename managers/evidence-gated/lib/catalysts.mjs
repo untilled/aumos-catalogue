@@ -309,13 +309,55 @@ export function catalystRegister({ market, previous = null, catalysts = [], esti
   }
   /** ⚠️ Also the other direction: an estimate handed to the observed argument is the same defect, and reading it as a confirmed window is the failure this whole split exists to prevent. */
   const marked = catalysts.filter((row) => row?.dateSource === CATALYST_DATE_ESTIMATED || row?.cadenceBasis !== undefined).length
-  if (unmarkedEstimates || marked) {
+
+  /**
+   * ── The third shape, which registered and then lied about what it was (#249) ─
+   *
+   * ⚠️ **The two refusals above are both about one row, and the defect measured
+   * on `run_bb689b6199084b04afd8b0e1d1528cda` was about two.** us-sleeve tried
+   * three shapes for this book's first derived window (medianLag 32d over 21
+   * filings, measured from its own cache) and reported all three:
+   *
+   *   the cadence row on `catalysts`            → `catalyst_estimate_unmarked` · blocked
+   *   the cadence row on `estimated` only       → refused for a shape reason
+   *   **the window on both, markers stripped from the `catalysts` copy** →
+   *       **registered**, with `dateSource` reading `"observed"`
+   *       (`withConfirmedCatalystInHorizon: 1` / `withEstimatedCatalystInHorizon: 0`)
+   *
+   * The third one is the worst of the three and it was the only one that got
+   * through. Neither check above sees it: the `catalysts` copy carries no
+   * `dateSource` and no `cadenceBasis`, so it is a perfectly ordinary observed
+   * row, and the fold below then does exactly what it is written to do — a
+   * confirmed window is never replaced by an estimate — and keeps the copy that
+   * says a projection is a date somebody read. The flow read the result and
+   * declined to store it, so the axis stayed unfed and the window was computed
+   * and thrown away.
+   *
+   * ⛔ **A new code would be the wrong answer.** `catalyst_estimate_unmarked`
+   * exists to stop precisely this reading, and its two existing arms are the
+   * two ways one row can produce it; this is the third, and the fix a reader
+   * needs is the same one — send the window on `estimated` and on nothing else.
+   *
+   * ⚠️ **Keyed on `(market, symbol, event)`, which is the key the fold uses**,
+   * so what is refused is exactly the pair that would have collided. ⛔ Not on
+   * the window instants: a caller that rounded one copy's `windowEnd` by a
+   * millisecond would escape the check while producing the identical record.
+   */
+  const windowKeyOf = (row) => (
+    compactString(row?.symbol, 32) && (row?.market === 'kr' || row?.market === 'us') && compactString(row?.event, MAX_EVENT_LABEL)
+      ? `${row.market}:${row.symbol}:${row.event}`
+      : null
+  )
+  const observedKeys = new Set(catalysts.map(windowKeyOf).filter((key) => key !== null))
+  const onBothArrays = [...new Set(estimated.map(windowKeyOf).filter((key) => key !== null && observedKeys.has(key)))]
+
+  if (unmarkedEstimates || marked || onBothArrays.length) {
     diagnostics.push(diagnostic(
       'catalyst_estimate_unmarked',
       'blocked',
-      `An estimated window must arrive on \`estimated\` carrying \`dateSource: "${CATALYST_DATE_ESTIMATED}"\` and the \`cadenceBasis\` it was derived from, and an observed window must carry neither — an estimate that does not say it is one is registered as a confirmed date, which is the one reading this axis must never produce`,
+      `An estimated window must arrive on \`estimated\` carrying \`dateSource: "${CATALYST_DATE_ESTIMATED}"\` and the \`cadenceBasis\` it was derived from, and an observed window must carry neither — an estimate that does not say it is one is registered as a confirmed date, which is the one reading this axis must never produce. ⛔ **And the same window may not arrive on both arrays**: the fold keeps the confirmed copy under a \`(market, symbol, event)\` key, so a projection sent twice is registered once as a date somebody read. Send it on \`estimated\` and on nothing else — \`catalystCadence\` hands back \`registerAs\` for exactly that call`,
       unmarkedEstimates ? 'estimated' : 'catalysts',
-      { unmarked: unmarkedEstimates, estimatesOnObservedInput: marked, of: estimated.length + catalysts.length },
+      { unmarked: unmarkedEstimates, estimatesOnObservedInput: marked, onBothArrays, of: estimated.length + catalysts.length },
     ))
   }
   if (invalidEstimates) {
@@ -647,7 +689,8 @@ export function catalystCadence({ market, documents = {}, evidence = {}, roster 
       { basisFilings, basisSymbols, floor: MIN_BASIS_FILINGS },
     ))
     return {
-      data: { market, estimated: [], cadence: null, coverage: { rosterCount: rosterOf(roster).length, derived: 0, basisSymbols, uncited }, horizonDays, eventsProduced: false, eventProductionReason: EVENT_PRODUCTION_REASON, asOf },
+      /** ⚠️ `registerAs` is present here too, holding nothing: «no window was derived» is an answer, and a key that disappears on one branch is a key whose absence has to be interpreted. */
+      data: { market, estimated: [], registerAs: { estimated: [] }, cadence: null, coverage: { rosterCount: rosterOf(roster).length, derived: 0, basisSymbols, uncited }, horizonDays, eventsProduced: false, eventProductionReason: EVENT_PRODUCTION_REASON, asOf },
       diagnostics,
     }
   }
@@ -729,6 +772,29 @@ export function catalystCadence({ market, documents = {}, evidence = {}, roster 
       market,
       /** The rows `catalystRegister` takes as `estimated`. ⛔ Never as `catalysts`: they are not readings. */
       estimated,
+      /**
+       * ── The call, ready to make (#249) ────────────────────────────────────
+       *
+       * ⚠️ **The same array under the argument name that takes it**, which is
+       * the `priceLevelsToRegister` / `watchesToRegister` pattern: the reading
+       * side of this package publishes the shape, and the writing side hands
+       * back something a run can pass without composing anything. It is not a
+       * second answer — it is `estimated` above, by reference, so the two
+       * cannot disagree.
+       *
+       * ⚠️ It is the whole of what this operation may fill in. `market`,
+       * `roster` and `previous` are the caller's: the first two it already
+       * passed here, and `previous` is the revision it read out of
+       * `research/catalyst-window` — an operation that invented one would be
+       * offering to overwrite a register it never read.
+       *
+       * ⛔ **And it carries no `catalysts` key at all.** The absence is
+       * structural, for the reason the answer carries no `events` key: the one
+       * shape that registered and lied was this window on `catalysts` as well
+       * as here, so a document that mentions both arguments in one object is
+       * the shape #249 measured, written down as an example.
+       */
+      registerAs: { estimated },
       cadence: {
         ...cadence,
         leadDays,

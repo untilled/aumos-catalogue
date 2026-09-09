@@ -10,7 +10,7 @@ import { METHODOLOGY } from '../managers/evidence-gated/lib/constants.mjs'
 import { GRANDFATHER_DEFAULTS } from '../managers/evidence-gated/lib/diagnostics.mjs'
 import { OPERATIONS, PUBLISHED_OPERATIONS, INTERNAL_OPERATIONS, SUBSUMED_BY, assertRegistered } from '../managers/evidence-gated/lib/operations.mjs'
 import { labelAxes, sessionRows } from '../managers/evidence-gated/lib/input-shapes.mjs'
-import { canonicalizeInput, INPUT_VOCABULARY } from '../managers/evidence-gated/lib/input-contracts.mjs'
+import { canonicalizeInput, INPUT_VOCABULARY, NESTED_CONTRACTS } from '../managers/evidence-gated/lib/input-contracts.mjs'
 import { FLOWS, numberedSteps, stepOf, wiringFaults, applyFeeds } from '../managers/evidence-gated/lib/flows.mjs'
 import { CATALYST_MEMORY_KEY, CATALYST_EPOCH_FIELDS } from '../managers/evidence-gated/lib/catalysts.mjs'
 import { renderOperations, checkOperations } from './generate-evidence-gated-operations.mjs'
@@ -53,6 +53,7 @@ const globalIntegration = JSON.parse(await readFile(new URL('global/integration.
 const research = JSON.parse(await readFile(new URL('research-contract.json', fixtureRoot), 'utf8'))
 const observationContract = JSON.parse(await readFile(new URL('observation-contract.json', fixtureRoot), 'utf8'))
 const catalystContract = JSON.parse(await readFile(new URL('catalyst-contract.json', fixtureRoot), 'utf8'))
+const priceArtifacts = JSON.parse(await readFile(new URL('price-artifacts.json', fixtureRoot), 'utf8'))
 
 /**
  * ── Coverage names that have to be earned (issue #70 §4) ───────────────────
@@ -312,6 +313,99 @@ assert.deepEqual(
   scannerGolden.expected.meanSignals,
 )
 
+/**
+ * ── The series whose shape is valid and whose history is wrong (#248) ──────
+ *
+ * The legacy scanner fixture above is the clean case, and it is what made this
+ * one invisible: its numbers agree with the price they were taken over, so no
+ * assertion in this file had ever compared a derived level against its own
+ * series. The 2026-09-09 US sweep answered `ma200` 2,316.55 against a `close`
+ * of 193.29 and `aboveLow200` of +373%, and every existing bar defence passed
+ * both — the bars parse, the averages compute, and `discoveryScore` read
+ * `offHigh200` and `ma200Distance` off a fall no session printed.
+ *
+ * ⚠️ **What is asserted is that it is reported, not that it is refused.** The
+ * status stays `ok`, `discoveryScore` is whatever the series gives, and the
+ * severity is `info` — a name that really did split has exactly this shape and
+ * its history is exactly right. The defect the issue names is that the reader
+ * had no way to tell, so the assertion is that the reader is now told.
+ */
+covers('scanner/price-series-discontinuity')
+
+/**
+ * Bars from a case's own generator. ⚠️ It refuses a generator shape it does not
+ * recognise rather than falling through to a flat series: a fixture that
+ * silently produced 260 identical closes would assert that a clean series is
+ * clean, under the name of the case it was meant to reproduce.
+ */
+function artifactBars(generator, asOf) {
+  const start = Date.parse(asOf) - generator.count * 86_400_000
+  const closeAt = (index) => {
+    if (generator.stepAtIndex !== undefined) return index < generator.stepAtIndex ? generator.preStepClose : generator.postStepClose
+    if (generator.artifactAtIndex !== undefined) return index === generator.artifactAtIndex ? generator.artifactClose : generator.baseClose
+    if (generator.firstClose !== undefined) return generator.firstClose * (generator.lastClose / generator.firstClose) ** (index / (generator.count - 1))
+    throw new Error('unrecognised price-artifact generator shape')
+  }
+  return Array.from({ length: generator.count }, (_, index) => {
+    const close = closeAt(index)
+    return {
+      timestamp: new Date(start + index * 86_400_000).toISOString(),
+      open: close,
+      high: close * generator.highFactor,
+      low: close * generator.lowFactor,
+      close,
+      volume: generator.volume,
+    }
+  })
+}
+
+for (const artifact of priceArtifacts.cases) {
+  const bars = artifactBars(artifact.generator, priceArtifacts.asOf)
+  /** ⛔ The premise first: every bar is complete, so this is not a case the row-level defences could have caught. */
+  assert.ok(
+    bars.every((bar) => [bar.open, bar.high, bar.low, bar.close, bar.volume].every((value) => Number.isFinite(value) && value >= 0) && bar.high >= bar.low),
+    `${artifact.name}: every bar is complete and numeric — this is the shape-valid, data-wrong family and \`bar_value_invalid\` passes it`,
+  )
+  const measured = execute({ operation: 'indicators', asOf: priceArtifacts.asOf, input: { bars } })
+  assert.equal(measured.status, 'ok', `${artifact.name}: the answer stands — this reports and refuses nothing`)
+  const found = measured.data.indicators.discontinuity
+  assert.equal(found.suspected, artifact.expected.suspected, `${artifact.name} is suspected`)
+  assert.deepEqual(found.reasons.sort(), [...artifact.expected.reasons].sort(), `${artifact.name}: the readings that fired are the ones the case was built for`)
+  assert.equal(found.jumpCount, artifact.expected.jumpCount, `${artifact.name}: the count of adjacent sessions beyond ±50% is carried in the answer`)
+  const row = measured.diagnostics.find((item) => item.code === 'price_series_discontinuity_suspected')
+  assert.ok(row, `${artifact.name} raises the code`)
+  assert.equal(row.severity, 'info', `${artifact.name}: ⛔ info — the judgement is the reader\'s, and a real split is not an error`)
+  assert.equal(row.details.jumpCount, artifact.expected.jumpCount, 'the diagnostic carries the same reading the packet does, because it is the same object')
+  if (artifact.expected.closeToMa200Below !== undefined) {
+    assert.ok(found.closeToMa200 < artifact.expected.closeToMa200Below, `${artifact.name}: close/ma200 is outside the bound, which is BKNG\'s reading`)
+  }
+  if (artifact.expected.high200ToLow200Above !== undefined) {
+    assert.ok(found.high200ToLow200 > artifact.expected.high200ToLow200Above, `${artifact.name}: the window extremes disagree even though no single session stepped`)
+    assert.equal(found.jumpCount, 0, '⚠️ and this is why the ratio readings are kept: a smeared adjustment has no jump to count')
+  }
+  if (artifact.expected.low200 !== undefined) {
+    assert.equal(measured.data.indicators.low200, artifact.expected.low200, `${artifact.name}: the measured low200 is reproduced exactly`)
+    assert.equal(measured.data.indicators.aboveLow200, artifact.expected.aboveLow200, 'and so is the +373% it produced')
+  }
+}
+
+/**
+ * ⚠️ **And the clean series says so.** `jumpCount: 0` on a name with nothing
+ * wrong is the half of this that a reader needs: a field that only appears when
+ * something is broken is a field whose absence has to be interpreted, and the
+ * legacy scanner fixture — a 200-bar decline of 1.25 a day — is the series this
+ * package has always called clean.
+ */
+covers('scanner/price-series-discontinuity')
+assert.equal(scannerOutput.data.indicators.discontinuity.suspected, false, 'the legacy scanner series is coherent and is reported as coherent')
+assert.equal(scannerOutput.data.indicators.discontinuity.jumpCount, 0)
+assert.deepEqual(scannerOutput.data.indicators.discontinuity.reasons, [])
+assert.equal(
+  scannerOutput.diagnostics.some((row) => row.code === 'price_series_discontinuity_suspected'),
+  false,
+  '⛔ and a clean series raises nothing, so the row fires exactly when a series steps',
+)
+
 covers('owner-cutover/single-manager-three-flows')
 assert.equal(topology.managerId, manifest.id, 'topology names the one published manager id')
 assert.equal(topology.flows.length, 3, 'package runs KR, US and allocator flows')
@@ -473,9 +567,9 @@ const strata = execute({ operation: 'oversoldStrata', asOf: '2026-12-31T00:00:00
 assert.equal(strata.data.symbolsUsed, backtest.expected.symbolsUsed)
 
 covers('sizing/specialist-budget')
-const krBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.4 } })
+const krBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedSleeveTotalWeight: 0.4 } })
 assert.equal(krBudget.status, 'blocked', 'specialist cannot spend beyond its Brief sleeve')
-const urgentExit = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'us-sleeve', market: 'XNAS', currentSleeveWeight: 0.4, sleeveBudgetWeight: 0.4, requestedTargetWeight: 0.2, emergencyExit: true } })
+const urgentExit = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'us-sleeve', market: 'XNAS', currentSleeveWeight: 0.4, sleeveBudgetWeight: 0.4, requestedSleeveTotalWeight: 0.2, emergencyExit: true } })
 assert.equal(urgentExit.data.allowed, true, 'urgent exit does not wait for Global')
 covers('sizing/global-denominator')
 const globalBudget = execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'kr-sleeve', weight: 0.4 }, { key: 'us-sleeve', weight: 0.5 }, { key: 'cash', weight: 0.1 }] } })
@@ -1077,11 +1171,11 @@ assert.ok(copiedMemory.diagnostics.some((row) => row.code === 'memory_raw_source
  * One manager, three flows — the pre-2026-08-27 package ids are gone. (issue #70 §5)
  */
 covers('owner-cutover/flow-lane-ownership')
-const realIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: manifest.id, flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+const realIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: manifest.id, flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedSleeveTotalWeight: 0.32 } })
 assert.equal(realIdBudget.data.allowed, true, 'the published manager id is the one specialistBudget accepts')
-const staleIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-kr', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+const staleIdBudget = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { managerId: 'evidence-gated-kr', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedSleeveTotalWeight: 0.32 } })
 assert.ok(staleIdBudget.diagnostics.some((row) => row.code === 'manager_id_unknown'), 'a retired package id is rejected rather than silently owning a lane')
-const wrongLane = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XNAS', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedTargetWeight: 0.32 } })
+const wrongLane = execute({ operation: 'specialistBudget', asOf: globalIntegration.asOf, input: { flow: 'kr-sleeve', market: 'XNAS', currentSleeveWeight: 0.3, sleeveBudgetWeight: 0.35, requestedSleeveTotalWeight: 0.32 } })
 assert.ok(wrongLane.diagnostics.some((row) => row.code === 'specialist_market_not_owned'), 'a sleeve flow still cannot allocate outside its market')
 assert.equal(
   execute({ operation: 'globalAllocation', asOf: globalIntegration.asOf, input: { availableWeight: 1, targets: [{ key: 'cash', weight: 1 }] } }).data.owner,
@@ -3033,7 +3127,7 @@ assert.equal(new Set(tabledOperations).size, tabledOperations.length, 'no operat
  * that a row which cannot fill all four is refused by name rather than
  * published half-wired.
  */
-assert.equal(Object.keys(OPERATIONS).length, 111, 'every operation the package answers has a definition row')
+assert.equal(Object.keys(OPERATIONS).length, 113, 'every operation the package answers has a definition row')
 assert.equal(PUBLISHED_OPERATIONS.length + INTERNAL_OPERATIONS.length, Object.keys(OPERATIONS).length, 'surface partitions the table; there is no third state')
 assert.deepEqual([...supportedOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'operation_unknown lists the published surface, projected from the definition')
 assert.deepEqual([...tabledOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'and the skill table is that same surface')
@@ -3166,14 +3260,14 @@ assert.deepEqual(cashRows.data, cashObject.data, 'per-currency cash is one fact 
 assert.deepEqual(cashRows.diagnostics, cashObject.diagnostics, 'and neither shape is reported as a problem')
 assert.equal(cashObject.data.globalNavKrw, 27000, 'the arithmetic is the arithmetic — the conversion does not round, total or re-denominate')
 assert.deepEqual(
-  canonicalRun('specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02, sleeveCashByCurrency: [{ currency: 'KRW', amount: 11115231 }], portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }).data,
-  canonicalRun('specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02, sleeveCashByCurrency: { KRW: 11115231 }, portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }).data,
+  canonicalRun('specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedSleeveTotalWeight: 0.02, sleeveCashByCurrency: [{ currency: 'KRW', amount: 11115231 }], portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }).data,
+  canonicalRun('specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedSleeveTotalWeight: 0.02, sleeveCashByCurrency: { KRW: 11115231 }, portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }).data,
   'and the other operation that takes per-currency cash reads both the same way',
 )
 /** ⛔ The aggregate #174 is about is still refused by name, on both keys. */
 for (const [operation, input, path] of [
   ['sleeveNav', { cash: 8596.1, positions: [], fx: { USDKRW: 1300 } }, 'input.cash'],
-  ['specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedTargetWeight: 0.02, sleeveCashByCurrency: 8596.1, portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }, 'input.sleeveCashByCurrency'],
+  ['specialistBudget', { managerId: 'evidence-gated', flow: 'kr-sleeve', market: 'XKRX', currentSleeveWeight: 0.1, sleeveBudgetWeight: 0.3, requestedSleeveTotalWeight: 0.02, sleeveCashByCurrency: 8596.1, portfolioNav: 20000000, portfolioNavCurrency: 'KRW', fx: { USDKRW: 1300 } }, 'input.sleeveCashByCurrency'],
 ]) {
   const refused = canonicalRun(operation, input)
   assert.equal(refused.status, 'blocked', `${operation}: a bare amount names no currency`)
@@ -5412,6 +5506,45 @@ for (const flow of Object.keys(FLOWS)) {
 }
 
 /**
+ * ── The boundary moves during the run, so its verdict is last (#246) ───────
+ *
+ * Both sleeve flows declared a research extension and reported
+ * `coverage.complete: true` / `uncovered: []` **in the same run**, and the
+ * orchestrator's re-call with those names in the universe flipped both.
+ * Measured on `run_bb689b6199084b04afd8b0e1d1528cda` (2026-09-09): KR
+ * `extensions: ["001440"]`, declared 77 / screened 75 / dispositions 74; US
+ * `["LEU"]`, 85 / 84 / 83. ⚠️ **Two flows in one run is a procedure**, and the
+ * procedure was that `coverage` sat in the sleeve's preamble — where
+ * `extensions: []` makes `complete: true` genuinely honest — and the boundary
+ * moved behind the verdict.
+ *
+ * ⛔ The old shape is exactly what #212 ⑦ was written against: «call coverage
+ * after you register the extension» is an adverb in a paragraph, and a
+ * paragraph cannot be executed. Both are declared steps now and this asserts
+ * the order between them.
+ */
+for (const flow of Object.keys(FLOWS)) {
+  for (const call of ['researchState', 'coverage']) {
+    assert.ok(stepOf(flow, call), `${call} is a numbered step of ${flow}: the extension registration and the verdict about the boundary it widens are both on this path`)
+  }
+  assert.ok(
+    stepOf(flow, 'researchState').n < stepOf(flow, 'coverage').n,
+    `${flow} reads coverage after it has registered this run's extensions — a verdict taken before them is a claim about a universe the run then enlarged (#246)`,
+  )
+  /**
+   * ⚠️ **And the verdict is the last thing the flow does**, not merely after
+   * the registration: a step added between them later is a step that can widen
+   * the boundary again. ⛔ Asserted as «nothing after it» rather than as the
+   * literal 18, which is the numbering pin this file replaced.
+   */
+  assert.equal(
+    stepOf(flow, 'coverage').n,
+    numberedSteps(flow).length,
+    `${flow}'s coverage verdict is its last declared step; anything after it could move the boundary the verdict has already been read over`,
+  )
+}
+
+/**
  * ── The discovery axis that had no producer (issue #169) ───────────────────
  *
  * `radarCandidates` takes `catalysts` and `events`, `upsideRadar` reads a
@@ -5599,7 +5732,163 @@ assert.equal(Object.values(derivedRegister.data.catalysts)[0][0].dateSource, 'es
 covers('research/catalyst-axis-producer')
 assert.equal(usCadence.data.eventsProduced, false)
 assert.deepEqual(derivedRegister.data.events, {}, 'nothing derived reaches the event map, so no `actual` is ever fabricated from a schedule')
-assert.deepEqual(Object.keys(usCadence.data), ['market', 'estimated', 'cadence', 'coverage', 'horizonDays', 'eventsProduced', 'eventProductionReason', 'asOf'], '⛔ the answer has no events key at all — the absence is structural, not a filter')
+assert.deepEqual(Object.keys(usCadence.data), ['market', 'estimated', 'registerAs', 'cadence', 'coverage', 'horizonDays', 'eventsProduced', 'eventProductionReason', 'asOf'], '⛔ the answer has no events key at all — the absence is structural, not a filter')
+assert.deepEqual(Object.keys(belowFloor.data), Object.keys(usCadence.data), '⚠️ and the under-the-floor branch answers the same keys in the same order — a key that disappears on one branch is a key whose absence has to be interpreted')
+
+/**
+ * ── The call, handed back ready to make (#249 ②) ────────────────────────
+ *
+ * The derivation worked on `run_bb689b6199084b04afd8b0e1d1528cda` — 32 days over
+ * 21 filings, measured from this book's own cache, status ok, no diagnostics —
+ * and the window was computed and thrown away because no shape a flow tried
+ * registered it. `registerAs` is the `priceLevelsToRegister` pattern applied to
+ * this argument: the rows the register takes, under the name it takes them
+ * under.
+ */
+covers('research/catalyst-estimate-registration-path')
+assert.deepEqual(Object.keys(usCadence.data.registerAs), ['estimated'], '⛔ one key, and it is not `catalysts` — an object naming both arguments is the shape that registered a projection as a confirmed date')
+assert.equal(usCadence.data.registerAs.estimated, usCadence.data.estimated, '⚠️ the same array, by reference: it is a handle on one answer and never a second copy of it')
+assert.deepEqual(belowFloor.data.registerAs, { estimated: [] }, 'and under the floor it hands back nothing to register, which is an answer')
+
+/** ⚠️ **Handed straight over, it registers** — the assertion the run could not make. */
+const handedOver = execute({
+  operation: 'catalystRegister',
+  asOf: cadenceContract.asOf,
+  input: { market: usCadence.data.market, roster: cadenceContract.us.roster, ...usCadence.data.registerAs },
+})
+assert.notEqual(handedOver.status, 'blocked', 'the object the cadence answered is a call the register accepts, with nothing composed in between')
+assert.equal(handedOver.data.coverage.derived, 5)
+assert.equal(handedOver.data.coverage.withEstimatedCatalystInHorizon, 5, 'and every one of them is counted as the estimate it is')
+assert.equal(handedOver.data.coverage.withConfirmedCatalystInHorizon, 0, '⛔ none of them is counted as a date somebody read — which is the whole of what #249 was about')
+for (const rows of Object.values(handedOver.data.catalysts)) {
+  for (const row of rows) assert.equal(row.dateSource, 'estimated_from_filing_cadence', 'the register keeps the label the producer stamped')
+}
+
+/**
+ * ── The third shape, which registered and lied (#249 ③) ──────────────────
+ *
+ * The window on `catalysts` **and** on `estimated`, with the markers stripped
+ * from the first copy so it passes the observed arm. Measured: it registered,
+ * and `dateSource` came out `"observed"` — `withConfirmedCatalystInHorizon: 1`,
+ * `withEstimatedCatalystInHorizon: 0`. Both halves are asserted, because the
+ * old behaviour is what makes this check a measurement: the pair is refused
+ * now, and the copy that used to win the fold is named.
+ */
+covers('research/catalyst-estimate-registration-path')
+const { dateSource: _stripped, cadenceBasis: _strippedBasis, ...plainWindow } = derivedRow
+const onBoth = execute({
+  operation: 'catalystRegister',
+  asOf: cadenceContract.asOf,
+  input: { market: 'us', roster: cadenceContract.us.roster, catalysts: [plainWindow], estimated: [derivedRow] },
+})
+assert.equal(onBoth.status, 'blocked', 'the same window on both arrays is refused rather than registered under the friendlier of the two claims')
+const bothRow = onBoth.diagnostics.find((row) => row.code === 'catalyst_estimate_unmarked')
+assert.ok(bothRow && bothRow.severity === 'blocked', '⛔ the existing code, because the reading it exists to prevent is exactly the one this produced')
+assert.deepEqual(bothRow.details.onBothArrays, [`us:${derivedRow.symbol}:${derivedRow.event}`], 'and it names the pair by the key the fold would have collided them under')
+assert.equal(bothRow.details.unmarked, 0, '⚠️ neither existing arm fires — the `catalysts` copy is a perfectly ordinary observed row, which is why nothing saw this')
+assert.equal(bothRow.details.estimatesOnObservedInput, 0)
+assert.equal(onBoth.data.nextState, null, 'and a refused calculation offers no replacement revision, so the register is not quietly written')
+
+/** ⛔ The pair is refused on the key, never on the instants: a millisecond of rounding is the same record. */
+covers('research/catalyst-estimate-registration-path')
+const nudged = execute({
+  operation: 'catalystRegister',
+  asOf: cadenceContract.asOf,
+  input: {
+    market: 'us',
+    roster: cadenceContract.us.roster,
+    catalysts: [{ ...plainWindow, windowEnd: new Date(Date.parse(plainWindow.windowEnd) + 1).toISOString() }],
+    estimated: [derivedRow],
+  },
+})
+assert.equal(nudged.status, 'blocked', 'a window nudged by one millisecond is the same (market, symbol, event) and is still refused')
+
+/** ⚠️ And two genuinely different events on one name are two windows, which this may not break. */
+covers('research/catalyst-estimate-registration-path')
+const differentEvents = execute({
+  operation: 'catalystRegister',
+  asOf: cadenceContract.asOf,
+  input: {
+    market: 'us',
+    roster: cadenceContract.us.roster,
+    catalysts: [{ ...plainWindow, event: 'analyst-day', evidenceIds: ['ev-analyst-day'] }],
+    estimated: [derivedRow],
+  },
+})
+assert.notEqual(differentEvents.status, 'blocked', '⛔ a read window and a derived window for two different events on one name are two claims and both register')
+assert.equal(differentEvents.data.coverage.withConfirmedCatalystInHorizon, 1)
+assert.equal(differentEvents.data.coverage.withEstimatedCatalystInHorizon, 1, 'each counted as what it is')
+
+/**
+ * ── The measured run, replayed on its own numbers (#249 ①) ────────────────
+ *
+ * `catalyst-contract.json`'s `registration` block carries the window this book
+ * actually derived — 32 days of median lag over 21 filings, measured from its
+ * own cache — and the shapes us-sleeve tried to register it with. It is here
+ * rather than in `cadence-contract.json` because what is under test is not the
+ * derivation, which worked: it is the **argument**, and the argument takes a
+ * row, not a cache.
+ */
+covers('research/catalyst-estimate-registration-path')
+const registration = catalystContract.registration
+const registrationInput = (input) => execute({
+  operation: 'catalystRegister',
+  asOf: registration.asOf,
+  input: { market: registration.market, roster: registration.roster, ...input },
+})
+
+/**
+ * ⚠️ **The published shape is the producer's shape, field for field.** This is
+ * the whole of #249 ①: the contract said `estimated[]` in a paragraph while
+ * `catalysts[]` was a field table, so a caller with no wrong spelling to learn
+ * from had to guess — and every guess it made was refused. Asserted against
+ * the **producer's own answer** as well as the fixture, so a field added to one
+ * side and not the other fails here rather than on a run.
+ */
+const publishedEstimatedRow = NESTED_CONTRACTS.catalystRegister['estimated[]']
+assert.equal(typeof publishedEstimatedRow, 'object', 'the estimated row shape is published as fields, not described in prose')
+assert.deepEqual(
+  Object.keys(publishedEstimatedRow).sort(),
+  Object.keys(registration.derived).sort(),
+  'the published field names are the ones the measured derived row carries',
+)
+assert.deepEqual(
+  Object.keys(publishedEstimatedRow).sort(),
+  Object.keys(usCadence.data.estimated[0]).sort(),
+  '⚠️ and they are the ones `catalystCadence` answers today — 1:1 with the producer, which is what makes `registerAs` passable without composing anything',
+)
+assert.deepEqual(
+  Object.keys(NESTED_CONTRACTS.catalystRegister['estimated[].cadenceBasis']).sort(),
+  Object.keys(registration.derived.cadenceBasis).sort(),
+  'and the basis is published field by field too — `cadenceBasis: OBJECT` is the shape a guess is built on',
+)
+
+/* ⑴ the shape that registers, and what it is counted as. */
+covers('research/catalyst-estimate-registration-path')
+const measuredRegister = registrationInput({ estimated: [registration.derived] })
+assert.notEqual(measuredRegister.status, 'blocked', 'the derived window registers on `estimated` — the answer the run could not find')
+assert.equal(measuredRegister.data.coverage.derived, registration.registers.expected.derived)
+assert.equal(measuredRegister.data.coverage.researched, registration.registers.expected.researched, '⛔ and it still does not make NKE a name somebody researched')
+assert.equal(measuredRegister.data.coverage.withEstimatedCatalystInHorizon, registration.registers.expected.withEstimatedCatalystInHorizon)
+assert.equal(measuredRegister.data.coverage.withConfirmedCatalystInHorizon, registration.registers.expected.withConfirmedCatalystInHorizon)
+assert.equal(measuredRegister.data.catalysts[registration.derived.symbol][0].dateSource, registration.registers.expected.dateSource)
+
+/* ⑵ and every shape the run reported is refused, on the numbers it reported them with. */
+for (const attempt of registration.attempts) {
+  covers('research/catalyst-estimate-registration-path')
+  const { dateSource: _dropped, cadenceBasis: _droppedBasis, ...unmarked } = registration.derived
+  const input = attempt.arrives === 'catalysts'
+    ? { catalysts: [registration.derived] }
+    : { catalysts: [unmarked], estimated: [registration.derived] }
+  const answer = registrationInput(input)
+  assert.equal(answer.status, attempt.expected.status, `${attempt.name}: ${attempt.reported}`)
+  const row = answer.diagnostics.find((item) => item.code === attempt.expected.code)
+  assert.ok(row && row.severity === 'blocked', `${attempt.name} raises ${attempt.expected.code}`)
+  if (attempt.expected.onBothArrays) {
+    assert.deepEqual(row.details.onBothArrays, attempt.expected.onBothArrays, `${attempt.name}: the pair is named by the key the fold would have collided them under`)
+  }
+  assert.equal(answer.data.nextState, null, `${attempt.name}: and nothing is offered for the register`)
+}
 
 /**
  * ⚠️ The lane opens on a derived window and says which kind it opened on, and
@@ -5858,6 +6147,124 @@ assert.notEqual(
  * repeating that is documentation; a check on the substring is a check that a
  * word appears.
  */
+
+/**
+ * ── #242/#243: three lenses rank apart, and one candidate reaches a document ─
+ *
+ * The two halves of one failure. `discoveryScore` ordered the research queue by
+ * mean-reversion depth, so the lenses that require an intact trend scored zero
+ * and were never reached (#242); and no stage carried whichever candidate *was*
+ * reached to the document the four gates judge, so the run declined four names
+ * at 1, 2 and 3 of 4 and registered nothing (#243).
+ */
+covers('scanner/lens-rank-per-lens')
+const shallowPullback = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'SHALLOW', market: 'us', bars: boundaryBars(-0.06, 3) } })
+const deeperPullback = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'DEEPER', market: 'us', bars: boundaryBars(-0.12, 3) } })
+assert.deepEqual(shallowPullback.data.lenses, ['trend-pullback'])
+assert.deepEqual(deeperPullback.data.lenses, ['trend-pullback'])
+assert.equal(shallowPullback.data.discoveryScore, 0, 'the #242 measurement: a name above its MA200 carries none of the mean-reversion signals, so the score that ordered research was structurally zero for this whole lens')
+assert.equal(deeperPullback.data.discoveryScore, 0, 'and zero for every other member of it, so the order among them was arbitrary and the lens was never reached')
+assert.equal(shallowPullback.data.discoveryScoreMeaning, 'mean-reversion-depth-only', 'the label says which lens the number is about; `research-priority-only` was what a run read while researching in this order')
+assert.equal(shallowPullback.data.lensRanks['trend-pullback'].metric, 'offHigh200')
+assert.equal(shallowPullback.data.lensRanks['trend-pullback'].order, 'desc')
+
+const fallingRow = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'FALLING', market: 'us', bars: stillFalling } })
+assert.deepEqual(fallingRow.data.lenses, ['mean-reversion'])
+const queued = execute({
+  operation: 'candidateQueue',
+  asOf: methodology.asOf,
+  input: { rows: [deeperPullback.data, shallowPullback.data, fallingRow.data], perLens: 1 },
+})
+assert.deepEqual(
+  queued.data.queues['trend-pullback'].map((row) => row.symbol),
+  ['SHALLOW', 'DEEPER'],
+  'the least fallen name inside the band sorts first — the ported original’s own selection reason, and the opposite of what one score paid 60 points for',
+)
+assert.equal(queued.data.queues['mean-reversion'][0].metric, 'meanReversionSignalFraction', 'and depth still orders the lens whose claim depth is')
+assert.equal(queued.data.queues['mean-reversion'][0].value, fallingRow.data.discoveryScore / 100, 'the depth rank is the row’s own number rather than a second measurement of it')
+assert.equal(queued.data.rankScope, 'within-one-lens-only')
+assert.deepEqual(
+  [...new Set(Object.values(queued.data.queues).flat().map((row) => row.metric))].sort(),
+  ['ma200Distance', 'meanReversionSignalFraction', 'offHigh200'].filter((metric) => Object.values(queued.data.queues).flat().some((row) => row.metric === metric)),
+  'the ranks are three different measurements, which is why there is nothing here to sort three lenses by',
+)
+assert.deepEqual(
+  queued.data.owesDocument.map((row) => `${row.lens}:${row.symbol}`),
+  ['mean-reversion:FALLING', 'trend-pullback:SHALLOW'],
+  'one candidate per lens is carried, so a lens that scores zero on another lens’s metric still owes a document',
+)
+
+/** A candidate two lenses name is ranked by each of them, on each lens’s own metric. */
+const dualLens = execute({ operation: 'scan', asOf: methodology.asOf, input: { symbol: 'DUAL', market: 'us', bars: boundaryBars(-0.18, 3) } })
+assert.deepEqual(dualLens.data.lenses, ['trend-pullback', 'quality-pullback'])
+assert.equal(dualLens.data.lensRanks['trend-pullback'].metric, 'offHigh200')
+assert.equal(dualLens.data.lensRanks['quality-pullback'].metric, 'ma200Distance', 'the band has already fixed the depth here, so what orders it is how much of the uptrend survived')
+
+/** ⛔ A rank that cannot be read carries the row last; it never shortens the queue. */
+const unreadable = execute({
+  operation: 'candidateQueue',
+  asOf: methodology.asOf,
+  input: { rows: [{ symbol: 'BLIND', market: 'us', eligibleForNewResearch: true, lenses: ['trend-pullback'], indicators: {} }, shallowPullback.data], perLens: 1 },
+})
+assert.deepEqual(unreadable.data.queues['trend-pullback'].map((row) => row.symbol), ['SHALLOW', 'BLIND'])
+assert.equal(unreadable.data.counts.queued, unreadable.data.counts.eligible, 'the queue is never shorter than the eligible set')
+assert.ok(unreadable.diagnostics.some((row) => row.code === 'lens_rank_unavailable' && row.severity === 'unevaluated'), 'and the row that could not be ordered is named rather than dropped')
+
+covers('research/candidate-completion-stage')
+const owedForCompletion = [{ symbol: '267260', market: 'kr', lens: 'mean-reversion', position: 1 }]
+const nothingWritten = execute({ operation: 'candidateCompletion', asOf: observationAsOf, input: { owesDocument: owedForCompletion, records: [] } })
+assert.equal(nothingWritten.data.stageRan, false)
+assert.deepEqual(nothingWritten.data.absent, [{ symbol: '267260', market: 'kr', lens: 'mean-reversion' }])
+assert.ok(
+  nothingWritten.diagnostics.some((row) => row.code === 'candidate_completion_absent' && row.severity === 'unevaluated'),
+  'the stage that produces the document the four gates judge was missing from the run loop, and a lane whose leading candidate reached no document is one this run cannot claim to have judged',
+)
+assert.equal(nothingWritten.status, 'unevaluated', '⛔ and it withdraws the positive answer rather than blocking: a WAIT with every document written is an honest run')
+
+const completed = execute({
+  operation: 'candidateCompletion',
+  asOf: observationAsOf,
+  input: {
+    owesDocument: owedForCompletion,
+    records: [{ symbol: '267260', market: 'kr', lens: 'mean-reversion', thesis: thesisWith(consensusFixtures.managerAttested), challengeVerdict: 'cleared', verdict: 'ready' }],
+  },
+})
+assert.equal(completed.data.stageRan, true)
+assert.deepEqual([...completed.data.completed[0].satisfied].sort(), ['challengeCleared', 'consensusRefs', 'thesisComplete', 'variantView'], 'the four requirements are `variantViewCheck`’s and this operation calls it rather than reimplementing it — there is one answer in this package to whether a variant view is established')
+assert.equal(completed.diagnostics.length, 0)
+
+/**
+ * ⚠️ **The two states this exists to tell apart.** `267260` was declined
+ * correctly — 19 buy / 0 sell, so there was nothing to differ from — and the
+ * answer the run published was `1 of 4`, which reads as «there was nothing to
+ * judge». A decline **with** the document is an outcome of the stage and raises
+ * nothing; the same decline without one is the missing stage.
+ */
+const declinedWithDocument = execute({
+  operation: 'candidateCompletion',
+  asOf: observationAsOf,
+  input: {
+    owesDocument: owedForCompletion,
+    records: [{ symbol: '267260', market: 'kr', lens: 'mean-reversion', thesis: { ...methodology.thesis, evidenceStatus: 'incomplete', consensusRefs: [] }, challengeVerdict: 'conditional_watch', verdict: 'rejected' }],
+  },
+})
+assert.equal(declinedWithDocument.diagnostics.length, 0, 'a candidate carried to a document and then declined is a judged candidate, and this reports it as one')
+assert.equal(declinedWithDocument.data.stageRan, true)
+assert.equal(declinedWithDocument.data.completed[0].verdict, 'rejected', 'the run’s own verdict is carried verbatim and never interpreted')
+assert.ok(declinedWithDocument.data.completed[0].missing.includes('consensusRefs'), 'and what the document was short of is named, so «1 of 4» says which one')
+assert.ok(declinedWithDocument.data.completed[0].thesisGaps.includes('consensusRefs'), 'down to the gap under `thesisComplete`, rather than restating the requirement')
+
+/** ⛔ A document addressed to another name does not answer for the one that was carried. */
+const wrongName = execute({
+  operation: 'candidateCompletion',
+  asOf: observationAsOf,
+  input: {
+    owesDocument: owedForCompletion,
+    records: [{ symbol: '035900', market: 'kr', lens: 'mean-reversion', thesis: thesisWith(consensusFixtures.managerAttested), challengeVerdict: 'cleared', verdict: 'ready' }],
+  },
+})
+assert.equal(wrongName.data.stageRan, false)
+assert.ok(wrongName.diagnostics.some((row) => row.code === 'candidate_completion_absent'), 'a record for a name nobody carried is not the record that was owed')
 
 /**
  * ⚠️ **§37: nothing new is asked of the investor.** The inputs come from tools

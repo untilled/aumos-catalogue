@@ -1,5 +1,5 @@
 import { diagnostic, finite, round } from './diagnostics.mjs'
-import { stopRegistration } from './price-levels.mjs'
+import { stopIntent, stopRegistration, timeStopIntent } from './price-levels.mjs'
 import { INPUT_VOCABULARY } from './vocabulary.mjs'
 import { METHODOLOGY } from './constants.mjs'
 
@@ -569,13 +569,26 @@ export function exitDiscipline({
         'asset',
         { symbol, stopLevel, causes: registration.diagnostics.map((row) => row.code) },
       ))
-      watchesToRegister.push({ kind: 'price-below', threshold: stopLevel, expiresAt: watchExpiry, reason: 'exit-discipline-hard-stop' })
+      /**
+       * ⚠️ **The level is unstateable and the promise still has an identity.**
+       * Without the asset there is no currency, so there is no `Money` and no
+       * nested trigger to hand over — but `intent` needs neither, and a stop
+       * armed with the run's own prose is the one that will not fold when the
+       * next run re-arms it (#244).
+       */
+      watchesToRegister.push({ kind: 'price-below', threshold: stopLevel, intent: stopIntent(symbol), expiresAt: watchExpiry, reason: 'exit-discipline-hard-stop' })
     } else {
       watchesToRegister.push(registration.watch)
       priceLevelsToRegister.push(registration.level)
     }
   }
-  if (dueAt !== null) watchesToRegister.push({ kind: 'at-time', at: dueAt, expiresAt: watchExpiry, reason: 'exit-discipline-time-stop' })
+  /**
+   * ⛔ **The time stop gets an intent and never a level** — a level holds
+   * prices and this row holds a date. It gets the intent for the same reason
+   * the price row does: it is re-armed on every judgement of a position that
+   * still holds, and #704 folds it on `intent` like everything else.
+   */
+  if (dueAt !== null) watchesToRegister.push({ kind: 'at-time', at: dueAt, intent: timeStopIntent(symbol), expiresAt: watchExpiry, reason: 'exit-discipline-time-stop' })
 
   return {
     data: {

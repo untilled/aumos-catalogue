@@ -173,6 +173,32 @@ export const CAUSE_CODE_REGISTRY = Object.freeze([
   /* ── discovery ───────────────────────────────────────────────────────── */
   { code: 'discovery_lane_dark', operation: 'discoveryCapacity', module: 'coverage.mjs', lane: 'input-path' },
 
+  /**
+   * ── the stage with no producer, one layer down from #169 (#243) ───────
+   *
+   * ⚠️ **`input-path`, and it is the same judgement `catalyst_producer_absent`
+   * got.** The four gates that open a position have judged candidates since
+   * #226; what nothing produced is **the document they judge**. Measured on
+   * `run_bb689b6199084b04afd8b0e1d1528cda`: both price branches fed and
+   * evaluated (KR 74/74, US 83/83, `unprepared` 0), 42 eligible candidates, four
+   * pushed to `variantViewCheck`, all four declined, **0 registered** — and
+   * `267260`'s answer was `1 of 4`, which does not read as «judged and
+   * declined». It reads as «there was nothing to judge».
+   *
+   * A run carrying this has a lane it cannot claim to have judged, which is
+   * exactly what this lane is for: it **withdraws** `mandateExecution`'s
+   * positive answer rather than granting one, and it does not block — a book
+   * may honestly reach `WAIT` with every document written and every candidate
+   * declined.
+   *
+   * ⛔ **Not a gate's own finding.** `thesis_incomplete` and
+   * `challenge_not_cleared` are judgements this methodology made and are
+   * registered nowhere (#212 ④); a run filing its own verdict here would be
+   * excusing it as unfinished wiring. This row is raised only where **no
+   * document exists at all.**
+   */
+  { code: 'candidate_completion_absent', operation: 'candidateCompletion', module: 'completion.mjs', lane: 'input-path' },
+
   /* ── the valuation gap, read three ways (#166) ───────────────────────── */
   { code: 'valuation_gap_is_unfetched_not_unfillable', operation: 'thesisGapSources', module: 'valuation.mjs', lane: 'input-path' },
   { code: 'instrument_class_disputed', operation: 'thesisGapSources', module: 'valuation.mjs', lane: 'unresolved' },
@@ -195,6 +221,25 @@ export const CAUSE_CODE_REGISTRY = Object.freeze([
    */
   { code: 'sleeve_budget_not_fundable_in_currency', operation: 'specialistBudget', module: 'sizing.mjs', lane: 'unresolved' },
   { code: 'sleeve_budget_fundability_unevaluated', operation: 'specialistBudget', module: 'sizing.mjs', lane: 'unresolved' },
+
+  /* ── the cap that was declared somewhere nothing reads (#251 ①) ────────── */
+  /**
+   * ⚠️ **`unresolved`, and the argument is the one two rows up.** A run whose
+   * sector, theme and factor thresholds landed in `config` has not measured
+   * three of its five axes, so it cannot claim the methodology worked — and it
+   * is not `input-path` either: nothing was lost upstream and no fetch fixes
+   * it, the call has to be rewritten with the numbers the caller already holds.
+   * What it does is forbid the `info` answer, which is what this lane is for.
+   *
+   * ⛔ **Its sibling `concentration_cap_missing` is deliberately not
+   * registered, and the asymmetry is the point.** That code fires for every
+   * axis a caller legitimately leaves out — a run asking only about the
+   * position axis raises it four times — so registering it would demote almost
+   * every run to `unreported`. This one fires only when the threshold is
+   * demonstrably declared and demonstrably unread, which is never a call
+   * anybody meant to make.
+   */
+  { code: 'concentration_caps_misplaced', operation: 'concentration', module: 'sizing.mjs', lane: 'unresolved' },
 ])
 
 /** The codes of one lane, sorted, frozen — the only way a consumer gets a list. */

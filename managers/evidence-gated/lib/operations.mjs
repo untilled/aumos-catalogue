@@ -57,7 +57,7 @@
  */
 import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
-import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, sectorSeries, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
+import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, candidateQueue, trendState, blendedSectorStrength, sectorSeries, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
 import { sleeveNav, targetWeight, minimumExecutableWeight, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { proposalDisclosure } from './proposal.mjs'
 import { priceLevelSet } from './price-levels.mjs'
@@ -70,6 +70,7 @@ import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetric
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
 import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, migrationMap, exitCheck } from './methodology.mjs'
+import { candidateCompletion } from './completion.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { fundamentalsPlan, mapCorporationCodes, dartVendorStatus, radarCandidates, radarFeedDiagnosis } from './fundamentals-feed.mjs'
 import { catalystRegister, catalystCadence, CATALYST_DATE_ESTIMATED } from './catalysts.mjs'
@@ -168,6 +169,17 @@ export const OPERATIONS = {
     mode: 'named', keys: { rows: ARRAY },
     describe: 'the declared universe, with held and pending excluded',
     run: opportunityUniverse,
+  },
+  candidateQueue: {
+    group: 'scanners',
+    surface: 'published',
+    mode: 'strict', keys: { rows: ARRAY, perLens: NUMBER },
+    nested: {
+      rows: 'The `scan` answers you read back from the sweep\'s answer files — one row per name, carrying `lenses`, `eligibleForNewResearch` and `indicators`. ⛔ Not the `opportunityMetrics` rows: those are the five oversold axes and `opportunityUniverse` folds them. A row this operation cannot read is counted in `counts.rows` and queued nowhere.',
+      perLens: 'How many candidates of **each** lens this run carries to a completed record; the default is 1, and it is the number #243 asks for rather than a ceiling on research. ⛔ There is no argument for «the top N of the roster»: three lenses rank on three different measurements and putting them on one scale is the defect (#242).',
+    },
+    describe: 'the research order **per lens** — each lens ranked by its own measurement, so no one score orders three of them — and which candidates this run therefore owes a completed record for',
+    run: candidateQueue,
   },
   trendState: {
     group: 'scanners',
@@ -433,6 +445,7 @@ export const OPERATIONS = {
       caps: { position: NUMBER, sector: NUMBER, theme: NUMBER, factor: NUMBER, portfolioHeat: NUMBER },
       'positions[]': { symbol: STRING, weight: NUMBER, core: BOOLEAN, parkedLiquidity: BOOLEAN, stopLossPct: NUMBER, sector: STRING, themes: ARRAY, factors: ARRAY },
       'proposed[]': 'The same row shape as positions[]. ⚠️ A row for a symbol the book already holds is the target state for that symbol and replaces the holding; it does not stack on it.',
+      capsPlacement: 'All five caps go in `caps` and nowhere else: `position` and `portfolioHeat` are the Mandate\'s `maxPositionWeight` and `maxDrawdown`, and `sector`, `theme` and `factor` are the investor\'s, declared at `config.concentration.{sector,theme,factor}` in this package\'s own settings — which the caller reads out and passes **as caps**. ⚠️ Passing them in `config` instead is concentration_caps_misplaced / blocked (#251 ①), and it is blocked because the alternative reads as a pass: an unread cap leaves its axis accumulated into `exposures` and compared against nothing, so `breaches` comes back empty for it and three unmeasured axes look measured and clear. Both wrong places are named — `config.<axis>` at the top, and `config.concentration.<axis>` handed straight through from the settings block. ⛔ An axis with no cap anywhere is the older, narrower concentration_cap_missing / unevaluated, which is also not a pass; `data.unmeasuredAxes` names either case.',
       rowShape: 'The three label axes are not spelled alike and the difference is read: sector is a single string — a listing has one — while themes and factors are arrays, because a name sits on several shared loss paths. ⛔ sectors (plural), theme (singular) and factor (singular) are refused as input_shape_invalid rather than ignored; before #173 the plural sectors was read by nothing, the sector axis accumulated empty, and its cap applied to no weight while the answer stayed status: ok. ⚠️ A row that carries no label on an axis whose cap is declared is reported as concentration_labels_unstated / unevaluated: unlabelled is not under the cap.',
     },
     shape: labelAxes,
@@ -457,6 +470,9 @@ export const OPERATIONS = {
     group: 'sizing',
     surface: 'published',
     mode: 'strict', keys: { started: OBJECT, run: OBJECT, rows: ARRAY, eligibleSymbols: ARRAY },
+    nested: {
+      'rows[]': 'One recipe answer as `files_read` returned it. Two fields are read: **`sourced`** — a boolean, whether this fund held anything readable for the name — and whether the recipe arrived at anything, which **`data` non-null** states and which a plain boolean **`evaluated`** also states. ⚠️ Until #251 ③ only `data` was read, so a caller who wrote `evaluated: true` on every row came back `counts.evaluated: 0` and `candidateEvaluation: "none"` with no diagnostic — a record reading «25 names eligible» beside «nothing was evaluated». ⛔ A row saying neither is a third answer and never a `false`: it is research_record_unreadable / unevaluated, and `counts.evaluationUnstated` counts it. When both are present `data` decides, because it is the field the recipe itself writes, and the disagreement is reported.',
+    },
     describe: 'what this run\'s data preparation actually did — the host\'s own item counts from the task run, set beside what the recipe answers themselves report about how many names this fund held anything readable for, and how many of the answers cleared the gates. ⛔ Reads no diagnostic',
     run: executionRecord,
   },
@@ -501,12 +517,19 @@ export const OPERATIONS = {
   specialistBudget: {
     group: 'sizing',
     surface: 'published',
-    canonical: cashByCurrency('sleeveCashByCurrency'),
+    canonical: all(cashByCurrency('sleeveCashByCurrency'), cashByCurrency('sleeveParkedLiquidity')),
     mode: 'strict',
+    /**
+     * ⚠️ `requestedTargetWeight` stays **declared and refused** (#251 ④). The
+     * key is `requestedSleeveTotalWeight`; the retired spelling is kept in the
+     * contract only so that a call carrying it gets the sentence that says what
+     * the number means, rather than the generic unknown-key refusal — and it is
+     * never read as the new one, because the reversed answer was the defect.
+     */
     keys: {
       managerId: STRING, flow: STRING, market: STRING,
-      currentSleeveWeight: NUMBER, sleeveBudgetWeight: NUMBER, requestedTargetWeight: NUMBER, emergencyExit: BOOLEAN,
-      sleeveCashByCurrency: ANY, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
+      currentSleeveWeight: NUMBER, sleeveBudgetWeight: NUMBER, requestedSleeveTotalWeight: NUMBER, requestedTargetWeight: NUMBER, emergencyExit: BOOLEAN,
+      sleeveCashByCurrency: ANY, sleeveParkedLiquidity: ANY, portfolioNav: NUMBER, portfolioNavCurrency: STRING, fx: OBJECT,
     },
     /**
      * ⚠️ The budget was published as three weights and answered `withinBriefBudget`
@@ -514,12 +537,15 @@ export const OPERATIONS = {
      */
     nested: {
       sleeveCashByCurrency: 'This book\'s cash stated per currency — { KRW: 11115231, USD: 294.02 }, or the { currency, amount } rows `portfolio.cashByCurrency` carries. ⛔ Never the aggregate `portfolio.cash`: on the book that measured this it read USD 8,596.10 and 96.6% of it was won. A bare amount is input_shape_invalid, and a currency with no row is read as zero of it rather than as unknown.',
+      sleeveParkedLiquidity: 'The market value of this book\'s parked liquidity — short-duration and T-bill holdings, the rows carrying `parkedLiquidity: true` — stated per currency in the same two representations as `sleeveCashByCurrency`. ⚠️ It is **in the funding numerator**: money the sleeve already holds in its own currency is money the budget can be paid with, and before #250 there was nowhere to write it, so a sleeve fundable entirely out of its own parking reported `budgetFundableInSleeveCurrency: false` on every run with a «shortfall» equal to that parking. ⚠️ **Reported apart from the cash all the same** — `fundableFromCash` and `fundableFromParking`, because spending parking is a sale and a sale is a proposal the investor approves; read `fundingRoute` for which act pays. ⛔ Optional, and absent is `{}` rather than a missing key: a book that parks nothing is the ordinary book.',
+      fundingRoute: 'Not an input. Which act pays for the budget, so that a reader does not have to compare a shortfall against a parked market value by hand — `cash` (idle in the sleeve\'s own currency, or nothing to procure at all), `sell-parking-same-currency`, `fx-conversion`, `cross-market-sale`. The last two are the allocate flow\'s judgement and the investor\'s approval, and this names them rather than choosing.',
+      requestedSleeveTotalWeight: 'The weight the **sleeve** is to stand at once the order fills — a total, never the increment being added. ⚠️ A sleeve at 0.31471199 taking on a new 3% name states **0.34471199**; stating `0.03` asks for the sleeve to be cut to three per cent, and until #251 that call came back `increaseWeight: −0.28471199` and `allowed: true` with no diagnostic. It was measured twice in one run, by the us-sleeve flow and by allocate independently. ⛔ The old name `requestedTargetWeight` is refused as sleeve_requested_weight_renamed / blocked and is never read as this key.',
       fx: { USDKRW: NUMBER },
       sleeveCurrency: `Not an input. The sleeve is paid in the currency its market quotes — ${Object.entries(MARKET_CURRENCIES).map(([market, currency]) => `${market} → ${currency}`).join(', ')} — derived from \`market\` and never declared, because a run that could name it could name the wrong one. ⛔ It is neither mandate.constraints.baseCurrency nor portfolio.baseCurrency: those two may disagree and both be right, and neither says what a US buy settles in.`,
       managerId: `The literal id this package publishes — \`${MANAGER_ID}\`, also in inputContracts.vocabulary.managerIds — and **not** the instance id the host addresses this manager by. An \`inst_…\` is manager_id_unknown / blocked, which is the whole answer refused; \`managerId: "string"\` was all the contract said, and \`skills/deterministic-metrics\` named only the retired pre-2026-08-27 package ids as rejected. ⚠️ It defaults to the published id, so the safe call omits it. The market roles are **flows** of this one manager — \`flow\` carries them — not ids of their own.`,
       budget: 'The budget itself stays a plain weight and carries no currency: one FX rate scales a ratio\'s numerator and denominator alike, so a ratio has none. What has a currency is the cash that pays for it — which is why the shortfall is reported in the sleeve currency while `sleeveBudgetWeight` is not.',
     },
-    shape: sleeveCash('sleeveCashByCurrency'),
+    shape: both(sleeveCash('sleeveCashByCurrency'), sleeveCash('sleeveParkedLiquidity')),
     describe: 'a sleeve flow inside its Brief budget and market lane, and whether that budget can be paid for in the currency the sleeve settles in',
     run: specialistBudget,
   },
@@ -926,6 +952,17 @@ export const OPERATIONS = {
     describe: 'what is already waiting for the investor, so this run does not propose it again',
     run: (input, asOf) => lessonAudit({ ...input, asOf }),
   },
+  candidateCompletion: {
+    group: 'evidence',
+    surface: 'published',
+    mode: 'strict', keys: { owesDocument: ARRAY, records: ARRAY },
+    nested: {
+      owesDocument: '`candidateQueue`\'s `owesDocument` rows, handed over unchanged — `{ symbol, market, lens, position }`. It is the list this run said it would carry, so the stage is checked against the run\'s own declaration and not against a number this operation chose.',
+      records: 'One row per completed candidate record: `{ symbol, market, lens, thesis, challengeVerdict, verdict }`. `thesis` is the document itself — the same object `variantViewCheck` and `validateThesis` take, which this calls rather than reimplements. ⚠️ `verdict` is what **you** concluded and is carried verbatim: a decline is an outcome of the stage and never a failure of it. ⛔ A record for a name that was not carried is not an error and is simply not read; a carried name with no record is `candidate_completion_absent`.',
+    },
+    describe: 'whether the completion stage ran — for each candidate this run said it would carry, is there a record, and what `variantViewCheck` made of it. ⛔ Not a fifth gate: «judged and declined» and «no document was ever written» are two different states of this book and this is what tells them apart',
+    run: (input, asOf) => candidateCompletion({ ...input, asOf }),
+  },
   validateThesis: {
     group: 'evidence',
     surface: 'published',
@@ -1127,7 +1164,25 @@ export const OPERATIONS = {
      */
     nested: {
       'catalysts[]': { symbol: STRING, market: STRING, event: STRING, windowStart: STRING, windowEnd: STRING, observedAt: STRING, evidenceIds: ARRAY },
-      'estimated[]': `The \`estimated\` rows \`catalystCadence\` answered, verbatim — the same window shape plus \`dateSource: "${CATALYST_DATE_ESTIMATED}"\` and the \`cadenceBasis\` it was derived from. ⛔ **A separate argument on purpose**: an estimate and a reading are different claims, and an estimate arriving on \`catalysts\` — or on this one without saying it is an estimate — is \`catalyst_estimate_unmarked\` and blocked. Neither array's discipline is weakened; what an estimated row cites is the past filings its cadence was measured over.`,
+      /**
+       * ⚠️ **Field by field, and with `catalystCadence`'s own output names
+       * (#249).** This entry was one paragraph of prose while `catalysts[]` one
+       * line up was a field table — *"a separate argument on purpose"* was said
+       * and the shape of the argument was not — and that asymmetry is what a
+       * flow measured: three shapes tried for one derived window on
+       * `run_bb689b6199084b04afd8b0e1d1528cda`, none of them the right one, and
+       * the only one that registered recorded a projection as a confirmed date.
+       * A caller that has never sent an estimate has no wrong spelling to learn
+       * from, which is #169's own reason for publishing `catalysts[]`, and it
+       * applies here one argument over.
+       *
+       * ⚠️ **The names are 1:1 with what `catalystCadence` answers**, so the
+       * rows pass straight through — `registerAs.estimated` is that array under
+       * this argument's name, and a run that hands it over composes nothing.
+       */
+      'estimated[]': { symbol: STRING, market: STRING, event: STRING, windowStart: STRING, windowEnd: STRING, observedAt: STRING, dateSource: STRING, cadenceBasis: OBJECT, evidenceIds: ARRAY },
+      'estimated[].cadenceBasis': { medianLagDays: NUMBER, leadDays: NUMBER, basisFilings: NUMBER, basisSymbols: NUMBER, periodGapDays: NUMBER, nextPeriodEnd: STRING, measuredFrom: STRING },
+      estimatedRowShape: `The \`estimated\` rows \`catalystCadence\` answered, verbatim — hand over \`registerAs.estimated\` and change nothing. \`dateSource\` is the literal \`"${CATALYST_DATE_ESTIMATED}"\`, the only value this argument accepts, and \`cadenceBasis\` is required: \`medianLagDays\` and a \`basisFilings\` above zero are the two an estimate cannot be read without, and the rest are carried when they were measured. \`windowStart\`/\`windowEnd\`/\`observedAt\` are RFC 3339 here, as they are on \`catalysts[]\`; ⚠️ the \`…EpochMs\` numbers are what \`previous\` carries and what \`nextState\` writes back, and either spelling is read. ⛔ **A separate argument on purpose**: an estimate and a reading are different claims, and an estimate arriving on \`catalysts\` — or on this one without saying it is an estimate — is \`catalyst_estimate_unmarked\` and blocked. ⛔ **And the same window may not arrive on both arrays**: the fold keeps the confirmed copy under a \`(market, symbol, event)\` key, so a projection sent twice registers once as a date somebody read — the third shape #249 measured, and the one that used to get through. Neither array's discipline is weakened; what an estimated row cites is the past filings its cadence was measured over.`,
       'events[]': { symbol: STRING, market: STRING, announcedAt: STRING, sue: NUMBER, day1ExcessPct: NUMBER, preAnnouncementClose: NUMBER, guidanceSurprise: NUMBER, evidenceIds: ARRAY },
       evidenceIds: 'Required on every row of both arrays, and this is the whole discipline of the operation: a catalyst window nobody can go and check is not a registered catalyst, it is a claim. File the reading with `observation_file` and put the returned id here — the same route `consensusRefs` takes.',
       previous: 'The whole value read from `state/research/catalyst-window.json` — { schemaVersion: 1, updatedAsOf, rows[] }. ⚠️ Its rows carry `windowStartEpochMs` / `windowEndEpochMs` as **numbers**: a catalyst window ends after `asOf` by construction, and `memory_read` refused a payload carrying a later **string** timestamp. That guard does not reach a file (`untilled/aumos#743`), and the encoding stays anyway as this package\'s own canon — every reader here expects it. Persist `nextState` verbatim; do not rewrite the instants as RFC 3339.',

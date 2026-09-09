@@ -477,6 +477,218 @@ for (const file of INSTRUCTION_FILES) {
 }
 
 /**
+ * ── The sweep's item id is the research market key, not the venue MIC (#245) ─
+ *
+ * Two coordinates live one line apart in each sleeve's dispatch block and only
+ * one of them is a MIC: `source_cache_refresh` takes the **venue** (`XKRX`,
+ * `XNAS`/`XNYS`) and `task_start`'s item id takes the key the store files
+ * documents under, which `source_cache_read` publishes as *the key is the
+ * research market — `kr`, `us` — and a venue MIC is folded onto it*. Both skills
+ * instructed the MIC.
+ *
+ * ⚠️ **The failure is silent and is shaped like an empty market.** An item id of
+ * the run's own invention is accepted and the recipe is handed nothing, so every
+ * row comes back `sourced: false` / `documents: 0` / `barsRead: 0` — which reads
+ * as a market that offered nothing. Measured in the owner's store,
+ * `scans/2026-09-09/roster-scan/`: the discarded batch is 83 US names on
+ * `XNAS:`/`XNYS:` ids, **every one** unsourced, beside 76 `kr:` and 83 `us:` ids
+ * every one sourced. ⛔ And the US instruction was self-contradictory even inside
+ * the MIC reading — one sentence naming `market` as `XNAS`/`XNYS` and the id as
+ * `XNAS:<symbol>`, while the real split is XNYS 55 / XNAS 28.
+ *
+ * ⚠️ **Worst in combination with the completion stage, which is why it is fixed
+ * here.** A run loop that carries a candidate to a document reports «0 eligible»
+ * honestly off a sweep addressed to nothing, and no diagnostic in this package
+ * fires on that: the roster was declared, the refresh answered, the task
+ * settled. The coordinate fix is what makes the stage's report mean anything.
+ *
+ * ── Which documents this covers, and the line the boundary is drawn on ────
+ *
+ * **Is this document handed to a flow?** The two sleeve skills are loaded by a
+ * flow and the three `agents/*.md` are the prompts the orchestrator **hands** it
+ * — and the second is the path that actually decided the 2026-09-09 run, whose
+ * orchestrator read its private record and corrected the coordinate in the
+ * dispatch instruction. So a flow trusting its dispatch prompt was reading the
+ * effective coordinate, and leaving those three wrong keeps «completion stage
+ * present + coordinate wrong» reachable.
+ *
+ * ⚠️ **`skills/orchestrate/SKILL.md` was the other side of that line and has
+ * crossed it.** It was deferred as the orchestrator's own copy, handed to no
+ * other process — but the block it carries is the template every dispatch prompt
+ * is written from (*"So every dispatch prompt carries this, adjusted to the
+ * flow's markets"*), so it reaches a flow at one remove and it held the last
+ * `MIC:symbol` in the package. All six are asserted now, and the generic wrong
+ * form is refused in every one of them.
+ *
+ * ⚠️ **`allocate.md` is generic on purpose.** That flow prices the two sleeves
+ * against each other and reads **both** their answer files, so the key is per
+ * name; an id fixed to one market addresses nothing for every name in the other,
+ * which is `XNAS:<symbol>` being wrong for 55 of 83 with the direction reversed.
+ */
+const SWEEP_INSTRUCTIONS = {
+  'skills/kr-sleeve/SKILL.md': { itemId: '`kr:<symbol>`', mic: 'XKRX', marketArgument: '`market` the venue MIC', probe: true },
+  'skills/us-sleeve/SKILL.md': { itemId: '`us:<symbol>`', mic: 'XNAS', marketArgument: '`market` the venue MIC', probe: true },
+  'agents/kr-sleeve.md': { itemId: '`kr:<symbol>`', mic: 'XKRX', marketArgument: 'the venue\nMIC as `market`', probe: false },
+  'agents/us-sleeve.md': { itemId: '`us:<symbol>`', mic: 'XNAS', marketArgument: 'the venue\nMIC as `market`', probe: false },
+  /**
+   * ⚠️ No `mic`: the generic form is the correct instruction here, so there is
+   * no one MIC to refuse — and `bothKeys` is what stands in its place. This flow
+   * prices the two sleeves against each other and reads **both** their answer
+   * files, so an id pinned to one market addresses nothing for every name in the
+   * other. ⛔ That is `XNAS:<symbol>` being wrong for 55 of 83 with the direction
+   * reversed, and it passed the generic-form assertion on its own: measured by
+   * rewriting this instruction to «`us:` for every name» and watching the check
+   * stay green.
+   */
+  'agents/allocate.md': { itemId: '`<research market>:<symbol>`', mic: null, bothKeys: '`kr:` or `us:`', marketArgument: 'the venue\nMIC as `market`', probe: false },
+  /**
+   * ⚠️ **Generic for the same reason `allocate.md` is, and for one more.** This
+   * block is one template the orchestrator adjusts per flow, so it addresses
+   * both sleeves at once and a pinned market key would be wrong for every name
+   * in the other. ⛔ And no backticks: it lives inside a fenced block that is
+   * copied into a prompt, so the literals here are the bare spellings.
+   */
+  'skills/orchestrate/SKILL.md': { itemId: '<research market>:<symbol>', mic: null, bothKeys: 'kr: or us:', marketArgument: 'the venue MIC as market', probe: false },
+}
+for (const [file, row] of Object.entries(SWEEP_INSTRUCTIONS)) {
+  const text = await readFile(new URL(file, packageRoot), 'utf8')
+  assert.ok(
+    text.includes(row.itemId),
+    `${file} instructs the item id as the research market key ${row.itemId}; the store files no document under anything else, and an invented id is accepted and handed nothing`,
+  )
+  /**
+   * ⛔ The generic wrong form, refused in every one of them. It is what all five
+   * documents said, and it is the spelling `skills/orchestrate/SKILL.md` still
+   * carries — so this assertion is also what will fail the day that file is
+   * pulled in without being fixed.
+   */
+  assert.equal(
+    text.includes('MIC:symbol'),
+    false,
+    `${file} no longer instructs the item id as \`MIC:symbol\`; the store files documents under the research market key and hands a recipe nothing for any other id`,
+  )
+  if (row.bothKeys) {
+    assert.ok(
+      text.includes(row.bothKeys),
+      `${file} names both sleeves' keys, so the id is per name rather than pinned to one market; a flow that reads both sleeves' answers under one market key addresses nothing for every name in the other`,
+    )
+  }
+  if (row.mic !== null) {
+    assert.equal(
+      text.includes(`\`${row.mic}:<symbol>\``),
+      false,
+      `${file} no longer instructs the item id as the venue MIC — that is the coordinate the 2026-09-09 sweep sent for 83 US names, every one of which came back sourced: false with the roster and the vendor both fine`,
+    )
+  }
+  /**
+   * ⚠️ And the `market` argument beside it is still the MIC, because it belongs
+   * to the other call. Asserted so that fixing one coordinate cannot quietly
+   * take the other with it — the two being adjacent is the whole trap.
+   *
+   * ⛔ **Matched on the argument and not on the phrase.** «the venue MIC» now
+   * appears in the prose that explains the two coordinates, so a looser pattern
+   * passes on the explanation alone; that vacuousness was measured by deleting
+   * the argument and watching the check stay green.
+   */
+  assert.ok(
+    text.includes(row.marketArgument),
+    `${file} still names the venue MIC as source_cache_refresh's \`market\` argument; the item id was wrong and that one never was`,
+  )
+  /**
+   * The recovery, because the failure mode is indistinguishable from an empty
+   * market at every layer below it. One call, one name, both coordinates.
+   *
+   * ⚠️ It is owed by the **skills**, which is where a flow reads its procedure.
+   * The dispatch prompts name the probe's owner rather than restating it — they
+   * are eight lines handed to another process, and a second copy of a procedure
+   * is a second thing to keep in step.
+   */
+  if (row.probe) {
+    assert.ok(
+      /two-sided probe/.test(text) && text.includes(`{ id: "${row.mic}:`),
+      `${file} tells a flow to probe both coordinates on one name rather than report a roster of sourced: false as a market that offered nothing`,
+    )
+  } else {
+    /**
+     * ⛔ **Matched on the procedure's name and not on the word «probe».** These
+     * documents use that word in the sentence that describes the symptom too, so
+     * `/probe/` alone passes on the symptom while the pointer is gone — measured.
+     */
+    assert.ok(
+      /two-sided/.test(text),
+      `${file} points at the two-sided probe by name rather than restating it; a dispatch prompt that says nothing about a roster of sourced: false leaves the flow to read it as an empty market`,
+    )
+  }
+}
+
+/**
+ * ── The sweep folder is a calendar day and the answers are a run (#245) ────
+ *
+ * `outputPath` is `scans/<asOf's calendar day>/<recipeId>`, so the folder is
+ * keyed by **date and not by run** and accumulates every sweep taken that day,
+ * discarded ones included. Measured in the owner's store,
+ * `scans/2026-09-09/roster-scan/` held **242** answers: 55 `XNYS:` and 28
+ * `XNAS:` from the discarded venue-keyed batch, beside 83 `us:` and 76 `kr:`
+ * from the sweep that worked. Folding that folder wholesale reads the discarded
+ * 83 as `sourced: false` and reports `unprepared 83종` — a count of names
+ * nobody failed to read.
+ *
+ * ⚠️ **Two routes tell them apart and they are not equals.** `task_get`'s
+ * `outputs` names this run's files and nothing else, so it needs no comparison
+ * at all; each answer's own `evaluatedAsOf` is the check that survives a path
+ * reached for by hand (`00:39:16.609Z` on the discarded batch against
+ * `11:23:55.210Z` on the live one, written by `recipes/request.mjs` from the
+ * host's pin and never from `Date.now()`). So `outputs` is asserted as the
+ * instruction and `evaluatedAsOf` beside it.
+ *
+ * ⛔ **`files_list` is the route that must not be the roster.** It answers *what
+ * is on disk*, which is a question about the folder rather than about the run —
+ * a flow that lists a directory is reading something nobody promised it.
+ */
+const ANSWER_ROUTES = {
+  'skills/kr-sleeve/SKILL.md': { outputs: '`files_read` on the answer files `task_get` names in its `outputs`.', folder: '⛔ **Fold what `task_get` named and never the folder**' },
+  'skills/us-sleeve/SKILL.md': { outputs: '`files_read` on the answer files `task_get` names in its `outputs`.', folder: '⛔ **Fold what `task_get` named and never the folder**' },
+  'skills/candidate-research/SKILL.md': { outputs: '`files_read` on the files `task_get` named in `outputs`.', folder: '⛔ **Fold `outputs`, never the folder**' },
+  'agents/kr-sleeve.md': { outputs: 'the answer files `task_get` names in its `outputs`', folder: '⛔ **Never the folder.**' },
+  'agents/us-sleeve.md': { outputs: 'the answer files `task_get` names in its `outputs`', folder: '⛔ **Never the folder.**' },
+  'agents/allocate.md': { outputs: 'the answer files `task_get` names in its `outputs`', folder: '⛔ **Never the folder.**' },
+  /** ⛔ Bare spellings: inside the fenced dispatch template. */
+  'skills/orchestrate/SKILL.md': { outputs: 'the answer files task_get names in its outputs', folder: 'Never fold the folder:' },
+}
+for (const [file, row] of Object.entries(ANSWER_ROUTES)) {
+  const text = await readFile(new URL(file, packageRoot), 'utf8')
+  assert.ok(
+    text.includes(row.outputs),
+    `${file} reads the answers ${'`task_get`'} named in ${'`outputs`'}; that list is the only thing that says which of the folder's files are this run's`,
+  )
+  assert.ok(
+    text.includes(row.folder),
+    `${file} refuses the folder as the roster — ${'`scans/<date>/<recipeId>/`'} accumulates every sweep taken that calendar day, 242 files on 2026-09-09, and folding it wholesale reports an unprepared count that never happened`,
+  )
+  /**
+   * ⚠️ The check beside the instruction, because a path reached for by hand
+   * gets no `outputs` list. ⛔ Matched on the field name: the answers carry it
+   * and no other date on a row means what it means.
+   */
+  assert.ok(
+    text.includes('evaluatedAsOf'),
+    `${file} names ${'`evaluatedAsOf`'} as the key that separates one day's sweeps; it is written from the host's pin, so it is the one field that dates an answer to a run`,
+  )
+  /**
+   * ⛔ **The sentence that invited the fold, refused by name.** It stood in
+   * `skills/candidate-research/SKILL.md` — *«`files_list` over the folder tells
+   * you what is there»* — one line under the instruction to read each answer,
+   * and it is the only place in this package that offered the directory as a
+   * way of finding your rows.
+   */
+  assert.equal(
+    text.includes('`files_list` over the folder tells you what is there'),
+    false,
+    `${file} does not offer ${'`files_list`'} over the folder as the way to find this run's answers; the folder is a calendar day and the listing cannot say which sweep wrote what`,
+  )
+}
+
+/**
  * ⛔ **And no document tells a flow to hand `vendorId` or a research market to it.**
  *
  * Both are refused by the host on this route — a bar is one venue's record, and
