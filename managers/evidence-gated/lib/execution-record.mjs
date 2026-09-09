@@ -148,10 +148,38 @@ function rowName(row) {
  * Dropping it would shrink the denominator and quietly turn a folder half of
  * which could not be parsed into a fully prepared roster.
  */
+/**
+ * ── ⚠️ Whether this answer evaluated anything, in either of the two ways an
+ *    answer says so (#251 ③) ───────────────────────────────────────────────
+ *
+ * `data` non-null is what `recipes/request.mjs` writes and it stays
+ * authoritative. What was missing is that **a caller who states the fact
+ * directly was read by nothing**: `rows[].evaluated: true` on every row came
+ * back `counts.evaluated: 0` and `candidateEvaluation: 'none'`, with no
+ * diagnostic — and `mandateExecution` then read out a record saying *«25 names
+ * eligible»* beside *«nothing was evaluated»*, which is a self-contradiction
+ * this package published about its own run.
+ *
+ * ⛔ **`null` is a third answer and not a `false`.** A row that carries neither
+ * field has not said, and counting it as «not evaluated» is the silent zero the
+ * whole defect is made of; it is named below instead.
+ *
+ * ⚠️ **`data` wins when both are present, and a disagreement is reported.** Two
+ * fields answering one question is the shape this package keeps deleting, so the
+ * one the producer writes decides and the reader is told the two did not agree.
+ */
+function rowEvaluated(row) {
+  if (row.data !== undefined) return row.data !== null
+  if (typeof row.evaluated === 'boolean') return row.evaluated
+  return null
+}
+
 function readRows(rows) {
   const unreadable = []
   const sourced = []
   const unprepared = []
+  const unstated = []
+  const contradicted = []
   let evaluated = 0
   for (const row of rows) {
     if (row === null || typeof row !== 'object' || Array.isArray(row)) {
@@ -161,7 +189,10 @@ function readRows(rows) {
     const name = rowName(row)
     if (row.sourced === true) {
       if (name !== null) sourced.push(name)
-      if (row.data !== null && row.data !== undefined) evaluated += 1
+      const said = rowEvaluated(row)
+      if (said === null) unstated.push(name)
+      else if (said) evaluated += 1
+      if (row.data !== undefined && typeof row.evaluated === 'boolean' && row.evaluated !== (row.data !== null)) contradicted.push(name)
     } else if (row.sourced === false) {
       if (name !== null) unprepared.push(name)
     } else {
@@ -173,6 +204,10 @@ function readRows(rows) {
     sourced: sourced.length,
     unprepared: unprepared.length,
     evaluated,
+    /** ⚠️ Rows that said nothing either way — never folded into `evaluated`. */
+    evaluationUnstated: unstated.length,
+    evaluationUnstatedSymbols: [...new Set(unstated.filter((name) => name !== null))],
+    evaluationContradicted: contradicted.length,
     unpreparedSymbols: [...new Set(unprepared)],
   }
 }
@@ -239,10 +274,44 @@ export function executionRecord({ started = null, run = null, rows = undefined, 
         sourced: basis === 'rows' ? derived.sourced : null,
         unprepared: basis === 'rows' ? derived.unprepared : null,
         evaluated: basis === 'rows' ? derived.evaluated : null,
+        /** ⛔ `0` is «every answer said»; a positive number is «this count is short by that many» (#251 ③). */
+        evaluationUnstated: basis === 'rows' ? derived.evaluationUnstated : null,
       }
       if (basis === 'rows') unpreparedSymbols = symbolList(derived.unpreparedSymbols) ?? []
       failedSymbols = symbolList((run?.failures ?? []).map((row) => rowName(row))) ?? []
       pendingSymbols = symbolList((run?.pendingItems ?? []).map((id) => rowName({ itemId: id }))) ?? []
+      /**
+       * ⚠️ **A row that says nothing about evaluation is not a row that says
+       * no** (#251 ③). `evaluated` is derived, so a roster whose answers all
+       * omit both fields comes back `0` — indistinguishable from a recipe that
+       * ran and answered nothing. This is the sentence that separates them, and
+       * it names the two fields either of which settles it.
+       *
+       * ⛔ Not `input_key_unread`: that code is about a **declared operation
+       * key** the contract publishes, and these are fields inside somebody
+       * else's answer file. This is the same code the missing `sourced` raises,
+       * for the same reason — an answer read back without the field the
+       * diagnosis rests on.
+       */
+      if (basis === 'rows' && derived.evaluationUnstated > 0) {
+        diagnostics.push(diagnostic(
+          'research_record_unreadable',
+          'unevaluated',
+          'Some of the answers read back say neither `data` nor `evaluated`, so whether the recipe arrived at anything for those names is unknown and `counts.evaluated` is short by that many. ⛔ It is not a count of answers that evaluated nothing — hand back the recipe answers as `files_read` returned them, where `data` is the field, or state `evaluated` as a boolean',
+          'rows',
+          { evaluationUnstated: derived.evaluationUnstated, symbols: derived.evaluationUnstatedSymbols, settledBy: ['data', 'evaluated'], rowsRead: handedRows.length },
+        ))
+      }
+      /** ⚠️ Two fields answering one question, disagreeing. `data` is the producer's and it decides. */
+      if (basis === 'rows' && derived.evaluationContradicted > 0) {
+        diagnostics.push(diagnostic(
+          'research_record_unreadable',
+          'unevaluated',
+          'Some answers carry both `data` and `evaluated` and the two disagree about whether the recipe arrived at anything. `data` is what the recipe itself writes and it is the one counted; the other was read past',
+          'rows',
+          { evaluationContradicted: derived.evaluationContradicted, authoritative: 'data' },
+        ))
+      }
       if (basis === 'rows' && derived.unreadable.length > 0) {
         diagnostics.push(diagnostic(
           'research_record_unreadable',

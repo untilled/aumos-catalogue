@@ -90,7 +90,11 @@ So a budget you write is a budget you have shown can be procured, or a budget yo
 `specialistBudget` reports `sleeve_budget_not_fundable_in_currency` when the sleeve cannot pay for
 its own budget in the currency it settles in, and it is a **warning** rather than a block for the
 reason it lands here: the two moves that close the gap — converting currency, or selling in the
-other sleeve — are yours to propose and the investor's to approve. ⚠️ A budget written without
+other sleeve — are yours to propose and the investor's to approve. ⚠️ **Read `fundingRoute` before
+you decide it is yours at all** (#250): a sleeve whose budget comes out `sell-parking-same-currency`
+can pay for it out of its own same-currency parking, which is that sleeve's sale to propose and not
+your conversion — and until the parking had a key to arrive under, every one of those was reported
+to you as a shortfall. Only `fx-conversion` and `cross-market-sale` are this flow's. ⚠️ A budget written without
 either the funding or the escalation is the one shape that is not allowed, because the sleeve flow
 reading it back cannot tell the difference.
 

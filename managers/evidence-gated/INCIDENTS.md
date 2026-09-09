@@ -396,6 +396,109 @@ enforced without being published: `observations[]` requires `symbol`, `market`, 
 non-empty `evidenceIds`, and omitting `observedAt` cost that run one more round trip.
 `inputContracts.nested.researchState` publishes it.
 
+### A funding verdict that could not come out true (#250, 2026-09-09)
+
+Two defects in `specialistBudget`'s procurement side, either of which alone made the verdict
+unreadable.
+
+**The parking had nowhere to be written.** `sleeveCashByCurrency` was the only numerator. So a
+sleeve fundable entirely out of its own same-currency parking — short-duration and T-bill holdings,
+the rows `concentration` has excluded from the sector, theme and factor axes since #141 — reported
+`budgetFundableInSleeveCurrency: false` on **every** run. This book has recorded it four runs
+running under `sleeve-budget-in-portfolio-weight-ignores-which-duration-the-cash-is-in`, which named
+the symptom and not the cause. The measurement that settles it: write the budget down to the
+fundable amount, call again, and the reported «shortfall» equals that sleeve's own parked market
+value **to the cent**. The money was there; the route was a sale inside one currency, and there was
+no field in the answer that could say so.
+
+⚠️ **Why the two halves are reported apart.** `fundableFromCash` and `fundableFromParking`, never
+just their sum, because spending the parking is a **sale** — a proposal the investor approves — and
+holding the cash is not. A single `fundableAmount` prices an act as a balance. `fundingRoute` is the
+same finding said in one word, and it exists because the run that measured this had to compare a
+shortfall against a parked market value by hand, four times, to discover that it was not short of
+anything.
+
+**And the comparison could not come out true.** It was made in weight space against
+`BUDGET_EPSILON = 1e-9`, while the answer is printed in the sleeve currency to two places. Every
+weight in these runs is written to eight decimals, which carries up to `5e-9` of rounding error —
+five times the tolerance; at the measured book's NAV that is four hundredths of a cent. One control:
+
+```
+requiredAmount  = 294.02
+fundableAmount  = 294.02
+shortfallAmount = 0
+budgetFundableInSleeveCurrency = false     ← and the code fired
+```
+
+⇒ **no budget value could pass this code quietly**, and `mandateExecution` therefore booked one
+unresolved code on every run of the flow — a permanent finding that described the tolerance rather
+than the book. ⛔ The fix is not a wider epsilon. The verdict is `<= 0` of the **printed** shortfall,
+so the published number and the published verdict are one value; `BUDGET_EPSILON` still guards
+`withinBriefBudget`, which is a ratio against a ratio and has no amount to round to.
+
+### Four inputs that were shape-valid and answered the opposite question (#251, 2026-09-09)
+
+`run_bb689b6199084b04afd8b0e1d1528cda`. The orchestrator met four in one run; two were refused
+honestly and two came back confident and reversed — the pattern
+`failures/repeated-patterns` has recorded seven times as *a wrong input is not refused and comes
+back looking like a pass*.
+
+**① The three configured caps put in `config`.** `caps` carried the Mandate's two and `config`
+carried `{ sector: 0.2, theme: 0.15, factor: 0.15 }`, which is where this package's own settings
+declare them. The answer was `concentration_cap_missing` / `unevaluated` three times. ⛔
+`unevaluated` is not a pass — and that answer **reads** as one: `breaches` comes back empty and
+`exposures` comes back populated, so three unmeasured axes look measured and clear. §4's table named
+`caps.position` and `caps.portfolioHeat` and left the other three to a sentence of prose that never
+said where they go.
+
+⚠️ **`blocked`, and on the judgement `scheduleBuffers` already made** for the close buffers put at
+the top of `config`. No legitimate call is refused by it: nothing in this package reads a threshold
+from `config.<axis>` or from `config.concentration.<axis>`, so a call carrying one has already lost
+the axis whatever the severity says. A fourth way of answering `unevaluated` would have left the
+reversed reading standing beside it. ⛔ Only the three: `config.schema.json` deliberately declares
+neither `position` nor `portfolioHeat`, so neither has a wrong place to be found in.
+
+**② `effectivePositionCap.evidenceSamples: 0`.** `input_shape_invalid` / `blocked` / `data: null`.
+An honest refusal, and the type was already published at `contracts.effectivePositionCap.keys`; what
+cost the round trip is that the field literally called `keys` is a bare **name list**, so a caller
+reading it learns the key exists and not that it takes an array. Both halves are pinned now and the
+skill says which of the two projections carries types.
+
+**③ `executionRecord` read `data` non-null and nothing read `rows[].evaluated`.** A caller stating
+the fact directly got `counts.evaluated: 0` and `candidateEvaluation: "none"` with no diagnostic —
+and the record then published **«eligible 25» beside «candidateEvaluation: none»**, a
+self-contradiction about the run's own work that `mandateExecution` read out as written. Either field
+settles it now, `data` decides when both are present, and a row saying neither is
+`research_record_unreadable` rather than a silent zero: ⛔ *«did not say»* is a third answer and
+never a `false`.
+
+**④ `specialistBudget.requestedTargetWeight` was the sleeve total under a name that reads as the
+increment.**
+
+```
+current 0.31471199, a new 3% name wanted
+requestedTargetWeight: 0.03        → increaseWeight −0.28471199, allowed: true   ← reversed
+requestedTargetWeight: 0.34471199  → specialist_sleeve_budget_exceeded / blocked ← the answer
+```
+
+⚠️ Met **twice in one run by two subjects independently** — the `us-sleeve` flow and `allocate`,
+which caught itself. That is the evidence the name was the defect rather than the caller. The key is
+`requestedSleeveTotalWeight`, and ⛔ the retired spelling is refused by name rather than aliased:
+reading it as the new key would answer the same reversed question it always did, and reading it as an
+increment would make two callers mean two things by one contract. It stays **declared** only so the
+refusal can state what the number means, and it is `blocked` so that `allowed` can never again come
+back `true` for a question this operation could not establish.
+
+⚠️ **The one thing that is not in this package.** The same issue reports the metrics MCP server
+mangling Korean syllables in its response echo (`평균`→`평재`, `기각`→`기겁`, `혼잡`→`혜잡`,
+`전망`→`전말`, `대비`→`대버`, `베타`→`버타`), reported independently by three subjects. Measured
+here: seven Korean strings, including all six of those, survive `execute()` → `tools/call` →
+`JSON.stringify` → UTF-8 bytes → parse **byte-identically**, and the corruptions are single-byte
+flips inside the UTF-8 stream (`각` `ea b0 81` → `겁` `ea b2 81`), which no JavaScript string
+operation produces. `lib/mcp-server.mjs` neither decodes nor re-encodes; it hands `execute`'s object
+to `JSON.stringify` and returns the same object as `structuredContent`. ⇒ the cause is downstream of
+this package and gets its own issue rather than a guess here.
+
 ## The paper track (§5)
 
 **A track passed under the wrong key looks like a cold start.** `state.openWindows` is where

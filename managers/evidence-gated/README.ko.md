@@ -462,6 +462,42 @@ USD) 호출자가 선언하지 않으며, 현금은 `portfolio.cashByCurrency`�
 `budgetFundableInSleeveCurrency`가 `withinBriefBudget` 옆에서 `null`이다. 전에는 `status: ok`와 빈
 진단 배열이었다.
 
+**그리고 그 판정은 참이 될 수 없었다.** (#250) 결함 둘이고, 각각 하나만으로도 조달 판정을 쓸모없게
+만들기에 충분했다. `sleeveCashByCurrency`가 지불 재원의 **유일한** 분자였으므로, 자기 통화의 파킹
+유동성으로 필요액을 전부 조달할 수 있는 슬리브 — 단기채·T-bill 보유, #141부터 집중도 축에서 이미
+`parkedLiquidity: true`를 달고 있던 그 행들 — 이 매 런 `budgetFundableInSleeveCurrency: false`를
+받았고, 그것이 네 런 연속이었다. 확정한 측정: 예산을 조달 가능액에 맞춰 내려 적고 다시 호출하면
+「부족분」이 그 슬리브 자신의 파킹 시가와 **센트까지 일치한다**. 돈은 있었고 조달 경로는 환전이 아니라
+**한 통화 안에서 파킹을 파는 것**이었다. 이제 `sleeveParkedLiquidity`를 통화별로 읽어 분자에 넣고,
+답은 `fundableFromCash`와 `fundableFromParking`을 **분리해서** 싣는다 — 파킹을 파는 것은 제안이 필요한
+행위이고 현금을 드는 것은 아니므로, 합산만 하면 앞의 것을 뒤의 것으로 값매기게 된다. `fundingRoute`가
+넷 중 무엇인지 이름 댄다: `cash` · `sell-parking-same-currency` · `fx-conversion` ·
+`cross-market-sale`. 뒤의 둘은 그대로 `allocate`와 투자자의 것이고, 둘째는 그 슬리브 자신의 것이다.
+나머지 절반은 산술이었다. 비교가 **비중** 공간에서 `1e-9` 입실론에 대고 이뤄지는데 답은 **센트**로
+인쇄됐고, 이 런들의 모든 비중은 소수 여덟 자리로 적히므로 그 관용의 **다섯 배**까지 반올림 오차를
+나른다. 통제 1회: `requiredAmount 294.02` · `fundableAmount 294.02` · `shortfallAmount 0`, 그리고
+`budgetFundableInSleeveCurrency: false`와 함께 코드 발화. **어떤 예산값도 이 코드를 조용히 통과할 수
+없었고**, 그래서 `mandateExecution`이 이 플로우의 매 런마다 미해소 코드 1건을 만들어 냈다. 판정은 이제
+인쇄되는 부족분으로 정한다 — 답이 게시하는 그 숫자의 `<= 0` — 그래서 둘이 어긋날 수 없고, 고침은 더
+넓은 관용이 아니라 **답이 말해지는 자리에서 하는 비교**다.
+
+**형태가 유효하고 반대 질문에 답한 입력이 둘 있었다.** (#251) 한 런에서 함정 넷을 밟았고, 둘은
+정직하게 거부됐고 둘은 확신에 찬 반대 답으로 돌아왔다. `concentration`의 캡은 다섯이고 그중 둘만
+Mandate의 것이므로, 한 런이 나머지 셋을 자기 설정이 그것을 선언하는 자리 — `config` — 에 넣고
+`concentration_cap_missing` / `unevaluated`를 세 번 받았다. ⛔ `unevaluated`는 통과가 아닌데 그 답은
+통과처럼 읽힌다: `breaches`는 비어 있고 `exposures`는 채워져 나오므로 측정되지 않은 축 셋이 측정되고
+통과한 것으로 보인다. 이제 그것은 `concentration_caps_misplaced` / **blocked**이고 틀린 자리 둘을 함께
+이름 댄다 — `config`의 최상위, 그리고 설정 블록을 그대로 넘긴 `config.concentration` — 그리고
+`unmeasuredAxes`가 어느 축을 측정하지 않았는지를 답이 스스로 말한다. 그리고 `specialistBudget`의
+요청 비중은 증분처럼 읽히는 이름 아래의 슬리브 **총량**이었다: 0.31471199에 서 있던 슬리브가 새 3%
+종목을 담으려고 `0.03`을 넘겼고, 그것이 *이 슬리브를 3%로 줄여라*로 읽혀 `increaseWeight: −0.28471199`
+· `allowed: true` · 진단 0건으로 돌아왔다 — 같은 런에서 슬리브 플로우와 `allocate`가 **독립적으로**
+두 번 밟았다. 키는 `requestedSleeveTotalWeight`이고, 은퇴한 철자는 이름으로 거절되며 ⛔ 새 키로
+**읽지 않는다**: 별칭으로 두면 같은 반대 질문에 계속 답하게 된다. `executionRecord`는 `data`의
+non-null을 읽고 있었고 `rows[].evaluated`는 아무도 읽지 않았으며, 그것이 「적격 25종」 옆에
+「아무것도 평가되지 않음」이라는 기록을 게시했다. 이제 두 필드 어느 쪽으로도 정해지고, 둘 다 말하지
+않은 행은 아무것도 찾지 못한 답으로 세는 대신 이름으로 말해진다.
+
 **답처럼 보이는 오답 넷이 더 있었다.** (#177) 이 패키지가 가장 자주 기록하는 패턴 — *틀린 입력이
 거절되지 않고 통과처럼 돌아온다* — 을 한 런에서 넷 더 쟀고, 가장 비싼 것은 **1,338.848배** 틀린
 NAV였다. `sleeveNav`는 포지션 행의 `currency`를 두 사실로 동시에 읽고 있었다: 이 이름이 어느 슬리브의
