@@ -1,0 +1,124 @@
+{
+  "note": "One staged plan, read four times. The second read is the whole reason this module exists: the same plan, the same due stage, and nothing added. Illustrative figures.",
+  "plan": {
+    "originDecisionId": "dec_2026_0630_a00007",
+    "symbol": "A00007",
+    "cumulativeTargetWeight": 0.12,
+    "thesisRecheckedAt": "2026-06-30T06:40:00Z",
+    "remainingRiskBudget": 0.2,
+    "stages": [
+      { "id": "s1", "weight": 0.04, "condition": { "kind": "immediate" } },
+      { "id": "s2", "weight": 0.04, "condition": { "kind": "price-below", "threshold": 9200 }, "expiresAt": "2026-09-30T00:00:00Z" },
+      { "id": "s3", "weight": 0.04, "condition": { "kind": "at-time", "at": "2026-08-15T00:00:00Z" }, "expiresAt": "2026-10-31T00:00:00Z" }
+    ]
+  },
+  "runs": [
+    {
+      "name": "first-run-fills-the-immediate-stage",
+      "asOf": "2026-06-30T07:00:00Z",
+      "price": 10000,
+      "previous": null,
+      "expect": { "addedThisRun": 0.04, "cumulativeWeightAfter": 0.04, "filledStageIds": ["s1"], "pendingStageIds": ["s2", "s3"], "diagnosticCodes": [] }
+    },
+    {
+      "name": "re-running-the-same-plan-adds-nothing",
+      "why": "The plan is handed back with s1 marked unfilled — a restatement, not a second order. The carried register wins.",
+      "asOf": "2026-06-30T09:00:00Z",
+      "price": 10000,
+      "previous": {
+        "version": 1,
+        "originDecisionId": "dec_2026_0630_a00007",
+        "symbol": "A00007",
+        "cumulativeTargetWeight": 0.12,
+        "filledStageIds": ["s1"],
+        "filledWeight": 0.04,
+        "lapsedStageIds": []
+      },
+      "expect": { "addedThisRun": 0, "cumulativeWeightAfter": 0.04, "filledStageIds": ["s1"], "diagnosticCodes": ["filled_stage_restated_as_unfilled"] }
+    },
+    {
+      "name": "a-price-stage-comes-due",
+      "why": "The condition is met on a later run and the increment is the stage's own weight, not the plan's.",
+      "asOf": "2026-07-14T07:00:00Z",
+      "price": 9000,
+      "previous": {
+        "version": 1,
+        "originDecisionId": "dec_2026_0630_a00007",
+        "symbol": "A00007",
+        "cumulativeTargetWeight": 0.12,
+        "filledStageIds": ["s1"],
+        "filledWeight": 0.04,
+        "lapsedStageIds": []
+      },
+      "expect": { "addedThisRun": 0.04, "cumulativeWeightAfter": 0.08, "filledStageIds": ["s1", "s2"], "diagnosticCodes": [] }
+    },
+    {
+      "name": "an-expired-stage-is-not-executed-quietly",
+      "why": "Past the expiry the remainder is re-armed, resized or abandoned in this run. Leaving it is how a plan becomes a standing order.",
+      "asOf": "2026-11-15T07:00:00Z",
+      "price": 8000,
+      "previous": {
+        "version": 1,
+        "originDecisionId": "dec_2026_0630_a00007",
+        "symbol": "A00007",
+        "cumulativeTargetWeight": 0.12,
+        "filledStageIds": ["s1"],
+        "filledWeight": 0.04,
+        "lapsedStageIds": []
+      },
+      "expect": { "addedThisRun": 0, "cumulativeWeightAfter": 0.04, "lapsedStageIds": ["s2", "s3"], "diagnosticCodes": ["stage_lapsed"] }
+    }
+  ],
+  "malformed": [
+    {
+      "name": "stages-that-do-not-sum",
+      "asOf": "2026-06-30T07:00:00Z",
+      "price": 10000,
+      "plan": {
+        "originDecisionId": "dec_bad_sum",
+        "symbol": "A00007",
+        "cumulativeTargetWeight": 0.12,
+        "thesisRecheckedAt": "2026-06-30T06:40:00Z",
+        "remainingRiskBudget": 0.2,
+        "stages": [
+          { "id": "s1", "weight": 0.04, "condition": { "kind": "immediate" } },
+          { "id": "s2", "weight": 0.05, "condition": { "kind": "at-time", "at": "2026-08-15T00:00:00Z" }, "expiresAt": "2026-10-31T00:00:00Z" }
+        ]
+      },
+      "expect": { "diagnosticCodes": ["stage_sizes_do_not_sum"] }
+    },
+    {
+      "name": "a-due-stage-with-no-thesis-recheck-waits",
+      "asOf": "2026-06-30T07:00:00Z",
+      "price": 10000,
+      "plan": {
+        "originDecisionId": "dec_no_recheck",
+        "symbol": "A00007",
+        "cumulativeTargetWeight": 0.08,
+        "remainingRiskBudget": 0.2,
+        "stages": [
+          { "id": "s1", "weight": 0.04, "condition": { "kind": "immediate" } },
+          { "id": "s2", "weight": 0.04, "condition": { "kind": "at-time", "at": "2026-08-15T00:00:00Z" }, "expiresAt": "2026-10-31T00:00:00Z" }
+        ]
+      },
+      "expect": { "addedThisRun": 0, "causeCodes": ["research_incomplete"] }
+    },
+    {
+      "name": "two-stages-cannot-share-an-id",
+      "asOf": "2026-06-30T07:00:00Z",
+      "price": 10000,
+      "plan": {
+        "originDecisionId": "dec_dup",
+        "symbol": "A00007",
+        "cumulativeTargetWeight": 0.08,
+        "thesisRecheckedAt": "2026-06-30T06:40:00Z",
+        "remainingRiskBudget": 0.2,
+        "stages": [
+          { "id": "s1", "weight": 0.04, "condition": { "kind": "immediate" } },
+          { "id": "s1", "weight": 0.04, "condition": { "kind": "at-time", "at": "2026-08-15T00:00:00Z" }, "expiresAt": "2026-10-31T00:00:00Z" }
+        ]
+      },
+      "expect": { "diagnosticCodes": ["stage_id_duplicated"] }
+    }
+  ]
+}

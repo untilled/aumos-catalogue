@@ -1,0 +1,627 @@
+{
+  "note": "Eleven runs, each reaching a different rung of the ladder in lib/verdict.mjs. Every figure here is illustrative and constructed to exercise a rung; none of it is a re-audited historical record, and nothing in this file is a claim about any company. The symbols are placeholders except where a case is explicitly about the reference case, which lives in reference-case.json.",
+  "asOf": "2026-06-30T07:00:00Z",
+  "cases": [
+    {
+      "name": "catalyst-realised-and-priced-in",
+      "why": "The confirming indicator arrived in a filing and 80% of the path to the target is in the price. Trim: the recovery is what was bought.",
+      "expect": {
+        "intent": "trim-into-realisation",
+        "review": "post-realisation-trim",
+        "benchmarkComparisonRequired": true,
+        "causeCodes": []
+      },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00001",
+        "market": "XKRX",
+        "held": true,
+        "strategy": "catalyst-turnaround",
+        "case": {
+          "policyDependent": true,
+          "policyStage": "in-results",
+          "earningsPathTraced": true,
+          "deteriorationCauseIdentified": true,
+          "valuationMultiple": 41.2
+        },
+        "catalysts": [
+          {
+            "id": "cat-price-revision-2026q2",
+            "kind": "tariff-or-price-revision",
+            "source": { "url": "https://example.invalid/notice/2026-0210", "publisher": "regulator", "documentId": "notice-2026-0210" },
+            "publishedAt": "2026-02-10T00:30:00Z",
+            "reportDate": "2026-02-09T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-04-01T00:00:00Z", "endsAt": "2026-05-31T00:00:00Z" },
+            "confirmingIndicator": { "name": "regulated unit price", "unit": "KRW/unit", "source": "quarterly report" },
+            "successCondition": "The revised unit price appears in the quarterly revenue line",
+            "failureCondition": "The revision is suspended or reversed before the quarter closes",
+            "evidenceIds": ["ev_notice_0210"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [
+          {
+            "catalystId": "cat-price-revision-2026q2",
+            "to": "realised",
+            "observedAt": "2026-05-20T00:00:00Z",
+            "evidenceIds": ["ev_q1_report"],
+            "evidenceKinds": ["filing"],
+            "confirmingIndicatorMet": true
+          }
+        ],
+        "indicators": [
+          {
+            "name": "trade receivable balance",
+            "channel": "receivable-balance",
+            "unit": "KRW",
+            "direction": "down-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": 12400000000000, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 10900000000000, "evidenceIds": ["ev_q1"] }
+            ]
+          },
+          {
+            "name": "operating margin",
+            "channel": "operating-margin",
+            "unit": "fraction",
+            "direction": "up-is-better",
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": 0.021, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 0.048, "evidenceIds": ["ev_q1"] }
+            ]
+          }
+        ],
+        "financials": {
+          "liquidAssets": 1800000000000,
+          "monthlyCashBurn": 0,
+          "debtMaturingWithinYear": 900000000000,
+          "securedRefinancing": 400000000000,
+          "dilutionRisk": "none-disclosed"
+        },
+        "price": { "last": 42000, "entryPrice": 30000, "targetPrice": 45000, "invalidationPrice": 33000, "stabilised": true },
+        "sizing": { "expectedActiveReturn": 0.18, "conviction": 0.55, "mandatePositionCap": 0.12 },
+        "book": { "positions": [{ "symbol": "A00001", "strategy": "catalyst-turnaround", "weight": 0.09 }], "proposals": [], "caps": { "accountSingleName": 0.2 } },
+        "scoring": { "price": { "unrealisedReturn": 0.4 } }
+      }
+    },
+    {
+      "name": "one-delay-with-new-evidence",
+      "why": "The deadline moved on stated new evidence, with the remaining expected return and the additional downside written down. Inside the budget of slips.",
+      "expect": { "intent": "hold-through-delay", "review": "delay-extended", "benchmarkComparisonRequired": false, "causeCodes": [] },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00002",
+        "market": "XKRX",
+        "held": true,
+        "strategy": "catalyst-turnaround",
+        "case": { "policyDependent": false, "policyStage": "none", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
+        "catalysts": [
+          {
+            "id": "cat-disposal-2026",
+            "kind": "asset-disposal",
+            "source": { "url": "https://example.invalid/disclosure/2026-0330", "publisher": "company", "documentId": "disc-2026-0330" },
+            "publishedAt": "2026-03-30T08:00:00Z",
+            "reportDate": "2026-03-30T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-06-01T00:00:00Z", "endsAt": "2026-07-31T00:00:00Z" },
+            "confirmingIndicator": { "name": "disposal proceeds received", "unit": "KRW", "source": "half-year report" },
+            "successCondition": "Proceeds appear in investing cash flow",
+            "failureCondition": "The buyer withdraws or the contract lapses",
+            "evidenceIds": ["ev_disc_0330"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [
+          {
+            "catalystId": "cat-disposal-2026",
+            "to": "delayed",
+            "observedAt": "2026-06-25T08:00:00Z",
+            "evidenceIds": ["ev_disc_0625"],
+            "evidenceKinds": ["company-disclosure"],
+            "reason": "regulatory-approval-outstanding",
+            "newWindowEndsAt": "2026-09-30T00:00:00Z",
+            "remainingExpectedReturn": 0.26,
+            "additionalDownside": -0.11
+          }
+        ],
+        "indicators": [
+          {
+            "name": "net debt",
+            "channel": "financing-cost",
+            "unit": "KRW",
+            "direction": "down-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": 4100000000000, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 3800000000000, "evidenceIds": ["ev_q1"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 600000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 300000000000, "securedRefinancing": 0, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 18000, "entryPrice": 16000, "targetPrice": 26000, "invalidationPrice": 13500, "stabilised": true },
+        "sizing": { "expectedActiveReturn": 0.3, "conviction": 0.5, "mandatePositionCap": 0.1 },
+        "book": { "positions": [{ "symbol": "A00002", "strategy": "catalyst-turnaround", "weight": 0.06 }], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "repeated-delay-exhausts-the-budget",
+      "why": "Two delays were already on the record and this run adds a third. The question stops being when it lands.",
+      "expect": { "intent": "exit-review", "review": "delay-exhausted", "benchmarkComparisonRequired": true, "causeCodes": [] },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00003",
+        "market": "XKRX",
+        "held": true,
+        "strategy": "catalyst-turnaround",
+        "case": { "policyDependent": true, "policyStage": "announced", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
+        "register": {
+          "catalysts": {
+            "version": 1,
+            "catalysts": [
+              { "id": "cat-settlement-2026", "state": "delayed", "delayCount": 2, "cancelled": false, "contraryEvidence": [], "history": [] }
+            ]
+          }
+        },
+        "catalysts": [
+          {
+            "id": "cat-settlement-2026",
+            "kind": "receivable-settlement",
+            "source": { "url": "https://example.invalid/gazette/2025-1201", "publisher": "ministry", "documentId": "gazette-2025-1201" },
+            "publishedAt": "2025-12-01T00:00:00Z",
+            "reportDate": "2025-11-30T00:00:00Z",
+            "dateStatus": "estimated",
+            "expectedWindow": {
+              "startsAt": "2026-04-01T00:00:00Z",
+              "endsAt": "2026-08-31T00:00:00Z",
+              "uncertaintyDays": 60,
+              "basis": "the ministry's stated semi-annual review schedule, which has moved twice"
+            },
+            "confirmingIndicator": { "name": "settled receivable", "unit": "KRW", "source": "quarterly report" },
+            "successCondition": "A settlement instalment appears in operating cash flow",
+            "failureCondition": "The review closes with no instalment scheduled",
+            "evidenceIds": ["ev_gazette_1201"],
+            "state": "delayed",
+            "delayCount": 2
+          }
+        ],
+        "transitions": [
+          {
+            "catalystId": "cat-settlement-2026",
+            "to": "delayed",
+            "observedAt": "2026-06-28T00:00:00Z",
+            "evidenceIds": ["ev_gazette_0628"],
+            "evidenceKinds": ["policy-gazette"],
+            "reason": "review-postponed-again",
+            "newWindowEndsAt": "2026-11-30T00:00:00Z",
+            "remainingExpectedReturn": 0.19,
+            "additionalDownside": -0.15
+          }
+        ],
+        "indicators": [
+          {
+            "name": "trade receivable balance",
+            "channel": "receivable-balance",
+            "unit": "KRW",
+            "direction": "down-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": 9000000000000, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 8850000000000, "evidenceIds": ["ev_q1"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 900000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 600000000000, "securedRefinancing": 200000000000, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 26000, "entryPrice": 28000, "targetPrice": 40000, "invalidationPrice": 21000, "stabilised": false },
+        "sizing": { "expectedActiveReturn": 0.2, "conviction": 0.45, "mandatePositionCap": 0.1 },
+        "book": { "positions": [{ "symbol": "A00003", "strategy": "catalyst-turnaround", "weight": 0.07 }], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "catalyst-cancelled",
+      "why": "Not a postponement. There is no window left to wait for, and a delay and a cancellation are two different records.",
+      "expect": { "intent": "close-out", "review": "catalyst-cancelled", "benchmarkComparisonRequired": true, "causeCodes": ["thesis_refuted"] },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00004",
+        "market": "XKRX",
+        "held": true,
+        "strategy": "catalyst-turnaround",
+        "case": { "policyDependent": true, "policyStage": "announced", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
+        "catalysts": [
+          {
+            "id": "cat-approval-2026",
+            "kind": "regulatory-approval",
+            "source": { "url": "https://example.invalid/notice/2026-0115", "publisher": "regulator", "documentId": "notice-2026-0115" },
+            "publishedAt": "2026-01-15T00:00:00Z",
+            "reportDate": "2026-01-14T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-05-01T00:00:00Z", "endsAt": "2026-08-31T00:00:00Z" },
+            "confirmingIndicator": { "name": "approval published", "unit": "boolean", "source": "regulator notice" },
+            "successCondition": "The approval is published and the tariff schedule follows",
+            "failureCondition": "The application is withdrawn or refused",
+            "evidenceIds": ["ev_notice_0115"],
+            "state": "in-progress"
+          }
+        ],
+        "transitions": [
+          {
+            "catalystId": "cat-approval-2026",
+            "to": "failed",
+            "observedAt": "2026-06-20T00:00:00Z",
+            "evidenceIds": ["ev_notice_0620"],
+            "evidenceKinds": ["regulator-notice"],
+            "reason": "cancelled",
+            "contrary": true
+          }
+        ],
+        "indicators": [
+          {
+            "name": "inventory days",
+            "channel": "inventory-and-working-capital",
+            "unit": "days",
+            "direction": "down-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": 88, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 81, "evidenceIds": ["ev_q1"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 700000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 400000000000, "securedRefinancing": 100000000000, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 9800, "entryPrice": 11000, "targetPrice": 17000, "invalidationPrice": 8200, "stabilised": false },
+        "sizing": { "expectedActiveReturn": 0.25, "conviction": 0.4, "mandatePositionCap": 0.08 },
+        "book": { "positions": [{ "symbol": "A00004", "strategy": "catalyst-turnaround", "weight": 0.05 }], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "receivable-re-growth-fires-a-declared-invalidation",
+      "why": "The channel the thesis named in advance as a business invalidation condition reversed. That is a refutation and not an uncertainty.",
+      "expect": { "intent": "reduce-on-invalidation", "review": "recovery-indicator-reversed", "benchmarkComparisonRequired": true, "causeCodes": ["thesis_refuted"] },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00005",
+        "market": "XKRX",
+        "held": true,
+        "strategy": "catalyst-turnaround",
+        "case": { "policyDependent": true, "policyStage": "executing", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
+        "catalysts": [
+          {
+            "id": "cat-settlement-2026h2",
+            "kind": "receivable-settlement",
+            "source": { "url": "https://example.invalid/gazette/2026-0210", "publisher": "ministry", "documentId": "gazette-2026-0210" },
+            "publishedAt": "2026-02-10T00:00:00Z",
+            "reportDate": "2026-02-09T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-07-01T00:00:00Z", "endsAt": "2026-10-31T00:00:00Z" },
+            "confirmingIndicator": { "name": "settled receivable", "unit": "KRW", "source": "quarterly report" },
+            "successCondition": "An instalment appears in operating cash flow",
+            "failureCondition": "The receivable balance rises for two consecutive quarters",
+            "evidenceIds": ["ev_gazette_0210"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [
+          {
+            "name": "trade receivable balance",
+            "channel": "receivable-balance",
+            "unit": "KRW",
+            "direction": "down-is-better",
+            "invalidationChannel": true,
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": 11800000000000, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 12600000000000, "evidenceIds": ["ev_q1"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 1200000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 700000000000, "securedRefinancing": 300000000000, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 31000, "entryPrice": 29000, "targetPrice": 46000, "invalidationPrice": 24000, "stabilised": true },
+        "sizing": { "expectedActiveReturn": 0.3, "conviction": 0.45, "mandatePositionCap": 0.1 },
+        "book": { "positions": [{ "symbol": "A00005", "strategy": "catalyst-turnaround", "weight": 0.08 }], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "refinancing-deterioration",
+      "why": "The recovery is unchanged and the balance sheet no longer funds the wait. A size decision, not a verdict on the thesis.",
+      "expect": { "intent": "resize-to-risk-limit", "review": "survivability-breach", "benchmarkComparisonRequired": false, "causeCodes": ["risk_limit_exceeded"] },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00006",
+        "market": "XKRX",
+        "held": true,
+        "strategy": "catalyst-turnaround",
+        "case": { "policyDependent": false, "policyStage": "none", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
+        "catalysts": [
+          {
+            "id": "cat-restructuring-2026",
+            "kind": "restructuring-completion",
+            "source": { "url": "https://example.invalid/disclosure/2026-0420", "publisher": "company", "documentId": "disc-2026-0420" },
+            "publishedAt": "2026-04-20T08:00:00Z",
+            "reportDate": "2026-04-20T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-08-01T00:00:00Z", "endsAt": "2026-11-30T00:00:00Z" },
+            "confirmingIndicator": { "name": "loss-making segment closed", "unit": "boolean", "source": "quarterly report" },
+            "successCondition": "The segment is deconsolidated and the operating loss narrows",
+            "failureCondition": "The closure is abandoned",
+            "evidenceIds": ["ev_disc_0420"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [
+          {
+            "name": "operating loss",
+            "channel": "operating-margin",
+            "unit": "KRW",
+            "direction": "up-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": -420000000000, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": -180000000000, "evidenceIds": ["ev_q1"] }
+            ]
+          }
+        ],
+        "financials": {
+          "liquidAssets": 500000000000,
+          "monthlyCashBurn": 20000000000,
+          "debtMaturingWithinYear": 900000000000,
+          "securedRefinancing": 100000000000,
+          "dilutionRisk": "rights-issue-under-discussion"
+        },
+        "price": { "last": 5400, "entryPrice": 6200, "targetPrice": 11000, "invalidationPrice": 4200, "stabilised": false },
+        "sizing": { "expectedActiveReturn": 0.4, "conviction": 0.45, "mandatePositionCap": 0.06 },
+        "book": { "positions": [{ "symbol": "A00006", "strategy": "catalyst-turnaround", "weight": 0.04 }], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "completed-positive-thesis-reaches-the-buy-path",
+      "why": "Two distinct improving channels, a traced cash-flow link, a confirmed window inside the horizon, survivable finances and a positive edge.",
+      "expect": { "intent": "enter-staged", "review": "staged-entry-armed", "benchmarkComparisonRequired": false, "causeCodes": [] },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00007",
+        "market": "XKRX",
+        "held": false,
+        "strategy": "catalyst-turnaround",
+        "case": { "policyDependent": true, "policyStage": "executing", "earningsPathTraced": true, "deteriorationCauseIdentified": true, "valuationMultiple": 88.4 },
+        "catalysts": [
+          {
+            "id": "cat-tariff-2026h2",
+            "kind": "tariff-or-price-revision",
+            "source": { "url": "https://example.invalid/gazette/2026-0505", "publisher": "ministry", "documentId": "gazette-2026-0505" },
+            "publishedAt": "2026-05-05T00:00:00Z",
+            "reportDate": "2026-05-04T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-07-01T00:00:00Z", "endsAt": "2026-10-31T00:00:00Z" },
+            "confirmingIndicator": { "name": "regulated unit price", "unit": "KRW/unit", "source": "Q3 report" },
+            "successCondition": "The revised unit price is billed and appears in Q3 revenue",
+            "failureCondition": "The revision is suspended before Q3 closes",
+            "evidenceIds": ["ev_gazette_0505"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [
+          {
+            "name": "trade receivable balance",
+            "channel": "receivable-balance",
+            "unit": "KRW",
+            "direction": "down-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": 13100000000000, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 11700000000000, "evidenceIds": ["ev_q1"] }
+            ]
+          },
+          {
+            "name": "unit import cost",
+            "channel": "input-cost",
+            "unit": "KRW/unit",
+            "direction": "down-is-better",
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": 1180, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 1020, "evidenceIds": ["ev_q1"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 2400000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 1500000000000, "securedRefinancing": 400000000000, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 10000, "entryPrice": null, "targetPrice": 15000, "invalidationPrice": 7600, "stabilised": true },
+        "sizing": { "expectedActiveReturn": 0.45, "conviction": 0.55, "mandatePositionCap": 0.12 },
+        "book": { "positions": [], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "policy-announced-with-no-traced-path",
+      "why": "The policy is real and this company's share of it is assumed. Research, not a position — and the absence is recorded as an absence.",
+      "expect": { "intent": "research-watch", "review": "earnings-path-untraced", "benchmarkComparisonRequired": false, "causeCodes": ["research_incomplete"] },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00008",
+        "market": "XKRX",
+        "held": false,
+        "strategy": "catalyst-turnaround",
+        "case": { "policyDependent": true, "policyStage": "announced", "earningsPathTraced": false, "earningsPathNote": "The programme names an industry; no filing links a won of it to this issuer", "deteriorationCauseIdentified": true },
+        "catalysts": [
+          {
+            "id": "cat-programme-2026",
+            "kind": "policy-decision",
+            "source": { "url": "https://example.invalid/gazette/2026-0601", "publisher": "ministry", "documentId": "gazette-2026-0601" },
+            "publishedAt": "2026-06-01T00:00:00Z",
+            "reportDate": "2026-05-31T00:00:00Z",
+            "dateStatus": "estimated",
+            "expectedWindow": { "startsAt": "2026-09-01T00:00:00Z", "endsAt": "2026-12-31T00:00:00Z", "uncertaintyDays": 90, "basis": "the programme's stated implementation review, which has no fixed date" },
+            "confirmingIndicator": { "name": "programme revenue recognised", "unit": "KRW", "source": "quarterly report" },
+            "successCondition": "Programme revenue appears in a segment note",
+            "failureCondition": "The programme is funded and this issuer receives none of it",
+            "evidenceIds": ["ev_gazette_0601"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [
+          {
+            "name": "operating margin",
+            "channel": "operating-margin",
+            "unit": "fraction",
+            "direction": "up-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": -0.04, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": -0.01, "evidenceIds": ["ev_q1"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 300000000000, "monthlyCashBurn": 10000000000, "debtMaturingWithinYear": 100000000000, "securedRefinancing": 0, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 4200, "entryPrice": null, "targetPrice": 7000, "invalidationPrice": 3300, "stabilised": false },
+        "sizing": { "expectedActiveReturn": 0.4, "conviction": 0.5, "mandatePositionCap": 0.08 },
+        "book": { "positions": [], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "uncited-catalyst-is-an-absence",
+      "why": "A catalyst nobody can go and check is not registered. The run waits, and the finding is data_missing — never a refutation.",
+      "expect": {
+        "intent": "wait-for-data",
+        "review": "inputs-unreadable",
+        "benchmarkComparisonRequired": false,
+        "causeCodes": ["data_missing"],
+        "diagnosticCodes": ["catalyst_uncited"]
+      },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00009",
+        "market": "XKRX",
+        "held": false,
+        "strategy": "catalyst-turnaround",
+        "case": { "policyDependent": true, "policyStage": "executing", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
+        "catalysts": [
+          {
+            "id": "cat-unsourced",
+            "kind": "policy-decision",
+            "source": { "url": "https://example.invalid/gazette/2026-0505", "publisher": "ministry" },
+            "publishedAt": "2026-05-05T00:00:00Z",
+            "reportDate": "2026-05-04T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-07-01T00:00:00Z", "endsAt": "2026-10-31T00:00:00Z" },
+            "confirmingIndicator": { "name": "regulated unit price", "unit": "KRW/unit", "source": "Q3 report" },
+            "successCondition": "The revised price is billed",
+            "failureCondition": "The revision is suspended",
+            "evidenceIds": [],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [],
+        "financials": { "liquidAssets": 800000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 200000000000, "securedRefinancing": 0, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 10000, "entryPrice": null, "targetPrice": 15000, "invalidationPrice": 7600 },
+        "sizing": { "expectedActiveReturn": 0.45, "conviction": 0.55, "mandatePositionCap": 0.12 },
+        "book": { "positions": [], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "prior-year-news-is-not-a-current-catalyst",
+      "why": "The same story ran last year with near-identical wording. A source older than a full reporting year does not open a window.",
+      "expect": {
+        "intent": "wait-for-data",
+        "review": "inputs-unreadable",
+        "benchmarkComparisonRequired": false,
+        "causeCodes": ["data_missing"],
+        "diagnosticCodes": ["catalyst_source_stale"]
+      },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00010",
+        "market": "XKRX",
+        "held": false,
+        "strategy": "catalyst-turnaround",
+        "case": { "policyDependent": true, "policyStage": "announced", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
+        "catalysts": [
+          {
+            "id": "cat-last-years-story",
+            "kind": "tariff-or-price-revision",
+            "source": { "url": "https://example.invalid/gazette/2025-0304", "publisher": "ministry", "documentId": "gazette-2025-0304" },
+            "publishedAt": "2025-03-04T00:00:00Z",
+            "reportDate": "2025-03-03T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-07-01T00:00:00Z", "endsAt": "2026-10-31T00:00:00Z" },
+            "confirmingIndicator": { "name": "regulated unit price", "unit": "KRW/unit", "source": "Q3 report" },
+            "successCondition": "The revised price is billed",
+            "failureCondition": "The revision is suspended",
+            "evidenceIds": ["ev_gazette_2025_0304"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [],
+        "financials": { "liquidAssets": 800000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 200000000000, "securedRefinancing": 0, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 10000, "entryPrice": null, "targetPrice": 15000, "invalidationPrice": 7600 },
+        "sizing": { "expectedActiveReturn": 0.45, "conviction": 0.55, "mandatePositionCap": 0.12 },
+        "book": { "positions": [], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "account-limit-already-taken-by-another-strategy",
+      "why": "The thesis is complete and another manager on the same book already holds the account's whole allowance for this name. One book, one position.",
+      "expect": { "intent": "blocked-by-account-limit", "review": "account-limit-taken", "benchmarkComparisonRequired": false, "causeCodes": ["risk_limit_exceeded"] },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "A00007",
+        "market": "XKRX",
+        "held": false,
+        "strategy": "catalyst-turnaround",
+        "case": { "policyDependent": true, "policyStage": "executing", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
+        "catalysts": [
+          {
+            "id": "cat-tariff-2026h2",
+            "kind": "tariff-or-price-revision",
+            "source": { "url": "https://example.invalid/gazette/2026-0505", "publisher": "ministry", "documentId": "gazette-2026-0505" },
+            "publishedAt": "2026-05-05T00:00:00Z",
+            "reportDate": "2026-05-04T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-07-01T00:00:00Z", "endsAt": "2026-10-31T00:00:00Z" },
+            "confirmingIndicator": { "name": "regulated unit price", "unit": "KRW/unit", "source": "Q3 report" },
+            "successCondition": "The revised unit price is billed and appears in Q3 revenue",
+            "failureCondition": "The revision is suspended before Q3 closes",
+            "evidenceIds": ["ev_gazette_0505"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [
+          {
+            "name": "trade receivable balance",
+            "channel": "receivable-balance",
+            "unit": "KRW",
+            "direction": "down-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": 13100000000000, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 11700000000000, "evidenceIds": ["ev_q1"] }
+            ]
+          },
+          {
+            "name": "unit import cost",
+            "channel": "input-cost",
+            "unit": "KRW/unit",
+            "direction": "down-is-better",
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-14T00:00:00Z", "value": 1180, "evidenceIds": ["ev_fy25"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 1020, "evidenceIds": ["ev_q1"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 2400000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 1500000000000, "securedRefinancing": 400000000000, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 10000, "entryPrice": null, "targetPrice": 15000, "invalidationPrice": 7600, "stabilised": true },
+        "sizing": { "expectedActiveReturn": 0.45, "conviction": 0.55, "mandatePositionCap": 0.12 },
+        "book": {
+          "positions": [{ "symbol": "A00007", "strategy": "shareholder-rerating", "weight": 0.14 }],
+          "proposals": [{ "symbol": "A00007", "strategy": "fundamental-mean-reversion", "weight": 0.06 }],
+          "caps": { "accountSingleName": 0.2, "perStrategy": { "catalyst-turnaround": 0.12, "shareholder-rerating": 0.14, "fundamental-mean-reversion": 0.1 } }
+        }
+      }
+    }
+  ]
+}

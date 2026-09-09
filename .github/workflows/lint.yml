@@ -167,6 +167,26 @@ jobs:
       # requests it was written for.
       - run: npm run check:shareholder-rerating
 
+      # `catalyst-turnaround` is prose like every other package, with one small
+      # deterministic core underneath it — the catalyst ledger and its state
+      # machine, the point-in-time comparison of recovery indicators, the sizing
+      # from the distance to invalidation, and the staged plan that must not add
+      # the same rung twice on a re-run. Those are the rules whose failure is
+      # **silent**: a delay count that quietly resets reads as a first slip, and
+      # a re-read plan that adds again reads as a fill.
+      #
+      # It runs the same way `check:allocator` does — plain Node over committed
+      # JSON, no install, no network — and its load-bearing assertion is one no
+      # per-case test can make: that catalyst realisation, one delay, repeated
+      # delay, cancellation, a reversing recovery indicator and a deteriorating
+      # refinancing reach six **different** judgements. #256 refuses an
+      # implementation where every case ends in WAIT, and a suite that checks
+      # each case alone cannot see that happening.
+      #
+      # Before `check:pins`, and the paragraph below is why anything after it
+      # does not run on a pull request that adds a package.
+      - run: npm run check:catalyst-turnaround
+
       # ── Last, and that position is the point ──────────────────────────────
       #
       # The pair to `check:index`, and a different question: `check:index` asks

@@ -1,0 +1,82 @@
+{
+  "manifestVersion": 1,
+  "id": "catalyst-turnaround",
+  "publisher": "aumos",
+  "name": "Catalyst Turnaround",
+  "version": "0.1.0",
+  "description": "Korea-listed companies with an identifiable event that would repair the business and its balance sheet, held for as long as the event's own window and no longer. Keeps a catalyst ledger — scheduled, in progress, realised, delayed, failed — and never records a rising share price as a catalyst that worked.",
+  "readme": "./README.md",
+  "prompt": "./PROMPT.md",
+  "schedule": [
+    {
+      "cron": "30 16 * * 1-5",
+      "timeZone": "Asia/Seoul",
+      "label": "post-close-risk-review"
+    }
+  ],
+  "runtimes": ["claude"],
+  "license": "MIT",
+  "provenance": {
+    "sourceRepo": "https://github.com/morethanmin/trading-harness",
+    "commit": "1fa18c595baa742f7323366a3c220fec5c6535a7",
+    "license": "MIT",
+    "licenseHolder": "Lee Sang Min",
+    "notice": "./NOTICE.md"
+  },
+  "engines": {
+    "aumos": ">=0.4.0"
+  },
+  "ampVersion": 1,
+  "contributes": {
+    "managers": [
+      {
+        "id": "catalyst-turnaround",
+        "name": "Catalyst Turnaround",
+        "description": "Finds Korea-listed companies where a named, sourced event would restore the business and its finances, writes the recovery path down to the cash-flow line, and manages the position by whether that event realises, slips or fails.",
+        "tasks": ["PORTFOLIO_REVIEW", "ASSET_REVIEW", "THESIS_REVIEW", "EVENT_REVIEW"],
+        "assetClasses": ["equity"],
+        "markets": ["XKRX"]
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "portfolio:read",
+      "reason": "The book is what says whether this name is already held, at what weight, and how much of the account's single-name allowance other managers have taken. Sizing without it would be a per-strategy limit pretending to be an account limit."
+    },
+    {
+      "kind": "thesis:read",
+      "reason": "A held position's invalidation conditions were written when it was opened, and a review that cannot read them is free to invent gentler ones after the fact."
+    },
+    {
+      "kind": "evidence:read",
+      "reason": "Every catalyst row cites the evidence ids the reading was filed under, and a run has to be able to re-read what a previous run registered rather than re-fetching and re-deciding."
+    },
+    {
+      "kind": "manager-memory:read",
+      "reason": "The catalyst register — which catalysts are open, how many times each has slipped, and which contrary findings are on the record — is this manager's own durable state and carries no copied vendor data."
+    },
+    {
+      "kind": "manager-memory:write",
+      "reason": "A delay count that is not written back is a delay count that resets, and the rule against holding indefinitely through repeated delays is exactly the rule that needs the record to survive the run."
+    },
+    {
+      "kind": "source:passthrough",
+      "reason": "Filings and public policy documents: the receivable balance, the working-capital lines, the debt maturity schedule and the regulator's own notices are where a catalyst and its confirming indicator are actually read.",
+      "sources": ["open-dart"]
+    },
+    {
+      "kind": "connection:passthrough",
+      "reason": "Adjusted won price history, for two numbers only — the distance to the price invalidation, which sizes the position, and the progress toward the target, which trims it."
+    }
+  ],
+  "requires": {
+    "skills": ["source_request", "connection_request"]
+  },
+  "config": {
+    "schema": "./config.schema.json"
+  },
+  "memory": {
+    "persistent": true
+  }
+}

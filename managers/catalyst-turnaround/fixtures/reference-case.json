@@ -1,0 +1,238 @@
+{
+  "note": "The reference case #258 names — 한국가스공사 (036460), the 미수금 회수 / 요금 정상화 shape — read at three points in the same story.\n\n⛔ Every figure below is ILLUSTRATIVE. #256 is explicit that the investor's reported result was never re-audited and is not a validated edge, and nothing here is a re-audited historical record, a claim about that company, or a backtest. What these three variants assert is the MECHANISM: that a policy story with no traced path to this issuer's earnings stays research; that once the path is traced the case classifies as a policy and financial turnaround; that a large valuation multiple does not exclude it; and — variant C — that the classification does not by itself produce a purchase. No threshold in lib/constants.mjs was chosen to make any of these three land where it lands.",
+  "symbol": "036460",
+  "market": "XKRX",
+  "variants": [
+    {
+      "name": "A-announcement-only",
+      "asOf": "2026-02-15T07:00:00Z",
+      "why": "The revision has been announced and nothing links a won of it to this issuer's own income statement yet. Announcement, execution and appearance in results are three facts, and this is the first.",
+      "expect": {
+        "classification": "research-candidate",
+        "excludedByValuationMultiple": false,
+        "policyAnnounced": true,
+        "policyExecuting": false,
+        "policyInResults": false,
+        "intent": "research-watch",
+        "review": "earnings-path-untraced"
+      },
+      "input": {
+        "asOf": "2026-02-15T07:00:00Z",
+        "symbol": "036460",
+        "market": "XKRX",
+        "held": false,
+        "strategy": "catalyst-turnaround",
+        "case": {
+          "policyDependent": true,
+          "policyStage": "announced",
+          "earningsPathTraced": false,
+          "earningsPathNote": "The revision is announced; no filing yet states the billed unit price or the recovery schedule that would carry it into this issuer's revenue",
+          "deteriorationCauseIdentified": true,
+          "valuationMultiple": 62.5
+        },
+        "catalysts": [
+          {
+            "id": "cat-unit-price-2026",
+            "kind": "tariff-or-price-revision",
+            "source": { "url": "https://example.invalid/gazette/2026-0210", "publisher": "ministry", "documentId": "gazette-2026-0210" },
+            "publishedAt": "2026-02-10T00:30:00Z",
+            "reportDate": "2026-02-09T00:00:00Z",
+            "dateStatus": "estimated",
+            "expectedWindow": {
+              "startsAt": "2026-04-01T00:00:00Z",
+              "endsAt": "2026-07-31T00:00:00Z",
+              "uncertaintyDays": 60,
+              "basis": "the ministry's stated quarterly review of the regulated unit price, whose effective date is set at each review rather than in advance"
+            },
+            "confirmingIndicator": { "name": "regulated unit price billed", "unit": "KRW/MJ", "source": "quarterly report, revenue note" },
+            "successCondition": "The revised unit price is billed and appears in the quarterly revenue note",
+            "failureCondition": "The revision is suspended, or is billed and offset by an equal rise in the recovery-adjusted cost",
+            "evidenceIds": ["ev_gazette_0210"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [
+          {
+            "name": "regulated unit price",
+            "channel": "regulated-price",
+            "unit": "KRW/MJ",
+            "direction": "up-is-better",
+            "observations": [
+              { "periodEnd": "2025-09-30T00:00:00Z", "publishedAt": "2025-11-14T00:00:00Z", "value": 19.4, "evidenceIds": ["ev_q3_2025"] },
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-13T00:00:00Z", "value": 19.4, "evidenceIds": ["ev_fy2025"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 3000000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 2000000000000, "securedRefinancing": 800000000000, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 34000, "entryPrice": null, "targetPrice": 50000, "invalidationPrice": 26000, "stabilised": false },
+        "sizing": { "expectedActiveReturn": 0.35, "conviction": 0.45, "mandatePositionCap": 0.1 },
+        "book": { "positions": [], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "B-execution-visible-and-four-channels-kept-apart",
+      "asOf": "2026-06-30T07:00:00Z",
+      "why": "The revised price is being billed, the receivable balance has fallen and the unit import cost has fallen, while the overseas result has worsened. Four channels, tracked separately, with the interest saving marked as derived from the receivable so that one fact is not counted twice.",
+      "expect": {
+        "classification": "policy-financial-turnaround",
+        "excludedByValuationMultiple": false,
+        "qualifiesAsPosition": true,
+        "policyExecuting": true,
+        "improvingChannels": ["input-cost", "receivable-balance", "regulated-price"],
+        "diagnosticCodes": ["offsetting_effects_double_counted"],
+        "intent": "enter-staged",
+        "review": "staged-entry-armed"
+      },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "036460",
+        "market": "XKRX",
+        "held": false,
+        "strategy": "catalyst-turnaround",
+        "case": {
+          "policyDependent": true,
+          "policyStage": "executing",
+          "earningsPathTraced": true,
+          "earningsPathNote": "The billed unit price and the recovery schedule are both in the quarterly revenue note, so the policy reaches this issuer's revenue by a stated mechanism rather than by assumption",
+          "deteriorationCauseIdentified": true,
+          "valuationMultiple": 62.5
+        },
+        "catalysts": [
+          {
+            "id": "cat-unit-price-2026h2",
+            "kind": "tariff-or-price-revision",
+            "source": { "url": "https://example.invalid/gazette/2026-0505", "publisher": "ministry", "documentId": "gazette-2026-0505" },
+            "publishedAt": "2026-05-05T00:30:00Z",
+            "reportDate": "2026-05-04T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-07-01T00:00:00Z", "endsAt": "2026-11-15T00:00:00Z" },
+            "confirmingIndicator": { "name": "recovery-adjusted receivable balance", "unit": "KRW", "source": "Q3 report, receivable note" },
+            "successCondition": "The receivable balance falls again in the Q3 note with the revised price billed for the full quarter",
+            "failureCondition": "The balance rises for two consecutive quarters with the revised price in force",
+            "evidenceIds": ["ev_gazette_0505"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [
+          {
+            "name": "recovery-adjusted receivable balance",
+            "channel": "receivable-balance",
+            "unit": "KRW",
+            "direction": "down-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-13T00:00:00Z", "value": 13400000000000, "evidenceIds": ["ev_fy2025"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 12100000000000, "evidenceIds": ["ev_q1_2026"] }
+            ]
+          },
+          {
+            "name": "regulated unit price billed",
+            "channel": "regulated-price",
+            "unit": "KRW/MJ",
+            "direction": "up-is-better",
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-13T00:00:00Z", "value": 19.4, "evidenceIds": ["ev_fy2025"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 21.1, "evidenceIds": ["ev_q1_2026"] }
+            ]
+          },
+          {
+            "name": "unit import cost",
+            "channel": "input-cost",
+            "unit": "KRW/MJ",
+            "direction": "down-is-better",
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-13T00:00:00Z", "value": 17.8, "evidenceIds": ["ev_fy2025"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 16.3, "evidenceIds": ["ev_q1_2026"] }
+            ]
+          },
+          {
+            "name": "interest on the receivable balance",
+            "channel": "financing-cost",
+            "unit": "KRW",
+            "direction": "down-is-better",
+            "derivedFrom": "receivable-balance",
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-13T00:00:00Z", "value": 190000000000, "evidenceIds": ["ev_fy2025"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 171000000000, "evidenceIds": ["ev_q1_2026"] }
+            ]
+          },
+          {
+            "name": "overseas exploration result",
+            "channel": "overseas-result",
+            "unit": "KRW",
+            "direction": "up-is-better",
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-13T00:00:00Z", "value": -60000000000, "evidenceIds": ["ev_fy2025"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": -95000000000, "evidenceIds": ["ev_q1_2026"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 3200000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 2100000000000, "securedRefinancing": 900000000000, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 41000, "entryPrice": null, "targetPrice": 58000, "invalidationPrice": 31000, "stabilised": true },
+        "sizing": { "expectedActiveReturn": 0.35, "conviction": 0.5, "mandatePositionCap": 0.1 },
+        "book": { "positions": [], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    },
+    {
+      "name": "C-the-classification-does-not-buy-anything-by-itself",
+      "asOf": "2026-06-30T07:00:00Z",
+      "why": "The same company, the same classification, and one improving channel with no traced cash-flow link. It stays research. This variant exists so that «classifies as a policy and financial turnaround» can never be read as «reaches BUY».",
+      "expect": {
+        "classification": "policy-financial-turnaround",
+        "excludedByValuationMultiple": false,
+        "qualifiesAsPosition": true,
+        "intent": "research-watch",
+        "review": "recovery-not-yet-a-path"
+      },
+      "input": {
+        "asOf": "2026-06-30T07:00:00Z",
+        "symbol": "036460",
+        "market": "XKRX",
+        "held": false,
+        "strategy": "catalyst-turnaround",
+        "case": {
+          "policyDependent": true,
+          "policyStage": "executing",
+          "earningsPathTraced": true,
+          "deteriorationCauseIdentified": true,
+          "valuationMultiple": 62.5
+        },
+        "catalysts": [
+          {
+            "id": "cat-unit-price-2026h2",
+            "kind": "tariff-or-price-revision",
+            "source": { "url": "https://example.invalid/gazette/2026-0505", "publisher": "ministry", "documentId": "gazette-2026-0505" },
+            "publishedAt": "2026-05-05T00:30:00Z",
+            "reportDate": "2026-05-04T00:00:00Z",
+            "dateStatus": "confirmed",
+            "expectedWindow": { "startsAt": "2026-07-01T00:00:00Z", "endsAt": "2026-11-15T00:00:00Z" },
+            "confirmingIndicator": { "name": "recovery-adjusted receivable balance", "unit": "KRW", "source": "Q3 report, receivable note" },
+            "successCondition": "The receivable balance falls in the Q3 note with the revised price billed for the full quarter",
+            "failureCondition": "The balance rises for two consecutive quarters with the revised price in force",
+            "evidenceIds": ["ev_gazette_0505"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [
+          {
+            "name": "regulated unit price billed",
+            "channel": "regulated-price",
+            "unit": "KRW/MJ",
+            "direction": "up-is-better",
+            "observations": [
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-02-13T00:00:00Z", "value": 19.4, "evidenceIds": ["ev_fy2025"] },
+              { "periodEnd": "2026-03-31T00:00:00Z", "publishedAt": "2026-05-15T00:00:00Z", "value": 21.1, "evidenceIds": ["ev_q1_2026"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 3200000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 2100000000000, "securedRefinancing": 900000000000, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 41000, "entryPrice": null, "targetPrice": 58000, "invalidationPrice": 31000, "stabilised": true },
+        "sizing": { "expectedActiveReturn": 0.35, "conviction": 0.5, "mandatePositionCap": 0.1 },
+        "book": { "positions": [], "proposals": [], "caps": { "accountSingleName": 0.2 } }
+      }
+    }
+  ]
+}

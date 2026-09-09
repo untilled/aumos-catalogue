@@ -1,0 +1,41 @@
+{
+  "note": "The crossed case, which is the only one worth a fixture: the price went up and the catalyst failed. Illustrative figures.",
+  "scenarios": [
+    {
+      "name": "a-rising-price-does-not-score-a-catalyst",
+      "catalysts": [
+        { "id": "cat-a", "state": "failed", "cancelled": false },
+        { "id": "cat-b", "state": "realised", "cancelled": false }
+      ],
+      "price": { "unrealisedReturn": 0.23, "realisedReturn": null, "forwardReturn": 0.19, "fees": -0.002, "tax": -0.004, "dividends": 0.011 },
+      "benchmark": { "symbol": "KOSPI200-TR", "forwardReturn": 0.07 },
+      "expect": {
+        "catalyst": { "registered": 2, "realised": 1, "failed": 1, "successRate": 0.5 },
+        "price": { "unrealisedReturn": 0.23, "forwardReturn": 0.19, "benchmarkExcessReturn": 0.12 }
+      }
+    },
+    {
+      "name": "an-open-window-is-not-in-the-denominator",
+      "why": "A catalyst still ahead of its window is neither a success nor a failure, and putting it in the denominator makes a young book look like a bad one.",
+      "catalysts": [
+        { "id": "cat-c", "state": "scheduled", "cancelled": false },
+        { "id": "cat-d", "state": "delayed", "cancelled": false },
+        { "id": "cat-e", "state": "realised", "cancelled": false }
+      ],
+      "price": { "unrealisedReturn": -0.08 },
+      "benchmark": null,
+      "expect": {
+        "catalyst": { "registered": 3, "realised": 1, "delayed": 1, "failed": 0, "successRate": 1 },
+        "price": { "unrealisedReturn": -0.08, "forwardReturn": null, "benchmarkExcessReturn": null }
+      }
+    },
+    {
+      "name": "a-combined-return-is-refused",
+      "why": "A mark-to-market, a realised exit and a forward measurement have different denominators and answer different questions.",
+      "catalysts": [],
+      "price": { "unrealisedReturn": 0.1, "combinedReturn": 0.1 },
+      "benchmark": null,
+      "expect": { "diagnosticCodes": ["combined_return_refused"] }
+    }
+  ]
+}
