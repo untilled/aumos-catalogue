@@ -288,15 +288,42 @@ through `mcp__evidence-gated-metrics__calculate` — never through `Bash`.
 `source_cache_refresh` on **`prices`/`daily`** across the roster — provider `prices`, document
 `daily`, `market` the venue MIC (`XKRX`, ⛔ never the research market you use for a
 filer) and ⛔ no `vendorId` — and then `task_start` over the two recipes this package
-declares (`roster-scan` and `opportunity-metrics`), each item id the store coordinate
-`XKRX:<symbol>` and `outputPath` `scans/<asOf date>/<recipeId>`; `task_get` until it settles, then
+declares (`roster-scan` and `opportunity-metrics`), each item id the **research market key**
+`kr:<symbol>` and `outputPath` `scans/<asOf date>/<recipeId>`; `task_get` until it settles, then
 `files_read` on `<outputPath>/<itemId>.json` for each answer.
+⛔ **The item id is not the venue MIC, and the two coordinates live one line apart — that is the
+shape of this trap** (`untilled/aumos-catalogue#245`). The `market` argument above **is** the MIC,
+because it is `source_cache_refresh`'s; the `task_start` item id is the key the store files
+documents under, and `source_cache_read` publishes it in its own description: *the key is the
+research market — `kr`, `us` — and a venue MIC is folded onto it*. `PROMPT.md` says the same
+thing one branch over: *`researchUniverse` and everything on that path take `'kr'` / `'us'`, not a
+MIC.* ⚠️ **An id of your own invention is accepted and the recipe is handed nothing**, so the
+failure is silent and shaped exactly like a market that offered nothing.
 ⚠️ **`task_start` collects nothing**, so preparing
 first is a sweep whose every row says the price branch was never run. The bars stay in the host on
 both steps and the row that comes back carries no series. ⛔ Never a worker opened to relay bars,
 walk listing pages or batch the roster, and ⛔ never a roster of bars typed back as `calculate`
 arguments. `skills/candidate-research/SKILL.md` owns the procedure and the three counts and
 `skills/data-source-contract/SKILL.md` the route.
+
+⚠️ **A whole roster of `sourced: false` is a coordinate to probe, not a market to report.**
+`unprepared` on **every** name at once is not a finding about the companies and is not a finding
+about the vendor either — a refresh that answered `observed` or `satisfied` cannot produce it. So
+before you write a single sentence about what this market offered, spend **one call** on a
+two-sided probe: take one name you know bars were just collected for and put it in `task_start`
+under **both** coordinates —
+
+```jsonc
+items: [{ id: "kr:005930" }, { id: "XKRX:005930" }]
+```
+
+— and read which side came back `sourced: true`. That is the whole diagnosis, it costs one call,
+and it distinguishes the two states nothing downstream can: a market that was looked at and
+offered nothing, and a sweep addressed to a key the store files nothing under. ⚠️ **This is not
+hypothetical and it is why the 2026-09-09 run survived**: the discarded batch was 83 US names on
+`XNAS:`/`XNYS:` ids, every one `sourced: false` / `documents: 0` / `barsRead: 0`, beside 76 of 76
+answered on the research market key. ⛔ **Do not repair it by widening the roster, refreshing
+again, or opening a worker** — the roster and the vendor were both fine.
 ⛔ **And the bars you do hand-collect for a single name are not de-partialled by `before`.** That
 parameter is **inclusive**, and a Toss daily bar is stamped at the venue's local midnight, so
 today's midnight returns today's *unfinished* bar — measured 2026-09-08 on 069500 mid-session, where

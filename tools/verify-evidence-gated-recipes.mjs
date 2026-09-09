@@ -370,6 +370,68 @@ for (const file of INSTRUCTION_FILES) {
 }
 
 /**
+ * ── The sweep's item id is the research market key, not the venue MIC (#245) ─
+ *
+ * Two coordinates live one line apart in each sleeve's dispatch block and only
+ * one of them is a MIC: `source_cache_refresh` takes the **venue** (`XKRX`,
+ * `XNAS`/`XNYS`) and `task_start`'s item id takes the key the store files
+ * documents under, which `source_cache_read` publishes as *the key is the
+ * research market — `kr`, `us` — and a venue MIC is folded onto it*. Both skills
+ * instructed the MIC.
+ *
+ * ⚠️ **The failure is silent and is shaped like an empty market.** An item id of
+ * the run's own invention is accepted and the recipe is handed nothing, so every
+ * row comes back `sourced: false` / `documents: 0` / `barsRead: 0` — which reads
+ * as a market that offered nothing. Measured in the owner's store,
+ * `scans/2026-09-09/roster-scan/`: the discarded batch is 83 US names on
+ * `XNAS:`/`XNYS:` ids, **every one** unsourced, beside 76 `kr:` and 83 `us:` ids
+ * every one sourced. ⛔ And the US instruction was self-contradictory even inside
+ * the MIC reading — one sentence naming `market` as `XNAS`/`XNYS` and the id as
+ * `XNAS:<symbol>`, while the real split is XNYS 55 / XNAS 28.
+ *
+ * ⚠️ **Worst in combination with the completion stage, which is why it is fixed
+ * here.** A run loop that carries a candidate to a document reports «0 eligible»
+ * honestly off a sweep addressed to nothing, and no diagnostic in this package
+ * fires on that: the roster was declared, the refresh answered, the task
+ * settled. The coordinate fix is what makes the stage's report mean anything.
+ *
+ * ⛔ **Scope.** `skills/orchestrate/SKILL.md` and the three `agents/*.md`
+ * dispatch prompts still say `MIC:symbol`; they are `untilled/aumos-catalogue#245`'s
+ * and this assertion is deliberately not widened to them yet. It covers the two
+ * files that tell a flow the item id it actually sends.
+ */
+const SWEEP_COORDINATES = { 'skills/kr-sleeve/SKILL.md': ['kr', 'XKRX'], 'skills/us-sleeve/SKILL.md': ['us', 'XNAS'] }
+for (const [file, [researchMarket, mic]] of Object.entries(SWEEP_COORDINATES)) {
+  const text = await readFile(new URL(file, packageRoot), 'utf8')
+  assert.ok(
+    text.includes(`\`${researchMarket}:<symbol>\``),
+    `${file} instructs the item id as the research market key \`${researchMarket}:<symbol>\`; the store files no document under anything else, and an invented id is accepted and handed nothing`,
+  )
+  assert.equal(
+    text.includes(`\`${mic}:<symbol>\``),
+    false,
+    `${file} no longer instructs the item id as the venue MIC — that is the coordinate the 2026-09-09 sweep sent for 83 US names, every one of which came back sourced: false with the roster and the vendor both fine`,
+  )
+  /**
+   * ⚠️ And the `market` argument beside it is still the MIC, because it belongs
+   * to the other call. Asserted so that fixing one coordinate cannot quietly
+   * take the other with it — the two being adjacent is the whole trap.
+   */
+  assert.ok(
+    text.includes('`market` the venue MIC'),
+    `${file} still names the venue MIC as source_cache_refresh's \`market\` argument; the item id was wrong and that one never was. ⚠️ Matched on the argument rather than on the phrase, which appears in the prose that explains the two coordinates and would pass this on its own`,
+  )
+  /**
+   * The recovery, because the failure mode is indistinguishable from an empty
+   * market at every layer below it. One call, one name, both coordinates.
+   */
+  assert.ok(
+    /two-sided probe/.test(text) && text.includes(`{ id: "${mic}:`),
+    `${file} tells a flow to probe both coordinates on one name rather than report a roster of sourced: false as a market that offered nothing`,
+  )
+}
+
+/**
  * ⛔ **And no document tells a flow to hand `vendorId` or a research market to it.**
  *
  * Both are refused by the host on this route — a bar is one venue's record, and
