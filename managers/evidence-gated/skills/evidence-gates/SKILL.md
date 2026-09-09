@@ -194,6 +194,13 @@ what checks it.** Call it for every non-core holding and for every entry this ru
   owes — a `price-below` at the stop and an `at-time` at the time stop — and they are copied into
   the same `DecisionProposal` as the BUY. A missing stop or review date is
   `exit_rules_unregistered` / `blocked`.
+- **Copied means copied — `intent`, `subject` and `trigger` included (#244).** Aumos folds a re-armed
+  promise into the one already standing by comparing `kind`, `subject`, `intent` and `trigger` as
+  written and interpreting none of them (`untilled/aumos#704`), so every one of those four is minted
+  on the row and none of them is a run's to compose. Measured 2026-09-09: two stops in the owner's
+  book stood twice — one because the `intent` prose was rewritten between runs, one because
+  ₩104,254.40 was spelled `exponent: 2` once and `exponent: 1` the next time. ⛔ Reasoning about
+  *this* judgement goes in `priceLevels[].reason` and `rationale`, which nothing compares.
 - **And the stop is stated as a price with a purpose on it, not only armed.** `priceLevelsToRegister`
   returns the same number as a `priceLevels` row with `purpose: 'stop'` — because one `price-below`
   is a stop under a holding *and* an entry somebody is waiting for, so a direction cannot say which

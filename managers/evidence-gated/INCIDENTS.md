@@ -404,6 +404,26 @@ track looks empty and the `nextState` it returns then deletes it. `paper_state_m
 that shape. Bars written under `date` rather than `timestamp` come back `forward_base_missing`, which
 reads as a window the calendar has not reached.
 
+## Arming (§6)
+
+**The sentence explaining the fold prevented the fold.** Aumos folds a re-armed promise into the
+one already standing by comparing `kind`, `subject`, `intent` and `trigger` as the bytes the
+manager wrote, interpreting none of them (`untilled/aumos#704`); reviews and tranches survived that
+because their intents are minted (`marketReviewIntent`, `trancheIntent`) and armed verbatim. A stop
+had **nothing to mint from** — the row carried this package's `reason` and no `intent` at all — so
+the sentence was the run's, and a run writes it afresh. Measured on 2026-09-09 in the owner's book:
+`SGOV`'s stop re-armed with a byte-identical trigger and 162 characters of prose grown to 231, the
+new sentence naming the plan id the fold was meant to retire; and `153130`'s ₩104,254.40 arriving as
+`exponent: 2 / 10425440` from one run and `exponent: 1 / 1042544` from the next — the same value,
+different bytes, and `sameShape` is structural. Both left **two** standing `price-below` watches on
+one asset, and a `price-below` is not folded at firing time either (#590, #593 and #624 all key on
+`at-time`), so one breach opens two wakes against a `MAX_LIVE_RUNS` of four. `exitDiscipline` now
+mints all four fields on the row and the run copies them; ⛔ nothing about the judgement making the
+promise may be in `intent`, which is what `priceLevels[].reason` and `rationale` are for. ⛔ The four
+plans already standing are not disposed of by this — this package has no withdrawal tool — and they
+fold on the first re-arm from a run of `0.11.1` **whose stop level is unchanged**, because a level
+that moved is a different promise and correctly stays one.
+
 ## Where the rest of the record lives
 
 - `ARCHITECTURE.md` — why the package is shaped this way, and which AMP capabilities it can and

@@ -191,6 +191,9 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    Mandate's cap. `skills/evidence-gates` carries the rest. ⚠️ **Pass `asset` in
    full**: the same call returns `priceLevelsToRegister`, the stop as a `priceLevels` row with its
    purpose stated, and a level belongs to the currency its asset's market quotes.
+   ⚠️ **Copy the rows whole.** `intent`, `subject` and `trigger` are on them, and those plus `kind`
+   are the four fields Aumos compares to fold a re-armed stop into the one already standing
+   (`untilled/aumos#704`); a sentence you write instead is a second promise on the next run (#244).
 4c-2. **When one limit is the only thing in the way, say what would open it (#230).** All three of
    `effectivePositionCap`, `effectiveCashFloor` and `concentration` return **`unlockDelta`**, and the
    source's condition is the whole of it — *«캡 상향을 제안하기 전에 이 캡을 올리면 실제로 몇 원이

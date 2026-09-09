@@ -412,6 +412,70 @@ export function buildPriceLevel({
   return { level, diagnostics }
 }
 
+/** The marker that opens the `intent` of a stop this package registers. */
+export const STOP_INTENT_PREFIX = 'exit-discipline'
+
+/**
+ * ── The `intent` a stop is armed with, and why the package writes it (#244) ─
+ *
+ * A promise is folded into the one already standing by comparing `kind`,
+ * `subject`, **`intent`** and `trigger` as the bytes the manager wrote
+ * (`untilled/aumos#704`), and the host ⛔ interprets none of them — that
+ * strictness is the ruling, not an oversight. Reviews and tranches survived it
+ * because their intents are minted here (`marketReviewIntent`,
+ * `trancheIntent`) and armed verbatim. A stop had **nothing to copy**: the row
+ * carried this package's `reason` and no `intent` at all, so the sentence was
+ * the run's to compose, and a run composes it afresh every time.
+ *
+ * Measured in the owner's book, 2026-09-09: the same SGOV stop re-armed with a
+ * byte-identical trigger and 162 characters of prose grown to 231, the new
+ * sentence *naming the plan id the fold was meant to retire*. The explanation
+ * of the fold prevented the fold, and `price-below` is not folded at firing
+ * time either (#590, #593 and #624 all key on `at-time`), so what was left
+ * standing was two live watches that open two wakes on one breach.
+ *
+ * ⛔ **So nothing about *this judgement* may enter it.** Not the plan being
+ * replaced, not the price restated in words, not the arithmetic that produced
+ * the level, not what the last close was. All of that is real and belongs to
+ * `priceLevels[].reason` and `rationale`, which are read by the person whose
+ * money this is and are not part of any identity. What is left is what the
+ * condition *is*, which is the only thing that can be said the same way twice.
+ *
+ * ⛔ **And no number and no instant.** The price and the asset are already in
+ * the trigger the host compares beside this string; a second spelling of either
+ * is a second thing that has to agree, which is the other half of this same
+ * issue. ⚠️ `marketReviewIntent` does carry its instant and that is not a
+ * counter-example: `resolveWakeFlow` reads it back out of a fired event to tell
+ * a late fire from a stale one. Nothing reads a stop's marker, so it carries
+ * nothing it does not need.
+ *
+ * ⚠️ **English, like the other two markers, and deliberately not the run's
+ * language.** The language a run writes prose in is the app's setting and is a
+ * term of §24's fingerprint; an intent that followed it would split every fold
+ * on this book the day the investor changed it.
+ *
+ * ⚠️ **The symbol alone, matching `armedKey`.** The board is in `trigger.asset`
+ * and in `subject`, both of which the fold compares, so a marker qualified by
+ * market would separate nothing the host does not already separate.
+ */
+export function stopIntent(symbol) {
+  return `${STOP_INTENT_PREFIX}:hard-stop:${symbol} — the registered stop under this position; the price it watches and the asset it is about are the trigger's, and the arithmetic behind the level is the level's reason`
+}
+
+/**
+ * The `intent` the unconditional time stop is armed with.
+ *
+ * ⚠️ **Here rather than beside the row it goes on.** The two stops are one
+ * vocabulary and a second file holding half of it is a second place for the
+ * marker to drift — which is the shape of the defect this whole note is about.
+ *
+ * ⛔ The instant is the trigger's, for the reason `stopIntent` gives, and the
+ * time stop needs it stated even less: `at` is the entire condition.
+ */
+export function timeStopIntent(symbol) {
+  return `${STOP_INTENT_PREFIX}:time-stop:${symbol} — the unconditional time stop this position was entered under; the instant it comes due is the trigger's own`
+}
+
 /**
  * The pair an entry's stop owes: the `price-below` watch, and the `stop` level
  * that names what that watch is watching.
@@ -461,6 +525,19 @@ export function stopRegistration({
       threshold: stopLevel,
       price: built.level.price.value,
       asset: built.level.asset,
+      /**
+       * ⚠️ **All four fields the host's fold reads, built here (#244).** The
+       * row already held one `Money`; what it did not hold was the other three
+       * things `samePromise` compares, so a run had to compose `intent`,
+       * `subject` and the nested `trigger` for itself — and a stop re-armed by
+       * a second run composed them differently. `subject` and `trigger.asset`
+       * are the level's own `asset`, `trigger.price` is the level's own
+       * `Money`, and `intent` is a function of the symbol. ⛔ The run copies
+       * these; it does not build them.
+       */
+      subject: built.level.asset,
+      intent: stopIntent(symbol ?? asset?.symbol ?? null),
+      trigger: { kind: 'price-below', asset: built.level.asset, price: built.level.price.value },
       expiresAt,
       reason: 'exit-discipline-hard-stop',
       key: armedKey,

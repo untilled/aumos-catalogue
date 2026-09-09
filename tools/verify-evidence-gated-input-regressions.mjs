@@ -944,6 +944,92 @@ const noDistance = run('exitDiscipline', { symbol: '035420', asset: { class: 'eq
 assert.deepEqual(noDistance.data.priceLevelsToRegister, [])
 assert.equal(has(noDistance, 'stop_level_unstated'), false, 'the unstated level is a level that exists and could not be spelled, never one that was never computed')
 
+/**
+ * ── The same stop, said twice, in the same bytes (#244 · `untilled/aumos#704`) ─
+ *
+ * The host folds a re-armed promise into the one already standing by comparing
+ * `kind`, `subject`, `intent` and `trigger` **as written**, interpreting none
+ * of them. Measured in the owner's book on 2026-09-09, this package's stops
+ * failed that twice over: `SGOV`'s trigger was byte-identical and the `intent`
+ * prose had grown from 162 characters to 231 — the new sentence naming the very
+ * plan id the fold was meant to retire — and `153130`'s ₩104,254.40 was spelled
+ * `exponent: 2 / 10425440` by one run and `exponent: 1 / 1042544` by the next.
+ * Both left two live `price-below` watches on one asset, and `price-below` is
+ * not folded at firing time either (#590, #593 and #624 all key on `at-time`),
+ * so one breach opens two wakes against a `MAX_LIVE_RUNS` of four.
+ *
+ * ⛔ **The fix is not a looser fold.** *"Identity, not likeness"* is the host's
+ * ruling and it is right; what was wrong is that a stop had no minted identity
+ * to copy, so the run composed one and composed it differently. So the test is
+ * the property the issue names: two runs of the same stop, three days apart,
+ * produce a `watch` row identical in exactly the four fields the host reads.
+ */
+const rearmedAt = (thisAsOf) => execute({
+  operation: 'exitDiscipline',
+  asOf: thisAsOf,
+  input: {
+    symbol: '153130',
+    asset: { class: 'equity', symbol: '153130', market: 'XKRX' },
+    lane: 'main',
+    entryDate: '2026-08-25',
+    entryPrice: 113_320,
+    price: 113_000,
+    positionWeight: 0.2705039,
+    mandateMaxDrawdown: 0.06,
+  },
+}).data.watchesToRegister
+const promiseIdentity = (row) => JSON.stringify({ kind: row.kind, subject: row.subject ?? null, intent: row.intent, trigger: row.trigger ?? null })
+const armedSept6 = rearmedAt('2026-09-06T12:49:42.942Z')
+const armedSept9 = rearmedAt('2026-09-09T11:23:55.210Z')
+const stopOf = (rows) => rows.find((row) => row.kind === 'price-below')
+const timeStopOf = (rows) => rows.find((row) => row.kind === 'at-time')
+/** The measured level, reproduced rather than retyped: the −8% cap on an entry of 113,320. */
+assert.equal(stopOf(armedSept6).threshold, 104_254.4, 'the stop the owner’s book carries, from the methodology ceiling')
+assert.equal(
+  promiseIdentity(stopOf(armedSept6)),
+  promiseIdentity(stopOf(armedSept9)),
+  'a stop re-armed three days later is the same promise in the same bytes, which is the whole of what the host’s fold reads',
+)
+assert.equal(
+  promiseIdentity(timeStopOf(armedSept6)),
+  promiseIdentity(timeStopOf(armedSept9)),
+  'and so is the time stop beside it — it is re-armed on every judgement of a position that still holds',
+)
+/**
+ * ⚠️ **The identity is not vacuously equal, and these are what would make it
+ * so.** An `intent` that is absent on both rows, or a `trigger` that is, would
+ * pass the two comparisons above while leaving the defect exactly where it was.
+ */
+assert.match(stopOf(armedSept6).intent, /^exit-discipline:hard-stop:153130 — \S/, 'the intent is minted, marked, and about the promise')
+assert.match(timeStopOf(armedSept6).intent, /^exit-discipline:time-stop:153130 — \S/)
+assert.deepEqual(stopOf(armedSept6).trigger, { kind: 'price-below', asset: stopOf(armedSept6).asset, price: stopOf(armedSept6).price }, 'the nested trigger is AMP’s shape, holding the row’s own asset and its own Money — so the run copies it rather than translating it')
+assert.deepEqual(stopOf(armedSept6).subject, stopOf(armedSept6).asset, 'and the subject the host compares is that same asset, not one a run retypes')
+/**
+ * ⛔ **Nothing about *this run* may be in it.** That is the precise defect: the
+ * sentence explaining the fold prevented the fold. The instants above differ by
+ * three days and the arithmetic's inputs do not, so any of it leaking into the
+ * identity would already have failed the comparison — this states the rule the
+ * comparison enforces, for the reader who changes the sentence later.
+ */
+assert.equal(stopOf(armedSept6).intent.includes('2026'), false, 'no instant, no date, and no plan id — the trigger carries the condition’s own time')
+assert.equal(/[0-9]{3}/.test(stopOf(armedSept6).intent.replace('153130', '')), false, 'and no price restated in words beside the one in the trigger')
+/**
+ * ⚠️ **The spelling of the price is one function's answer, and that is the
+ * other half.** ₩104,254.40 is `exponent: 1` because that is the smallest
+ * exponent representing it exactly; the book's older row says `exponent: 2`,
+ * which is the same value and different bytes. ⛔ Normalising exponents is the
+ * host's to refuse — it did — so what is asserted is that this package has one
+ * place that answers, and that the level and the watch hold its one answer.
+ */
+assert.deepEqual(stopOf(armedSept6).price, { currency: 'KRW', minorUnits: 1_042_544, exponent: 1 }, 'the smallest exponent that spells the level exactly, and the same one every run')
+assert.deepEqual(stopOf(armedSept6).trigger.price, rearmedAt('2026-09-06T12:49:42.942Z')[0].price)
+const [rearmedLevel] = execute({
+  operation: 'exitDiscipline',
+  asOf: '2026-09-09T11:23:55.210Z',
+  input: { symbol: '153130', asset: { class: 'equity', symbol: '153130', market: 'XKRX' }, lane: 'main', entryDate: '2026-08-25', entryPrice: 113_320, price: 113_000, positionWeight: 0.2705039, mandateMaxDrawdown: 0.06 },
+}).data.priceLevelsToRegister
+assert.deepEqual(rearmedLevel.price.value, stopOf(armedSept9).trigger.price, 'the level and the trigger the run arms are the one Money, so there is nothing for a second spelling to disagree with')
+
 // A due stop the proposal does not act on is the prose this replaced.
 assert.equal(entered().data.exitProposed, null, 'unjudged before the proposal exists')
 assert.equal(has(entered(), 'exit_due_unactioned'), false)
