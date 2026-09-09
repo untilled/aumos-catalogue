@@ -55,14 +55,20 @@ const REFUTING_DAMAGE = new Set(['operating-deterioration', 'monetisation-failur
  * — nothing here judges whether a paragraph is any good, and pretending
  * otherwise would report a pass it did not establish.
  */
-export function requiredOutputs(input = {}) {
+export function requiredOutputs(input = {}, computed = {}) {
   const { business = {}, research = {}, sizing = null } = input
   const filled = (value) => value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0)
   return {
     fallDecomposition: filled(research.fallCauses),
     businessIntactEvidence: filled(business.evidenceIds),
-    technicalState: true,
-    stabilisationObservation: true,
+    /**
+     * ⚠️ These two were hardcoded `true` on the argument that they are always
+     * computed. A checklist entry that cannot be `false` checks nothing, and
+     * both *can* be absent — a refused series produces no technical state and no
+     * stabilisation reading at all.
+     */
+    technicalState: filled(computed.technical),
+    stabilisationObservation: filled(computed.stabilisation),
     targetDerivation: filled(research.targetBasis),
     refutationConditions: filled(research.invalidationPrice) && filled(research.invalidationConditions),
     maximumWait: finite(research.maxWaitDays),
@@ -73,7 +79,7 @@ export function requiredOutputs(input = {}) {
      * dressed as unfinished research (#254's distinction, one branch over).
      */
     cumulativeStagedTarget: sizing && sizing.status !== 'refused' ? finite(sizing.plannedTotalWeight) : null,
-    targetWeightAndDownside: sizing && sizing.status !== 'refused' ? finite(sizing.targetWeight) && finite(sizing.downsideValue) : null,
+    targetWeightAndDownside: sizing && sizing.status !== 'refused' ? finite(sizing.targetTotalWeight ?? sizing.targetWeight) && finite(sizing.downsideValue) : null,
     reviewAndEvidenceIds: filled(research.reviewAt) && filled(research.evidenceIds),
   }
 }
@@ -119,7 +125,7 @@ export function classifyCase(input = {}) {
       technical: state,
       discovery,
       stabilisation: extra.stabilisation ?? null,
-      requiredOutputs: requiredOutputs(input),
+      requiredOutputs: requiredOutputs(input, { technical: state, stabilisation: extra.stabilisation ?? null }),
       diagnostics,
       ...extra,
     }
@@ -140,8 +146,38 @@ export function classifyCase(input = {}) {
   const stabilisation = stabilisationTest(normalised.bars, state)
   diagnostics.push(...stabilisation.diagnostics)
 
+  /**
+   * ⛔ **A book that says this manager already holds the name, against a run
+   * that did not say so.** `position.held` defaults to absent, and absent
+   * skipped the whole review branch — so a run that failed to read its own
+   * position went straight to the discovery path and proposed a *new* entry on
+   * a thesis it never reviewed. The sizing answer knows better: it folds the
+   * book and attributes exposure per strategy, so the contradiction is
+   * detectable rather than having to be trusted.
+   */
+  const ownExposure = sizing?.exposure?.ownWeight ?? null
+  if (position.held !== true && finite(ownExposure) && ownExposure > 0) {
+    return answer('data-missing', 'WATCH', 'data_missing', {
+      stabilisation,
+      note: `The book attributes ${ownExposure} of exposure in this name to this strategy and the run did not report holding it. Until the two agree the review branch cannot run, and a new entry proposed over an unreviewed position is the review being skipped rather than passed`,
+    })
+  }
+
   // ⑵ ── this fund already holds it: the review branch.
   if (position.held === true) {
+    /**
+     * ⛔ **A held position with nothing said about its review is unadjudicated,
+     * not clean.** Each flag was read as `=== true`, so an absent `review`
+     * object meant «no invalidation, no target, no elapsed deadline» — three
+     * passes nobody granted. At least one has to be an explicit boolean.
+     */
+    const stated = ['invalidationTriggered', 'deadlineElapsed', 'targetReached'].filter((name) => typeof review[name] === 'boolean')
+    if (stated.length === 0) {
+      return answer('data-missing', 'WATCH', 'data_missing', {
+        stabilisation,
+        note: 'This position is held and the run stated none of the three review conditions as a boolean. An unadjudicated review is missing data: it is not the same as a review that found nothing, and only the second of those may be followed by holding on',
+      })
+    }
     if (review.invalidationTriggered === true) {
       return answer('invalidated-re-adjudicate', 'RE_ADJUDICATE', 'thesis_refuted', {
         stabilisation,
@@ -222,7 +258,7 @@ export function classifyCase(input = {}) {
   }
 
   // ⑹ ── is the thesis actually finished?
-  const outputs = requiredOutputs(input)
+  const outputs = requiredOutputs(input, { technical: state, stabilisation })
   const missingOutputs = Object.entries(outputs).filter(([, present]) => present === false).map(([name]) => name)
   if (research.complete === false || missingOutputs.length > 0) {
     return answer('research-incomplete', 'WATCH', 'research_incomplete', {
@@ -245,6 +281,33 @@ export function classifyCase(input = {}) {
   if (!sizing) {
     diagnostics.push(diagnostic('sizing_absent', 'info', 'No sizing was handed in, so the buy case is stated without a weight', 'sizing'))
     return answer('research-incomplete', 'WATCH', 'research_incomplete', { stabilisation, note: 'A buy case without a target weight and a downside figure is not a finished one' })
+  }
+  /**
+   * ⛔ **A reading the sizing could not take may not authorise a buy.** A
+   * `blocked` diagnostic already refuses inside `positionSizing`, but an
+   * `unevaluated` one — a halt state nobody declared, say — travelled all the
+   * way here on an `ok` answer and reached BUY. Only an explicitly passed check
+   * authorises an entry; an unevaluated one is research that is not finished.
+   */
+  const unevaluated = (sizing.diagnostics ?? []).filter((row) => row.severity === 'unevaluated' || row.severity === 'blocked')
+  if (unevaluated.length > 0) {
+    return answer('research-incomplete', 'WATCH', 'research_incomplete', {
+      stabilisation,
+      sizing,
+      unevaluatedSizing: unevaluated.map((row) => row.code),
+      note: `The sizing carries reading(s) it could not evaluate — ${unevaluated.map((row) => row.code).join(', ')}. An unevaluated check is not a passed one, and the weight it produced rests on whichever value was assumed in its place`,
+    })
+  }
+  /**
+   * ⚠️ The already-complete position, as its own answer. It is neither a risk
+   * limit nor a refutation: the thesis stands and there is nothing to buy.
+   */
+  if (sizing.atOrAboveTarget === true) {
+    return answer('target-weight-already-held', 'WAIT', null, {
+      stabilisation,
+      sizing,
+      note: `This thesis already holds its whole target weight of ${sizing.targetTotalWeight}, so the increment is zero. The position is complete rather than blocked, and saying so is what keeps a zero increment from reading as «no room»`,
+    })
   }
 
   // ⑻ ── otherwise.

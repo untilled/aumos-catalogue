@@ -176,6 +176,7 @@ export const OUTCOMES = Object.freeze([
   'price-artifact-suspected',
   'uptrend-pullback-not-this-strategy',
   'out-of-scope',
+  'target-weight-already-held',
   'target-reached-trim',
   'invalidated-re-adjudicate',
   'deadline-elapsed-re-adjudicate',

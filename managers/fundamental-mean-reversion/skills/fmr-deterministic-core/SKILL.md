@@ -109,11 +109,30 @@ the current price — that is a finding about the target, not a reason to widen 
 ```
 
 - `book` is **the whole fund's**, not this manager's sleeve. Holdings and open proposals both
-  count, whoever wrote them.
-- `execution.dailyPriceLimit` is `true` on KRX. It is what turns the stop distance into the
-  effective loss.
+  count, whoever wrote them. ⛔ Both arrays must be **present**: an empty one is a fact and is
+  accepted, a missing one is refused with `book_unreadable`. A book nobody could read is not a
+  book with nothing in it, and treating it as empty is how a run that never saw the account
+  returns a full target weight.
+- `mandate.singleNameCap` **and** `mandate.grossCap` are both required. An unreadable limit is
+  not an absent one.
+- `execution.halted` and `execution.dailyPriceLimit` must be **booleans**. On KRX the daily
+  price limit is `true`; declare it. An omitted flag is not read as `false` — it is reported as
+  `execution_conditions_undeclared` (`unevaluated`), and `classifyCase` will not reach BUY over
+  a sizing carrying an unevaluated reading. Only a check that actually ran authorises an entry.
 - The answer names `bindingConstraint`. Say which one bound; an investor reading *"3.5%"* with
   no reason cannot tell a risk budget from a ceiling.
+
+**Two weights come back and they mean different things:**
+
+| field | means |
+|---|---|
+| `targetTotalWeight` | the whole position should be this |
+| `incrementalWeight` | buy this much more today |
+| `atOrAboveTarget` | the second is zero because the position is already complete |
+
+⛔ Never carry one of them into a proposal as though it were the other. With nothing held they
+are equal, which is exactly why one field looked sufficient — and why the run that already held
+half the position is the one that would have executed it wrongly.
 
 ## `stagedPlan` — the ledger
 

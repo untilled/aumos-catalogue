@@ -88,6 +88,25 @@ export function stabilisation(bars, state) {
     diagnostics.push(diagnostic('stabilisation_unreadable', 'blocked', 'There is no base window to read a low from', 'bars'))
     return { outcome: 'data-missing', base: null, checks: null, diagnostics, thresholds: rules }
   }
+  /**
+   * ⛔ **A short base window is missing data, not an unconfirmed base.** With
+   * fewer bars than the window asks for, `baseState` still answers — over
+   * whatever is there — and every reading below would then be taken against a
+   * low that is simply the oldest bar available. The three outcomes #259
+   * requires to be separate collapse exactly here: an unreadable series would
+   * come back as `stabilization-unconfirmed`, which is a statement about the
+   * market rather than about the data.
+   */
+  if (base.windowBars < rules.baseWindowBars) {
+    diagnostics.push(diagnostic(
+      'stabilisation_window_short',
+      'blocked',
+      `The base is read over ${rules.baseWindowBars} completed bars and only ${base.windowBars} were readable, so the low below is the oldest bar available rather than the fall's low`,
+      'bars',
+      { bars: base.windowBars, required: rules.baseWindowBars },
+    ))
+    return { outcome: 'data-missing', base, checks: null, diagnostics, thresholds: rules }
+  }
   if (!finite(state.rsi14)) {
     diagnostics.push(diagnostic(
       'stabilisation_rsi_unavailable',
@@ -105,6 +124,26 @@ export function stabilisation(bars, state) {
     reclaimAboveBaseLow: { value: base.reclaimAboveBaseLow, required: rules.minReclaimAboveBaseLow, met: finite(base.reclaimAboveBaseLow) && base.reclaimAboveBaseLow >= rules.minReclaimAboveBaseLow },
     /** ⑶ The RSI floor. Oversold is what opened the research; leaving oversold is what opens the entry. */
     rsi: { value: state.rsi14, required: rules.minRsi, met: state.rsi14 >= rules.minRsi },
+  }
+
+  /**
+   * ⛔ **A condition whose value is not a number is unevaluated, and an
+   * unevaluated condition is missing data — never an unmet one.** `met: false`
+   * on a `null` reading is the same defect one level down: it turns *«could not
+   * be measured»* into *«measured and failed»*, which reads as
+   * `stabilization-unconfirmed` and is indistinguishable from a real base that
+   * has not finished. Only `rsi` was guarded before this; all three are now.
+   */
+  const unreadable = Object.entries(checks).filter(([, check]) => !finite(check.value)).map(([name]) => name)
+  if (unreadable.length > 0) {
+    diagnostics.push(diagnostic(
+      'stabilisation_reading_unavailable',
+      'blocked',
+      `${unreadable.join(', ')} could not be read as a number, so the pre-registered test was not evaluated. An unevaluated condition is missing data and never a failed one`,
+      'bars',
+      { unreadable },
+    ))
+    return { outcome: 'data-missing', base, checks, diagnostics, thresholds: rules }
   }
 
   if (base.sessionsSinceLow <= rules.knifeWindowBars) {

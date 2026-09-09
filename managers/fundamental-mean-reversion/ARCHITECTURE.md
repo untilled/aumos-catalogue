@@ -75,6 +75,44 @@ something to work from.
 Nothing was taken from `evidence-gated`'s allocator, learning, calibration, catalyst, coverage,
 memory or recipe modules, and no fixture was copied.
 
+## The absence rule, and where it is enforced
+
+One defect class runs through every operation here and it is worth stating once: **a declared
+input that is absent, unread or unadjudicable must never read as a pass.** It arrives as
+ordinary defensive code — `Array.isArray(x) ? x : []`, `finite(x) && check(x)`,
+`clamp(measured, floor, cap)` — and every one of those turns *«nobody could tell»* into
+*«nothing was wrong»*.
+
+The three shapes, and the rule for each:
+
+| shape | what it did | what it does |
+|---|---|---|
+| a collection defaulted to empty | an unread book had **unlimited** headroom under every cap | `bookIsReadable` requires both arrays; an empty one is a fact, a missing one refuses |
+| a guard written `finite(x) && …` | the check silently did not run when its input was absent | the absent input refuses first: `mandate_gross_cap_missing`, `target_prior_high_unreadable`, `staged_total_unstated`, `plan_expiry_unstated`, `stage_weight_unstated` |
+| a clamp with a floor | a plausible number stood in for a measurement | `gapHaircut` returns `measurable: false` and `positionSizing` refuses on it |
+
+And two severity rules that make the above bite: a reading that could not be taken is
+`blocked` (it refuses), a reading nobody declared is `unevaluated` — and `classifyCase` will
+not reach BUY over a sizing answer carrying either. `info` stops nothing and is reserved for
+facts worth recording.
+
+⛔ **Every one of these refusals is `data_missing`.** Absence is not evidence against a thesis
+(#254), so none of them may be reported as `thesis_refuted`, and none of them is
+`risk_limit_exceeded` either — that code means the judgement was made, was positive, and the
+book has no room.
+
+### The two weights
+
+`targetTotalWeight` is *«the whole position should be this»* and `incrementalWeight` is *«buy
+this much more today»*. They were one field, and one field carrying both meanings is a proposal
+the host executes wrongly in one of its two readings with no way to tell which it was handed.
+
+Caps are measured against what **other** strategies hold, so this thesis's own weight is
+subtracted once — at the increment — rather than twice. `atOrAboveTarget` is the defined state
+where the increment is zero because the position is complete; `classifyCase` answers
+`target-weight-already-held` and `WAIT`, which is a different sentence from «no room» and would
+otherwise have been the same zero.
+
 ## Fixtures
 
 Synthetic bars, generated once and committed. ⛔ **They are shapes, not prices.** No vendor data
@@ -105,10 +143,16 @@ name.
 | `risk-limit-exceeded` | `risk-limit-exceeded` → WAIT |
 | `no-future-rows-across-an-earnings-date` | identical technical state to the clean series |
 
-`sizing.json` carries eight cases: the calm baseline, a gap-down history, a halted name, a name
+`sizing.json` carries ten cases: the calm baseline, a gap-down history, a halted name, a name
 held by another strategy plus an open proposal from a third, a per-strategy cap larger than the
-account cap, no headroom left, a `config` value trying to widen the risk budget, and an
-invalidation above the entry.
+account cap, no headroom left, a `config` value trying to widen the risk budget, an invalidation
+above the entry, a fully declared execution state, and a position already at its own target.
+
+⚠️ **The absence regressions are in the checker rather than in the fixtures**, as in-memory
+mutations of a positive control: each one deletes or blanks exactly one declared input and
+asserts the answer changes. Keeping them there means a reviewer reads the *difference* between
+two inputs instead of diffing two fixture files, and the committed fixtures stay a record of
+what a well-formed run produces.
 
 `staged-plan.json` carries nine: the first stage firing, the re-run refusing to double-add,
 price alone, price-and-time alone, a broken stabilisation, an exhausted loss budget, the

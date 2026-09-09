@@ -48,6 +48,9 @@ import {
   THRESHOLDS,
   execute,
   normalizeBars,
+  reversionTarget,
+  round,
+  stabilisation,
   technicalState,
 } from '../managers/fundamental-mean-reversion/lib/index.mjs'
 
@@ -234,7 +237,9 @@ for (const row of sizing.cases) {
     assert.equal(answer.status, row.measured.status, `${row.name}: status`)
     assert.equal(answer.code ?? null, row.measured.code, `${row.name}: code`)
     assert.equal(answer.effectiveLoss ?? null, row.measured.effectiveLoss, `${row.name}: effective loss`)
-    assert.equal(answer.targetWeight ?? null, row.measured.targetWeight, `${row.name}: target weight`)
+    assert.equal(answer.targetTotalWeight ?? null, row.measured.targetTotalWeight, `${row.name}: target total weight`)
+    assert.equal(answer.incrementalWeight ?? null, row.measured.incrementalWeight, `${row.name}: incremental weight`)
+    assert.equal(answer.atOrAboveTarget ?? null, row.measured.atOrAboveTarget, `${row.name}: at-or-above-target`)
     assert.equal(answer.bindingConstraint ?? null, row.measured.bindingConstraint, `${row.name}: binding constraint`)
   })
 }
@@ -244,9 +249,9 @@ check('a gap-down history sizes smaller than a calm one', () => {
   const gap = sized.get('gap-down-series')
   const halted = sized.get('halted-name')
   assert.ok(gap.effectiveLoss > calm.effectiveLoss, 'the same stop distance costs more where the price has gapped through levels')
-  assert.ok(gap.targetWeight < calm.targetWeight, 'so the position is smaller')
+  assert.ok(gap.targetTotalWeight < calm.targetTotalWeight, 'so the position is smaller')
   assert.ok(halted.effectiveLoss > calm.effectiveLoss, 'a halted name costs the halt haircut on top')
-  assert.ok(halted.targetWeight < calm.targetWeight)
+  assert.ok(halted.targetTotalWeight < calm.targetTotalWeight)
   assert.ok(calm.haircut.total >= THRESHOLDS.sizing.gapHaircutFloor, 'and a quiet history still pays the floor, because a quiet history is not a promise')
 })
 
@@ -254,11 +259,11 @@ check('concentration counts real holdings and open proposals together', () => {
   const held = sized.get('held-by-another-strategy')
   assert.equal(held.exposure.existingWeight, 0.085, 'a 6% holding under one strategy and a 2.5% open proposal under another are 8.5% of exposure to one name')
   assert.equal(held.bindingConstraint, 'single-name-headroom')
-  assert.equal(held.targetWeight, 0.015, 'so the 10% account ceiling leaves 1.5%')
-  assert.ok(held.targetWeight < sized.get('calm-series').targetWeight, 'which is less than the risk budget alone would have taken')
+  assert.equal(held.targetTotalWeight, 0.015, 'so the 10% account ceiling leaves 1.5%')
+  assert.ok(held.targetTotalWeight < sized.get('calm-series').targetTotalWeight, 'which is less than the risk budget alone would have taken')
 
   const strategyCap = sized.get('per-strategy-cap-cannot-raise-the-account-cap')
-  assert.equal(strategyCap.targetWeight, held.targetWeight, 'a 20% per-strategy allowance does not raise a 10% account ceiling')
+  assert.equal(strategyCap.targetTotalWeight, held.targetTotalWeight, 'a 20% per-strategy allowance does not raise a 10% account ceiling')
   assert.ok(
     strategyCap.diagnostics.some((row) => row.code === 'strategy_cap_exceeds_account_cap'),
     'and the attempt is reported rather than obeyed',
@@ -273,7 +278,7 @@ check('config may narrow the risk budget and may not widen it', () => {
   const widened = sized.get('config-may-not-widen-the-risk-budget')
   assert.equal(widened.riskBudget, THRESHOLDS.sizing.perThesisRiskBudget)
   assert.ok(widened.diagnostics.some((row) => row.code === 'config_loosens_preregistered_threshold'))
-  assert.equal(widened.targetWeight, sized.get('calm-series').targetWeight)
+  assert.equal(widened.targetTotalWeight, sized.get('calm-series').targetTotalWeight)
 })
 
 check('an invalidation above the entry is unsized rather than assumed', () => {
@@ -346,7 +351,288 @@ check('the old high is never assumed to be recovered', () => {
   assert.ok(answer.diagnostics.some((row) => row.code === 'target_assumes_prior_high_recovered'))
 })
 
-// ── ⑫ asOf is not optional ────────────────────────────────────────────────
+/**
+ * ── ⑫ the absence audit: a declared input that is gone may not read as a pass ─
+ *
+ * Every case below **deletes or blanks one declared input** from an otherwise
+ * positive run and asserts the answer changes. That is the whole of the defect
+ * class: an account nobody could read defaulting to an account with no
+ * positions, an unadjudicable cap being skipped rather than refusing, a clamp's
+ * floor standing in for a measurement, a guard written `finite(x) && …` that a
+ * caller can omit its way past.
+ *
+ * ⚠️ **The fixtures on disk are not touched.** Each mutation is made on a deep
+ * copy in memory, so the assertions above keep passing for the reasons they
+ * always did, and a reviewer can see the *difference* between the two inputs
+ * rather than having to diff two fixture files.
+ *
+ * ⛔ **`data_missing`, never `thesis_refuted`.** Absence is not evidence against
+ * a thesis (#254), and every assertion below names the code it expects.
+ */
+const clone = (value) => JSON.parse(JSON.stringify(value))
+const positiveSizing = () => ({
+  symbol: 'FMR001',
+  entryPrice: 172000,
+  invalidationPrice: 145000,
+  nav: 400_000_000,
+  mandate: { singleNameCap: 0.1, grossCap: 0.9 },
+  book: { holdings: [], openProposals: [] },
+  execution: { halted: false, dailyPriceLimit: true },
+  rows: rowsOf('shock-then-base'),
+})
+const sizeWith = (mutate) => {
+  const input = positiveSizing()
+  mutate(input)
+  return execute({ operation: 'positionSizing', asOf: ASOF, input })
+}
+/** The control: unmutated, this input sizes. Every assertion below is a difference from it. */
+check('the absence audit has a positive control', () => {
+  const control = sizeWith(() => {})
+  assert.equal(control.status, 'ok')
+  assert.ok(control.targetTotalWeight > 0)
+  assert.deepEqual(control.diagnostics, [], 'and it carries no unevaluated reading, so a BUY over it is authorised by checks that actually ran')
+})
+
+check('an unread book is not an empty book', () => {
+  for (const [what, mutate] of [
+    ['the whole object', (input) => { delete input.book }],
+    ['holdings', (input) => { delete input.book.holdings }],
+    ['open proposals', (input) => { delete input.book.openProposals }],
+    ['a null book', (input) => { input.book = null }],
+  ]) {
+    const answer = sizeWith(mutate)
+    assert.equal(answer.status, 'refused', `${what} missing: refused`)
+    assert.equal(answer.code, 'data_missing', `${what} missing: data_missing, not a refutation`)
+    assert.ok(answer.diagnostics.some((row) => row.code === 'book_unreadable'), `${what} missing: named`)
+    assert.equal(answer.targetTotalWeight, undefined, `${what} missing: and no weight was produced`)
+  }
+  // An empty book is a *fact* and still sizes — the distinction is the point.
+  const empty = sizeWith((input) => { input.book = { holdings: [], openProposals: [] } })
+  assert.equal(empty.status, 'ok', 'a fund that really holds nothing is not missing data')
+})
+
+check('an unreadable cap is not an absent cap', () => {
+  const gross = sizeWith((input) => { delete input.mandate.grossCap })
+  assert.equal(gross.status, 'refused')
+  assert.equal(gross.code, 'data_missing')
+  assert.ok(gross.diagnostics.some((row) => row.code === 'mandate_gross_cap_missing'), 'the gross cap was named in the contract and is now read or refused')
+
+  const single = sizeWith((input) => { delete input.mandate.singleNameCap })
+  assert.equal(single.status, 'refused')
+  assert.equal(single.code, 'data_missing')
+
+  // The regression in its original form: 79% of the book held elsewhere, a
+  // declared 80% gross cap, and a fresh buy the risk budget would have sized at
+  // 4%. The cap must **bind** rather than be skipped.
+  const crowded = sizeWith((input) => {
+    input.mandate.grossCap = 0.8
+    input.book.holdings = [{ symbol: 'OTHER', weight: 0.79, strategy: 'another-manager' }]
+  })
+  assert.equal(crowded.status, 'ok')
+  assert.equal(crowded.bindingConstraint, 'gross-headroom', 'the declared gross cap is what bound it')
+  assert.equal(crowded.targetTotalWeight, 0.01, 'so the 4% the risk budget wanted becomes the 1% the cap leaves')
+  assert.ok(crowded.targetTotalWeight < crowded.riskWeight)
+
+  // And with the cap already taken, there is no position at all.
+  const full = sizeWith((input) => {
+    input.mandate.grossCap = 0.8
+    input.book.holdings = [{ symbol: 'OTHER', weight: 0.8, strategy: 'another-manager' }]
+  })
+  assert.equal(full.status, 'refused')
+  assert.equal(full.code, 'risk_limit_exceeded')
+  assert.equal(full.bindingConstraint, 'gross-headroom')
+})
+
+check('an unmeasurable gap haircut refuses rather than taking the floor', () => {
+  const answer = sizeWith((input) => { input.rows = input.rows.slice(-5) })
+  assert.equal(answer.status, 'refused')
+  assert.equal(answer.code, 'data_missing')
+  assert.ok(answer.diagnostics.some((row) => row.code === 'gap_haircut_unmeasurable'))
+  assert.equal(answer.haircut.measurable, false)
+  assert.equal(answer.haircut.total, null, 'and the floor was not supplied in place of a measurement')
+
+  // The floor still does its own job where there *is* a measurement to bound.
+  const calm = sized.get('calm-series')
+  assert.equal(calm.haircut.measurable, true)
+  assert.ok(calm.haircut.bounded >= THRESHOLDS.sizing.gapHaircutFloor)
+})
+
+check('an undeclared halt state is unevaluated, and unevaluated does not authorise a BUY', () => {
+  const answer = sizeWith((input) => { delete input.execution })
+  assert.equal(answer.status, 'ok', 'the sizing still computes — this is a reading it could not take, not one it got wrong')
+  const row = answer.diagnostics.find((entry) => entry.code === 'execution_conditions_undeclared')
+  assert.ok(row, 'and it says so')
+  assert.equal(row.severity, 'unevaluated', 'as unevaluated rather than info, because an info stops nothing')
+  assert.deepEqual(row.details.undeclared, ['halted', 'dailyPriceLimit'])
+
+  // …and `classifyCase` refuses to reach BUY over it.
+  const positive = cases.cases.find((entry) => entry.name === 'temporary-shock-plus-stabilisation')
+  const withUnevaluated = execute({
+    operation: 'classifyCase',
+    asOf: ASOF,
+    input: {
+      ...clone(positive.input),
+      sizing: answer,
+      series: { adjustment: 'adjusted', corporateActions: [], rows: rowsOf(positive.series) },
+    },
+  })
+  assert.equal(withUnevaluated.outcome, 'research-incomplete')
+  assert.equal(withUnevaluated.code, 'research_incomplete')
+  assert.ok(withUnevaluated.unevaluatedSizing.includes('execution_conditions_undeclared'))
+})
+
+check('an unreadable liquidity ceiling is missing data, not an absent constraint', () => {
+  const answer = sizeWith((input) => { input.rows = input.rows.map((bar) => ({ ...bar, volume: null })) })
+  assert.equal(answer.status, 'refused')
+  assert.equal(answer.code, 'data_missing')
+  assert.ok(answer.diagnostics.some((row) => row.code === 'liquidity_unreadable'))
+})
+
+check('the target weight and the buy increment are two fields', () => {
+  const control = sizeWith(() => {})
+  assert.ok(Number.isFinite(control.targetTotalWeight) && Number.isFinite(control.incrementalWeight))
+  assert.equal(control.incrementalWeight, control.targetTotalWeight, 'with nothing held, the two agree — which is exactly why one field looked sufficient')
+
+  // Half the target already held by this strategy: the total is unchanged and
+  // the increment is the difference. One field could not have said both.
+  const half = sizeWith((input) => { input.book.holdings = [{ symbol: 'FMR001', weight: 0.02, strategy: 'fundamental-mean-reversion' }] })
+  assert.equal(half.targetTotalWeight, control.targetTotalWeight, 'a cap is measured against what *other* strategies hold, so the total does not shrink because this thesis re-ran on itself')
+  assert.equal(half.incrementalWeight, round(control.targetTotalWeight - 0.02))
+  assert.equal(half.atOrAboveTarget, false)
+
+  const complete = sized.get('already-at-its-own-target')
+  assert.equal(complete.status, 'ok', 'a completed position is not a refusal')
+  assert.equal(complete.incrementalWeight, 0)
+  assert.equal(complete.atOrAboveTarget, true)
+  assert.ok(complete.targetTotalWeight > 0, 'and the total is still positive, so a reader can tell it from having no room')
+  assert.ok(complete.diagnostics.some((row) => row.code === 'position_at_or_above_target'))
+})
+
+check('a completed position classifies as its own outcome, not as a risk limit', () => {
+  const positive = cases.cases.find((entry) => entry.name === 'temporary-shock-plus-stabilisation')
+  const answer = execute({
+    operation: 'classifyCase',
+    asOf: ASOF,
+    input: {
+      ...clone(positive.input),
+      sizing: sized.get('already-at-its-own-target'),
+      position: { held: true, weight: 0.045 },
+      review: { invalidationTriggered: false, deadlineElapsed: false, targetReached: false },
+      series: { adjustment: 'adjusted', corporateActions: [], rows: rowsOf(positive.series) },
+    },
+  })
+  assert.equal(answer.outcome, 'target-weight-already-held')
+  assert.equal(answer.verdict, 'WAIT')
+  assert.equal(answer.code, null, 'the thesis stands and the book is not the reason — neither a refutation nor a risk limit')
+})
+
+check('a held position with no stated review is unadjudicated', () => {
+  const positive = cases.cases.find((entry) => entry.name === 'temporary-shock-plus-stabilisation')
+  const base = () => ({
+    ...clone(positive.input),
+    series: { adjustment: 'adjusted', corporateActions: [], rows: rowsOf(positive.series) },
+  })
+  const silent = execute({ operation: 'classifyCase', asOf: ASOF, input: { ...base(), position: { held: true, weight: 0.03 } } })
+  assert.equal(silent.outcome, 'data-missing')
+  assert.equal(silent.code, 'data_missing')
+
+  // One explicit `false` is an adjudication and is accepted as one.
+  const adjudicated = execute({ operation: 'classifyCase', asOf: ASOF, input: { ...base(), position: { held: true, weight: 0.03 }, review: { invalidationTriggered: false } } })
+  assert.notEqual(adjudicated.outcome, 'data-missing', 'a review that ran and found nothing is not missing data')
+})
+
+check('the book contradicting the run about a holding stops the run', () => {
+  const positive = cases.cases.find((entry) => entry.name === 'temporary-shock-plus-stabilisation')
+  const ownedElsewhere = sizeWith((input) => { input.book.holdings = [{ symbol: 'FMR001', weight: 0.02, strategy: 'fundamental-mean-reversion' }] })
+  const answer = execute({
+    operation: 'classifyCase',
+    asOf: ASOF,
+    input: {
+      ...clone(positive.input),
+      sizing: ownedElsewhere,
+      series: { adjustment: 'adjusted', corporateActions: [], rows: rowsOf(positive.series) },
+    },
+  })
+  assert.equal(answer.outcome, 'data-missing', 'the book says this strategy holds it and the run did not say so, so the review branch was skipped rather than passed')
+  assert.equal(answer.code, 'data_missing')
+})
+
+check('a stabilisation reading that could not be taken is data-missing, not unconfirmed', () => {
+  // Too few bars for the 120-bar base: the readings would otherwise be taken
+  // against whatever the oldest available bar happened to be.
+  const short = execute({ operation: 'stabilisation', asOf: ASOF, input: { rows: rowsOf('shock-then-base').slice(-40) } })
+  assert.equal(short.outcome, 'data-missing')
+  assert.notEqual(short.outcome, 'stabilization-unconfirmed')
+  assert.notEqual(short.outcome, 'falling-knife')
+  assert.ok(short.diagnostics.some((row) => row.code === 'stabilisation_window_short'))
+
+  // An unreadable RSI: the same, and it was already guarded — this pins it.
+  const noRsi = stabilisation(normalizeBars(rowsOf('shock-then-base'), ASOF).bars, { ...technicalState(normalizeBars(rowsOf('shock-then-base'), ASOF).bars), rsi14: null })
+  assert.equal(noRsi.outcome, 'data-missing')
+
+  // And a base low of zero, which made `reclaimAboveBaseLow` null and used to
+  // score as a *failed* condition rather than an unevaluated one.
+  const bars = normalizeBars(rowsOf('shock-then-base'), ASOF).bars
+  const state = technicalState(bars)
+  const brokenBase = stabilisation(bars.map((bar, index) => (index === bars.length - 30 ? { ...bar, low: 0 } : bar)), state)
+  assert.equal(brokenBase.outcome, 'data-missing', 'a reading whose value is not a number is unevaluated, and unevaluated is never unmet')
+  assert.ok(brokenBase.diagnostics.some((row) => row.code === 'stabilisation_reading_unavailable'))
+
+  // The three outcomes stay three: none of the above is either of the others.
+  const outcomes = new Set([
+    execute({ operation: 'stabilisation', asOf: ASOF, input: { rows: rowsOf('shock-then-base') } }).outcome,
+    execute({ operation: 'stabilisation', asOf: ASOF, input: { rows: rowsOf('new-lows-continuing') } }).outcome,
+    execute({ operation: 'stabilisation', asOf: ASOF, input: { rows: rowsOf('reference-shape-first-bounce') } }).outcome,
+    short.outcome,
+  ])
+  assert.deepEqual([...outcomes].sort(), ['confirmed', 'data-missing', 'falling-knife', 'stabilization-unconfirmed'])
+})
+
+check('a staged plan missing its own ceiling, expiry or rung weight adds nothing', () => {
+  const template = staged.cases.find((row) => row.name === 'first-stage-fires')
+  const stageWith = (mutate) => {
+    const plan = clone(template.plan)
+    mutate(plan)
+    return execute({ operation: 'stagedPlan', asOf: ASOF, input: { plan, stageId: 'stage-1', satisfied: ['stabilisation-held', 'thesis-evidence'], gate: clone(template.gate) } })
+  }
+  const control = stageWith(() => {})
+  assert.equal(control.status, 'ok', 'the control still fires')
+
+  for (const [what, mutate, code] of [
+    ['no cumulative target', (plan) => { delete plan.plannedTotalWeight }, 'staged_total_unstated'],
+    ['a zero cumulative target', (plan) => { plan.plannedTotalWeight = 0 }, 'staged_total_unstated'],
+    ['no expiry', (plan) => { delete plan.expiresAt }, 'plan_expiry_unstated'],
+    ['an unparseable expiry', (plan) => { plan.expiresAt = 'whenever' }, 'plan_expiry_unstated'],
+    ['a rung with no weight', (plan) => { delete plan.stages[0].weight }, 'stage_weight_unstated'],
+  ]) {
+    const answer = stageWith(mutate)
+    assert.equal(answer.status, 'refused', `${what}: refused`)
+    assert.equal(answer.code, code, `${what}: ${code}`)
+    assert.deepEqual(answer.plan, answer.plan && clone(answer.plan), `${what}: the ledger came back`)
+    assert.equal((answer.plan?.filled ?? []).length, 0, `${what}: and nothing was recorded against it`)
+  }
+})
+
+check('a reversion target whose prior-high check could not run is refused', () => {
+  const bars = normalizeBars(rowsOf('shock-then-base'), ASOF).bars
+  const state = { ...technicalState(bars), high252: null }
+  const answer = reversionTarget({ basis: 'moving-average', movingAverage: 'ma200', bars, state })
+  assert.equal(answer.status, 'refused')
+  assert.ok(answer.diagnostics.some((row) => row.code === 'target_prior_high_unreadable'), 'a guard that only applies when its input is present is a guard a caller can omit its way past')
+})
+
+check('the required-output checklist can be false', () => {
+  const positive = cases.cases.find((entry) => entry.name === 'temporary-shock-plus-stabilisation')
+  const answer = execute({
+    operation: 'classifyCase',
+    asOf: ASOF,
+    input: { ...clone(positive.input), series: { adjustment: 'adjusted', corporateActions: [], rows: [] } },
+  })
+  assert.equal(answer.requiredOutputs.technicalState, false, 'a checklist entry hardcoded true checks nothing')
+  assert.equal(answer.requiredOutputs.stabilisationObservation, false)
+})
+
+// ── ⑬ asOf is not optional ────────────────────────────────────────────────
 check('every operation refuses a call with no asOf', () => {
   for (const operation of ['priceState', 'stabilisation', 'reversionTarget', 'positionSizing', 'stagedPlan', 'classifyCase']) {
     const answer = execute({ operation, input: {} })

@@ -30,9 +30,13 @@
     "liquidityCap": 56.75560069,
     "existingWeight": 0,
     "bindingConstraint": "risk-budget",
-    "targetWeight": 0.04011194,
+    "targetTotalWeight": 0.04011194,
+    "incrementalWeight": 0.04011194,
+    "atOrAboveTarget": false,
     "downsideFraction": 0.0075,
-    "diagnostics": []
+    "diagnostics": [
+     "execution_conditions_undeclared"
+    ]
    }
   },
   {
@@ -63,9 +67,13 @@
     "liquidityCap": 48.80983125,
     "existingWeight": 0,
     "bindingConstraint": "risk-budget",
-    "targetWeight": 0.02553813,
+    "targetTotalWeight": 0.02553813,
+    "incrementalWeight": 0.02553813,
+    "atOrAboveTarget": false,
     "downsideFraction": 0.0075,
-    "diagnostics": []
+    "diagnostics": [
+     "execution_conditions_undeclared"
+    ]
    }
   },
   {
@@ -99,9 +107,13 @@
     "liquidityCap": 56.75560069,
     "existingWeight": 0,
     "bindingConstraint": "risk-budget",
-    "targetWeight": 0.03623596,
+    "targetTotalWeight": 0.03623596,
+    "incrementalWeight": 0.03623596,
+    "atOrAboveTarget": false,
     "downsideFraction": 0.0075,
-    "diagnostics": []
+    "diagnostics": [
+     "execution_conditions_undeclared"
+    ]
    }
   },
   {
@@ -144,9 +156,13 @@
     "liquidityCap": 56.75560069,
     "existingWeight": 0.085,
     "bindingConstraint": "single-name-headroom",
-    "targetWeight": 0.015,
+    "targetTotalWeight": 0.015,
+    "incrementalWeight": 0.015,
+    "atOrAboveTarget": false,
     "downsideFraction": 0.00280465,
-    "diagnostics": []
+    "diagnostics": [
+     "execution_conditions_undeclared"
+    ]
    }
   },
   {
@@ -190,9 +206,12 @@
     "liquidityCap": 56.75560069,
     "existingWeight": 0.085,
     "bindingConstraint": "single-name-headroom",
-    "targetWeight": 0.015,
+    "targetTotalWeight": 0.015,
+    "incrementalWeight": 0.015,
+    "atOrAboveTarget": false,
     "downsideFraction": 0.00280465,
     "diagnostics": [
+     "execution_conditions_undeclared",
      "strategy_cap_exceeds_account_cap"
     ]
    }
@@ -231,9 +250,12 @@
     "liquidityCap": 56.75560069,
     "existingWeight": 0.1,
     "bindingConstraint": "single-name-headroom",
-    "targetWeight": 0,
+    "targetTotalWeight": 0,
+    "incrementalWeight": 0,
+    "atOrAboveTarget": false,
     "downsideFraction": 0,
     "diagnostics": [
+     "execution_conditions_undeclared",
      "risk_limit_exceeded"
     ]
    }
@@ -269,10 +291,13 @@
     "liquidityCap": 56.75560069,
     "existingWeight": 0,
     "bindingConstraint": "risk-budget",
-    "targetWeight": 0.04011194,
+    "targetTotalWeight": 0.04011194,
+    "incrementalWeight": 0.04011194,
+    "atOrAboveTarget": false,
     "downsideFraction": 0.0075,
     "diagnostics": [
-     "config_loosens_preregistered_threshold"
+     "config_loosens_preregistered_threshold",
+     "execution_conditions_undeclared"
     ]
    }
   },
@@ -304,10 +329,98 @@
     "liquidityCap": null,
     "existingWeight": null,
     "bindingConstraint": null,
-    "targetWeight": null,
+    "targetTotalWeight": null,
+    "incrementalWeight": null,
+    "atOrAboveTarget": null,
     "downsideFraction": null,
     "diagnostics": [
      "invalidation_not_below_entry"
+    ]
+   }
+  },
+  {
+   "name": "execution-conditions-declared",
+   "series": "shock-then-base",
+   "input": {
+    "symbol": "FMR001",
+    "entryPrice": 172000,
+    "invalidationPrice": 145000,
+    "nav": 400000000,
+    "mandate": {
+     "singleNameCap": 0.1,
+     "grossCap": 0.9
+    },
+    "book": {
+     "holdings": [],
+     "openProposals": []
+    },
+    "execution": {
+     "halted": false,
+     "dailyPriceLimit": true
+    }
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "lossToInvalidation": 0.15697674,
+    "gapHaircut": 0.05,
+    "effectiveLoss": 0.20697674,
+    "riskBudget": 0.0075,
+    "riskWeight": 0.03623596,
+    "liquidityCap": 56.75560069,
+    "existingWeight": 0,
+    "bindingConstraint": "risk-budget",
+    "targetTotalWeight": 0.03623596,
+    "incrementalWeight": 0.03623596,
+    "atOrAboveTarget": false,
+    "downsideFraction": 0.0075,
+    "diagnostics": []
+   }
+  },
+  {
+   "name": "already-at-its-own-target",
+   "series": "shock-then-base",
+   "input": {
+    "symbol": "FMR001",
+    "entryPrice": 172000,
+    "invalidationPrice": 145000,
+    "nav": 400000000,
+    "mandate": {
+     "singleNameCap": 0.1,
+     "grossCap": 0.9
+    },
+    "book": {
+     "holdings": [
+      {
+       "symbol": "FMR001",
+       "weight": 0.045,
+       "strategy": "fundamental-mean-reversion"
+      }
+     ],
+     "openProposals": []
+    },
+    "execution": {
+     "halted": false,
+     "dailyPriceLimit": true
+    }
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "lossToInvalidation": 0.15697674,
+    "gapHaircut": 0.05,
+    "effectiveLoss": 0.20697674,
+    "riskBudget": 0.0075,
+    "riskWeight": 0.03623596,
+    "liquidityCap": 56.75560069,
+    "existingWeight": 0.045,
+    "bindingConstraint": "risk-budget",
+    "targetTotalWeight": 0.03623596,
+    "incrementalWeight": 0,
+    "atOrAboveTarget": true,
+    "downsideFraction": 0.0075,
+    "diagnostics": [
+     "position_at_or_above_target"
     ]
    }
   }

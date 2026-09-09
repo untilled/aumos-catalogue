@@ -164,7 +164,23 @@ export function reversionTarget(input = {}) {
    * as a band whose top happens to sit above the 252-bar high. So the reading is
    * made against the high itself rather than against the prose.
    */
-  if (finite(state.high252) && finite(high) && high > state.high252) {
+  if (!finite(state.high252)) {
+    /**
+     * ⛔ **The guard was written `finite(state.high252) && …`, so an unreadable
+     * high disabled it.** A rule that only applies when its input happens to be
+     * there is a rule a caller can omit its way past — and the omission is
+     * silent, because the answer looks exactly like one where the check ran.
+     */
+    diagnostics.push(diagnostic(
+      'target_prior_high_unreadable',
+      'blocked',
+      'The 252-bar high could not be read, so the range could not be checked against it. This methodology makes no claim about the old high, and a check that did not run is not a check that passed',
+      'state.high252',
+      { high252: state.high252 ?? null },
+    ))
+    return { status: 'refused', diagnostics }
+  }
+  if (finite(high) && high > state.high252) {
     diagnostics.push(diagnostic(
       'target_assumes_prior_high_recovered',
       'blocked',

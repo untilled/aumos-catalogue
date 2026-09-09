@@ -94,6 +94,34 @@ export function applyStage(input = {}) {
   if (state.expired === true) {
     return refuse('plan_expired', 'The plan\'s expiry has passed. An expired plan is re-judged in the open rather than continued quietly', 'plan.expiresAt', { expiresAt: plan?.expiresAt, asOf })
   }
+  /**
+   * ⛔ **An unreadable expiry is not the absence of one.** `state.expired` is
+   * `null` when `expiresAt` does not parse, and only `=== true` refused — so a
+   * plan with a missing or malformed expiry never expired, which is a standing
+   * instruction to buy that outlives the reason it was written.
+   */
+  if (state.expired !== false) {
+    return refuse(
+      'plan_expiry_unstated',
+      'The plan\'s expiry could not be read as an instant. A ladder with no readable expiry never expires, and every stage under it would keep firing after the thesis it belongs to has stopped being re-judged',
+      'plan.expiresAt',
+      { expiresAt: plan?.expiresAt ?? null, asOf },
+    )
+  }
+  /**
+   * ⛔ **And an unstated cumulative target is not an unlimited one.** The
+   * ceiling check below was guarded by `finite(plannedTotalWeight) && …`, so a
+   * plan that never stated its total skipped the comparison entirely and could
+   * add for as long as it had stages.
+   */
+  if (!finite(state.plannedTotalWeight) || state.plannedTotalWeight <= 0) {
+    return refuse(
+      'staged_total_unstated',
+      'The plan does not state a positive cumulative target weight, so there is no ceiling for a stage to be checked against. A staged entry is one decision with a total, not a decision to keep buying',
+      'plan.plannedTotalWeight',
+      { plannedTotalWeight: state.plannedTotalWeight },
+    )
+  }
 
   const kind = stage.kind ?? 'add'
   const satisfiedKinds = satisfied.filter((name) => Object.hasOwn(CONDITION_KINDS, name))
@@ -124,8 +152,22 @@ export function applyStage(input = {}) {
     if (!finite(gate.lossBudgetRemaining) || gate.lossBudgetRemaining <= 0) {
       return refuse('risk_limit_exceeded', 'The remaining loss budget does not cover this stage', 'gate.lossBudgetRemaining', { stageId, lossBudgetRemaining: gate.lossBudgetRemaining ?? null })
     }
-    const wouldCommit = round(state.committedWeight + (finite(stage.weight) ? stage.weight : 0))
-    if (finite(state.plannedTotalWeight) && wouldCommit > round(state.plannedTotalWeight + 1e-9)) {
+    /**
+     * ⛔ **A stage with no readable weight used to add nothing and pass.** It
+     * then went into `filled` as a recorded rung, so the plan had spent a stage
+     * and committed no exposure — and the *next* run's ceiling check was
+     * measured against a total that was missing it.
+     */
+    if (!finite(stage.weight) || stage.weight <= 0) {
+      return refuse(
+        'stage_weight_unstated',
+        'This stage does not state a positive weight, so what it would add to the plan is unknown. A rung that commits an unknown amount cannot be checked against the cumulative target',
+        'stage.weight',
+        { stageId, weight: stage.weight ?? null },
+      )
+    }
+    const wouldCommit = round(state.committedWeight + stage.weight)
+    if (wouldCommit > round(state.plannedTotalWeight + 1e-9)) {
       return refuse('staged_total_exceeded', 'This stage would take the plan past its cumulative target weight', 'plan.plannedTotalWeight', { wouldCommit, plannedTotalWeight: state.plannedTotalWeight })
     }
   }

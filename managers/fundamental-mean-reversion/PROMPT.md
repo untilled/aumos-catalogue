@@ -214,11 +214,25 @@ lossToInvalidation = (entry − invalidation) / entry
 gapHaircut         = clamp(worst single-session fall in 250 bars, 0.03, 0.15)
                      + 0.02 if the name was halted or the venue has a daily price limit
 effectiveLoss      = lossToInvalidation + gapHaircut
-targetWeight       = min( perThesisRiskBudget / effectiveLoss,
+targetTotalWeight  = min( perThesisRiskBudget / effectiveLoss,
                           liquidity ceiling,
-                          the Mandate's single-name headroom after existing exposure,
-                          the Mandate's gross headroom )
+                          the Mandate's single-name cap less what *other* strategies hold,
+                          the Mandate's gross cap less what *other* strategies hold )
+incrementalWeight  = max(0, targetTotalWeight − what this thesis already holds)
 ```
+
+⚠️ **Two weights, and they are never one field.** `targetTotalWeight` is *«the whole
+position should be this»*; `incrementalWeight` is *«buy this much more today»*. Say which one
+your proposal's target is. When the second is zero because the position is already complete,
+the answer is `target-weight-already-held` and a `WAIT` — that is a finished position, not a
+book with no room, and reporting the two as one zero would make them the same decision.
+
+⛔ **Every input to that formula must have been read.** A book you could not read is not a book
+with nothing in it; a cap you could not read is not an absent cap; a worst-session figure you
+could not measure is not 3%. All of them refuse with `data_missing`, and a sizing carrying a
+reading it could not evaluate — an undeclared halt state, say — will not reach BUY. On XKRX
+`execution.dailyPriceLimit` is `true`; declare it, because this package will not fill a venue
+fact in for you.
 
 **A stop price does not guarantee a fill.** On KRX the ±30% daily limit is not protection, it
 is the mechanism: a limit-down session is a session in which your stop is a wish, and a halt is
