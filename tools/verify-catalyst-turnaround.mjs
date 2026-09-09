@@ -348,7 +348,221 @@ check('the reference case classification does not by itself produce a purchase',
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 7. The package's own boundaries.
+// 7. The absent-input audit. (regression, after untilled/aumos-catalogue#265)
+//
+// ── The defect class, and why it needs its own section ─────────────────────
+//
+// A review of the sibling `shareholder-rerating` package found the same mistake
+// three times and it has one shape: **a declared input that is absent, unread or
+// unadjudicable being treated as a pass.** Delete the account object from a
+// passing fixture and the holdings default to `[]` — which is arithmetically an
+// account with unlimited headroom — and the run still returns a full-sized
+// purchase. Nothing is malformed. Nothing is missing on screen. The answer is
+// wrong, and no per-case fixture can see it, because every per-case fixture
+// passes every input.
+//
+// So the regressions below are **mutations of a fixture that passes**, applied
+// in memory: take the one case that reaches the entry path, remove exactly one
+// declared input, and assert the run refuses rather than proceeds. The fixture
+// files are not edited — the positive cases above must keep passing for the same
+// reasons they passed before.
+//
+// ⛔ The other half of every assertion here: none of these may report
+// `thesis_refuted`. An input nobody read says nothing whatever about the thesis,
+// and the failure mode this section guards against has a twin in which absence
+// is over-read instead of under-read.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const positive = cases.cases.find((item) => item.name === 'completed-positive-thesis-reaches-the-buy-path')
+const heldDelay = cases.cases.find((item) => item.name === 'one-delay-with-new-evidence')
+
+/** One mutation of a passing input, with the fixture left alone. */
+function mutate(base, edit) {
+  const copy = structuredClone(base.input)
+  edit(copy)
+  return runVerdict(copy)
+}
+
+const ABSENCE_REGRESSIONS = [
+  {
+    name: 'the book was not read',
+    why: '#265 finding 1, exactly: positions and proposals defaulted to empty arrays, and an account nobody could read authorised a full position.',
+    base: positive,
+    edit: (input) => delete input.book,
+    expect: { intent: 'wait-for-data', review: 'inputs-unread', causeCodes: ['data_missing'] },
+  },
+  {
+    name: 'the account single-name limit was not read',
+    why: '#265 finding 2: only an explicit failure refused, so an unadjudicable limit passed.',
+    base: positive,
+    edit: (input) => delete input.book.caps.accountSingleName,
+    expect: { intent: 'wait-for-data', review: 'inputs-unread', causeCodes: ['data_missing'] },
+  },
+  {
+    name: 'the mandate position cap was not read',
+    why: 'It used to be filtered out of the cap list, leaving this package’s own ceiling as the only limit.',
+    base: positive,
+    edit: (input) => delete input.sizing.mandatePositionCap,
+    expect: { intent: 'wait-for-data', review: 'inputs-unread', causeCodes: ['data_missing'] },
+  },
+  {
+    name: 'the mandate was read and declares no position cap',
+    why: 'The other side of the same rule, and the reason it is three states and not two: a declared absence is readable and may authorise, and it leaves its own record.',
+    base: positive,
+    edit: (input) => {
+      input.sizing.mandatePositionCap = 'not-declared'
+    },
+    expect: { intent: 'enter-staged', review: 'staged-entry-armed', diagnosticCodes: ['mandate_position_cap_not_declared'] },
+  },
+  {
+    name: 'the catalyst register was not read, on the entry path',
+    base: positive,
+    edit: (input) => delete input.register,
+    expect: { intent: 'wait-for-data', review: 'inputs-unread', causeCodes: ['data_missing'] },
+  },
+  {
+    name: 'the cash burn was not read',
+    why: 'It defaulted to 0, which reads as a company that is not burning cash — infinite runway, check passed.',
+    base: positive,
+    edit: (input) => delete input.financials.monthlyCashBurn,
+    expect: { intent: 'research-watch', review: 'survivability-fails', causeCodes: ['data_missing'] },
+  },
+  {
+    name: 'the debt maturity schedule was not read',
+    why: 'It defaulted to 0, which reads as a company with no debt falling due — coverage null, check skipped entirely.',
+    base: positive,
+    edit: (input) => delete input.financials.debtMaturingWithinYear,
+    expect: { intent: 'research-watch', review: 'survivability-fails', causeCodes: ['data_missing'] },
+  },
+  {
+    name: 'the price has explicitly not stabilised',
+    why: '#265 finding 4’s shape: the input was declared, carried into the answer, and never read by the implementation.',
+    base: positive,
+    edit: (input) => {
+      input.price.stabilised = false
+    },
+    expect: { intent: 'research-watch', review: 'stabilisation-not-confirmed' },
+  },
+  {
+    name: 'stabilisation was not read at all',
+    why: 'A secondary confirmation, so its absence is uncertainty and not a gate — #256 says supporting data absence is recorded as uncertainty. It may withhold; it may never qualify.',
+    base: positive,
+    edit: (input) => delete input.price.stabilised,
+    expect: { intent: 'enter-staged', review: 'staged-entry-armed', diagnosticCodes: ['stabilisation_unread'] },
+  },
+  {
+    name: 'the book already holds the whole target',
+    why: 'The case with no defined behaviour: the increment is zero and there is nothing to do, rather than the full target bought again.',
+    base: positive,
+    edit: (input) => {
+      input.book.positions = [{ symbol: 'A00007', strategy: 'catalyst-turnaround', weight: 0.12 }]
+    },
+    expect: { intent: 'hold', review: 'already-at-target' },
+  },
+  {
+    name: 'the register was not read, on a held position mid-delay',
+    why: 'The one the delay counter exists for: without the register a fourth slip is indistinguishable from a first, and the old code would have held through it as though it were the first.',
+    base: heldDelay,
+    edit: (input) => delete input.register,
+    expect: { intent: 'hold', review: 'register-unread', causeCodes: ['data_missing'] },
+  },
+  {
+    name: 'the balance sheet was not read, on a held position',
+    why: 'The held twin of the entry check: unchanged and named, not resized — resizing on an absence would score it as a breach.',
+    base: heldDelay,
+    edit: (input) => delete input.financials.liquidAssets,
+    expect: { intent: 'hold', review: 'survivability-unread', causeCodes: ['data_missing'] },
+  },
+]
+
+for (const regression of ABSENCE_REGRESSIONS) {
+  const result = mutate(regression.base, regression.edit)
+  const where = `absent-input → ${regression.name}`
+  check(where, () => {
+    assert.equal(result.data.intent, regression.expect.intent, `${where}: expected ${regression.expect.intent}, got ${result.data.intent}`)
+    assert.equal(result.data.review.name, regression.expect.review, `${where}: review`)
+    for (const code of regression.expect.causeCodes ?? []) {
+      assert.ok(has(result.causes, code), `${where}: expected cause ${code}, got ${codes(result.causes).join(', ') || '(none)'}`)
+    }
+    for (const code of regression.expect.diagnosticCodes ?? []) {
+      assert.ok(has(result.diagnostics, code), `${where}: expected diagnostic ${code}, got ${codes(result.diagnostics).join(', ') || '(none)'}`)
+    }
+    // ⛔ An unread input is never a refutation. Every mutation, every time.
+    assert.ok(!has(result.causes, 'thesis_refuted'), `${where}: an unread input was reported as a refutation`)
+  })
+}
+
+/**
+ * The invariant the twelve cases above are twelve instances of, asserted once as
+ * a rule: **no mutation that removes a declared input may increase exposure.**
+ * A future rung that forgets the gate fails here rather than in production.
+ */
+check('no run missing a declared input increases exposure', () => {
+  for (const regression of ABSENCE_REGRESSIONS) {
+    const result = mutate(regression.base, regression.edit)
+    if (regression.expect.intent === 'enter-staged') continue
+    assert.equal(result.data.incrementThisRun, 0, `${regression.name}: added ${result.data.incrementThisRun} of the book on an input nobody read`)
+    assert.equal(result.data.increasesExposure, false, `${regression.name}: increasesExposure`)
+  }
+})
+
+/**
+ * ── Two weights, two meanings (#265's fourth finding) ─────────────────────
+ *
+ * The same field meant «the whole position should be this» and «buy this much
+ * more» depending on which caller read it, and either reading by the host is
+ * wrong for the other case. Here they are separate fields, and the ones that do
+ * not buy anything say zero rather than leaving the previous meaning standing.
+ */
+check('the cumulative target and the increment are two different numbers', () => {
+  const entry = runVerdict(positive.input)
+  assert.equal(entry.data.intent, 'enter-staged')
+  assert.equal(entry.data.cumulativeTargetWeight, 0.12, 'the cumulative target is what the sizing produced')
+  assert.equal(entry.data.currentWeight, 0, 'the book holds none of it')
+  assert.equal(entry.data.incrementThisRun, 0.12, 'with no staged plan the increment is the whole gap')
+  assert.equal(entry.data.weightMeanings.cumulativeTargetWeight, 'cumulative-position-weight')
+  assert.equal(entry.data.weightMeanings.incrementThisRun, 'weight-added-this-run')
+
+  // Every intent that is not one of the two purchases reports a zero increment,
+  // including the trims and the exits — a reduction is a cumulative target the
+  // host reduces to, never a negative increment.
+  for (const item of cases.cases) {
+    const result = runVerdict(item.input)
+    if (result.data.increasesExposure) continue
+    assert.equal(result.data.incrementThisRun, 0, `${item.name} carries a non-zero increment on ${result.data.intent}`)
+  }
+})
+
+/**
+ * The same three-state rule at the two module boundaries, so that a caller other
+ * than `runVerdict` cannot reach the permissive reading either.
+ */
+check('the modules themselves distinguish read-and-empty from unread', () => {
+  const ledgerUnread = catalystLedger({ rows: [], transitions: [], asOf: cases.asOf })
+  assert.equal(ledgerUnread.data.summary.registerRead, false)
+  assert.equal(ledgerUnread.data.summary.delayExhausted, null, 'delayExhausted was false on an unread register, which claims there is room left')
+  assert.ok(has(ledgerUnread.causes, 'data_missing'))
+
+  const ledgerEmpty = catalystLedger({ previous: null, rows: [], transitions: [], asOf: cases.asOf })
+  assert.equal(ledgerEmpty.data.summary.registerRead, true)
+  assert.ok(!has(ledgerEmpty.causes, 'data_missing'), 'an explicitly empty register was reported as unread')
+
+  const planUnread = stagedPlan({ plan: staging.plan, price: 10000, asOf: staging.runs[0].asOf })
+  assert.equal(planUnread.data.addedThisRun, 0, 'a stage fired on an unknown fill history, which is the double-add')
+  assert.ok(has(planUnread.causes, 'data_missing'))
+
+  const bookUnread = accountConcentration({ caps: { accountSingleName: 0.2 }, strategy: 'catalyst-turnaround' })
+  assert.equal(bookUnread.data.readable, false)
+  assert.ok(has(bookUnread.causes, 'data_missing'))
+  assert.equal(bookUnread.data.unusedHeadroom, null, 'an unread book reported headroom')
+
+  const capUnread = accountConcentration({ positions: [], proposals: [], caps: {}, strategy: 'catalyst-turnaround' })
+  assert.equal(capUnread.data.readable, false, 'an unread account cap fell back to this package’s own ceiling')
+  assert.ok(has(capUnread.causes, 'data_missing'))
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. The package's own boundaries.
 // ─────────────────────────────────────────────────────────────────────────────
 
 check('the cause vocabulary is closed', () => {
@@ -415,4 +629,5 @@ check('the manifest and the plugin agree, and the capabilities are the ones the 
 })
 
 console.log(`catalyst-turnaround: ${checks} checks over ${cases.cases.length} ladder cases, ${ledgerFixture.scenarios.length} ledger scenarios, ${staging.runs.length + staging.malformed.length} staged-plan runs, ${concentration.scenarios.length} concentration scenarios, ${scoreboard.scenarios.length} scoreboards and ${reference.variants.length} reference-case variants`)
+console.log(`catalyst-turnaround: ${ABSENCE_REGRESSIONS.length} absent-input regressions — a declared input removed from a passing run, and none of them buys anything or reports a refutation`)
 console.log(`catalyst-turnaround: the six catalyst outcomes reached ${new Set(SIX.map((name) => reached.get(name))).size} distinct judgements`)

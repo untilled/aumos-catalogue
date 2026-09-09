@@ -285,6 +285,24 @@ wherever anything here disagrees with it.
 `risk_limit_exceeded`. Absence is not refutation. A missing figure that stops you sizing is a WAIT
 with a reason; a missing *supporting* figure is uncertainty on a judgement you still made.
 
+⛔ **Say what you read, and say separately when you read a source that declares nothing.** Every
+limit, budget and balance-sheet figure this methodology uses has **three** states, not two, and only
+the first two may authorise a purchase or a staged add:
+
+| | what it means |
+|---|---|
+| a number | you read it, and this is the value |
+| `"not-declared"` | you read the source and it declares no limit |
+| absent | nobody read it — `data_missing`, and no exposure increases this run |
+
+The distinction is load-bearing because the two absences produce the *same arithmetic* and must not
+produce the same record. A book you could not read is not an empty book, and an empty book is an
+account with unlimited room for this name. A cash-flow statement you could not read is not a company
+with no cash burn. A catalyst register you could not read is not a catalyst that has never slipped —
+that one is the worst of the three, because a fourth delay then reads as a first. **When your own
+register does not arrive, hold what you hold, extend nothing, adjudicate nothing, and say which
+record was missing.**
+
 ## Stage 9 — The reviews you arm, and the calendar you watch
 
 Every judgement you submit — including the ones concluding there is nothing to do — arms its own next

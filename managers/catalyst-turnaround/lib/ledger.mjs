@@ -358,9 +358,32 @@ function applyTransition(row, move, { asOfInstant, maxDelays }) {
  * copied vendor data. `rows` are the catalysts this run read; `transitions` are
  * the state changes it observed.
  */
-export function catalystLedger({ previous = null, rows = [], transitions = [], asOf, config = {} } = {}) {
+export function catalystLedger({ previous, rows = [], transitions = [], asOf, config = {} } = {}) {
   const diagnostics = []
   const causes = []
+
+  /**
+   * ── The register is read, or the delay count is not known ────────────────
+   *
+   * ⛔ `previous` used to default to `null`, and `null` meant «nothing carried»
+   * — which is true on a first run and false when `memory_read` failed. In the
+   * second case every `delayCount` restarted at whatever the incoming row said,
+   * and **a catalyst that has slipped three times reads as a first slip.** That
+   * is the exact risk `skills/degraded-sources/SKILL.md` warns about, so the code
+   * has to enforce what the skill says rather than describe it.
+   *
+   * `null` is now a positive statement — *the register was read and holds
+   * nothing* — and `undefined` is nobody having read it. The second is
+   * `data_missing`, and `registerRead: false` travels with the answer so the
+   * ladder cannot extend a deadline or add to a position on an unknown count.
+   */
+  const registerRead = previous !== undefined
+  if (!registerRead) {
+    causes.push(
+      cause('data_missing', 'The catalyst register was not read, so no delay count on any open catalyst is known. Pass null to say the register was read and is empty; a first slip and a fourth are indistinguishable without it', 'previous'),
+    )
+  }
+
   const asOfInstant = instantOf(asOf)
   if (asOfInstant === null) {
     diagnostics.push(diagnostic('as_of_unreadable', 'blocked', 'Every judgement in this package is pinned to asOf and there is no default', 'asOf'))
@@ -453,7 +476,14 @@ export function catalystLedger({ previous = null, rows = [], transitions = [], a
     delayed: current.filter((row) => row.state === 'delayed').length,
     failed: current.filter((row) => row.state === 'failed').length,
     cancelled: current.filter((row) => row.cancelled).length,
-    delayExhausted: current.some((row) => row.delayCount > maxDelays),
+    /**
+     * ⚠️ Only ever `true` on a count this run can stand behind. With the register
+     * unread the answer is `null` — not `false` — because `false` here means
+     * «checked, and there is room left», which is the claim that cannot be made.
+     */
+    delayExhausted: registerRead ? current.some((row) => row.delayCount > maxDelays) : null,
+    registerRead,
+    delayCountKnown: registerRead,
     confirmedDates: current.filter((row) => row.dateStatus === 'confirmed').length,
     estimatedDates: current.filter((row) => row.dateStatus === 'estimated').length,
     dueForAdjudication: finalRows.filter((row) => row.dueForAdjudication).map((row) => row.id),

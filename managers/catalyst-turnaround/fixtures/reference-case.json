@@ -22,6 +22,7 @@
         "market": "XKRX",
         "held": false,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": {
           "policyDependent": true,
           "policyStage": "announced",
@@ -90,6 +91,7 @@
         "market": "XKRX",
         "held": false,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": {
           "policyDependent": true,
           "policyStage": "executing",
@@ -192,6 +194,7 @@
         "market": "XKRX",
         "held": false,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": {
           "policyDependent": true,
           "policyStage": "executing",

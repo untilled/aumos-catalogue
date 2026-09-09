@@ -45,9 +45,24 @@ function conditionDue(condition, { asOfInstant, price }) {
   return { due: false, readable: false }
 }
 
-export function stagedPlan({ previous = null, plan = {}, price = null, asOf } = {}) {
+export function stagedPlan({ previous, plan = {}, price = null, asOf } = {}) {
   const diagnostics = []
   const causes = []
+
+  /**
+   * ⛔ **The same three-state rule as the catalyst register, and here it is the
+   * double-add itself.** `previous = null` meant «no stage has been filled», and
+   * a run whose register read failed would then find its first stage due and buy
+   * it again. `null` is now the positive statement — read, and nothing filled —
+   * and `undefined` is nobody having read it, which adds nothing at all.
+   */
+  const registerRead = previous !== undefined
+  if (!registerRead) {
+    causes.push(
+      cause('data_missing', 'The staged-plan register was not read, so which stages have already been filled is unknown. Pass null to say the register was read and holds nothing; adding on an unknown fill history is the double-add this module exists to refuse', 'previous'),
+    )
+  }
+
   const asOfInstant = instantOf(asOf)
   if (asOfInstant === null) {
     diagnostics.push(diagnostic('as_of_unreadable', 'blocked', 'A staged plan is judged at asOf', 'asOf'))
@@ -61,7 +76,7 @@ export function stagedPlan({ previous = null, plan = {}, price = null, asOf } = 
       )
     }
   }
-  if (previous !== null && previous.originDecisionId !== plan.originDecisionId) {
+  if (registerRead && previous !== null && previous.originDecisionId !== plan.originDecisionId) {
     diagnostics.push(
       diagnostic('plan_origin_mismatch', 'blocked', 'The carried register belongs to a different decision. Reconciling two plans under one id is exactly how a filled stage becomes an unfilled one', 'plan.originDecisionId', {
         carried: previous.originDecisionId,
@@ -168,6 +183,7 @@ export function stagedPlan({ previous = null, plan = {}, price = null, asOf } = 
    * run that cannot say it did adds nothing.
    */
   let addedThisRun = round(dueRows.reduce((total, row) => total + row.weight, 0))
+  if (addedThisRun > 0 && !registerRead) addedThisRun = 0
   if (addedThisRun > 0) {
     const rechecked = instantOf(plan?.thesisRecheckedAt)
     if (rechecked === null || rechecked > asOfInstant) {
@@ -219,6 +235,7 @@ export function stagedPlan({ previous = null, plan = {}, price = null, asOf } = 
       filledStageIds: nextRegister.filledStageIds,
       filledWeight,
       addedThisRun,
+      registerRead,
       cumulativeWeightAfter: round(filledWeight + addedThisRun),
       cumulativeTargetWeight: finite(cumulativeTarget) ? cumulativeTarget : null,
       pendingStageIds: rows.filter((row) => !filled.has(row.id) && !row.due && !row.lapsed).map((row) => row.id),

@@ -214,9 +214,9 @@ export function recoveryComparison({ indicators = [], asOf } = {}) {
  */
 export function financialSurvivability({
   liquidAssets,
-  monthlyCashBurn = 0,
-  debtMaturingWithinYear = 0,
-  securedRefinancing = 0,
+  monthlyCashBurn,
+  debtMaturingWithinYear,
+  securedRefinancing,
   dilutionRisk = null,
   currency = 'KRW',
   config = {},
@@ -226,15 +226,35 @@ export function financialSurvivability({
   const minRunwayMonths = finite(config.minRunwayMonths) ? config.minRunwayMonths : METHODOLOGY.minRunwayMonths
   const floor = finite(config.debtCoverageFloor) ? config.debtCoverageFloor : METHODOLOGY.debtCoverageFloor
 
-  if (!finite(liquidAssets) || liquidAssets < 0) {
-    causes.push(cause('data_missing', 'Financial survivability cannot be judged without the liquid assets figure, so this run cannot size the position', 'liquidAssets'))
-    return { data: { survivable: null }, diagnostics, causes }
+  /**
+   * ⛔ **Zero was the wrong default and it was the wrong default in the flattering
+   * direction, twice.** `monthlyCashBurn = 0` made a cash-flow statement nobody
+   * read into a company that is not burning cash — infinite runway, check passed.
+   * `debtMaturingWithinYear = 0` made an unread maturity schedule into a company
+   * with no debt falling due — coverage `null`, check skipped. Both are the exact
+   * shape #254 forbids: an absence scored as a pass.
+   *
+   * A company genuinely not burning cash passes `0` on purpose, and that reads
+   * identically in the arithmetic and differently in the record.
+   */
+  const required = [
+    ['liquidAssets', liquidAssets],
+    ['monthlyCashBurn', monthlyCashBurn],
+    ['debtMaturingWithinYear', debtMaturingWithinYear],
+    ['securedRefinancing', securedRefinancing],
+  ]
+  const unread = required.filter(([, value]) => !finite(value) || value < 0).map(([name]) => name)
+  if (unread.length > 0) {
+    causes.push(
+      cause('data_missing', `Survivability cannot be judged without ${unread.join(', ')}. A figure nobody read is not a zero, and a zero here is what makes the check pass`, unread[0], { unread }),
+    )
+    return { data: { survivable: null, unread }, diagnostics, causes }
   }
 
-  const burning = finite(monthlyCashBurn) && monthlyCashBurn > 0
+  const burning = monthlyCashBurn > 0
   const runwayMonths = burning ? round(liquidAssets / monthlyCashBurn, 3) : null
-  const maturing = finite(debtMaturingWithinYear) ? debtMaturingWithinYear : 0
-  const secured = finite(securedRefinancing) ? securedRefinancing : 0
+  const maturing = debtMaturingWithinYear
+  const secured = securedRefinancing
   const debtCoverage = maturing > 0 ? round((liquidAssets + secured) / maturing, 6) : null
 
   const runwayShort = burning && runwayMonths < minRunwayMonths

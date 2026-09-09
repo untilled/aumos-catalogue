@@ -1,5 +1,5 @@
 import { METHODOLOGY } from './constants.mjs'
-import { cause, diagnostic, finite, round } from './diagnostics.mjs'
+import { NOT_DECLARED, cause, diagnostic, finite, readDeclared, round } from './diagnostics.mjs'
 
 /**
  * ── What a wrong answer costs, and therefore how large the position is ─────
@@ -57,14 +57,42 @@ export function targetWeight({
   expectedActiveReturn,
   stopDistance,
   conviction,
-  mandatePositionCap = null,
-  accountHeadroom = null,
+  mandatePositionCap,
+  accountHeadroom,
   config = {},
 } = {}) {
   const diagnostics = []
   const causes = []
   const kellyFraction = finite(config.kellyFraction) ? config.kellyFraction : METHODOLOGY.kellyFraction
   const houseCap = finite(config.defaultSingleNameCap) ? config.defaultSingleNameCap : METHODOLOGY.defaultSingleNameCap
+
+  /**
+   * ⛔ **Neither cap may arrive by omission.** Both used to default to `null`,
+   * be filtered out of the `caps` list, and leave the house ceiling as the only
+   * binding limit — so a run that never read the Mandate and a run whose Mandate
+   * declares no per-position cap produced the same, full-sized answer. They are
+   * different facts and only one of them may size anything.
+   */
+  const mandate = readDeclared(mandatePositionCap)
+  const headroom = readDeclared(accountHeadroom)
+  for (const [name, reading] of [
+    ['mandatePositionCap', mandate],
+    ['accountHeadroom', headroom],
+  ]) {
+    if (reading.state === 'unread') {
+      causes.push(
+        cause('data_missing', `${name} was not read, and an unread limit is not an absent one. Pass the number, or pass ${JSON.stringify(NOT_DECLARED)} to say the source was read and declares none`, name),
+      )
+    }
+  }
+  if (mandate.state === 'unread' || headroom.state === 'unread') {
+    return { data: { targetWeight: null, cumulativeTargetWeight: null }, diagnostics, causes }
+  }
+  if (mandate.state === 'not-declared') {
+    diagnostics.push(
+      diagnostic('mandate_position_cap_not_declared', 'note', `The Mandate was read and declares no per-position cap, so this package's own ceiling of ${houseCap} binds. Recorded because "no cap declared" and "cap not read" produce the same number and must not produce the same record`, 'mandatePositionCap'),
+    )
+  }
 
   if (![expectedActiveReturn, stopDistance, conviction].every(finite)) {
     causes.push(cause('data_missing', 'Sizing needs the expected active return, the distance to invalidation and a stated conviction. Any one of them missing and the answer is a weight this run made up', 'sizing'))
@@ -90,12 +118,12 @@ export function targetWeight({
     )
   }
 
-  const caps = [houseCap, mandatePositionCap, accountHeadroom].filter(finite)
+  const caps = [houseCap, mandate.value, headroom.value].filter(finite)
   const bindingCap = caps.length > 0 ? Math.max(0, Math.min(...caps)) : 0
   const sized = round(Math.min(raw, bindingCap))
   const capBinds = raw > bindingCap
 
-  if (finite(accountHeadroom) && accountHeadroom <= 0) {
+  if (headroom.state === 'value' && headroom.value <= 0) {
     causes.push(
       cause('risk_limit_exceeded', 'The whole-account concentration limit for this name is already taken by holdings and open proposals elsewhere, so there is no room for this one whatever the thesis says', 'accountHeadroom', {
         accountHeadroom,
@@ -105,7 +133,16 @@ export function targetWeight({
 
   return {
     data: {
+      /**
+       * ⚠️ **This is a *cumulative* weight: «the whole position should be this».**
+       * It is never «buy this much more». The increment is computed against what
+       * the book already holds, by `runVerdict`, and carried under its own name —
+       * the two were one field next door (#265) and either reading by a host is
+       * wrong for the other case.
+       */
       targetWeight: sized,
+      cumulativeTargetWeight: sized,
+      meaning: 'cumulative-position-weight',
       rawWeight: round(raw),
       bindingCap: round(bindingCap),
       capBinds,
@@ -118,7 +155,7 @@ export function targetWeight({
         riskBudget: round(riskBudget),
         stopDistance: round(stopDistance),
       },
-      caps: { house: houseCap, mandate: mandatePositionCap, accountHeadroom },
+      caps: { house: houseCap, mandate: mandate.value, mandateState: mandate.state, accountHeadroom: headroom.value, accountHeadroomState: headroom.state },
       units: { targetWeight: 'portfolio-weight', rawWeight: 'portfolio-weight', bindingCap: 'portfolio-weight' },
     },
     diagnostics,
@@ -148,10 +185,43 @@ export function targetWeight({
  * set — evidence-gated folds sector, theme and factor as well, and this package
  * makes a single-name claim only.
  */
-export function accountConcentration({ positions = [], proposals = [], caps = {}, strategy = null } = {}) {
+export function accountConcentration({ positions, proposals, caps = {}, strategy = null } = {}) {
   const diagnostics = []
   const causes = []
-  const accountCap = finite(caps.accountSingleName) ? caps.accountSingleName : METHODOLOGY.defaultSingleNameCap
+
+  /**
+   * ⛔ **The book is a required reading, not a defaulted one.** `positions = []`
+   * and `proposals = []` as parameter defaults meant an account nobody could read
+   * arrived as an account with nothing in it — which is the same arithmetic as an
+   * account with unlimited room. An empty book is a legitimate and common state
+   * and it is expressed the way every other empty thing here is: by passing an
+   * empty array on purpose.
+   */
+  for (const [name, rows] of [
+    ['positions', positions],
+    ['proposals', proposals],
+  ]) {
+    if (!Array.isArray(rows)) {
+      causes.push(
+        cause('data_missing', `${name} was not read. An unread book is not an empty one, and treating it as empty is the arithmetic of an account with no limits`, name),
+      )
+    }
+  }
+  const accountReading = readDeclared(caps.accountSingleName)
+  if (accountReading.state === 'unread') {
+    causes.push(
+      cause('data_missing', `The account's single-name limit was not read. Pass the number, or pass ${JSON.stringify(NOT_DECLARED)} to say the Mandate was read and declares none`, 'caps.accountSingleName'),
+    )
+  }
+  if (causes.length > 0) {
+    return { data: { rows: [], accountCap: null, headroom: {}, unusedHeadroom: null, breaches: [], readable: false }, diagnostics, causes }
+  }
+  if (accountReading.state === 'not-declared') {
+    diagnostics.push(
+      diagnostic('account_single_name_cap_not_declared', 'note', `The Mandate was read and declares no account single-name limit, so this package's own ceiling of ${METHODOLOGY.defaultSingleNameCap} binds. Recorded, because a declared absence and an unread field must not leave the same trace`, 'caps.accountSingleName'),
+    )
+  }
+  const accountCap = accountReading.state === 'value' ? accountReading.value : METHODOLOGY.defaultSingleNameCap
   const strategyCaps = caps.perStrategy ?? {}
 
   const strategyCapTotal = round(Object.values(strategyCaps).filter(finite).reduce((total, value) => total + value, 0))
@@ -238,6 +308,9 @@ export function accountConcentration({ positions = [], proposals = [], caps = {}
       unusedHeadroom,
       headroom: Object.fromEntries(rows.map((row) => [row.symbol, row.headroomForStrategy])),
       breaches: rows.filter((row) => row.breach).map((row) => row.symbol),
+      /** The book and the limit were both read. Nothing downstream may size without it. */
+      readable: true,
+      accountCapState: accountReading.state,
       units: { held: 'portfolio-weight', proposed: 'portfolio-weight', total: 'portfolio-weight' },
     },
     diagnostics,

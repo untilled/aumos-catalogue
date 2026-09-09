@@ -47,6 +47,42 @@ self-contained by decision, and the table above is the inventory a later commoni
 from. `recovery.mjs`, `classify.mjs`, `scoreboard.mjs` and `verdict.mjs` have no counterpart in
 `evidence-gated` and are original to this package.
 
+## The three-state input rule
+
+Every cap, budget, register and balance-sheet figure in `lib/` is read through
+`readDeclared()` in `diagnostics.mjs`, and has three states rather than two: a **number**, the
+explicit sentinel **`'not-declared'`**, or **unread**. Only the first two may authorise an increase in
+exposure; unread is `data_missing`, and `data_missing` never becomes a purchase, a staged add or a
+refutation.
+
+This replaced a set of ordinary-looking parameter defaults, and each of them was permissive in the
+flattering direction:
+
+| was | read as | now |
+|---|---|---|
+| `positions = []`, `proposals = []` | an unread book is an empty book — an account with unlimited headroom for this name | required arrays; `readable: false` and `data_missing` otherwise |
+| `caps.accountSingleName ?? defaultSingleNameCap` | an unread account limit is this package's own ceiling | declared, or `'not-declared'`, or refused |
+| `mandatePositionCap = null` filtered out of the cap list | an unread Mandate imposes no cap | same three states, with a `note` when it is a declared absence |
+| `monthlyCashBurn = 0` | an unread cash-flow statement is a company not burning cash — infinite runway | required; `survivable: null` and `data_missing` otherwise |
+| `debtMaturingWithinYear = 0` | an unread maturity schedule is a company with no debt due — coverage skipped | required, as above |
+| `previous = null` on the catalyst register | an unread register is a catalyst that has never slipped | `null` is *read and empty*; `undefined` is unread, and no deadline may be extended |
+| `previous = null` on the staged plan | an unread plan register is a plan with nothing filled — so the first stage fires again | same, and `addedThisRun` is forced to 0 |
+| `survivable === false` as the only refusal | an unadjudicable balance sheet passes the entry gate | `=== true` required to enter |
+| `price.stabilised` carried into the answer, never read | a declared input the implementation ignored | read: an explicit `false` withholds; an absent reading is uncertainty, never a qualification |
+
+⚠️ **`survivable !== true` and the `mayIncrease` gate are deliberately redundant.** The gate is one
+line covering all nine rungs; the per-rung `=== true` means that removing the gate still cannot buy on
+a `null`. Both are mutation-tested.
+
+## Two weights, two meanings
+
+`cumulativeTargetWeight` is *"the whole position should be this"*. `incrementThisRun` is *"buy this
+much more, now"*. They are separate fields on the verdict with a `weightMeanings` map beside them, and
+every intent that is not `enter-staged` or `add-next-stage` reports an increment of exactly zero —
+including the trims and the exits, which carry a **cumulative** target the host reduces to rather than
+a negative increment. The already-at-or-above-target case is defined: increment zero, intent `hold`,
+review `already-at-target`.
+
 ## Which fixture stands behind which rule
 
 `tools/verify-catalyst-turnaround.mjs` runs all of them on plain Node over committed JSON. No install,
@@ -59,6 +95,7 @@ no network, no test framework — there is none in this repository and this pack
 | `staging.json` | the same plan read four times. The second read is the point: the same due stage, and nothing added |
 | `concentration.json` | open proposals counting as exposure; per-strategy caps not summing into a larger account limit; a proposal restating its own strategy's holding; one name under two theses still being one position |
 | `scoreboard.json` | a failed catalyst under a positive price return still scoring zero on the catalyst side; an open window staying out of the denominator; a combined return being refused |
+| the absent-input regressions (in `tools/verify-catalyst-turnaround.mjs`, not a fixture file) | one declared input removed from a run that passes, twelve times over, asserting the run refuses rather than proceeds — and that none of them reports a refutation. They are in-memory mutations precisely so the positive fixtures keep passing for the reasons they already passed |
 | `reference-case.json` | the reference case classifying as a policy-and-financial turnaround at three points in its own story, never excluded on a valuation multiple, with the four channels kept apart — **and** a variant with the same classification that does not reach a purchase |
 
 ⛔ **Every figure in `fixtures/` is illustrative.** None of it is a re-audited historical record, a

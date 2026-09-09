@@ -92,6 +92,36 @@ export function diagnostic(code, severity, message, path, details = {}) {
 
 export const blocked = (rows) => rows.some((row) => row.severity === 'blocked')
 
+/**
+ * ── Three states, where the code used to have two ──────────────────────────
+ *
+ * ⚠️ **A limit that was never read and a limit that does not exist are not the
+ * same fact, and defaulting collapses them.** The failure has a shape and it was
+ * found next door in `shareholder-rerating` (#265): delete the account object
+ * from a passing fixture and the holdings default to `[]`, which reads as *an
+ * account with unlimited headroom*, and the run returns a full-sized purchase.
+ * Nothing is malformed, nothing is missing on screen, and the answer is wrong.
+ *
+ * So every cap, budget and re-check input in this package is read through here
+ * and has to be **one of three things**:
+ *
+ *   a number            the caller read it and this is the value
+ *   `'not-declared'`    the caller read the source and it declares no limit
+ *   anything else       nobody read it — `unread`
+ *
+ * ⛔ Only the first two may authorise anything. `unread` is `data_missing`, and
+ * `data_missing` never becomes a purchase, a staged add, or a refutation.
+ * `'not-declared'` is a positive statement a caller has to make on purpose,
+ * which is the whole point: it cannot be arrived at by forgetting.
+ */
+export const NOT_DECLARED = 'not-declared'
+
+export function readDeclared(value) {
+  if (value === NOT_DECLARED) return { state: 'not-declared', value: null }
+  if (finite(value)) return { state: 'value', value }
+  return { state: 'unread', value: null }
+}
+
 /** RFC 3339 in, epoch milliseconds out. A number is already an instant. */
 export function instantOf(value) {
   if (finite(value)) return value

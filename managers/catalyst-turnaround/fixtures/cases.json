@@ -17,6 +17,7 @@
         "market": "XKRX",
         "held": true,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": {
           "policyDependent": true,
           "policyStage": "in-results",
@@ -96,6 +97,7 @@
         "market": "XKRX",
         "held": true,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": { "policyDependent": false, "policyStage": "none", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
         "catalysts": [
           {
@@ -155,8 +157,10 @@
         "market": "XKRX",
         "held": true,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": { "policyDependent": true, "policyStage": "announced", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
         "register": {
+          "plan": null,
           "catalysts": {
             "version": 1,
             "catalysts": [
@@ -228,6 +232,7 @@
         "market": "XKRX",
         "held": true,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": { "policyDependent": true, "policyStage": "announced", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
         "catalysts": [
           {
@@ -285,6 +290,7 @@
         "market": "XKRX",
         "held": true,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": { "policyDependent": true, "policyStage": "executing", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
         "catalysts": [
           {
@@ -333,6 +339,7 @@
         "market": "XKRX",
         "held": true,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": { "policyDependent": false, "policyStage": "none", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
         "catalysts": [
           {
@@ -386,6 +393,7 @@
         "market": "XKRX",
         "held": false,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": { "policyDependent": true, "policyStage": "executing", "earningsPathTraced": true, "deteriorationCauseIdentified": true, "valuationMultiple": 88.4 },
         "catalysts": [
           {
@@ -443,6 +451,7 @@
         "market": "XKRX",
         "held": false,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": { "policyDependent": true, "policyStage": "announced", "earningsPathTraced": false, "earningsPathNote": "The programme names an industry; no filing links a won of it to this issuer", "deteriorationCauseIdentified": true },
         "catalysts": [
           {
@@ -496,6 +505,7 @@
         "market": "XKRX",
         "held": false,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": { "policyDependent": true, "policyStage": "executing", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
         "catalysts": [
           {
@@ -537,6 +547,7 @@
         "market": "XKRX",
         "held": false,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": { "policyDependent": true, "policyStage": "announced", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
         "catalysts": [
           {
@@ -572,6 +583,7 @@
         "market": "XKRX",
         "held": false,
         "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
         "case": { "policyDependent": true, "policyStage": "executing", "earningsPathTraced": true, "deteriorationCauseIdentified": true },
         "catalysts": [
           {

@@ -33,6 +33,17 @@ look like a failure: the run produces a clean, complete, first-slip judgement ab
 has slipped three times. So a run without its register does not size, does not extend a deadline and
 does not adjudicate — it records that it could not read its own record.
 
+✅ **This is enforced rather than requested.** Everything in the table above is a rule the deterministic
+core applies: an unread register, book, cap or balance-sheet figure is `data_missing`, and nothing in
+the ladder increases an exposure while one is outstanding. What is asked of *you* is the part code
+cannot do — saying **which** of §1's three things happened, per source, in `uncertainty`.
+
+⛔ **Say «read and empty» out loud when that is what you found.** An empty book, a register holding no
+catalysts and a Mandate that declares no per-position cap are all ordinary states, and each is reported
+positively — an empty array, and the word `not-declared` — rather than by leaving the field out.
+Leaving it out means nobody looked, and the run will refuse to open a position on it. That is the
+correct behaviour and it is not a bug to work around by filling the field in with a guess.
+
 ## 3. What never happens
 
 - ⛔ **A missing number is never `thesis_refuted`.** The lanes are in the code for this reason: absence
