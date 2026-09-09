@@ -658,7 +658,12 @@ CIK) → `mapCorporationCodes` → `fundamentalsPlan` → `source_cache_read` / 
   from a future document to a basis that exists. ⛔ The ported-from harness's measured medians
   (KR 45 days, US 30) are the precedent for the *method*: under the floor this refuses to estimate
   rather than borrowing them. ⛔ An estimate on `catalysts`, or on `estimated` without saying it is
-  one, is `catalyst_estimate_unmarked` and blocked. ⛔ **And nothing derived reaches `actual`** —
+  one, is `catalyst_estimate_unmarked` and blocked; ⛔ **and so is the same `(market, symbol, event)` on
+  both arrays** — the fold keeps the confirmed copy under that key, so a second copy with the markers
+  stripped registers the projection as a date somebody read, which is the one shape that used to get
+  through (#249). ⚠️ **Hand over `registerAs.estimated` and compose nothing**: the cadence answer
+  carries its rows under the argument name that takes them, and `estimated[]` is published field for
+  field on `inputContracts`. ⛔ **And nothing derived reaches `actual`** —
   `post-event-continuation` needs a real announcement record from the corporate-actions route and
   stays honestly empty until it has one; a cadence says when a filer will probably speak, never what
   it said. ⚠️ A derived window does not make a name researched: `coverage.researched` and

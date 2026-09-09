@@ -58,6 +58,23 @@ wrong in data, which is why every parse check passes it. The prescription lives 
 date is checked afterwards, and `newest_bar_may_be_unclosed` reports a newest bar younger than the
 24 hours that make a daily bar readable without refusing anything.
 
+⛔ **And *«adjusted and unadjusted are never mixed»* was a sentence with nothing behind it** (#248).
+One bar that has not closed is the shape above; two hundred bars that all closed and do not belong
+to one price history is the next one out, and until #248 no check in this package compared a derived
+level against the price it was derived from. Measured on the 2026-09-09 US sweep: BKNG answered
+`ma200` **2,316.55** against a `close` of 193.29, and VZ `aboveLow200` **+373%** off a `low200` of
+10.5999 — neither a drawdown, both an unadjusted split or an adjustment factor that stops part-way
+through the window. BKNG's `discoveryScore` of 20 came **entirely** from it, and that score reads
+`offHigh200` and `ma200Distance`, so the price branch's own ranking was partly made of the artifact.
+`price_series_discontinuity_suspected` (`info`) now reports three readings over the last 200 bars —
+`close/ma200` outside [0.1, 10], `high200/low200` outside [1, 20], and the count of adjacent sessions
+whose log return exceeds ±50% — and `indicators.discontinuity` carries that count **whether or not
+anything is suspected**, because *«no session moved by more than 50%»* is the fact that makes
+`offHigh200` readable. ⚠️ It refuses nothing: a name that really did split has exactly this shape and
+its history is exactly right, so the judgement is the reader's — what was wrong is that the reader
+had no way to know. ⛔ And it does not re-derive the adjustment: a series this package re-based would
+make it the second author of a price history whose first author is the vendor.
+
 | missing | continues | blocked |
 |---|---|---|
 | Toss connection | existing Evidence/Thesis review | new price signal and target calculation |
@@ -131,6 +148,16 @@ document back as one opaque string and the outgoing scan is anchored, so a JSON 
 timestamp and its leaves are never walked — and the encoding stays anyway, as this package's own
 canon rather than as an accommodation (§Known limits). ⛔ Event records are not persisted: `sue`, `day1ExcessPct` and
 `preAnnouncementClose` are copied vendor numbers, so they are re-read each run.
+⚠️ **The producer worked and the registration path did not reach it** (#249). `catalystCadence`
+answered this book's first derived window — 32 days of median lag over 21 filings, measured from its
+own cache — and it was computed and thrown away: `estimated[]` was published as a paragraph while
+`catalysts[]` beside it was a field table, so a caller with no wrong spelling to learn from guessed
+three shapes and the only one that registered stripped the markers off a second copy on `catalysts`
+and recorded a projection as a **confirmed date**. The row shape is published field for field now,
+1:1 with what the producer answers; `catalystCadence` hands back `registerAs: { estimated }`, the
+same array under the argument name that takes it; and the same `(market, symbol, event)` on both
+arrays is `catalyst_estimate_unmarked` / **blocked**, because the fold keeps the confirmed copy and
+that is the one reading this axis must never produce.
 The review-memory record is what this instance **proposed** and whose instant has not passed —
 never a copy of a run's planned sequence, and ⛔ never gated on `decisions[].armed`, which is past
 tense and drops a promise from the record precisely while it still stands (#156). What stood at

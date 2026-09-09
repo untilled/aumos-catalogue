@@ -1,0 +1,64 @@
+{
+  "spec": "EvidenceGatedPriceArtifacts/1",
+  "issue": "untilled/aumos-catalogue#248",
+  "measuredOn": "2026-09-09",
+  "measuredIn": "the US roster sweep — 83 names, `roster-scan` answers, us-sleeve",
+  "note": "The series whose bars are all complete and whose history steps by a factor. Every bar in every case below has finite, non-negative, high-above-low OHLCV, so `bar_value_invalid` passes it, and every moving average computes, so `trend_moving_average_unavailable` passes it too. `observed` is what the sweep actually answered; `generator` reproduces the shape that answers it.",
+  "asOf": "2026-09-09T00:00:00.000Z",
+  "cases": [
+    {
+      "name": "bkng-unadjusted-step-inside-the-ma200-window",
+      "symbol": "BKNG",
+      "market": "XNAS",
+      "observed": {
+        "close": 193.29,
+        "ma200": 2316.55,
+        "offHigh200": -0.965,
+        "ma200Discount": true,
+        "discoveryScore": 20,
+        "reading": "`discoveryScore` 20 came entirely from the artifact: `ma200Discount` fired because a level 12x the price was called a moving average."
+      },
+      "generator": { "count": 260, "preStepClose": 2300, "postStepClose": 193, "stepAtIndex": 240, "highFactor": 1.01, "lowFactor": 0.99, "volume": 1000 },
+      "expected": {
+        "suspected": true,
+        "jumpCount": 1,
+        "reasons": ["close-to-ma200-outside-bounds", "adjacent-session-step-beyond-half"],
+        "closeToMa200Below": 0.1
+      }
+    },
+    {
+      "name": "vz-artifact-bar-under-the-200-day-low",
+      "symbol": "VZ",
+      "market": "XNYS",
+      "observed": {
+        "close": 50.14,
+        "low200": 10.5999,
+        "aboveLow200": 3.7302,
+        "reading": "+373% above its own 200-day low, which is not a range this name traded. The step is a single bar in the middle of the window, so neither ratio reading is outside its bounds and only the adjacent-session step sees it."
+      },
+      "generator": { "count": 260, "baseClose": 50.14, "artifactAtIndex": 200, "artifactClose": 10.5999, "highFactor": 1.005, "lowFactor": 1, "volume": 900 },
+      "expected": {
+        "suspected": true,
+        "jumpCount": 2,
+        "reasons": ["adjacent-session-step-beyond-half"],
+        "low200": 10.5999,
+        "aboveLow200": 3.7302333
+      }
+    },
+    {
+      "name": "adjustment-smeared-across-several-sessions",
+      "symbol": "SYN",
+      "market": "XNAS",
+      "observed": {
+        "reading": "Not from the sweep — this is the shape the `high200/low200` reading exists for, and it is the reason that reading is kept even though neither measured name needed it. An adjustment factor applied progressively, or a gap backfilled by interpolation, leaves a 25x window with no single session moving more than 12%: every adjacent step is ordinary and the window's extremes are not."
+      },
+      "generator": { "count": 30, "firstClose": 10, "lastClose": 250, "highFactor": 1, "lowFactor": 1, "volume": 500 },
+      "expected": {
+        "suspected": true,
+        "jumpCount": 0,
+        "reasons": ["high200-to-low200-outside-bounds"],
+        "high200ToLow200Above": 20
+      }
+    }
+  ]
+}

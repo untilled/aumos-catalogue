@@ -1112,7 +1112,25 @@ export const OPERATIONS = {
      */
     nested: {
       'catalysts[]': { symbol: STRING, market: STRING, event: STRING, windowStart: STRING, windowEnd: STRING, observedAt: STRING, evidenceIds: ARRAY },
-      'estimated[]': `The \`estimated\` rows \`catalystCadence\` answered, verbatim — the same window shape plus \`dateSource: "${CATALYST_DATE_ESTIMATED}"\` and the \`cadenceBasis\` it was derived from. ⛔ **A separate argument on purpose**: an estimate and a reading are different claims, and an estimate arriving on \`catalysts\` — or on this one without saying it is an estimate — is \`catalyst_estimate_unmarked\` and blocked. Neither array's discipline is weakened; what an estimated row cites is the past filings its cadence was measured over.`,
+      /**
+       * ⚠️ **Field by field, and with `catalystCadence`'s own output names
+       * (#249).** This entry was one paragraph of prose while `catalysts[]` one
+       * line up was a field table — *"a separate argument on purpose"* was said
+       * and the shape of the argument was not — and that asymmetry is what a
+       * flow measured: three shapes tried for one derived window on
+       * `run_bb689b6199084b04afd8b0e1d1528cda`, none of them the right one, and
+       * the only one that registered recorded a projection as a confirmed date.
+       * A caller that has never sent an estimate has no wrong spelling to learn
+       * from, which is #169's own reason for publishing `catalysts[]`, and it
+       * applies here one argument over.
+       *
+       * ⚠️ **The names are 1:1 with what `catalystCadence` answers**, so the
+       * rows pass straight through — `registerAs.estimated` is that array under
+       * this argument's name, and a run that hands it over composes nothing.
+       */
+      'estimated[]': { symbol: STRING, market: STRING, event: STRING, windowStart: STRING, windowEnd: STRING, observedAt: STRING, dateSource: STRING, cadenceBasis: OBJECT, evidenceIds: ARRAY },
+      'estimated[].cadenceBasis': { medianLagDays: NUMBER, leadDays: NUMBER, basisFilings: NUMBER, basisSymbols: NUMBER, periodGapDays: NUMBER, nextPeriodEnd: STRING, measuredFrom: STRING },
+      estimatedRowShape: `The \`estimated\` rows \`catalystCadence\` answered, verbatim — hand over \`registerAs.estimated\` and change nothing. \`dateSource\` is the literal \`"${CATALYST_DATE_ESTIMATED}"\`, the only value this argument accepts, and \`cadenceBasis\` is required: \`medianLagDays\` and a \`basisFilings\` above zero are the two an estimate cannot be read without, and the rest are carried when they were measured. \`windowStart\`/\`windowEnd\`/\`observedAt\` are RFC 3339 here, as they are on \`catalysts[]\`; ⚠️ the \`…EpochMs\` numbers are what \`previous\` carries and what \`nextState\` writes back, and either spelling is read. ⛔ **A separate argument on purpose**: an estimate and a reading are different claims, and an estimate arriving on \`catalysts\` — or on this one without saying it is an estimate — is \`catalyst_estimate_unmarked\` and blocked. ⛔ **And the same window may not arrive on both arrays**: the fold keeps the confirmed copy under a \`(market, symbol, event)\` key, so a projection sent twice registers once as a date somebody read — the third shape #249 measured, and the one that used to get through. Neither array's discipline is weakened; what an estimated row cites is the past filings its cadence was measured over.`,
       'events[]': { symbol: STRING, market: STRING, announcedAt: STRING, sue: NUMBER, day1ExcessPct: NUMBER, preAnnouncementClose: NUMBER, guidanceSurprise: NUMBER, evidenceIds: ARRAY },
       evidenceIds: 'Required on every row of both arrays, and this is the whole discipline of the operation: a catalyst window nobody can go and check is not a registered catalyst, it is a claim. File the reading with `observation_file` and put the returned id here — the same route `consensusRefs` takes.',
       previous: 'The whole value read from `state/research/catalyst-window.json` — { schemaVersion: 1, updatedAsOf, rows[] }. ⚠️ Its rows carry `windowStartEpochMs` / `windowEndEpochMs` as **numbers**: a catalyst window ends after `asOf` by construction, and `memory_read` refused a payload carrying a later **string** timestamp. That guard does not reach a file (`untilled/aumos#743`), and the encoding stays anyway as this package\'s own canon — every reader here expects it. Persist `nextState` verbatim; do not rewrite the instants as RFC 3339.',
