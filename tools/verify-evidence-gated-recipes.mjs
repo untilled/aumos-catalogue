@@ -405,9 +405,13 @@ for (const file of INSTRUCTION_FILES) {
  * effective coordinate, and leaving those three wrong keeps «completion stage
  * present + coordinate wrong» reachable.
  *
- * ⛔ `skills/orchestrate/SKILL.md` is the other side of that line and stays
- * `untilled/aumos-catalogue#245`'s: it is the orchestrator's own copy, handed to
- * no other process, so the argument above does not reach it.
+ * ⚠️ **`skills/orchestrate/SKILL.md` was the other side of that line and has
+ * crossed it.** It was deferred as the orchestrator's own copy, handed to no
+ * other process — but the block it carries is the template every dispatch prompt
+ * is written from (*"So every dispatch prompt carries this, adjusted to the
+ * flow's markets"*), so it reaches a flow at one remove and it held the last
+ * `MIC:symbol` in the package. All six are asserted now, and the generic wrong
+ * form is refused in every one of them.
  *
  * ⚠️ **`allocate.md` is generic on purpose.** That flow prices the two sleeves
  * against each other and reads **both** their answer files, so the key is per
@@ -430,6 +434,14 @@ const SWEEP_INSTRUCTIONS = {
    * stay green.
    */
   'agents/allocate.md': { itemId: '`<research market>:<symbol>`', mic: null, bothKeys: '`kr:` or `us:`', marketArgument: 'the venue\nMIC as `market`', probe: false },
+  /**
+   * ⚠️ **Generic for the same reason `allocate.md` is, and for one more.** This
+   * block is one template the orchestrator adjusts per flow, so it addresses
+   * both sleeves at once and a pinned market key would be wrong for every name
+   * in the other. ⛔ And no backticks: it lives inside a fenced block that is
+   * copied into a prompt, so the literals here are the bare spellings.
+   */
+  'skills/orchestrate/SKILL.md': { itemId: '<research market>:<symbol>', mic: null, bothKeys: 'kr: or us:', marketArgument: 'the venue MIC as market', probe: false },
 }
 for (const [file, row] of Object.entries(SWEEP_INSTRUCTIONS)) {
   const text = await readFile(new URL(file, packageRoot), 'utf8')
@@ -500,6 +512,73 @@ for (const [file, row] of Object.entries(SWEEP_INSTRUCTIONS)) {
       `${file} points at the two-sided probe by name rather than restating it; a dispatch prompt that says nothing about a roster of sourced: false leaves the flow to read it as an empty market`,
     )
   }
+}
+
+/**
+ * ── The sweep folder is a calendar day and the answers are a run (#245) ────
+ *
+ * `outputPath` is `scans/<asOf's calendar day>/<recipeId>`, so the folder is
+ * keyed by **date and not by run** and accumulates every sweep taken that day,
+ * discarded ones included. Measured in the owner's store,
+ * `scans/2026-09-09/roster-scan/` held **242** answers: 55 `XNYS:` and 28
+ * `XNAS:` from the discarded venue-keyed batch, beside 83 `us:` and 76 `kr:`
+ * from the sweep that worked. Folding that folder wholesale reads the discarded
+ * 83 as `sourced: false` and reports `unprepared 83종` — a count of names
+ * nobody failed to read.
+ *
+ * ⚠️ **Two routes tell them apart and they are not equals.** `task_get`'s
+ * `outputs` names this run's files and nothing else, so it needs no comparison
+ * at all; each answer's own `evaluatedAsOf` is the check that survives a path
+ * reached for by hand (`00:39:16.609Z` on the discarded batch against
+ * `11:23:55.210Z` on the live one, written by `recipes/request.mjs` from the
+ * host's pin and never from `Date.now()`). So `outputs` is asserted as the
+ * instruction and `evaluatedAsOf` beside it.
+ *
+ * ⛔ **`files_list` is the route that must not be the roster.** It answers *what
+ * is on disk*, which is a question about the folder rather than about the run —
+ * a flow that lists a directory is reading something nobody promised it.
+ */
+const ANSWER_ROUTES = {
+  'skills/kr-sleeve/SKILL.md': { outputs: '`files_read` on the answer files `task_get` names in its `outputs`.', folder: '⛔ **Fold what `task_get` named and never the folder**' },
+  'skills/us-sleeve/SKILL.md': { outputs: '`files_read` on the answer files `task_get` names in its `outputs`.', folder: '⛔ **Fold what `task_get` named and never the folder**' },
+  'skills/candidate-research/SKILL.md': { outputs: '`files_read` on the files `task_get` named in `outputs`.', folder: '⛔ **Fold `outputs`, never the folder**' },
+  'agents/kr-sleeve.md': { outputs: 'the answer files `task_get` names in its `outputs`', folder: '⛔ **Never the folder.**' },
+  'agents/us-sleeve.md': { outputs: 'the answer files `task_get` names in its `outputs`', folder: '⛔ **Never the folder.**' },
+  'agents/allocate.md': { outputs: 'the answer files `task_get` names in its `outputs`', folder: '⛔ **Never the folder.**' },
+  /** ⛔ Bare spellings: inside the fenced dispatch template. */
+  'skills/orchestrate/SKILL.md': { outputs: 'the answer files task_get names in its outputs', folder: 'Never fold the folder:' },
+}
+for (const [file, row] of Object.entries(ANSWER_ROUTES)) {
+  const text = await readFile(new URL(file, packageRoot), 'utf8')
+  assert.ok(
+    text.includes(row.outputs),
+    `${file} reads the answers ${'`task_get`'} named in ${'`outputs`'}; that list is the only thing that says which of the folder's files are this run's`,
+  )
+  assert.ok(
+    text.includes(row.folder),
+    `${file} refuses the folder as the roster — ${'`scans/<date>/<recipeId>/`'} accumulates every sweep taken that calendar day, 242 files on 2026-09-09, and folding it wholesale reports an unprepared count that never happened`,
+  )
+  /**
+   * ⚠️ The check beside the instruction, because a path reached for by hand
+   * gets no `outputs` list. ⛔ Matched on the field name: the answers carry it
+   * and no other date on a row means what it means.
+   */
+  assert.ok(
+    text.includes('evaluatedAsOf'),
+    `${file} names ${'`evaluatedAsOf`'} as the key that separates one day's sweeps; it is written from the host's pin, so it is the one field that dates an answer to a run`,
+  )
+  /**
+   * ⛔ **The sentence that invited the fold, refused by name.** It stood in
+   * `skills/candidate-research/SKILL.md` — *«`files_list` over the folder tells
+   * you what is there»* — one line under the instruction to read each answer,
+   * and it is the only place in this package that offered the directory as a
+   * way of finding your rows.
+   */
+  assert.equal(
+    text.includes('`files_list` over the folder tells you what is there'),
+    false,
+    `${file} does not offer ${'`files_list`'} over the folder as the way to find this run's answers; the folder is a calendar day and the listing cannot say which sweep wrote what`,
+  )
 }
 
 /**

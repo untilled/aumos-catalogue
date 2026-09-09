@@ -511,14 +511,26 @@ result at all, and you read exactly the ones you want.
    `taskRunId` to poll.
 2. `task_get({ taskRunId })` until it settles — `completed`, `partial`, `failed` or `cancelled`. It
    carries the item counts, the folder, what is still pending by name, every answer with **the file
-   it is in**, and every failure with its `kind` (`network` will be retried, `parse` will not read
+   it is in** — that list is `outputs`, and it is the only thing that says which files are *this
+   run's* — and every failure with its `kind` (`network` will be retried, `parse` will not read
    any better next time).
-3. `files_read({ path: "<outputPath>/<itemId>.json" })` for each answer you want. ⚠️ **Read them —
+3. `files_read` on the files `task_get` named in `outputs`. ⚠️ **Read them —
    finishing is not preparing.** A settled run whose files you never opened is `unsettled` to
    `executionRecord`, and rightly: the host counted items and only the answers say what this fund
    could actually read. ⛔ There is no call that hands you the whole roster at once and you should
-   not want one; `files_list` over the folder tells you what is there, and the rows you fold with
-   `opportunityUniverse` are metric rows you read one by one.
+   not want one; the rows you fold with `opportunityUniverse` are metric rows you read one by one.
+
+   ⛔ **Fold `outputs`, never the folder** (`untilled/aumos-catalogue#245`). `outputPath` is a
+   **calendar day**, so `scans/<date>/<recipeId>/` accumulates every sweep run on that date,
+   discarded ones included. Measured in the owner's store, `scans/2026-09-09/roster-scan/` held
+   **242** files — 83 answers on discarded venue-keyed ids beside 83 `us:` and 76 `kr:` answers from
+   the sweep that worked — and folding the folder wholesale reports `unprepared 83종`, ⚠️ **a fact
+   that does not exist**: those 83 are a coordinate this run threw away, not names it could not read.
+   ⚠️ **The separating key is each answer's own `evaluatedAsOf`** — `00:39:16.609Z` on the discarded
+   batch against `11:23:55.210Z` on the live one — which `recipes/request.mjs` writes from the host's
+   pin and ⛔ never from `Date.now()`. So `outputs` is the instruction and `evaluatedAsOf` is the
+   check: ⛔ `files_list` says what is **on disk** and never which of it is **yours**, and a roster
+   read off a directory listing is a roster nobody promised you — the host promised you `outputs`.
 
 ### The counts are reports and are never added together — and you count three of them
 

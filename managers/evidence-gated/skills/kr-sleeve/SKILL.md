@@ -36,10 +36,13 @@ not mention, a fresh context does not do.
 1. **Load the curated roster** with `researchUniverse` for this sleeve, then verify current
    eligibility from the listing provider. Load extensions from `coverage/research-index`.
    Follow `skills/candidate-research/SKILL.md` for procurement and persistence.
-2. **Pass the screen and the extensions to `coverage`** as `scannerUniverses` and `extensions`,
-   and pass the same thing to `harnessAudit` as `universe`.
-3. **Report what you got.** `complete: null` with `universe_undeclared` is *the sweep did not
-   happen*, and it goes back to the orchestrator in your `uncertainty` — never as a clean sleeve.
+2. **Pass the declared universe to `harnessAudit`** as `universe`. ⛔ **`coverage` is not called
+   here** (`untilled/aumos-catalogue#246`). It is **step 18**, after `researchState`, because an
+   extension registered mid-run widens the boundary `coverage` measures and a verdict read at this
+   point is a claim about a universe the run then enlarged. `harnessAudit` stays: its claim is *was
+   a universe declared*, which an extension can only strengthen.
+3. **Report what you got.** A roster you could not read, or eligibility you could not check, is a
+   scope gap for your `uncertainty` — never a sleeve handed back as clean.
 
 ## Collect observations and run both discovery branches
 
@@ -241,6 +244,32 @@ been fed. Do these in order and report each one:
       document. ⛔ It blocks nothing — a `WAIT` with every document written and every candidate
       declined is an honest run and this reports it as one.
 
+17. **`researchState`** — persist the bounded roster and its Evidence references, **including any
+    name this run added**. ⛔ It was a sentence in the paragraph below this list, so nothing ordered
+    it against anything; it is a numbered step because the next one reads what it wrote. The key is
+    `coverage/research-index` and `skills/memory-contract/SKILL.md` owns it; a row carries
+    `extension: true` for a name the theme radar brought across the declared boundary.
+18. **`coverage`** — and ⛔ **never before the step above** (`untilled/aumos-catalogue#246`). Pass
+    the screen as `scannerUniverses` and the extensions **as they finally stand** as `extensions`.
+    - ⛔ **Declaring an extension and reporting `complete: true` in the same run measures a boundary
+      the run then moved.** Measured on `run_bb689b6199084b04afd8b0e1d1528cda` (2026-09-09): this
+      sleeve persisted an extension and reported `complete: true` / `uncovered: []`; the
+      orchestrator re-called this operation with that name in the universe and it flipped to
+      `complete: false` with the name in `uncovered`. **Both sleeves did it in the same run**, so it
+      is a procedure and not a slip: where this call used to sit — before the sweep, in the section
+      that declares the universe — `extensions: []` makes `complete: true` genuinely *honest*.
+    - **An extension you declare is a name you owe a disposition for, this run.** Widening the
+      boundary creates the obligation, and that is what makes an extension part of the declared
+      universe. Run that name's `source_cache_refresh` on `prices`/`daily` and carry it into the
+      sweep, so an answer exists by the time you get here.
+    - ⛔ **If you could not, say so and leave the name in `uncovered`.** Do not drop the extension to
+      make the verdict green: `coverage_incomplete` naming a name you added is the honest answer,
+      and `complete: true` over a universe you quietly narrowed is the defect one layer down. ⚠️ No
+      new diagnostic is added for this — an extension with no disposition is precisely what
+      `coverage_incomplete` already counts.
+    - ⚠️ `complete: null` with `universe_undeclared` is *the sweep did not happen*, never *the sweep
+      found nothing*, and it goes back to the orchestrator in your `uncertainty`.
+
 Also run the price-pattern `scan` branch; neither branch substitutes for the other. Return all
 radar lanes' included/excluded counts, the `radar_lane_starved` diagnostics **with their
 `feedStage`/`feedCause`**, and the feed verdict — `fed-and-evaluated`, `fed-and-genuinely-empty`,
@@ -251,7 +280,8 @@ other says nothing was ever looked at, and they read identically in a candidate 
 fed and 82 never fed — because a run that says «fed» on one name out of eighty-three has published
 eighty-two absences as judgements (#178).
 
-Use `researchState` to carry the bounded roster and Evidence references. ⛔ Private memory is not
+Carrying the bounded roster and Evidence references is **step 17** and reading `coverage` over it is
+**step 18**, in that order and for `untilled/aumos-catalogue#246`'s reason. ⛔ Private memory is not
 a source cache — `skills/memory-contract/SKILL.md` forbids it in as many words — and it no longer
 has to be: the store is the host's, reached through the two cache tools above. The roster is not a
 claim of full-market coverage.
@@ -290,7 +320,20 @@ through `mcp__evidence-gated-metrics__calculate` — never through `Bash`.
 filer) and ⛔ no `vendorId` — and then `task_start` over the two recipes this package
 declares (`roster-scan` and `opportunity-metrics`), each item id the **research market key**
 `kr:<symbol>` and `outputPath` `scans/<asOf date>/<recipeId>`; `task_get` until it settles, then
-`files_read` on `<outputPath>/<itemId>.json` for each answer.
+`files_read` on the answer files `task_get` names in its `outputs`.
+⛔ **Fold what `task_get` named and never the folder** (`untilled/aumos-catalogue#245`).
+`outputPath` is a **calendar day**, so `scans/<date>/<recipeId>/` accumulates every sweep run on
+that date — including the discarded ones. Measured in the owner's store,
+`scans/2026-09-09/roster-scan/` held **242** files: 83 answers on discarded venue-keyed ids beside
+83 `us:` and 76 `kr:` answers from the run that worked. Folding that folder wholesale reports
+`unprepared 83종` — ⚠️ **a fact that does not exist**, because the 83 unsourced rows are a
+coordinate this run threw away and not a name it could not read. ⚠️ **The separating key is each
+answer's own `evaluatedAsOf`** — the discarded batch is stamped `00:39:16.609Z` and the live sweep
+`11:23:55.210Z`, and `recipes/request.mjs` writes it from the host's pin and never `Date.now()`.
+⛔ `files_list` over the folder says what is **on disk**, never which of it is **yours**: it is a
+listing this package was promised nothing about, and reading a roster off it is reading someone
+else's run. So `outputs` is the instruction and `evaluatedAsOf` is the check — the first is what
+the host handed you, the second is what survives if you ever reach for a path by hand.
 ⛔ **The item id is not the venue MIC, and the two coordinates live one line apart — that is the
 shape of this trap** (`untilled/aumos-catalogue#245`). The `market` argument above **is** the MIC,
 because it is `source_cache_refresh`'s; the `task_start` item id is the key the store files

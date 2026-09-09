@@ -21,7 +21,11 @@ the order is load-bearing: `source_cache_refresh` on `prices`/`daily` across the
 MIC as `market`, ⛔ no `vendorId` — and then `task_start` over this package's declared recipes
 (`roster-scan`, `opportunity-metrics`), each item id the **research market key** `kr:<symbol>` and
 `outputPath` `scans/<asOf date>/<recipeId>`; then `task_get` until it settles, then `files_read` on
-`<outputPath>/<itemId>.json` for the answers.
+the answer files `task_get` names in its `outputs`, and check each row's `evaluatedAsOf` against
+your own `asOf` before you fold it. ⛔ **Never the folder.** `outputPath` is a calendar day, so it
+holds every sweep run on that date — the owner's `scans/2026-09-09/roster-scan/` held 242 files, 83
+of them a discarded venue-keyed batch — and folding it wholesale reports an `unprepared` count that
+never happened. `files_list` says what is on disk, never which of it is this run's.
 ⛔ **The item id is not the venue MIC** (`untilled/aumos-catalogue#245`). Two coordinates sit one
 line apart and only the first is a MIC: `market` above is `source_cache_refresh`'s and takes the
 venue, and the `task_start` item id is the key the store files documents under — `source_cache_read`
