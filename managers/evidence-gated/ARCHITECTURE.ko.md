@@ -424,7 +424,11 @@ MFE/MAE 계산, 기계적 추세/DCA/과매도 백테스트, 스페셜리스트 
   않았으므로 대조군 밖의 오늘 답은 `hard_stop_unevaluated`이고 **숫자를 지어내지 않는다.** 산문으로
   두면 안 되는 부분은 등록이다 — `watchesToRegister`가 진입이 자기 제안에 복사해 넣을 `price-below`·
   `at-time` 행을 돌려주고, 그것 없는 진입은 `exit_rules_unregistered`, 도래한 스톱을 이 실행이 이행하지
-  않으면 `exit_due_unactioned`이다. ⚠️ `standingPlans`가 `asOf`에 서 있던 무장을 이제 보여 주지만
+  않으면 `exit_due_unactioned`이다. ⚠️ **그리고 이제 «복사»가 전부다** — `intent`·`subject`·중첩
+  `trigger`가 그 행 위에서 만들어진다. 재무장한 약속을 이미 서 있는 것에 접을 때 Aumos가 비교하는 것이
+  `kind`와 그 셋이고 해석 없이 바이트로 비교하기 때문이다(`untilled/aumos#704`). 그중 하나라도 실행이
+  직접 쓰면 다음 실행은 다르게 쓴다 — 2026-09-09 한 장부에서 두 번 측정됐다
+  ([#244](https://github.com/untilled/aumos-catalogue/issues/244)). ⚠️ `standingPlans`가 `asOf`에 서 있던 무장을 이제 보여 주지만
   그것은 천장이 아니라 바닥이므로(시각을 댈 수 없는 약속은 추측하지 않고 빠진다), 규율은 여전히
   몇 주 전에 걸어둔 WATCH를 믿는 대신 매 실행 진입일에서 다시 계산된다. 그 읽기가 무엇을 정하고
   무엇을 정하지 못하는지는 `HOST-FOLLOWUPS.md`가 기록한다.

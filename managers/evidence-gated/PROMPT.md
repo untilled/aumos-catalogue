@@ -912,6 +912,19 @@ wrote, with `expiresAt` deliberately not part of it. ⬜ Merged is not shipped: 
 duplicate, which is why the depth read from `standingPlans` is something to **report** and never a
 reason to arm less.
 
+⚠️ **So arm a stop with the `intent`, `subject` and `trigger` `exitDiscipline` returns on the row —
+verbatim, and never a sentence of your own.** The four fields the fold compares are all on
+`watchesToRegister` now; composing any of them yourself is composing them differently next run.
+Measured: one `SGOV` stop stood **twice** because the prose beside a byte-identical trigger had grown
+from 162 characters to 231 — and the added sentence was an explanation of the fold, naming the plan id
+the fold was meant to retire. ⛔ **Everything about *this* judgement belongs elsewhere**: why this
+price is the level goes in `priceLevels[].reason`, and what you concluded this run goes in
+`rationale`. Both are read by the investor; neither is part of any identity. ⛔ And never rewrite the
+`Money`: the same ₩104,254.40 written `exponent: 2` by one run and `exponent: 1` by the next is two
+promises to a host that compares structure, so copy `trigger.price` rather than building it from
+`threshold`. ⚠️ A `price-below` is **not** folded when it fires either, so a duplicate stop opens two
+wakes on one breach.
+
 **Reconcile before you arm.** Read `run/armed-reviews` and pass **the whole value you read** as
 `previous`, the sequence as `sequence`, and the invocation's `standingPlans` **verbatim** as
 `standingPlans`, to `reconcileArmedReviews`; arm everything it returns in `toArm`, which is the whole

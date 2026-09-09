@@ -479,7 +479,12 @@ fixture asserts the difference so it cannot be undone silently.
   invented for it**. Registration is the part that must not be prose: `watchesToRegister`
   returns the `price-below` and `at-time` rows an entry copies into its own proposal, an entry
   without them is `exit_rules_unregistered`, and a due stop this run does not act on is
-  `exit_due_unactioned`. ⚠️ `standingPlans` now shows the arms that stood at `asOf`, and it is a
+  `exit_due_unactioned`. ⚠️ **And copying them is now the whole of it**: `intent`, `subject`
+  and the nested `trigger` are minted on the rows, because those plus `kind` are what Aumos
+  compares to fold a re-armed promise into the one already standing, byte for byte
+  (`untilled/aumos#704`). A run that wrote any of them itself wrote them differently the next
+  time — measured, twice, in one book on 2026-09-09
+  ([#244](https://github.com/untilled/aumos-catalogue/issues/244)). ⚠️ `standingPlans` now shows the arms that stood at `asOf`, and it is a
   floor rather than a ceiling — a promise it cannot date is left out rather than guessed at — so
   the discipline is still re-derived from the entry date every run rather than trusted to a WATCH
   armed weeks ago; `HOST-FOLLOWUPS.md` records what that read does and does not settle.
