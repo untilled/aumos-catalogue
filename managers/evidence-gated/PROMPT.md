@@ -538,6 +538,27 @@ three-way split.
   single-name variant view.
 - `existing-position`: thesis/weight/exit review, not a new-entry scanner result.
 
+⛔ **Research in each lens's own order, never in `discoveryScore` order.** That number is the
+fraction of the **mean-reversion** signal set a name fires, so a candidate above its MA200 scores
+**structurally zero** — and researching by score spent every run on the deepest drawdowns and never
+reached the two lenses that require an intact trend (#242, measured: `316140` eligible under
+`trend-pullback` at `ma200Distance` +7.8%, score 0, nothing done). ⚠️ **The sign was also backwards
+against the one result this methodology has**: the ported original chose its name for being the
+*least* fallen of the scan candidates. Call **`candidateQueue`** with the `scan` rows and take the
+top of **each** lens's queue; each lens declares the measurement that orders it and the three are
+deliberately not on one scale. ⛔ There is no «top N of the roster», and a rank is not a screen.
+
+⛔ **Then carry the top candidate of each lens to a complete record, and decline it only after that
+record exists** (#243). Call **`candidateCompletion`** with `candidateQueue`'s `owesDocument` and one
+`records` row per document written. The gates below are not too strict — the +18.6pp original
+satisfied all four by hand — and what was missing was the stage that produces what they judge:
+measured on `run_bb689b6199084b04afd8b0e1d1528cda`, 157 names screened, 42 eligible, four pushed to
+`variantViewCheck`, all four declined, **0 registered**. ⚠️ A decline is an outcome of this stage and
+never a failure of it; a *carried* name with no document is `candidate_completion_absent`, and this
+run may then not report `no-candidate-cleared-the-gates` over that lane. «1 of 4» does not say
+«judged and declined» — it says «there was nothing to judge», and those are two different states of
+this book. `skills/candidate-research/SKILL.md` §Candidate record owns what goes in the document.
+
 ⚠️ **This branch is the control arm, not the strategy.** Oversold and pullback are the most
 arbitraged signals there are, run by institutions at lower cost over large caps where there is no
 capacity advantage to hide in. `controlArmLane` requires the exit discipline registered before

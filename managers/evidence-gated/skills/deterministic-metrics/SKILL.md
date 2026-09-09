@@ -37,7 +37,7 @@ the JSON remains the canonical explanation.
 
 ## The operations
 
-All 102, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
+All 104, by name. An `operation_unknown` diagnostic also lists them, but discovering an API by
 calling it wrong is not a discovery path — every flow skill tells you not to go looking, so the
 names have to be here. A name absent from this table is a name you cannot call.
 
@@ -62,6 +62,7 @@ a name that does not exist.
 | `relativeStrength` | asset vs benchmark excess return over each period |
 | `opportunityMetrics` | the five oversold axes for one candidate |
 | `opportunityUniverse` | the declared universe, with held and pending excluded |
+| `candidateQueue` | the research order **per lens** — each lens ranked by its own measurement, so no one score orders three of them — and which candidates this run therefore owes a completed record for |
 | `trendState` | core ETF trend gate: `full` / `half` / `small_or_wait` / `stop` — over bars validated by the same rule `indicators` applies, so an unreadable row is `state: "insufficient_data"` and never a guidance. ⚠️ Bars are `{date, open, high, low, close, volume}` with **numeric** prices; a vendor candle payload (`closePrice` as a string) is refused row by row |
 | `sectorStrength` | L1: lane ranking, rank moves, regime, `researchQueue`, bot baselines |
 | `regimeTag` | a Brief regime call, canonicalized, attributed, and compared with the sector reading |
@@ -105,6 +106,7 @@ a name that does not exist.
 | `crossCheckPrice` | vendor vs web price; conflict retained, never averaged |
 | `validateMacro` | macro observations are dated and tiered; there is no macro score |
 | `observationLedger` | of what this run read on the web and filed with `observation_file`, which readings the proposal actually cites — and, for each value used in judgement, whether any submitted evidence id supports it |
+| `candidateCompletion` | whether the completion stage ran — for each candidate this run said it would carry, is there a record, and what `variantViewCheck` made of it. ⛔ Not a fifth gate: «judged and declined» and «no document was ever written» are two different states of this book and this is what tells them apart |
 | `validateThesis` | the thesis metadata contract; `complete` with gaps is refused |
 | `laneCoverage` | which lane a missing source closes, and what it degrades to |
 | `validateAdjustment` | split/dividend adjustment conflicts between vendors |

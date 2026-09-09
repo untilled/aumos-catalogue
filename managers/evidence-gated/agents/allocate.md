@@ -19,9 +19,22 @@ checkpoint — what you did review, what you did not, and why — rather than st
 ⛔ **And the whole-universe sweep is not carried through your context either.** It is two steps and
 the order is load-bearing: `source_cache_refresh` on `prices`/`daily` across the roster — the venue
 MIC as `market`, ⛔ no `vendorId` — and then `task_start` over this package's declared recipes
-(`roster-scan`, `opportunity-metrics`), each item id the store coordinate `MIC:symbol` and
+(`roster-scan`, `opportunity-metrics`), each item id the **research market key**
+`<research market>:<symbol>` — `kr:` or `us:`, the sleeve that name belongs to — and
 `outputPath` `scans/<asOf date>/<recipeId>`; then `task_get` until it settles, then `files_read` on
 `<outputPath>/<itemId>.json` for the answers.
+⛔ **The item id is not the venue MIC** (`untilled/aumos-catalogue#245`). Two coordinates sit one
+line apart and only the first is a MIC: `market` above is `source_cache_refresh`'s and takes the
+venue, and the `task_start` item id is the key the store files documents under — `source_cache_read`
+publishes it as *the key is the research market — `kr`, `us` — and a venue MIC is folded onto it*.
+⚠️ **And you read both sleeves' answers, so the key is per name and never one market's.** You are the
+flow that prices the two sleeves against each other: an id fixed to one market addresses nothing for
+every name in the other, which is the same defect as a venue MIC with the direction reversed.
+⚠️ **An invented id is accepted and the recipe is handed nothing**, so a wrong key returns
+`sourced: false` rows that read exactly like a market which offered nothing. A whole roster of
+them is a coordinate to probe and never a market to report: the sleeve skills own the two-sided
+probe that settles it in one call, and `executionRecord` is what you hand back either way — ⛔ a
+sleeve budget set off an unsourced roster is a budget priced on names nobody read.
 ⚠️ **`task_start` collects nothing**, so a sweep prepared first reports the price branch as
 never run on every name. The bars stay in the host on both steps. ⚠️ `unprepared` names are
 blindness with the names attached — `source_cache_refresh` is its control — and never a market that

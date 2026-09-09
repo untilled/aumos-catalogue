@@ -12,6 +12,184 @@ function volumeCapitulation(bars) {
     finite(bar.volume) && average > 0 && bar.volume >= average * 2 && bar.low > 0 && latestClose / bar.low - 1 >= 0.03)
 }
 
+/**
+ * ── One score was ordering three lenses, and its sign was wrong for two (#242) ─
+ *
+ * `discoveryScore` is `meanCount / knownMean`: the fraction of the
+ * **mean-reversion** signal set a name fires. That is a correct reading of
+ * dislocation depth and the wrong reading of everything else — and the flow
+ * researched in score order. A `trend-pullback` candidate carries none of those
+ * five signals by construction: a name above its MA200 is not near its 200-day
+ * low, is not at a 10% discount to that average, and rarely prints an RSI under
+ * 30. So the two lenses that require an intact trend scored **structurally
+ * zero** and were never reached.
+ *
+ * Measured on the 2026-09-09 KR sweep — 74 names, `roster-scan` answers read
+ * directly: `035900` scored **60** and was researched to
+ * `entry_quality_falling_knife`; `267260` scored **40** and was researched to a
+ * rejection; `316140` was eligible under `trend-pullback` with `offHigh200`
+ * −19.0% and `ma200Distance` **+7.8%**, scored **0**, and nothing was done
+ * about it.
+ *
+ * ⚠️ **And the sign is backwards against the one thesis this methodology has a
+ * measured result for.** The ported original (`theses/036460_KOGAS.md`,
+ * +18.6pp) wrote its own selection reason down: *200일 고점 대비 −28.6%
+ * (스캔 후보 중 **가장 덜 빠짐**), RSI 44 회복, 바닥다지기.* Least fallen. This
+ * score paid 60 points for most fallen.
+ *
+ * ── What replaced it: a metric and an order, per lens ──────────────────────
+ *
+ * ⛔ **Not one score with the sign flipped, and not a 0–100 number either.** A
+ * normalized score invites the comparison that caused this — 60 against 0 reads
+ * as an ordering whatever the label says — so each lens declares **which of its
+ * own measurements orders it** and in which direction, and the three numbers
+ * are on three different scales on purpose. There is nothing here to sort three
+ * lenses by, which is the property #242 asks for rather than a rule about it.
+ *
+ * ⚠️ Each key is the lens's **own claim**, not a preference:
+ *
+ * - `mean-reversion` — depth, unchanged, and correct for this lens: the claim
+ *   *is* dislocation. What keeps depth from being read as conviction is
+ *   `entryQualityGate`, which blocks, and not a rank.
+ * - `trend-pullback` — `offHigh200`, descending, so the **shallowest** drawdown
+ *   sorts first: the original's "least fallen", read inside the band this lens
+ *   already declares (−20%..−5%). ⚠️ Ranked only where `ma200Distance > 0` —
+ *   the rank stands on the trend being intact, which is the lens's own
+ *   `uptrend` check, and ordering a broken trend by shallowness would be
+ *   ordering names this lens does not claim.
+ * - `quality-pullback` — `ma200Distance`, descending: how much of the uptrend
+ *   survived the markdown. ⛔ **Not depth.** The band (−35%..−15%) has already
+ *   fixed the depth, so ranking on it inside the band would re-import exactly
+ *   the sign this issue is about, one lens over.
+ *
+ * ⛔ **A rank is not a screen.** `lenses` decides eligibility and nothing here
+ * changes it. A row whose rank cannot be computed is carried **last rather than
+ * dropped** — `diagnostics.mjs` states the general rule — and `candidateQueue`
+ * says which names those were by name.
+ *
+ * ⛔ **The `basis` prose lives here and never on a row.** One answer file per
+ * name is written per sweep, and three sentences copied onto seventy-four of
+ * them is the same fact stored seventy-four times.
+ */
+export const LENS_RANKS = Object.freeze({
+  'mean-reversion': Object.freeze({
+    metric: 'meanReversionSignalFraction',
+    order: 'desc',
+    basis: 'dislocation depth — the fraction of this lens’s five signals the name fires',
+  }),
+  'trend-pullback': Object.freeze({
+    metric: 'offHigh200',
+    order: 'desc',
+    requires: 'ma200Distance > 0',
+    basis: 'the least fallen name inside the band, with the trend intact — the ported original’s own selection reason',
+  }),
+  'quality-pullback': Object.freeze({
+    metric: 'ma200Distance',
+    order: 'desc',
+    basis: 'how much of the uptrend survived the markdown; the band has already fixed the depth',
+  }),
+})
+
+/**
+ * The value that orders one candidate inside one lens.
+ *
+ * ⚠️ `value: null` is *this row cannot be ordered*, never *this row ranks
+ * lowest*. The two are different sentences, `unrankable` names which one it is,
+ * and `candidateQueue` prints them differently.
+ */
+export function lensRank(lens, row = {}) {
+  const declared = LENS_RANKS[lens]
+  if (!declared) return { lens, metric: null, order: null, value: null, unrankable: 'lens-has-no-declared-rank' }
+  const indicators = row?.indicators ?? row ?? {}
+  const base = { lens, metric: declared.metric, order: declared.order }
+  const value = declared.metric === 'meanReversionSignalFraction'
+    ? (finite(row?.discoveryScore) ? row.discoveryScore / 100 : null)
+    : indicators?.[declared.metric]
+  if (!finite(value)) return { ...base, value: null, unrankable: 'rank-metric-unavailable' }
+  if (declared.requires === 'ma200Distance > 0' && !(finite(indicators?.ma200Distance) && indicators.ma200Distance > 0)) {
+    return { ...base, value: null, unrankable: 'rank-precondition-unmet' }
+  }
+  return { ...base, value: round(value), unrankable: null }
+}
+
+/**
+ * The research order, **per lens**, and the names the completion stage owes a
+ * document for (#242, #243).
+ *
+ * ⛔ **It returns no flat list and there is no argument that produces one.**
+ * `queues` is keyed by lens because the three ranks are three different
+ * measurements; a caller wanting «the top N of the roster» is asking the
+ * question this operation exists to refuse.
+ *
+ * ⚠️ **`sectorStrength.researchQueue` is a different subject and keeps its
+ * name.** That one queues *sectors* by relative strength; this one queues
+ * *candidates* inside one lens. Hence `candidateQueue` rather than a second
+ * spelling of `researchQueue`.
+ */
+export function candidateQueue({ rows = [], perLens = 1 } = {}) {
+  const diagnostics = []
+  const carry = Math.max(1, Number.isFinite(perLens) ? Math.trunc(perLens) : 1)
+  const usable = rows.filter((row) => row && typeof row === 'object')
+  const eligible = usable.filter((row) => row.eligibleForNewResearch === true && Array.isArray(row.lenses) && row.lenses.length > 0)
+  const queues = {}
+  const owed = []
+  const unrankable = []
+  const lensesWithNoCandidate = []
+  for (const lens of Object.keys(LENS_RANKS)) {
+    const members = eligible
+      .filter((row) => row.lenses.includes(lens))
+      .map((row) => ({ row, rank: lensRank(lens, row) }))
+    if (members.length === 0) {
+      queues[lens] = []
+      lensesWithNoCandidate.push(lens)
+      continue
+    }
+    /** Rankable first, by the lens's own metric descending; then the rows that could not be ordered, by symbol. */
+    const ordered = [...members].sort((a, b) => {
+      if (a.rank.unrankable && !b.rank.unrankable) return 1
+      if (!a.rank.unrankable && b.rank.unrankable) return -1
+      if (!a.rank.unrankable && !b.rank.unrankable && a.rank.value !== b.rank.value) return b.rank.value - a.rank.value
+      return String(a.row.symbol).localeCompare(String(b.row.symbol))
+    })
+    queues[lens] = ordered.map((entry, index) => ({
+      symbol: entry.row.symbol ?? null,
+      market: entry.row.market ?? null,
+      lens,
+      position: index + 1,
+      metric: entry.rank.metric,
+      order: entry.rank.order,
+      value: entry.rank.value,
+      unrankable: entry.rank.unrankable,
+      owesDocument: index < carry,
+    }))
+    for (const entry of queues[lens]) {
+      if (entry.owesDocument) owed.push({ symbol: entry.symbol, market: entry.market, lens, position: entry.position })
+      if (entry.unrankable) unrankable.push({ symbol: entry.symbol, market: entry.market, lens, unrankable: entry.unrankable })
+    }
+  }
+  if (unrankable.length > 0) {
+    diagnostics.push(diagnostic(
+      'lens_rank_unavailable',
+      'unevaluated',
+      'These candidates named a lens whose own rank metric could not be read, so they are ordered last rather than dropped; the queue is never shorter than the eligible set',
+      'rows',
+      { rows: unrankable },
+    ))
+  }
+  return {
+    data: {
+      perLens: carry,
+      ranks: LENS_RANKS,
+      rankScope: 'within-one-lens-only',
+      queues,
+      owesDocument: owed,
+      lensesWithNoCandidate,
+      counts: { rows: usable.length, eligible: eligible.length, queued: Object.values(queues).reduce((sum, list) => sum + list.length, 0), unrankable: unrankable.length },
+    },
+    diagnostics,
+  }
+}
+
 export function scanSymbol({ symbol, market, bars, held = false, pending = false }) {
   const diagnostics = []
   const packet = indicatorPacket(bars)
@@ -73,17 +251,31 @@ export function scanSymbol({ symbol, market, bars, held = false, pending = false
   if (Object.values(trendSignals).every(Boolean)) lenses.push('trend-pullback')
   if (Object.values(qualityPullbackSignals).every(Boolean)) lenses.push('quality-pullback')
   const discoveryScore = round((meanCount / Math.max(knownMean.length, 1)) * 100, 2)
+  /**
+   * ⚠️ **The number does not move and the label does** (#242). It was
+   * `research-priority-only`, which is what a run read when it researched in
+   * this order — and the order it names is one lens's. `lensRanks` carries the
+   * rank each lens this candidate named is actually ordered by, and
+   * `candidateQueue` folds them without ever putting the three on one scale.
+   */
+  const candidate = {
+    symbol,
+    market,
+    held,
+    pending,
+    eligibleForNewResearch: !held && !pending && lenses.length > 0,
+    lenses,
+    discoveryScore,
+    discoveryScoreMeaning: 'mean-reversion-depth-only',
+    indicators: packet,
+  }
   return {
     candidate: {
-      symbol,
-      market,
-      held,
-      pending,
-      eligibleForNewResearch: !held && !pending && lenses.length > 0,
-      lenses,
-      discoveryScore,
-      discoveryScoreMeaning: 'research-priority-only',
-      indicators: packet,
+      ...candidate,
+      lensRanks: Object.fromEntries(lenses.map((lens) => {
+        const { metric, order, value, unrankable } = lensRank(lens, candidate)
+        return [lens, { metric, order, value, unrankable }]
+      })),
       signals: { meanReversion: meanSignals, trendPullback: trendSignals, qualityPullback: qualityPullbackSignals },
     },
     diagnostics,

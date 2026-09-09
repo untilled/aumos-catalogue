@@ -207,6 +207,47 @@ been fed. Do these in order and report each one:
     used and uncited is `claim_evidence_missing` / `blocked` — that is the 2026-09-06 failure
     verbatim, where the BOK base rate of 3.00% decided a `thesisSentinel` invalidation condition
     and none of the 24 submitted ids supported it.
+15. **`candidateQueue({rows, perLens})`** — the research order, **per lens** (#242). Hand it the
+    `scan` rows you read back from the sweep's answer files. ⛔ **Do not research in
+    `discoveryScore` order.** That number is the fraction of the *mean-reversion* signal set a name
+    fires, so a `trend-pullback` candidate scores **structurally zero** — it is above its MA200, so
+    it is not near its 200-day low and not at a discount to that average — and the two lenses that
+    require an intact trend were never reached. Measured on the 2026-09-09 KR sweep: `035900`
+    scored 60 and `267260` scored 40 and both were researched; `316140` was eligible under
+    `trend-pullback` at `offHigh200` −19.0% and `ma200Distance` **+7.8%**, scored **0**, and
+    nothing was done about it. ⚠️ **And the sign is backwards against the one result this
+    methodology has**: the ported original (`theses/036460_KOGAS.md`, +18.6pp) chose its name for
+    being *"스캔 후보 중 **가장 덜 빠짐**"* — least fallen — and this score paid 60 points for most
+    fallen. Each lens now declares the measurement that orders it and the three are on three
+    different scales on purpose: depth for `mean-reversion`, the **shallowest** `offHigh200` with
+    the trend intact for `trend-pullback`, the surviving `ma200Distance` for `quality-pullback`.
+    ⛔ There is no argument for «the top N of the roster», and a rank is not a screen — `lenses`
+    still decides eligibility and a row whose rank could not be read is queued **last rather than
+    dropped**, by name, as `lens_rank_unavailable`.
+16. **`candidateCompletion`** — did the stage that finishes a candidate actually run (#243). ⛔ **A
+    candidate is carried all the way to a document before it is declined.** Every gate that opens a
+    position has been here since #226 and `variantViewCheck` judges them; what nothing produced was
+    **the document they judge.** Measured on `run_bb689b6199084b04afd8b0e1d1528cda`: 157 names
+    screened, 42 eligible, four pushed to `variantViewCheck`, all four declined, **0 registered** —
+    `267260` at `1 of 4`, `LOW` at 2, `NKE` at 3. ⛔ **The gates are not too strict**: the +18.6pp
+    original satisfied all four by hand.
+    - **For the top candidate of each lens `candidateQueue` names, write
+      `candidate-research` §Candidate record to the end** — the three scenarios with probabilities
+      totalling 100, `thesisValuation` over that table for `expectedUpsidePct` and
+      `fairValueRange`, a `catalystRegister` row for the window, the hard stop and the review date
+      you will register, and the `variantView` section stating what the market discounts and how
+      your view differs. Then hand that document to `variantViewCheck`.
+    - **Pass `owesDocument` from the step above and one `records` row per document** —
+      `{ symbol, market, lens, thesis, challengeVerdict, verdict }`. Your `verdict` is carried
+      verbatim: **a decline is an outcome of this stage and never a failure of it.**
+    - ⚠️ **Reject after the document exists, not instead of it.** `267260` was declined correctly —
+      19 buy / 0 sell, so there was no consensus to differ from — but *«1 of 4»* does not say
+      «judged and declined», it says «there was nothing to judge», and those are two different
+      states of this book. A carried name with no document is `candidate_completion_absent`, an
+      `input-path` cause that **withdraws** `mandateExecution`'s positive answer: this run may not
+      report `no-candidate-cleared-the-gates` over a lane whose leading candidate reached no
+      document. ⛔ It blocks nothing — a `WAIT` with every document written and every candidate
+      declined is an honest run and this reports it as one.
 
 Also run the price-pattern `scan` branch; neither branch substitutes for the other. Return all
 radar lanes' included/excluded counts, the `radar_lane_starved` diagnostics **with their
@@ -255,15 +296,42 @@ through `mcp__evidence-gated-metrics__calculate` — never through `Bash`.
 `source_cache_refresh` on **`prices`/`daily`** across the roster — provider `prices`, document
 `daily`, `market` the venue MIC (`XNAS`/`XNYS`, ⛔ never the research market you use for a
 filer) and ⛔ no `vendorId` — and then `task_start` over the two recipes this package
-declares (`roster-scan` and `opportunity-metrics`), each item id the store coordinate
-`XNAS:<symbol>` and `outputPath` `scans/<asOf date>/<recipeId>`; `task_get` until it settles, then
+declares (`roster-scan` and `opportunity-metrics`), each item id the **research market key**
+`us:<symbol>` and `outputPath` `scans/<asOf date>/<recipeId>`; `task_get` until it settles, then
 `files_read` on `<outputPath>/<itemId>.json` for each answer.
+⛔ **The item id is not the venue MIC, and the two coordinates live one line apart — that is the
+shape of this trap** (`untilled/aumos-catalogue#245`). The `market` argument above **is** the MIC,
+because it is `source_cache_refresh`'s; the `task_start` item id is the key the store files
+documents under, and `source_cache_read` publishes it in its own description: *the key is the
+research market — `kr`, `us` — and a venue MIC is folded onto it*. `PROMPT.md` says the same
+thing one branch over: *`researchUniverse` and everything on that path take `'kr'` / `'us'`, not a
+MIC.* ⚠️ **An id of your own invention is accepted and the recipe is handed nothing**, so the
+failure is silent and shaped exactly like a market that offered nothing.
 ⚠️ **`task_start` collects nothing**, so preparing
 first is a sweep whose every row says the price branch was never run. The bars stay in the host on
 both steps and the row that comes back carries no series. ⛔ Never a worker opened to relay bars,
 walk listing pages or batch the roster, and ⛔ never a roster of bars typed back as `calculate`
 arguments. `skills/candidate-research/SKILL.md` owns the procedure and the three counts and
 `skills/data-source-contract/SKILL.md` the route.
+
+⚠️ **A whole roster of `sourced: false` is a coordinate to probe, not a market to report.**
+`unprepared` on **every** name at once is not a finding about the companies and is not a finding
+about the vendor either — a refresh that answered `observed` or `satisfied` cannot produce it. So
+before you write a single sentence about what this market offered, spend **one call** on a
+two-sided probe: take one name you know bars were just collected for and put it in `task_start`
+under **both** coordinates —
+
+```jsonc
+items: [{ id: "us:AAPL" }, { id: "XNAS:AAPL" }]
+```
+
+— and read which side came back `sourced: true`. That is the whole diagnosis, it costs one call,
+and it distinguishes the two states nothing downstream can: a market that was looked at and
+offered nothing, and a sweep addressed to a key the store files nothing under. ⚠️ **This is not
+hypothetical and it is why the 2026-09-09 run survived**: the discarded batch was 83 US names on
+`XNAS:`/`XNYS:` ids, every one `sourced: false` / `documents: 0` / `barsRead: 0`, beside 83 of 83
+answered on the research market key. ⛔ **Do not repair it by widening the roster, refreshing
+again, or opening a worker** — the roster and the vendor were both fine.
 ⛔ **And the bars you do hand-collect for a single name are not de-partialled by `before`.** That
 parameter is **inclusive**, and a Toss daily bar is stamped at the venue's local midnight, so
 today's midnight returns today's *unfinished* bar. ⚠️ It was measured on XKRX (2026-09-08, 069500,

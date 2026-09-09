@@ -53,9 +53,11 @@ Two questions, asked in this order, before anything in the portfolio changes:
 | **Sleeve** | one market's slice of the book. This manager runs a Korean one and a US one |
 | **Paper call** | a research call recorded and scored without any money behind it |
 
-**A scanner score is discovery, not edge.** The package labels its own discovery score
-`research-priority-only` in code, so a machine signal cannot be read as a buy signal by a
-later reader.
+**A scanner score is discovery, not edge — and each lens is ordered by its own measurement.**
+The discovery score is labelled `mean-reversion-depth-only` in code, because that is what it
+measures: how deeply a name has fallen. It is not a buy signal, and it is not a ranking of the
+other lenses either — a strong thing dipping scores zero on it. Each lens declares what orders
+it, deliberately on its own scale, so nothing can quietly sort three of them into one queue.
 
 **Four lenses, judged separately.** Mean reversion, trend pullback, quality pullback and
 basing are different questions and keep different records. Quality pullback is the 15–35%
