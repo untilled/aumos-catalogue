@@ -19,9 +19,20 @@ checkpoint — what you did review, what you did not, and why — rather than st
 ⛔ **And the whole-universe sweep is not carried through your context either.** It is two steps and
 the order is load-bearing: `source_cache_refresh` on `prices`/`daily` across the roster — the venue
 MIC as `market`, ⛔ no `vendorId` — and then `task_start` over this package's declared recipes
-(`roster-scan`, `opportunity-metrics`), each item id the store coordinate `MIC:symbol` and
+(`roster-scan`, `opportunity-metrics`), each item id the **research market key** `kr:<symbol>` and
 `outputPath` `scans/<asOf date>/<recipeId>`; then `task_get` until it settles, then `files_read` on
-`<outputPath>/<itemId>.json` for the answers.
+the answer files `task_get` names in its `outputs`, and check each row's `evaluatedAsOf` against
+your own `asOf` before you fold it. ⛔ **Never the folder.** `outputPath` is a calendar day, so it
+holds every sweep run on that date — the owner's `scans/2026-09-09/roster-scan/` held 242 files, 83
+of them a discarded venue-keyed batch — and folding it wholesale reports an `unprepared` count that
+never happened. `files_list` says what is on disk, never which of it is this run's.
+⛔ **The item id is not the venue MIC** (`untilled/aumos-catalogue#245`). Two coordinates sit one
+line apart and only the first is a MIC: `market` above is `source_cache_refresh`'s and takes the
+venue, and the `task_start` item id is the key the store files documents under — `source_cache_read`
+publishes it as *the key is the research market — `kr`, `us` — and a venue MIC is folded onto it*.
+⚠️ **An invented id is accepted and the recipe is handed nothing**, so a venue-keyed id returns a
+roster of `sourced: false` that reads exactly like a market which offered nothing. If you get one,
+your skill's two-sided probe is the next call — not a sentence about this market.
 ⚠️ **`task_start` collects nothing**, so a sweep prepared first reports the price branch as
 never run on every name. The bars stay in the host on both steps. ⚠️ `unprepared` names are
 blindness with the names attached — `source_cache_refresh` is its control — and never a market that

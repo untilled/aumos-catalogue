@@ -201,5 +201,68 @@
         "obs_intc_corporate_action"
       ]
     }
+  },
+  "registration": {
+    "issue": "untilled/aumos-catalogue#249",
+    "run": "run_bb689b6199084b04afd8b0e1d1528cda",
+    "measuredOn": "2026-09-09",
+    "note": "This book's first derived catalyst window. `catalystCadence` answered status ok with no diagnostics — 32 days of median lag measured over 21 filings out of this book's own cache, close to but not borrowed from the ported-from harness's US 30 — and the window was computed and thrown away, because no shape us-sleeve tried registered it. The three it reported are `attempts` below; the one that got through recorded the projection as a confirmed date, and the flow correctly declined to store it.",
+    "asOf": "2026-09-09T00:00:00.000Z",
+    "market": "us",
+    "roster": ["NKE"],
+    "cadence": {
+      "medianLagDays": 32,
+      "leadQuantileLagDays": 27,
+      "tailQuantileLagDays": 52,
+      "leadDays": 5,
+      "basisFilings": 21,
+      "basisSymbols": 2,
+      "measuredFrom": "host-source-cache"
+    },
+    "derived": {
+      "symbol": "NKE",
+      "market": "us",
+      "event": "expected-regular-disclosure",
+      "windowStart": "2026-09-27T23:59:59.999Z",
+      "windowEnd": "2026-10-22T23:59:59.999Z",
+      "observedAt": "2026-09-09T00:00:00.000Z",
+      "dateSource": "estimated_from_filing_cadence",
+      "cadenceBasis": {
+        "medianLagDays": 32,
+        "leadDays": 5,
+        "basisFilings": 21,
+        "basisSymbols": 2,
+        "periodGapDays": 91,
+        "nextPeriodEnd": "2026-08-31",
+        "measuredFrom": "host-source-cache"
+      },
+      "evidenceIds": ["ev-nke-2026q4", "ev-nke-2026q3"]
+    },
+    "attempts": [
+      {
+        "name": "the cadence row handed to `catalysts`",
+        "arrives": "catalysts",
+        "reported": "catalyst_estimate_unmarked / blocked",
+        "expected": { "status": "blocked", "code": "catalyst_estimate_unmarked" }
+      },
+      {
+        "name": "the window on both arrays, markers stripped from the `catalysts` copy",
+        "arrives": "catalysts+estimated",
+        "reported": "registered, and `dateSource` came out \"observed\" — withConfirmedCatalystInHorizon 1 / withEstimatedCatalystInHorizon 0",
+        "wasTheWorstAndTheOnlyOneThatRegistered": true,
+        "expected": { "status": "blocked", "code": "catalyst_estimate_unmarked", "onBothArrays": ["us:NKE:expected-regular-disclosure"] }
+      }
+    ],
+    "registers": {
+      "arrives": "estimated",
+      "note": "The row `catalystCadence` answers, verbatim — `registerAs.estimated` is this array under the argument name that takes it. ⛔ The third attempt above is what a document naming both arguments produces.",
+      "expected": {
+        "withEstimatedCatalystInHorizon": 1,
+        "withConfirmedCatalystInHorizon": 0,
+        "researched": 0,
+        "derived": 1,
+        "dateSource": "estimated_from_filing_cadence"
+      }
+    }
   }
 }

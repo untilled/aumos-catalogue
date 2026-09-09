@@ -127,18 +127,26 @@ const ladder = execute({
 assert.equal(ladder.status, 'ok', `the ladder is a plan: ${JSON.stringify(ladder.diagnostics)}`)
 
 /**
- * The one translation the run owns: this package writes a watch flat and AMP
- * nests it. ⚠️ The `key` and the `Money` are **not** rewritten here — they come
- * off `watchesToRegister` as `exitDiscipline` built them, which is the property
- * that makes `armed-price-mismatch` unreachable.
+ * The one translation the run owns, and it is now smaller than it was (#244).
+ *
+ * ⚠️ **Every field the host's re-arm fold reads is copied, not composed.** This
+ * example used to write the `intent` and the `subject` here — *"Exit on the
+ * registered stop."* — which is exactly what a real run did, and what a second
+ * real run then did differently: measured on 2026-09-09, one `SGOV` stop stood
+ * twice because the prose beside a byte-identical trigger had grown by 69
+ * characters. `kind`, `subject`, `intent` and `trigger` all come off
+ * `watchesToRegister` as `exitDiscipline` built them, so `untilled/aumos#704`'s
+ * `samePromise` sees the same bytes on every re-arm, and `armed-price-mismatch`
+ * stays unreachable because the `Money` was never rewritten either.
+ *
+ * ⛔ What is left is the two shapes AMP needs and this package does not hold: a
+ * date-only expiry expanded to an instant, and the `at-time` row's own `at`.
  */
 const watches = stop.data.watchesToRegister.map((row) => ({
   ...(row.key ? { key: row.key } : {}),
-  subject: { ...asset, currency: 'KRW' },
-  intent: row.reason === 'exit-discipline-hard-stop' ? 'Exit on the registered stop.' : 'Close on the time stop.',
-  trigger: row.kind === 'price-below'
-    ? { kind: 'price-below', asset: row.asset, price: row.price }
-    : { kind: 'at-time', at: `${row.at}T00:00:00Z` },
+  ...(row.subject ? { subject: row.subject } : {}),
+  intent: row.intent,
+  trigger: row.trigger ?? { kind: 'at-time', at: `${row.at}T00:00:00Z` },
   ...(row.expiresAt ? { expiresAt: `${row.expiresAt}T00:00:00Z` } : {}),
 }))
 const folded = execute({
@@ -174,6 +182,24 @@ const stopLevel = assembled.priceLevels.find((row) => row.purpose === 'stop')
 const stopWatch = assembled.watches.find((row) => row.trigger.kind === 'price-below')
 assert.equal(stopLevel.armedKey, stopWatch.key, 'and the link the host checks is the one the operation minted')
 assert.deepEqual(stopLevel.price.value, stopWatch.trigger.price)
+/**
+ * ⚠️ And the promise identity the wire carries is the operation's, verbatim —
+ * the property `check:allocator` proves across two runs, asserted here against
+ * the bytes that actually validate (#244).
+ */
+const armingRow = stop.data.watchesToRegister.find((row) => row.kind === 'price-below')
+assert.deepEqual(
+  [stopWatch.intent, stopWatch.subject, stopWatch.trigger],
+  [armingRow.intent, armingRow.subject, armingRow.trigger],
+  /**
+   * ⚠️ The claim is about the **values** that reach the wire, not about who
+   * typed them: a hand-written subject identical to the operation's would pass
+   * this and is not the defect. What it refuses is a hand-written one that
+   * differs — which is every one that was measured.
+   */
+  'the four fields untilled/aumos#704 folds on reach the wire with the values exitDiscipline minted',
+)
+assert.match(stopWatch.intent, /^exit-discipline:hard-stop:035420 — \S/, 'and the intent is a marked function of the promise, not a sentence about this run')
 
 /**
  * ⛔ And the negative case, because a validator that accepts everything accepts

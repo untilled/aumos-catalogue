@@ -120,12 +120,14 @@
       "challenge-block",
       "resize-lens",
       "thesis-field-contract",
+      "candidate-completion-stage",
       "produced-event-invalidation",
       "single-name-tranche-plan",
       "tranche-plan-not-cash-deployment",
       "consensus-ref-attestation",
       "catalyst-axis-producer",
-      "catalyst-register-encoding"
+      "catalyst-register-encoding",
+      "catalyst-estimate-registration-path"
     ],
     "scanner": [
       "buy-radar",
@@ -138,13 +140,15 @@
       "mean-reversion-unconfirmed",
       "sector-rank-and-regime",
       "research-queue",
+      "lens-rank-per-lens",
       "bot-baseline-never-traded",
       "radar-lanes",
       "radar-lane-starvation",
       "lens-envelope-reachability",
       "lens-envelope-is-the-scanner-source",
       "regime-tag-provenance",
-      "baseline-signals-are-admissible"
+      "baseline-signals-are-admissible",
+      "price-series-discontinuity"
     ],
     "schedule": [
       "dislocation-signal",

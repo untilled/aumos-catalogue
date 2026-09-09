@@ -6,7 +6,7 @@ import { METHODOLOGY } from '../managers/evidence-gated/lib/constants.mjs'
 import { marketReviewIntent } from '../managers/evidence-gated/lib/schedule.mjs'
 import { MACRO_INDICATORS } from '../managers/evidence-gated/lib/evidence.mjs'
 import { MANAGER_ID } from '../managers/evidence-gated/lib/diagnostics.mjs'
-import { BAR_CLOSE_LAG_MS, unclosedNewestBar } from '../managers/evidence-gated/lib/indicators.mjs'
+import { BAR_CLOSE_LAG_MS, unclosedNewestBar, PRICE_DISCONTINUITY_BOUNDS, priceSeriesDiscontinuity } from '../managers/evidence-gated/lib/indicators.mjs'
 import { causeCodesInLane } from '../managers/evidence-gated/lib/diagnostic-codes.mjs'
 
 const configSchema = JSON.parse(await readFile(new URL('../managers/evidence-gated/config.schema.json', import.meta.url), 'utf8'))
@@ -944,6 +944,92 @@ assert.deepEqual(unstatedStop.data.watchesToRegister.map((row) => row.kind), sta
 const noDistance = run('exitDiscipline', { symbol: '035420', asset: { class: 'equity', symbol: '035420', market: 'XKRX' }, lane: 'main', entryDate: '2026-08-25', entryPrice: 100, price: 99, positionWeight: 0.2 })
 assert.deepEqual(noDistance.data.priceLevelsToRegister, [])
 assert.equal(has(noDistance, 'stop_level_unstated'), false, 'the unstated level is a level that exists and could not be spelled, never one that was never computed')
+
+/**
+ * ── The same stop, said twice, in the same bytes (#244 · `untilled/aumos#704`) ─
+ *
+ * The host folds a re-armed promise into the one already standing by comparing
+ * `kind`, `subject`, `intent` and `trigger` **as written**, interpreting none
+ * of them. Measured in the owner's book on 2026-09-09, this package's stops
+ * failed that twice over: `SGOV`'s trigger was byte-identical and the `intent`
+ * prose had grown from 162 characters to 231 — the new sentence naming the very
+ * plan id the fold was meant to retire — and `153130`'s ₩104,254.40 was spelled
+ * `exponent: 2 / 10425440` by one run and `exponent: 1 / 1042544` by the next.
+ * Both left two live `price-below` watches on one asset, and `price-below` is
+ * not folded at firing time either (#590, #593 and #624 all key on `at-time`),
+ * so one breach opens two wakes against a `MAX_LIVE_RUNS` of four.
+ *
+ * ⛔ **The fix is not a looser fold.** *"Identity, not likeness"* is the host's
+ * ruling and it is right; what was wrong is that a stop had no minted identity
+ * to copy, so the run composed one and composed it differently. So the test is
+ * the property the issue names: two runs of the same stop, three days apart,
+ * produce a `watch` row identical in exactly the four fields the host reads.
+ */
+const rearmedAt = (thisAsOf) => execute({
+  operation: 'exitDiscipline',
+  asOf: thisAsOf,
+  input: {
+    symbol: '153130',
+    asset: { class: 'equity', symbol: '153130', market: 'XKRX' },
+    lane: 'main',
+    entryDate: '2026-08-25',
+    entryPrice: 113_320,
+    price: 113_000,
+    positionWeight: 0.2705039,
+    mandateMaxDrawdown: 0.06,
+  },
+}).data.watchesToRegister
+const promiseIdentity = (row) => JSON.stringify({ kind: row.kind, subject: row.subject ?? null, intent: row.intent, trigger: row.trigger ?? null })
+const armedSept6 = rearmedAt('2026-09-06T12:49:42.942Z')
+const armedSept9 = rearmedAt('2026-09-09T11:23:55.210Z')
+const stopOf = (rows) => rows.find((row) => row.kind === 'price-below')
+const timeStopOf = (rows) => rows.find((row) => row.kind === 'at-time')
+/** The measured level, reproduced rather than retyped: the −8% cap on an entry of 113,320. */
+assert.equal(stopOf(armedSept6).threshold, 104_254.4, 'the stop the owner’s book carries, from the methodology ceiling')
+assert.equal(
+  promiseIdentity(stopOf(armedSept6)),
+  promiseIdentity(stopOf(armedSept9)),
+  'a stop re-armed three days later is the same promise in the same bytes, which is the whole of what the host’s fold reads',
+)
+assert.equal(
+  promiseIdentity(timeStopOf(armedSept6)),
+  promiseIdentity(timeStopOf(armedSept9)),
+  'and so is the time stop beside it — it is re-armed on every judgement of a position that still holds',
+)
+/**
+ * ⚠️ **The identity is not vacuously equal, and these are what would make it
+ * so.** An `intent` that is absent on both rows, or a `trigger` that is, would
+ * pass the two comparisons above while leaving the defect exactly where it was.
+ */
+assert.match(stopOf(armedSept6).intent, /^exit-discipline:hard-stop:153130 — \S/, 'the intent is minted, marked, and about the promise')
+assert.match(timeStopOf(armedSept6).intent, /^exit-discipline:time-stop:153130 — \S/)
+assert.deepEqual(stopOf(armedSept6).trigger, { kind: 'price-below', asset: stopOf(armedSept6).asset, price: stopOf(armedSept6).price }, 'the nested trigger is AMP’s shape, holding the row’s own asset and its own Money — so the run copies it rather than translating it')
+assert.deepEqual(stopOf(armedSept6).subject, stopOf(armedSept6).asset, 'and the subject the host compares is that same asset, not one a run retypes')
+/**
+ * ⛔ **Nothing about *this run* may be in it.** That is the precise defect: the
+ * sentence explaining the fold prevented the fold. The instants above differ by
+ * three days and the arithmetic's inputs do not, so any of it leaking into the
+ * identity would already have failed the comparison — this states the rule the
+ * comparison enforces, for the reader who changes the sentence later.
+ */
+assert.equal(stopOf(armedSept6).intent.includes('2026'), false, 'no instant, no date, and no plan id — the trigger carries the condition’s own time')
+assert.equal(/[0-9]{3}/.test(stopOf(armedSept6).intent.replace('153130', '')), false, 'and no price restated in words beside the one in the trigger')
+/**
+ * ⚠️ **The spelling of the price is one function's answer, and that is the
+ * other half.** ₩104,254.40 is `exponent: 1` because that is the smallest
+ * exponent representing it exactly; the book's older row says `exponent: 2`,
+ * which is the same value and different bytes. ⛔ Normalising exponents is the
+ * host's to refuse — it did — so what is asserted is that this package has one
+ * place that answers, and that the level and the watch hold its one answer.
+ */
+assert.deepEqual(stopOf(armedSept6).price, { currency: 'KRW', minorUnits: 1_042_544, exponent: 1 }, 'the smallest exponent that spells the level exactly, and the same one every run')
+assert.deepEqual(stopOf(armedSept6).trigger.price, rearmedAt('2026-09-06T12:49:42.942Z')[0].price)
+const [rearmedLevel] = execute({
+  operation: 'exitDiscipline',
+  asOf: '2026-09-09T11:23:55.210Z',
+  input: { symbol: '153130', asset: { class: 'equity', symbol: '153130', market: 'XKRX' }, lane: 'main', entryDate: '2026-08-25', entryPrice: 113_320, price: 113_000, positionWeight: 0.2705039, mandateMaxDrawdown: 0.06 },
+}).data.priceLevelsToRegister
+assert.deepEqual(rearmedLevel.price.value, stopOf(armedSept9).trigger.price, 'the level and the trigger the run arms are the one Money, so there is nothing for a second spelling to disagree with')
 
 // A due stop the proposal does not act on is the prose this replaced.
 assert.equal(entered().data.exitProposed, null, 'unjudged before the proposal exists')
@@ -3526,6 +3612,93 @@ assert.equal(
 )
 
 console.log('evidence-gated issue #224 partial-bar regression tests passed')
+
+/**
+ * ── #248: the series whose shape is valid and whose *history* is wrong ─────
+ *
+ * #224 above is one bar that has not closed. This is two hundred bars that all
+ * closed and do not belong to one price history. Measured on the 2026-09-09 US
+ * sweep: BKNG `close` 193.29 against `ma200` **2,316.55**, VZ `close` 50.14
+ * against `low200` **10.5999** — and `discoveryScore` reads `offHigh200` and
+ * `ma200Distance`, so BKNG's 20 was made of the artifact.
+ *
+ * ⛔ The three readings are asserted **at their bounds** here rather than
+ * inferred from a series, for the reason `unclosedNewestBar`'s boundary is: a
+ * threshold measured only through a fixture is a threshold nobody can move
+ * without rebuilding the fixture, and the fixture would then be the
+ * specification.
+ */
+const flatSeries = (close, count = 200) => Array.from({ length: count }, (_, index) => ({
+  timestamp: new Date(Date.parse(partialAsOf) - (count - index) * 86_400_000).toISOString(),
+  open: close, high: close, low: close, close, volume: 1,
+}))
+
+/* ── ⑴ the bounds, at the boundary ────────────────────────────────────────── */
+assert.deepEqual(PRICE_DISCONTINUITY_BOUNDS.closeToMa200, { min: 0.1, max: 10 }, 'the ratio bounds are the ones #248 named')
+assert.deepEqual(PRICE_DISCONTINUITY_BOUNDS.high200ToLow200, { min: 1, max: 20 })
+assert.equal(PRICE_DISCONTINUITY_BOUNDS.adjacentLogReturn, 0.5)
+assert.equal(PRICE_DISCONTINUITY_BOUNDS.windowBars, 200, 'the window is the one the corrupted numbers are read from')
+
+/** Exactly ±0.5 is an ordinary session; a hair beyond it is a step. */
+const stepBy = (factor) => {
+  const bars = flatSeries(100, 10)
+  for (const bar of bars.slice(-5)) {
+    bar.open = 100 * factor; bar.high = 100 * factor; bar.low = 100 * factor; bar.close = 100 * factor
+  }
+  return priceSeriesDiscontinuity(bars)
+}
+assert.equal(stepBy(Math.exp(0.5)).jumpCount, 0, 'a log return of exactly 0.5 is inside the bound')
+assert.equal(stepBy(Math.exp(0.5000001)).jumpCount, 1, 'and a hair beyond it is counted')
+
+/* ── ⑵ absence, and what is not a step ───────────────────────────────────── */
+assert.equal(priceSeriesDiscontinuity([]), null, 'no series is not an incoherent series')
+assert.equal(priceSeriesDiscontinuity(undefined), null)
+const single = priceSeriesDiscontinuity(flatSeries(100, 1))
+assert.equal(single.jumpCount, 0, 'one bar has no adjacent bar to step from')
+assert.equal(single.closeToMa200, null, '⛔ and no ma200 to disagree with — a missing average is #224\'s family, not this one')
+assert.equal(single.suspected, false, 'so nothing is suspected, because nothing was compared')
+/** ⛔ A zero or unreadable close is skipped rather than counted: a ratio against nothing is not a step. */
+const zeroed = flatSeries(100, 10)
+zeroed[4].close = 0
+assert.equal(priceSeriesDiscontinuity(zeroed).jumpCount, 0, 'a zero close is refused as a step rather than reported as an infinite one')
+
+/* ── ⑶ it fires on every operation that reads a bar array, and reports only ── */
+const bkngShape = flatSeries(2300, 260)
+for (const [index, bar] of bkngShape.entries()) {
+  if (index < 240) continue
+  bar.open = 193; bar.high = 193; bar.low = 193; bar.close = 193
+}
+for (const operation of barOperations) {
+  const answer = barRun(operation, bkngShape.map((bar) => ({ ...bar, date: bar.timestamp })))
+  const row = answer.diagnostics.find((item) => item.code === 'price_series_discontinuity_suspected')
+  assert.ok(row, `${operation} reports a series whose derived level disagrees with its own price by a factor — this is the gap #248 measured`)
+  assert.equal(row.severity, 'info', `${operation}: ⛔ a name that really did split has this shape and its history is right, so the judgement is the reader's`)
+  assert.equal(row.path, 'bars')
+  assert.ok(row.details.reasons.includes('close-to-ma200-outside-bounds'), `${operation}: BKNG's own reading — 193 against a 200-day mean above 2,000`)
+  assert.notEqual(answer.status, 'blocked', `${operation}: nothing is refused`)
+}
+/** ⛔ And `trendState` still answers a state: the row is `info`, so it is not one of the `unevaluated` rows that make a trend `insufficient_data`. */
+assert.notEqual(
+  barRun('trendState', bkngShape.map((bar) => ({ ...bar, date: bar.timestamp }))).data.state,
+  'insufficient_data',
+  'the gate that stops capital deployment is not stopped by a suspicion — #248 asks for a report and this is where refusing would have become one',
+)
+
+/* ── ⑷ and the clean series says so, in the same field ────────────────────── */
+for (const operation of barOperations) {
+  const answer = barRun(operation, closedSeries)
+  assert.equal(
+    answer.diagnostics.some((item) => item.code === 'price_series_discontinuity_suspected'),
+    false,
+    `${operation} says nothing about a coherent series`,
+  )
+}
+const cleanPacket = barRun('indicators', closedSeries).data.indicators.discontinuity
+assert.equal(cleanPacket.suspected, false)
+assert.equal(cleanPacket.jumpCount, 0, '⚠️ carried on a clean name too: «no adjacent session moved by more than 50%» is the fact that makes offHigh200 readable, and a field that appears only when it is bad is a field whose absence has to be interpreted')
+assert.deepEqual(cleanPacket.reasons, [])
+
+console.log('evidence-gated issue #248 price-series-discontinuity regression tests passed')
 
 /**
  * ── #227: the radar's clock, its override's producer, and the boundary ─────

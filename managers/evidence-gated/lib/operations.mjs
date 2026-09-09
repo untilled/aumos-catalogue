@@ -57,7 +57,7 @@
  */
 import { researchUniverse, researchState } from './research-state.mjs'
 import { normalizeBars, indicatorPacket } from './indicators.mjs'
-import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
+import { scanSymbol, relativeStrength, opportunityMetrics, opportunityUniverse, candidateQueue, trendState, blendedSectorStrength, entryQualityGate, sectorStrength, regimeTag } from './scanners.mjs'
 import { sleeveNav, targetWeight, minimumExecutableWeight, effectivePositionCap, effectiveCashFloor, singleNameBudget, legacySizeSuggestion, concentration, mandateExecution, specialistBudget, globalAllocation, newSinglePacing, entryTranchePlan } from './sizing.mjs'
 import { proposalDisclosure } from './proposal.mjs'
 import { priceLevelSet } from './price-levels.mjs'
@@ -70,6 +70,7 @@ import { decomposition, timeWeightedReturn, moneyWeightedReturn, portfolioMetric
 import { netReturnBreakdown, outcomeClassification, forwardOutcome, earningsActual } from './outcomes.mjs'
 import { trendGateForward, dcaMultiplierBacktest, oversoldStrata } from './backtest.mjs'
 import { validateThesis, variantViewCheck, thesisSentinel, upsideRadar, validateMemory, migrationMap, exitCheck } from './methodology.mjs'
+import { candidateCompletion } from './completion.mjs'
 import { filterPointInTime, normalizeSecFacts, normalizeDartFilings, parseDartCorpCodes, normalizeDartFinancials, normalizeSecSubmissions, laneCoverage, validateAdjustment } from './source-parsers.mjs'
 import { fundamentalsPlan, mapCorporationCodes, dartVendorStatus, radarCandidates, radarFeedDiagnosis } from './fundamentals-feed.mjs'
 import { catalystRegister, catalystCadence, CATALYST_DATE_ESTIMATED } from './catalysts.mjs'
@@ -168,6 +169,17 @@ export const OPERATIONS = {
     mode: 'named', keys: { rows: ARRAY },
     describe: 'the declared universe, with held and pending excluded',
     run: opportunityUniverse,
+  },
+  candidateQueue: {
+    group: 'scanners',
+    surface: 'published',
+    mode: 'strict', keys: { rows: ARRAY, perLens: NUMBER },
+    nested: {
+      rows: 'The `scan` answers you read back from the sweep\'s answer files — one row per name, carrying `lenses`, `eligibleForNewResearch` and `indicators`. ⛔ Not the `opportunityMetrics` rows: those are the five oversold axes and `opportunityUniverse` folds them. A row this operation cannot read is counted in `counts.rows` and queued nowhere.',
+      perLens: 'How many candidates of **each** lens this run carries to a completed record; the default is 1, and it is the number #243 asks for rather than a ceiling on research. ⛔ There is no argument for «the top N of the roster»: three lenses rank on three different measurements and putting them on one scale is the defect (#242).',
+    },
+    describe: 'the research order **per lens** — each lens ranked by its own measurement, so no one score orders three of them — and which candidates this run therefore owes a completed record for',
+    run: candidateQueue,
   },
   trendState: {
     group: 'scanners',
@@ -902,6 +914,17 @@ export const OPERATIONS = {
     describe: 'what is already waiting for the investor, so this run does not propose it again',
     run: (input, asOf) => lessonAudit({ ...input, asOf }),
   },
+  candidateCompletion: {
+    group: 'evidence',
+    surface: 'published',
+    mode: 'strict', keys: { owesDocument: ARRAY, records: ARRAY },
+    nested: {
+      owesDocument: '`candidateQueue`\'s `owesDocument` rows, handed over unchanged — `{ symbol, market, lens, position }`. It is the list this run said it would carry, so the stage is checked against the run\'s own declaration and not against a number this operation chose.',
+      records: 'One row per completed candidate record: `{ symbol, market, lens, thesis, challengeVerdict, verdict }`. `thesis` is the document itself — the same object `variantViewCheck` and `validateThesis` take, which this calls rather than reimplements. ⚠️ `verdict` is what **you** concluded and is carried verbatim: a decline is an outcome of the stage and never a failure of it. ⛔ A record for a name that was not carried is not an error and is simply not read; a carried name with no record is `candidate_completion_absent`.',
+    },
+    describe: 'whether the completion stage ran — for each candidate this run said it would carry, is there a record, and what `variantViewCheck` made of it. ⛔ Not a fifth gate: «judged and declined» and «no document was ever written» are two different states of this book and this is what tells them apart',
+    run: (input, asOf) => candidateCompletion({ ...input, asOf }),
+  },
   validateThesis: {
     group: 'evidence',
     surface: 'published',
@@ -1103,7 +1126,25 @@ export const OPERATIONS = {
      */
     nested: {
       'catalysts[]': { symbol: STRING, market: STRING, event: STRING, windowStart: STRING, windowEnd: STRING, observedAt: STRING, evidenceIds: ARRAY },
-      'estimated[]': `The \`estimated\` rows \`catalystCadence\` answered, verbatim — the same window shape plus \`dateSource: "${CATALYST_DATE_ESTIMATED}"\` and the \`cadenceBasis\` it was derived from. ⛔ **A separate argument on purpose**: an estimate and a reading are different claims, and an estimate arriving on \`catalysts\` — or on this one without saying it is an estimate — is \`catalyst_estimate_unmarked\` and blocked. Neither array's discipline is weakened; what an estimated row cites is the past filings its cadence was measured over.`,
+      /**
+       * ⚠️ **Field by field, and with `catalystCadence`'s own output names
+       * (#249).** This entry was one paragraph of prose while `catalysts[]` one
+       * line up was a field table — *"a separate argument on purpose"* was said
+       * and the shape of the argument was not — and that asymmetry is what a
+       * flow measured: three shapes tried for one derived window on
+       * `run_bb689b6199084b04afd8b0e1d1528cda`, none of them the right one, and
+       * the only one that registered recorded a projection as a confirmed date.
+       * A caller that has never sent an estimate has no wrong spelling to learn
+       * from, which is #169's own reason for publishing `catalysts[]`, and it
+       * applies here one argument over.
+       *
+       * ⚠️ **The names are 1:1 with what `catalystCadence` answers**, so the
+       * rows pass straight through — `registerAs.estimated` is that array under
+       * this argument's name, and a run that hands it over composes nothing.
+       */
+      'estimated[]': { symbol: STRING, market: STRING, event: STRING, windowStart: STRING, windowEnd: STRING, observedAt: STRING, dateSource: STRING, cadenceBasis: OBJECT, evidenceIds: ARRAY },
+      'estimated[].cadenceBasis': { medianLagDays: NUMBER, leadDays: NUMBER, basisFilings: NUMBER, basisSymbols: NUMBER, periodGapDays: NUMBER, nextPeriodEnd: STRING, measuredFrom: STRING },
+      estimatedRowShape: `The \`estimated\` rows \`catalystCadence\` answered, verbatim — hand over \`registerAs.estimated\` and change nothing. \`dateSource\` is the literal \`"${CATALYST_DATE_ESTIMATED}"\`, the only value this argument accepts, and \`cadenceBasis\` is required: \`medianLagDays\` and a \`basisFilings\` above zero are the two an estimate cannot be read without, and the rest are carried when they were measured. \`windowStart\`/\`windowEnd\`/\`observedAt\` are RFC 3339 here, as they are on \`catalysts[]\`; ⚠️ the \`…EpochMs\` numbers are what \`previous\` carries and what \`nextState\` writes back, and either spelling is read. ⛔ **A separate argument on purpose**: an estimate and a reading are different claims, and an estimate arriving on \`catalysts\` — or on this one without saying it is an estimate — is \`catalyst_estimate_unmarked\` and blocked. ⛔ **And the same window may not arrive on both arrays**: the fold keeps the confirmed copy under a \`(market, symbol, event)\` key, so a projection sent twice registers once as a date somebody read — the third shape #249 measured, and the one that used to get through. Neither array's discipline is weakened; what an estimated row cites is the past filings its cadence was measured over.`,
       'events[]': { symbol: STRING, market: STRING, announcedAt: STRING, sue: NUMBER, day1ExcessPct: NUMBER, preAnnouncementClose: NUMBER, guidanceSurprise: NUMBER, evidenceIds: ARRAY },
       evidenceIds: 'Required on every row of both arrays, and this is the whole discipline of the operation: a catalyst window nobody can go and check is not a registered catalyst, it is a claim. File the reading with `observation_file` and put the returned id here — the same route `consensusRefs` takes.',
       previous: 'The whole value read from `state/research/catalyst-window.json` — { schemaVersion: 1, updatedAsOf, rows[] }. ⚠️ Its rows carry `windowStartEpochMs` / `windowEndEpochMs` as **numbers**: a catalyst window ends after `asOf` by construction, and `memory_read` refused a payload carrying a later **string** timestamp. That guard does not reach a file (`untilled/aumos#743`), and the encoding stays anyway as this package\'s own canon — every reader here expects it. Persist `nextState` verbatim; do not rewrite the instants as RFC 3339.',

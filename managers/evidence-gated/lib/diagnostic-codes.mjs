@@ -173,6 +173,32 @@ export const CAUSE_CODE_REGISTRY = Object.freeze([
   /* ── discovery ───────────────────────────────────────────────────────── */
   { code: 'discovery_lane_dark', operation: 'discoveryCapacity', module: 'coverage.mjs', lane: 'input-path' },
 
+  /**
+   * ── the stage with no producer, one layer down from #169 (#243) ───────
+   *
+   * ⚠️ **`input-path`, and it is the same judgement `catalyst_producer_absent`
+   * got.** The four gates that open a position have judged candidates since
+   * #226; what nothing produced is **the document they judge**. Measured on
+   * `run_bb689b6199084b04afd8b0e1d1528cda`: both price branches fed and
+   * evaluated (KR 74/74, US 83/83, `unprepared` 0), 42 eligible candidates, four
+   * pushed to `variantViewCheck`, all four declined, **0 registered** — and
+   * `267260`'s answer was `1 of 4`, which does not read as «judged and
+   * declined». It reads as «there was nothing to judge».
+   *
+   * A run carrying this has a lane it cannot claim to have judged, which is
+   * exactly what this lane is for: it **withdraws** `mandateExecution`'s
+   * positive answer rather than granting one, and it does not block — a book
+   * may honestly reach `WAIT` with every document written and every candidate
+   * declined.
+   *
+   * ⛔ **Not a gate's own finding.** `thesis_incomplete` and
+   * `challenge_not_cleared` are judgements this methodology made and are
+   * registered nowhere (#212 ④); a run filing its own verdict here would be
+   * excusing it as unfinished wiring. This row is raised only where **no
+   * document exists at all.**
+   */
+  { code: 'candidate_completion_absent', operation: 'candidateCompletion', module: 'completion.mjs', lane: 'input-path' },
+
   /* ── the valuation gap, read three ways (#166) ───────────────────────── */
   { code: 'valuation_gap_is_unfetched_not_unfillable', operation: 'thesisGapSources', module: 'valuation.mjs', lane: 'input-path' },
   { code: 'instrument_class_disputed', operation: 'thesisGapSources', module: 'valuation.mjs', lane: 'unresolved' },

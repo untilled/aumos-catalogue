@@ -155,13 +155,34 @@ a track the operation cannot see.
 one universe declared, not one candidate generated, and nothing in any proposal that would let an
 investor see it. The circle closed with no error in it — §3 names the lens when there are
 candidates, candidates come out of the sweep, the sweep needs a declared universe, so the run that
-had none never reached the step that would have noticed. `coverage` is therefore called in
-pre-flight, where nothing downstream depends on the answer.
+had none never reached the step that would have noticed. `coverage` is therefore called **every
+run**, and whatever it says is reported. ⚠️ **Where it is called moved** (`#246`): it is the last
+step of the flow's checklist rather than pre-flight, because an extension registered mid-run is part
+of the boundary it measures. What #140 requires is that it is called and reported at all, and that
+is unchanged.
 
 **Coverage complete over the empty set** (run `run_ba37a8f6907a49c3a805a4ce3ee10ec6`, 2026-09-04).
 `coverage` was called with `scannerUniverses: []` and `extensions: []` and answered `complete: true`,
 `uncovered: []`, no diagnostics — on a denominator made entirely of the book's own holdings. Hence
 `complete: null`: `false` would say the run looked and found gaps.
+
+**An extension declared and `complete: true` reported in the same run** (#246,
+`run_bb689b6199084b04afd8b0e1d1528cda`, 2026-09-09). `kr-sleeve` persisted `extensions: ["001440"]`
+and `us-sleeve` `["LEU"]` through `researchState`, and both reported `coverage.complete: true` /
+`uncovered: []`. The orchestrator re-called `coverage` with those names in the universe and both
+flipped — KR declared 77 / screened 75 / dispositions 74, US 85 / 84 / 83 — each with its new name
+in `uncovered`, because neither had a `prices/daily` disposition; both flows had written *price
+series not collected, paper thesis only* about them in the same breath. ⚠️ **Two flows did it in one
+run, so it is a procedure and not an accident.** `coverage` was step 2 of the sleeve's own preamble,
+where `extensions: []` makes `complete: true` genuinely honest — and the boundary then moved behind
+the verdict. It is **step 18** now, after `researchState`, and `lib/flows.mjs` declares that order
+so a verifier executes it instead of a paragraph asserting it. ⛔ Widening the boundary creates the
+obligation to sweep inside it in the same run — that is what makes an extension part of the
+*declared* universe — and a run that cannot produce the disposition reports `coverage` incomplete
+with the name left in `uncovered` rather than dropping the extension. ⚠️ **The curated 74 all
+dispositioned is real and is this book's first**; what this records is that the boundary moved after
+it, not that the achievement was cancelled. ⛔ `discoveryCapacity`'s `emptyExtensionRuns` reset
+(1 → 0) worked correctly and is untouched: gaining an extension is itself a success.
 
 **The close buffers arrived at the wrong nesting.** A run that handed them at the top of `config`
 got the package's own 30/45 with nothing said — #91's *"the number on the install screen governed
@@ -206,6 +227,54 @@ on the host's own rule that a daily bar becomes readable 24 hours after its open
 after the close holds a same-day bar that is complete, and refusing there would turn a correct
 reading into no reading. On the corrected prescription the row does not appear at all, so it fires
 exactly when a run did not follow it.
+
+**A series whose shape was valid and whose history was wrong** (#248). #224 above closed the case
+of one bar that has not closed. This is the case of two hundred bars that all closed and do not
+belong to one price history, and the sentence that was supposed to cover it — *"adjusted and
+unadjusted series are never mixed"* — had nothing behind it: no check in this package compared a
+derived level against the price it was derived from. Measured on the 2026-09-09 US roster sweep (83
+names, `roster-scan` answers): **BKNG** `close` 193.29 against `ma200` **2,316.55**, `offHigh200`
+**−96.5%**, `ma200Discount: true`, `discoveryScore` **20**; **VZ** `close` 50.14 against `low200`
+**10.5999**, `aboveLow200` **+373%**. Neither is a drawdown, and BKNG's score of 20 came entirely
+from the artifact — `discoveryScore` reads `offHigh200` and `ma200Distance`, so the price branch's
+ranking was partly made of it, and nothing in the run could say how many of the other eight names
+that scored 20 had the same cause. ⛔ **Every existing defence passed it, and for #224's reason**:
+`bar_value_invalid` asks whether the row parsed and all of them did, and
+`trend_moving_average_unavailable` asks whether the average computed and 2,316.55 is a finite
+number. `price_series_discontinuity_suspected` (`info`) reports three readings over the last 200
+bars — the window the corrupted numbers are read from — and `indicators.discontinuity` carries the
+count of adjacent sessions beyond ±50% on a clean name too, because a field that appears only when
+something is broken is a field whose absence has to be interpreted. ⚠️ **It refuses nothing, and
+that is the finding rather than a compromise**: a name that really did split has exactly this shape
+and its history is exactly right. The defect was never that the artifact was allowed through; it
+was that the reader had no way to tell one from the other. ⛔ And the series is not repaired — a
+factor re-derived from the step would make this package the second author of a price history whose
+first author is the vendor.
+
+**A producer that worked and a registration path that could not be found** (#249). #228 built
+`catalystCadence` so the catalyst axis would stop being starved, and on
+`run_bb689b6199084b04afd8b0e1d1528cda` (2026-09-09, us-sleeve) it worked exactly as designed: status
+ok, no diagnostics, `medianLagDays` **32** over **21** filings with `basisSymbols` 2 and
+`measuredFrom: "host-source-cache"` — measured from this book's own cache and close to, but
+deliberately not borrowed from, the ported-from harness's US 30. **It was this book's first derived
+window, and it was computed and thrown away.** us-sleeve tried three shapes on `catalystRegister`
+and reported all three: the cadence row on `catalysts` → `catalyst_estimate_unmarked` / blocked; the
+window on `estimated` alone → refused for a shape reason; **the window on both arrays with the
+markers stripped from the `catalysts` copy → registered, with `dateSource` reading `"observed"`**
+(`withConfirmedCatalystInHorizon: 1` / `withEstimatedCatalystInHorizon: 0`). The third is the worst
+of the three and it was the only one that got through, and the flow read the result and correctly
+declined to store it. ⚠️ **The cause was published prose beside a published table.** `catalysts[]`
+was a field table and `estimated[]` was a paragraph saying *"a separate argument on purpose"* — the
+purpose without the shape — and a caller that has never sent an estimate has no wrong spelling to
+learn from, which is #169's own argument for publishing `catalysts[]` in the first place. Three
+things moved: the row is published field for field, 1:1 with what `catalystCadence` answers, and the
+`cadenceBasis` under it; `catalystCadence` hands back `registerAs: { estimated }`, the same array
+under the argument name that takes it, which is the `priceLevelsToRegister` pattern; and the same
+`(market, symbol, event)` on both arrays is now `catalyst_estimate_unmarked` / **blocked**. ⛔ **No
+new code for the third shape**, because `catalyst_estimate_unmarked` exists to prevent precisely
+that reading and the fix a reader needs is the same one. ⚠️ The key is `(market, symbol, event)` and
+not the window instants: a caller that rounded one copy's `windowEnd` by a millisecond would have
+escaped the check while producing the identical record.
 
 **A source that existed and a procedure that did not** (#229). `variantViewCheck` has four
 requirements and one of them — `consensusRefs` — takes an input that is in no filing and on no
@@ -300,6 +369,79 @@ streak of runs that moved nothing is counted by `discoveryCapacity` rather than 
 dislocation weeks, the richest thesis environment it names — and nothing in this package ever set
 it. `dislocationSignal` is the producer: an index 5% or more off its own window high, or a VIX
 spike, both read from rows `validateMacro` had already dated and tiered.
+
+**One score ordered three lenses, and its sign was backwards against the only thesis that worked**
+(#242). `discoveryScore` is `meanCount / knownMean` — the fraction of the *mean-reversion* signal set
+a name fires — and the flow researched in that order. A `trend-pullback` candidate carries none of
+those five signals by construction: above its MA200 it is not near its 200-day low, not at a 10%
+discount to that average, and rarely under RSI 30. So two of the three price lenses scored
+**structurally zero** and were never reached. Measured on the 2026-09-09 KR sweep, 74 names, reading
+the `roster-scan` answers directly:
+
+| name | eligible | `discoveryScore` | lens | `offHigh200` | `ma200Distance` | what the run did |
+|---|---|---:|---|---:|---:|---|
+| `035900` | ✅ | **60** | mean-reversion | −50.4% | −33.8% | researched → `entry_quality_falling_knife` |
+| `267260` | ✅ | **40** | mean-reversion | −49.1% | −19.9% | researched → declined on consensus |
+| `316140` | ✅ | **0** | trend-pullback | −19.0% | **+7.8%** | **nothing** |
+
+And the ported original wrote its own selection reason down: *200일 고점 대비 −28.6%(스캔 후보 중
+**가장 덜 빠짐**), RSI 44 회복, 바닥다지기.* Least fallen — while this score paid 60 points for most
+fallen. ⛔ The answer was not to flip the sign of one score: a single 0–100 number invites the
+comparison whatever its label says, and the label already said `research-priority-only` while
+pointing the other way. Each lens declares the measurement that orders it, the three are on three
+different scales, and there is nothing left to sort three lenses by.
+
+**157 names screened, four touched, nothing registered — there was no stage that finishes a
+candidate** (#243). Measured on `run_bb689b6199084b04afd8b0e1d1528cda` (2026-09-09). The price branch
+was fed and evaluated on both markets — KR 74 of 74, US 83 of 83, `unprepared` 0 — and produced 17
+eligible KR candidates and 25 US. Four reached `variantViewCheck`: `267260` at **1 of 4**
+(`thesisComplete`, `variantView`, `challengeCleared` outstanding), `LOW` at 2, `NKE` at 3
+(`challengeCleared`, verdict `conditional_watch`), and `MCD` blocked earlier by
+`entry_quality_falling_knife`. ⚠️ `consensusRefs` was satisfied on **both** markets for the first
+time, which confirms #182 closed — and `267260` still stopped at 1 of 4, because the flow reached a
+decline on the consensus and **never wrote the document.**
+
+⛔ **The gates are not too strict, and the evidence is the one result this methodology has.** The
++18.6pp thesis cited above satisfied all four by hand — a named variant-view section, four dated and
+sourced `consensusRefs` rows, one dated challenge cross-check, and bear/base/bull with a
+probability-weighted return, a hard stop and a review date. Its pattern: **one name, deeply, every
+artefact, small.** This run's: **157 names, screened, four touched, all declined, zero registered.**
+The items were already listed in `candidate-research` §Candidate record; what no numbered step did
+was carry one candidate to them.
+
+⚠️ **And the reporting was the sharper half.** `267260` was declined *correctly* — 19 buy / 0 sell,
+so there was nothing to differ from. But *«1 of 4»* does not read as «judged and declined»; it reads
+as «there was nothing to judge», and only one of those is evidence the methodology ran. Hence
+`candidate_completion_absent` as an `input-path` cause rather than a gate finding: it **withdraws**
+`mandateExecution`'s positive answer over a lane whose leading candidate reached no document, and
+blocks nothing — a `WAIT` with every document written and every candidate declined is an honest run,
+and the point of the code is that the two can be told apart.
+
+**242 files in one day's sweep folder, and folding them reports a roster nobody failed to read**
+(`untilled/aumos-catalogue#245`, owner's store, 2026-09-09). `outputPath` is
+`scans/<asOf's calendar day>/<recipeId>`, so the folder is keyed by **date and not by run**:
+`scans/2026-09-09/roster-scan/` held 242 answers — 55 `XNYS:` and 28 `XNAS:` from a discarded
+venue-keyed batch, beside the 83 `us:` and 76 `kr:` answers from the sweep that worked. Folding the
+folder wholesale reads those 83 as `sourced: false` and reports `unprepared 83종`, ⚠️ **a fact that
+does not exist** — they are a coordinate the run threw away, not names it could not read, and it is
+the same misreading as `never-fed` reported as `fed-and-genuinely-empty` one layer up. The
+separating key is each answer's own `evaluatedAsOf` — `00:39:16.609Z` on the discarded batch against
+`11:23:55.210Z` on the live one, written by `recipes/request.mjs` from the host's pin. ⚠️ **The
+instruction is `task_get`'s `outputs` and the check is `evaluatedAsOf`**: `outputs` names this run's
+files and nothing else, so it needs no comparison at all. ⛔ `files_list` answers *what is on disk*,
+which is a question about the folder and not about the run — a flow that lists a directory is
+reading something nobody promised it.
+
+**And the item id that filled that folder twice** (`untilled/aumos-catalogue#245`). `task_start`'s
+item id is the key the store files documents under — the research market, `kr:` / `us:` — and it sat
+one line under a `market` argument that genuinely takes the venue MIC. Six documents instructed the
+MIC; five were corrected with the completion stage and `skills/orchestrate/SKILL.md` was the last.
+⚠️ The US instruction was self-contradictory even inside the MIC reading: it said `XNAS:<symbol>`
+while the roster's real split is XNYS 55 / XNAS 28, so 55 of 83 were wrong on its own terms. ⛔ An
+invented id is **accepted** and the recipe is handed nothing, so the whole batch answers
+`sourced: false` — shaped exactly like a market that offered nothing, and reached by no diagnostic
+in this package, because the roster was declared, the refresh answered and the task settled. The
+recovery is the sleeve skills' two-sided probe: one call, one name, both coordinates.
 
 **`entryQualityGate` was documented as needing a scan history it does not read** (#147). Its input
 is `bars` — 60 minimum, 200+ for the long indicators — so a first run that fetches enough dated bars
@@ -506,6 +648,26 @@ this package and gets its own issue rather than a guess here.
 track looks empty and the `nextState` it returns then deletes it. `paper_state_misplaced` refuses
 that shape. Bars written under `date` rather than `timestamp` come back `forward_base_missing`, which
 reads as a window the calendar has not reached.
+
+## Arming (§6)
+
+**The sentence explaining the fold prevented the fold.** Aumos folds a re-armed promise into the
+one already standing by comparing `kind`, `subject`, `intent` and `trigger` as the bytes the
+manager wrote, interpreting none of them (`untilled/aumos#704`); reviews and tranches survived that
+because their intents are minted (`marketReviewIntent`, `trancheIntent`) and armed verbatim. A stop
+had **nothing to mint from** — the row carried this package's `reason` and no `intent` at all — so
+the sentence was the run's, and a run writes it afresh. Measured on 2026-09-09 in the owner's book:
+`SGOV`'s stop re-armed with a byte-identical trigger and 162 characters of prose grown to 231, the
+new sentence naming the plan id the fold was meant to retire; and `153130`'s ₩104,254.40 arriving as
+`exponent: 2 / 10425440` from one run and `exponent: 1 / 1042544` from the next — the same value,
+different bytes, and `sameShape` is structural. Both left **two** standing `price-below` watches on
+one asset, and a `price-below` is not folded at firing time either (#590, #593 and #624 all key on
+`at-time`), so one breach opens two wakes against a `MAX_LIVE_RUNS` of four. `exitDiscipline` now
+mints all four fields on the row and the run copies them; ⛔ nothing about the judgement making the
+promise may be in `intent`, which is what `priceLevels[].reason` and `rationale` are for. ⛔ The four
+plans already standing are not disposed of by this — this package has no withdrawal tool — and they
+fold on the first re-arm from a run of `0.11.1` **whose stop level is unchanged**, because a level
+that moved is a different promise and correctly stays one.
 
 ## Where the rest of the record lives
 

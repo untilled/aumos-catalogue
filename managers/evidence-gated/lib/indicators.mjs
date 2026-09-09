@@ -58,6 +58,135 @@ export function unclosedNewestBar(bars, asOf) {
   return instant + BAR_CLOSE_LAG_MS > cutoff ? { timestamp: newest.timestamp, ageMs: cutoff - instant } : null
 }
 
+/**
+ * ── The series whose shape is valid and whose *history* is wrong (#248) ────
+ *
+ * #224 closed the case where one bar is incomplete. This is the case where the
+ * bars are all complete and the **series** is not: an unadjusted split, or a
+ * vendor adjustment factor that stops part-way through the window, leaves a
+ * price history that steps by a factor rather than by a session. Measured on
+ * the 2026-09-09 US sweep (83 names, `roster-scan` answers):
+ *
+ *   BKNG  `close` 193.29 · `ma200` **2,316.55** · `offHigh200` **−96.5%**
+ *         → `ma200Discount: true`, `discoveryScore` **20**
+ *   VZ    `close` 50.14  · `low200` **10.5999** · `aboveLow200` **+373%**
+ *
+ * Neither is a drawdown. BKNG's `discoveryScore` of 20 came **entirely** from
+ * the artifact, and `discoveryScore` reads `offHigh200` and `ma200Distance`, so
+ * the price branch's own ranking was partly made of it.
+ *
+ * ⛔ **Every existing defence passes it, and for the same reason #224 did.**
+ * `bar_value_invalid` asks whether the row parsed and every row does;
+ * `trend_moving_average_unavailable` asks whether the average computed and it
+ * computed — 2,316.55 is a finite number. `newest_bar_may_be_unclosed` is about
+ * one bar's age and says nothing about the two hundred behind it. Nothing here
+ * compared a derived number against the price it was derived from, so nothing
+ * could see it.
+ *
+ * ── Three readings, and each one caught one of the measured names ──────────
+ *
+ * | reading | bound | the measured name it catches |
+ * |---|---|---|
+ * | `close / ma200` | outside [0.1, 10] | BKNG — 193.29 / 2,316.55 = **0.083** |
+ * | `high200 / low200` | outside [1, 20] | neither, and it is kept: it is the one reading that fires when the step is *inside* the window's extremes rather than at its edge |
+ * | adjacent-bar `ln(close₂/close₁)` | beyond ±0.5 | VZ — a bar at 10.60 beside one near 38 is `ln(38/10.6)` ≈ **1.28** |
+ *
+ * ⚠️ **The count is carried whether or not anything is suspected**, because
+ * *«no adjacent session moved by more than 50%»* is the fact a reader needs in
+ * order to trust `offHigh200`, and a field that only appears when it is bad is
+ * a field whose absence has to be interpreted (`dateSource`'s rule, one module
+ * over).
+ *
+ * ⚠️ **The window is the last 200 bars — the same window the corrupted numbers
+ * are read from.** A step 250 sessions back corrupts nothing this packet
+ * publishes, and reporting it would make a name with three years of clean
+ * history and one ancient split permanently suspect.
+ *
+ * ⚠️ **`info`, and it refuses nothing.** A name that really did split 1:10 has
+ * exactly this shape and its history is exactly right; the judgement is the
+ * reader's. What was wrong was that the reader had no way to know — so this
+ * reports, the score is not touched, and no verdict moves. ⛔ It is deliberately
+ * **not** registered in `CAUSE_CODE_REGISTRY`: that table is
+ * `mandateExecution`'s vocabulary for *«why does this book hold no single
+ * name?»*, and a suspected artifact is neither a stage that lost an input nor
+ * an answer that refuses both conclusions — the sweep ran and answered.
+ *
+ * ⛔ **And it does not try to repair the series.** Re-deriving an adjustment
+ * factor from the step would make this package the second author of a price
+ * history whose first author is the vendor, and a silently re-based series is
+ * the failure this file exists to report rather than a fix for it.
+ */
+export const PRICE_DISCONTINUITY_BOUNDS = Object.freeze({
+  windowBars: 200,
+  closeToMa200: Object.freeze({ min: 0.1, max: 10 }),
+  high200ToLow200: Object.freeze({ min: 1, max: 20 }),
+  adjacentLogReturn: 0.5,
+})
+
+/**
+ * The three readings over one series, or `null` when there is no series to read.
+ * Pure, and exported so the bounds can be tested without standing up an
+ * operation.
+ *
+ * ⚠️ It calls the same `sma` over the same 200-bar slice `indicatorPacket`
+ * reads, so a ratio can never disagree with the level it was taken over — the
+ * levels and the ratios are one computation with two readers, which is why this
+ * lives beside them rather than in `scanners.mjs`.
+ */
+export function priceSeriesDiscontinuity(bars) {
+  const rows = (Array.isArray(bars) ? bars : []).slice(-PRICE_DISCONTINUITY_BOUNDS.windowBars)
+  if (rows.length === 0) return null
+  const closes = rows.map((bar) => bar.close)
+  const ma200 = sma(closes, PRICE_DISCONTINUITY_BOUNDS.windowBars)
+  const highs = rows.map((bar) => bar.high).filter(finite)
+  const lows = rows.map((bar) => bar.low).filter(finite)
+  const high200 = highs.length ? Math.max(...highs) : null
+  const low200 = lows.length ? Math.min(...lows) : null
+  const latest = closes.at(-1)
+
+  const closeToMa200 = finite(latest) && finite(ma200) && ma200 > 0 ? round(latest / ma200, 6) : null
+  const high200ToLow200 = finite(high200) && finite(low200) && low200 > 0 ? round(high200 / low200, 6) : null
+
+  /**
+   * ⚠️ Counted over **adjacent readable closes**, and a pair whose earlier
+   * close is zero or unreadable is skipped rather than counted: a ratio against
+   * nothing is not a step, and reporting it would make a missing volume look
+   * like a split.
+   */
+  let jumpCount = 0
+  let largestJump = null
+  for (let index = 1; index < rows.length; index += 1) {
+    const previous = closes[index - 1]
+    const current = closes[index]
+    if (!finite(previous) || !finite(current) || previous <= 0 || current <= 0) continue
+    const logReturn = Math.log(current / previous)
+    if (Math.abs(logReturn) <= PRICE_DISCONTINUITY_BOUNDS.adjacentLogReturn) continue
+    jumpCount += 1
+    if (largestJump === null || Math.abs(logReturn) > Math.abs(largestJump.logReturn)) {
+      largestJump = { timestamp: rows[index].timestamp ?? null, from: previous, to: current, logReturn: round(logReturn, 6) }
+    }
+  }
+
+  const reasons = []
+  if (closeToMa200 !== null && (closeToMa200 < PRICE_DISCONTINUITY_BOUNDS.closeToMa200.min || closeToMa200 > PRICE_DISCONTINUITY_BOUNDS.closeToMa200.max)) {
+    reasons.push('close-to-ma200-outside-bounds')
+  }
+  if (high200ToLow200 !== null && (high200ToLow200 < PRICE_DISCONTINUITY_BOUNDS.high200ToLow200.min || high200ToLow200 > PRICE_DISCONTINUITY_BOUNDS.high200ToLow200.max)) {
+    reasons.push('high200-to-low200-outside-bounds')
+  }
+  if (jumpCount > 0) reasons.push('adjacent-session-step-beyond-half')
+
+  return {
+    windowBars: rows.length,
+    closeToMa200,
+    high200ToLow200,
+    jumpCount,
+    largestJump,
+    suspected: reasons.length > 0,
+    reasons,
+  }
+}
+
 export function normalizeBars(rows, asOf) {
   const diagnostics = []
   const cutoff = Date.parse(asOf)
@@ -99,6 +228,16 @@ export function normalizeBars(rows, asOf) {
       'The newest bar is younger than the 24 hours after its own opening stamp that make a daily bar readable, so it may be an incomplete session. On `/api/v1/candles` this is the shape a mid-session partial bar has: `before` is inclusive and a daily bar is stamped at local midnight, so today\'s midnight returns today\'s partial bar — pass an instant inside the previous day and check the first row\'s date. ⚠️ A run pinned after the close holds a same-day bar that is complete, and this rule cannot tell the two apart; it reports and refuses nothing',
       'bars',
       { timestamp: unclosed.timestamp, ageMs: unclosed.ageMs, closesAfterMs: BAR_CLOSE_LAG_MS, asOf },
+    ))
+  }
+  const discontinuity = priceSeriesDiscontinuity(bars)
+  if (discontinuity?.suspected) {
+    diagnostics.push(diagnostic(
+      'price_series_discontinuity_suspected',
+      'info',
+      'A derived level disagrees with the price it was derived from by a factor, which is the shape an unadjusted split or a part-way adjustment factor leaves: `close/ma200` outside [0.1, 10], `high200/low200` outside [1, 20], or an adjacent session stepping by more than 50%. Measured on the 2026-09-09 US sweep — BKNG close 193.29 against ma200 2,316.55, VZ close 50.14 against low200 10.5999 — where `offHigh200` and `ma200Distance` fed `discoveryScore` off a fall no session printed. ⚠️ A name that really did split has exactly this shape and its history is right, so this reports and refuses nothing: check the series against an adjusted source before reading `offHigh200`, `aboveLow200`, `ma60Distance` or `ma200Distance` as a drawdown',
+      'bars',
+      discontinuity,
     ))
   }
   return { bars, diagnostics }
@@ -170,5 +309,13 @@ export function indicatorPacket(bars) {
     ma60Distance: ma60 ? round(latest.close / ma60 - 1) : null,
     ma200Distance: ma200 ? round(latest.close / ma200 - 1) : null,
     avgVolume20,
+    /**
+     * ⚠️ **Always present, and `jumpCount: 0` is the answer a reader needs**
+     * (#248). Every field above it is a level or a distance and none of them can
+     * say whether the series they were taken over steps by a factor; this one
+     * says so, and it says so on a clean name too — a field that appears only
+     * when something is wrong is a field whose absence has to be interpreted.
+     */
+    discontinuity: priceSeriesDiscontinuity(bars),
   }
 }
