@@ -188,7 +188,9 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    working, not an inconsistency. ⚠️ **That same stop is an input to sizing now (#226)**: hand it to
    `effectivePositionCap` as `stopLossPct` and the risk budget
    `(maxDrawdown − heldPortfolioHeat) / |stopLossPct|` is what holds the position under the
-   Mandate's cap. `skills/evidence-gates` carries the rest.
+   Mandate's cap. `skills/evidence-gates` carries the rest. ⚠️ **Pass `asset` in
+   full**: the same call returns `priceLevelsToRegister`, the stop as a `priceLevels` row with its
+   purpose stated, and a level belongs to the currency its asset's market quotes.
 4c-2. **When one limit is the only thing in the way, say what would open it (#230).** All three of
    `effectivePositionCap`, `effectiveCashFloor` and `concentration` return **`unlockDelta`**, and the
    source's condition is the whole of it — *«캡 상향을 제안하기 전에 이 캡을 올리면 실제로 몇 원이
@@ -207,6 +209,11 @@ Sizing comes after evidence and challenge. Never use size to repair a failed res
    `cap_raise_would_unlock` **verbatim**; `PROMPT.md` §4 has the sentence. ⚠️ **A proposal and never
    an edit** — nothing here changes a threshold, and a run that answers a binding limit by moving it
    is still `policy_auto_relax` / `blocked`.
+4d′. **Then fold every level the run still stands behind — `priceLevels`.** One call for the whole
+   book, and copy what it returns into the proposal. The field **replaces**, so a level left out is
+   released: fold in the stops of holdings you only swept, not just the entry you are proposing.
+   ⛔ Omitting the field and sending `[]` are opposite statements — the first keeps what stood, the
+   second releases all of it. `PROMPT.md` §6 carries the rest.
 4e. **Judge the disclosures once the proposal exists — `proposalDisclosure`.** Hand it the
    `disclosures` array 4a returned (or `targetWeight`'s, which is the same array) **verbatim** and
    the assembled `DecisionProposal`. It answers `disclosed` and, for each obligation, which fields

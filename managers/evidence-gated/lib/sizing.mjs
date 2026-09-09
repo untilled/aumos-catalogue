@@ -4,6 +4,7 @@ import { DATA_PREPARATION_STATES, CANDIDATE_EVALUATION_STATES } from './executio
 import { METHODOLOGY } from './constants.mjs'
 import { variantViewCheck } from './methodology.mjs'
 import { trancheIntent } from './schedule.mjs'
+import { buildPriceLevel } from './price-levels.mjs'
 
 /**
  * Lane ownership is keyed by flow, not by manager id.
@@ -2475,7 +2476,7 @@ export const SINGLE_NAME_TRANCHES = {
 /** A tranche waits on a date or on a price. `immediate` is the one that does not wait. */
 const TRANCHE_CONDITION_KINDS = new Set(['immediate', 'at-time', 'price-below', 'price-above'])
 
-export function entryTranchePlan({ symbol = null, lens = null, maturity = null, price, plannedTotalWeight = null, tranches = [], execution = null, asOf } = {}) {
+export function entryTranchePlan({ symbol = null, asset = null, lens = null, maturity = null, price, plannedTotalWeight = null, tranches = [], execution = null, asOf } = {}) {
   const diagnostics = []
   const findings = []
   const add = (kind, label, message, detail = {}) => findings.push({ kind, symbol, label, message, ...detail })
@@ -2608,6 +2609,66 @@ export function entryTranchePlan({ symbol = null, lens = null, maturity = null, 
     }
   }
 
+  /**
+   * ── The rungs, said out loud rather than left in an `intent` (#756) ───────
+   *
+   * A ladder's rungs are prices, and until now the only place a rung's number
+   * reached the host was `trancheIntent(symbol, label)` — a string this package
+   * writes and nothing reads — plus the `price-below` a run may or may not have
+   * armed beside it. So a plan that had decided *«we accumulate at 62,000, then
+   * 58,000, then 54,000»* submitted three opaque promises and no prices. Each
+   * unfilled priced rung is now also an `entry` level with `purpose` stated.
+   *
+   * ⚠️ **One rung, one level — the ladder is not folded into a band.** The
+   * temptation is to send `band: 54,000–62,000`, and it says something the plan
+   * does not: a band is *a range you would work across*, and this plan names
+   * three prices it will act at and nothing in between. Points are strictly
+   * more of what was concluded, and #756's prohibition is on **collapsing** a
+   * range, which three points do not do. ⛔ Never both shapes for one ladder —
+   * that draws one intention twice, which is the duplicate #756 §7 refuses.
+   *
+   * ⛔ **`immediate` gets no level.** That rung executes at whatever the market
+   * is on the run that plans it, so its price is an observation and not a level
+   * the plan is working to; stating today's quote as an entry level would put a
+   * number on the chart the methodology never chose. A lapsed or filled rung
+   * gets none either — it is not a price this plan still stands behind, and the
+   * field replaces rather than adds.
+   *
+   * ⛔ **No `armedKey`.** This operation emits no watches, so there is nothing
+   * in *this* function's output to point at. A run that arms a `price-below`
+   * per rung may add the link itself, and `priceLevelSet` checks it — but
+   * inventing a key here for a watch this function did not write is a dangling
+   * reference by construction.
+   */
+  const priceLevelsToRegister = []
+  const pricedRungs = rows.filter((row) => !row.filled
+    && !lapsed.includes(row.label)
+    && (row.condition?.kind === 'price-below' || row.condition?.kind === 'price-above')
+    && finite(row.condition?.threshold))
+  if (pricedRungs.length) {
+    for (const row of pricedRungs) {
+      const built = buildPriceLevel({
+        purpose: 'entry',
+        asset,
+        point: row.condition.threshold,
+        reason: `Rung ${row.label} of a ${rows.length}-rung staged entry${finite(row.weight) ? ` for ${round(row.weight * 100, 4)}% of the book` : ''}: the plan adds here and nowhere between the rungs.`,
+        ...(row.expiresAt ? { expiresAt: row.expiresAt } : {}),
+        path: `priceLevels[${row.label}]`,
+      })
+      if (built.level === null) {
+        diagnostics.push(diagnostic(
+          'entry_level_unstated',
+          'unevaluated',
+          'A rung states a price and the level it puts on the chart cannot be stated: a price level belongs to the currency its asset is quoted in, and that is derived from the market, which this call did not give. The ladder verdicts are unaffected — pass `asset` to state the levels as well',
+          'asset',
+          { symbol, label: row.label, threshold: row.condition.threshold, causes: built.diagnostics.map((entry) => entry.code) },
+        ))
+        break
+      }
+      priceLevelsToRegister.push(built.level)
+    }
+  }
+
   const complete = rows.length > 0 && rows.every((row) => row.filled)
   if (lapsed.length && !complete) {
     diagnostics.push(diagnostic('tranche_plan_incomplete', 'blocked', 'Half an entry plan is a position nobody decided the size of; state the remainder as re-armed, resized or abandoned', 'tranches', { lapsed, filledWeight: round(filledWeight), plannedTotalWeight: finite(plannedTotalWeight) ? plannedTotalWeight : round(plannedSum) }))
@@ -2642,6 +2703,8 @@ export function entryTranchePlan({ symbol = null, lens = null, maturity = null, 
       action,
       findings,
       intents,
+      /** One `entry` level per unfilled priced rung, for the proposal's `priceLevels`. */
+      priceLevelsToRegister,
       priceLaneRead: priceRead,
       candidateOnly: true,
     },

@@ -342,8 +342,8 @@ prompt, and the run's only discovery lane closed for it.
 
 ## What a flow must return, and what you do with it
 
-A flow returns Evidence ids, proposed targets and its own `uncertainty`. Treat it as a
-**proposal to you**, not a decision:
+A flow returns Evidence ids, proposed targets, **its `priceLevelsToRegister` rows** and its own
+`uncertainty`. Treat it as a **proposal to you**, not a decision:
 
 Collect each flow's `researchActivity` and radar lane coverage. Rerun `harnessAudit` with the
 actual route activity before submitting; carry `lane_not_queried`, `lane_query_failed`,
@@ -358,6 +358,12 @@ actual route activity before submitting; carry `lane_not_queried`, `lane_query_f
   their slices are added together.
 - A flow that answered *unable to judge* is `WAIT` for that sleeve, not silence. Carry its
   `uncertainty` into yours.
+- ⚠️ **A flow's price levels are collected, never assembled twice.** Each sleeve hands up the rows
+  `exitDiscipline` and `entryTranchePlan` returned for its own market; you fold **all** of them —
+  both sleeves' — through `priceLevels` once and copy the result into the proposal. ⛔ Folding one
+  sleeve's set releases the other sleeve's levels: the field replaces every level this manager has
+  standing on the book, and it is not scoped to a market. That is the same trap three flows each
+  checking their own concentration slice fall into, one field along.
 
 ## One proposal
 

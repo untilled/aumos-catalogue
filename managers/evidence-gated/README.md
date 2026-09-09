@@ -295,6 +295,19 @@ repository from release gates that need an installed runtime. `INCIDENTS.md` hol
 `PROMPT.md` was measured against — the run that failed and the number it produced — so that the
 prompt itself can stay an execution contract a run reads in one pass.
 
+**The prices this methodology works to are now stated, and 0.6.0 needs a host that reads them.**
+The stop distance this package derives and the rungs of a staged entry were always numbers it
+computed, and there was nowhere in the decision contract to put them: the only way to say a price was
+to arm a watch, and one *price-below* is a stop under a holding **and** an entry somebody is waiting
+for on a name they do not own. `DecisionProposal.priceLevels` (Aumos 0.4.0) carries the price with
+its purpose stated — `entry`, `stop`, `take-profit` — its currency, its reason in this package's own
+words, and an optional link to the watch that is watching it. ⛔ Writing a price down arms nothing
+and orders nothing; the approval gate is still the only road to a broker. ⚠️ No profit target is
+emitted: a fair value range is a valuation, and turning its high end into a level where the book
+sells is a rule this methodology never declared. ⚠️ On a host that does not read the field the run
+omits it and says so, rather than losing the judgement — `HOST-FOLLOWUPS.md` carries why the version
+range and that check are both needed.
+
 **The fundamental discovery branch is fed from host source storage, and this is new.**
 `source-cache:read` / `source-cache:write` (Aumos 0.3.30) hold OpenDART and SEC filings per filer,
 trimmed at each invocation's `asOf`, so this package no longer re-procures the same statements every

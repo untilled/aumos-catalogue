@@ -291,7 +291,7 @@ something a run would otherwise discover *after* proposing.
 | 1 | `lessonAudit` | nothing — but proposing a change already waiting for the investor is repeating yourself |
 | 2 | `harnessAudit` | **a blocker stops planning.** Orphaned WATCHes, size disagreements, order-ready decisions with no registered exit. A held position no decision explains is a **`warn`** |
 | 3 | `calibration` | low maturity does not stop the run and ⛔ since #226 it does not cap size either; it frames what the run may claim, and `maturityStatus` travels for attribution |
-| 4 | `exitDiscipline` over every non-core holding and every proposed entry | **a due stop this run does not act on is `blocked`.** The time stop is unconditional — 40 trading days from entry — and an entry with no registered stop and review date is refused: `entryProposed: true` with an entry, `false` for a holding review |
+| 4 | `exitDiscipline` over every non-core holding and every proposed entry | **a due stop this run does not act on is `blocked`.** The time stop is unconditional — 40 trading days from entry — and an entry with no registered stop and review date is refused: `entryProposed: true` with an entry, `false` for a holding review. ⚠️ Pass `asset` in full, or the stop level cannot be stated in the proposal (§6) |
 | 5 | `exitCheck` over every non-core holding | nothing — but **its SELL and TRIM candidates are reported before any new buy is considered** |
 | 6 | `trendState` on the core ETFs | a `stop` guidance halts core tranches for this run |
 | 7 | broker limits | Aumos owns them; read what the invocation carries and do not assume |
@@ -994,6 +994,39 @@ multi-asset `REBALANCE`.
 
 Include only Evidence ids actually returned in this run. ⛔ There is no `evidence_read` to widen that
 set with.
+
+#### The prices you are working to — `priceLevels`
+
+**A price your method computed and did not state is a price nothing can name.** `exitDiscipline`
+returns the stop level it derived and `entryTranchePlan` returns one level per priced rung; both come
+back as `priceLevelsToRegister`. Hand every level you still stand behind to **`priceLevels`** — once,
+for the whole book — and copy the `priceLevels` it returns into the proposal.
+
+- **It is the complete standing set, not this run's arithmetic.** The field *replaces*: a level you
+  leave out is released. So fold in the levels for every holding you swept, not only the ones you
+  changed. This is the obligation `standingPlans` already carries for promises, and it fails the same
+  way — silently.
+- **Omitting the field and sending `[]` are opposite statements.** No `levels` argument answers
+  `intent: 'unstated'` — what stood keeps standing. `levels: []` releases every level you had. Send
+  `[]` only when you mean *these prices no longer stand*, and say why in `rationale`.
+- **Pass `asset` to `exitDiscipline` and `entryTranchePlan`.** A level belongs to the currency its
+  asset is quoted in, derived from the market, so a bare ticker leaves the level unstateable and both
+  operations answer `stop_level_unstated` / `entry_level_unstated` instead of a level.
+- **Linking is optional and checked.** A level with no `armedKey` is recorded and watched by nothing —
+  that is the normal case. When a watch of *this* proposal is watching that line, give the watch the
+  `key` the operation minted and leave the level's `armedKey` alone; `priceLevels` checks the pair the
+  way Aumos does, and a `price_level_link_unresolved` here is fixable, whereas the host only reports
+  it after the judgement is sealed.
+- ⛔ **Writing a price arms nothing and orders nothing.** No watch, plan or order is created by it.
+  Never put a quantity, a side or a limit price on a level: there is nowhere for them and the whole
+  proposal is refused for trying.
+
+⚠️ **Check the field exists before you send it.** `decision_submit`'s own input schema is derived from
+the host's judge at run time, so it is the one honest answer to *does this Aumos read `priceLevels`?*
+If the schema does not declare it, this host predates the field: **omit `priceLevels` entirely**, keep
+the watches, and name the omission in `uncertainty`. Sending it to a host that does not know it makes
+the whole judgement `invalid-proposal` — the proposal schema is strict and refuses the unknown key
+rather than dropping it.
 
 Assemble the one proposal from what the flows returned. `targets` is where a run that touched both
 markets lands: one `REBALANCE` naming every sleeve position it moves, rather than three judgements the

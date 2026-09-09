@@ -13,6 +13,81 @@ reading `decisions[].armed` as a receipt for a promise it cannot carry; 0.4.24 s
 lane from the maturity gate, read the Mandate's `cashFloor`, derived the single-name total from the
 Mandate and enforced the source's exit discipline.
 
+## Stated price levels, and when this version may be published (`untilled/aumos#756`)
+
+`untilled/aumos#758` added `DecisionProposal.priceLevels`, and 0.6.0 sends them: `exitDiscipline`
+returns the stop it derived as a `stop` level beside the `price-below` it already armed, and
+`entryTranchePlan` returns one `entry` level per priced rung. Both numbers existed before and had
+nowhere to go — the only way to say a price was to arm a watch, and **one `price-below` is a stop
+under a holding and an entry somebody is waiting for on a name they do not own**, so nothing
+downstream could name the line without guessing. `priceLevels` states `purpose` instead.
+
+### ⛔ Still owed by the host: nothing — and the debt runs the other way
+
+This is the first entry here that is a debt **of this package to a host release**, not the reverse.
+The direction matters because the compatibility is asymmetric:
+
+| direction | verdict |
+|---|---|
+| an old package on a new host | **fine.** The field is optional and absence is a defined case: *what stood keeps standing* |
+| a new package on an **old** host | ⛔ **the whole judgement is lost.** `decisionProposalSchema` is strict at every depth, so an unknown key is `unrecognized_keys` and the answer is recorded as `invalid-proposal` — not a dropped field, a dropped judgement |
+
+⚠️ **So a minimum host version is not documentation here, it is the mechanism.** `engines.aumos` is
+a semver range the installer matches against `AUMOS_APP_VERSION` and **refuses** on
+(`engine-range`, blocking), and the marketplace entry carries the same string as `enginesAumos` so a
+listing can say *not on this build* before a download. `untilled/aumos#758` recorded ⬜ *«no device
+for declaring a minimum host version exists»*; that is the device, and it has been there since the
+manifest had two version fields. ⛔ **What does not exist is a way to say «a host that has
+`priceLevels`»** — `ampVersion` is `z.literal(1)` and will still be `1` after this ships, and a new
+manifest field would be the very change #238 measured: a key added to the manifest made all five
+published packages `unreadable` on the binaries investors were running.
+
+**The range stays `>=0.4.0`, which is the floor 0.5.0 already declared for `untilled/aumos#743`.**
+⚠️ It is a statement about a release *number*, and the thing that has to be true of it is a
+statement about release *contents*: that the first release satisfying it carries #758. That is not
+checkable from this repository — the host is private and its releases are cut by hand — so it is
+recorded here rather than asserted, and the remedy is one line: **if #758 lands after 0.4.0 is cut,
+raise this range before this version is published.**
+
+### And why a wrong bet on that number costs nothing
+
+⚠️ **Because the field is also negotiated at run time, and that is what makes the range safe rather
+than load-bearing.** `decision_submit`'s published `inputSchema` is derived from the host's own judge
+**at run time** — the manager reads the schema the judgement will be measured against, not a copy of
+it — so *does this Aumos read `priceLevels`?* has an honest answer inside the run. `PROMPT.md` §6
+says to read it and to **omit the field and name the omission in `uncertainty`** when it is not
+declared. So the worst case of a version range that is one release too generous is a run that
+behaves exactly as 0.5.0 did, rather than a judgement thrown away.
+
+⛔ **It is an instruction and not enforcement, and the difference is stated rather than hidden.** No
+hook can check it: `hooks/guard-submit.mjs` sees the tool input on `PreToolUse` and never the tool's
+schema, and this package's own MCP server cannot see the host's. Enforcement is `engines.aumos`;
+this is the belt beside it. ⚠️ The one thing that *is* checked here is that the sentence exists —
+`tools/verify-evidence-gated-allocator.mjs` fails if §6 stops carrying it, because the argument
+above is the only reason the range is allowed to be a bet.
+
+### What is deliberately not stated, and by which packages
+
+⛔ **No `take-profit` level is emitted.** The schema carries the purpose and this methodology does
+not compute one: `thesisValuation.fairValueRange` is a **valuation** — the bear, base and bull
+targets — and turning its high end into a level where the book sells is a rule the methodology never
+declared. #756 says price levels are not forced on every strategy, and this is that case.
+⛔ **No band from a ladder either.** Three rungs are three points; a band is *a range you would work
+across*, and this plan acts at its rungs and nowhere between them. The builder supports bands and
+`priceLevels` accepts one from a run that genuinely concluded a range — the fixture exercises it —
+but `entryTranchePlan` never folds a ladder into one.
+
+⚠️ **The other eight packages in this catalogue state no levels, and that is a judgement rather than
+a backlog.** None of them computes a price with an investment purpose attached: the two
+`atlas-trend` sleeves and `atlas-trend-crypto` exit on an ensemble vote and hold no stop price,
+`prudent-allocator` and `basic-investor` are weight-first and read a stop only as prose inside a
+thesis somebody else wrote, `undervalued-now` arms one `at-time` watch by construction, and
+`earnings-drift-watcher` decides on a surprise rather than a level. The one real candidate is
+`ai-hedge-fund-value`, whose `price-below` watch *is* an entry price in prose — *"revisit if the
+price falls far enough for Graham's margin of safety to exist"* — and it is a number the model
+writes rather than one the package computes, so stating it would be adding a field to a judgement
+this catalogue cannot check. It stays open until that price has a deterministic author.
+
 ## Execution state (#212 ④) — ✅ the counts exist, and what is left to prove is the join
 
 **0.4.57 stops inferring execution state from diagnostics and reads the host's counts instead.**
@@ -579,6 +654,12 @@ verifying half** — the read is a floor, so a stop present in it did stand at `
 from it may still be standing, and «absent» is therefore not a finding. So the discipline is still
 re-derived from the entry date every run, and the package still discloses that the arm is unverified
 rather than assuming it stands.
+
+⚠️ **2026-09-08: the number is now stated as well as armed.** `priceLevelsToRegister` returns the
+same stop as a `priceLevels` row with `purpose: 'stop'`, built by the same call that builds the
+`price-below` and holding the same `Money` and `key` — see the `untilled/aumos#756` section above.
+⛔ It does not close the read-back gap and must not be read as closing it: a level is a statement in
+a proposal, exactly as the WATCH was, and this package still cannot read either one back.
 
 ⚠️ **The stop distance itself waits on the investor, not the host.** `mandate.constraints.maxDrawdown`
 is undeclared, so outside the control arm the distance comes back `hard_stop_unevaluated` with the

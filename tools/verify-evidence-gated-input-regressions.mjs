@@ -905,6 +905,45 @@ assert.equal(freshEntry.data.watchesToRegister[1].at, freshEntry.data.timeStop.d
 for (const watch of freshEntry.data.watchesToRegister) {
   assert.equal(run('validateWatch', { watch: { ...watch, symbol: 'DKS' }, current: { price: 99 } }).status, 'ok', 'the rows an entry copies are rows validateWatch accepts')
 }
+/**
+ * ── The stop, as a price with a purpose on it (#756 · `untilled/aumos#758`) ─
+ *
+ * The `price-below` row above was the whole statement of the number, and one
+ * `price-below` is a stop under a holding **and** an entry somebody is waiting
+ * for — so Aumos could not name the line without guessing, and
+ * `reason: 'exit-discipline-hard-stop'` is this package's word, not a field the
+ * host reads. The level says `purpose: 'stop'` and the pair is built by one
+ * call, which is the part that must not be lost: a run assembling the watch's
+ * `Money` and the level's separately answers the same question twice.
+ */
+const withAsset = (extra = {}) => entered({ asset: { class: 'equity', symbol: 'DKS', market: 'XNAS' }, ...extra })
+const statedStop = withAsset({ entryDate: '2026-08-25' })
+assert.deepEqual(
+  statedStop.data.priceLevelsToRegister.map((row) => [row.purpose, row.price.kind, row.price.value.currency, row.price.value.minorUnits, row.price.value.exponent ?? null]),
+  [['stop', 'point', 'USD', 9200, null]],
+  'the level is the stop level, in the currency the market quotes, at the cent USD counts in',
+)
+const [statedLevel] = statedStop.data.priceLevelsToRegister
+const priceBelow = statedStop.data.watchesToRegister.find((row) => row.kind === 'price-below')
+assert.equal(statedLevel.armedKey, priceBelow.key, 'the level names the watch, by a key this package mints rather than one a run retypes')
+assert.deepEqual(statedLevel.price.value, priceBelow.price, 'and the two hold one Money, so the host’s armed-price-mismatch is unreachable by construction')
+assert.deepEqual(statedLevel.asset, priceBelow.asset, 'on one asset, compared by every field — the host does not ignore currency here')
+assert.equal(statedLevel.reason.includes('-8%'), true, 'the reason carries the distance and where it came from, in this package’s own words')
+assert.match(statedLevel.expiresAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, 'AMP has no date-only instant, and the calendar day this package counts in is expanded to one')
+// ⛔ The time stop is a date, so it gets no level; only the price row does.
+assert.equal(statedStop.data.priceLevelsToRegister.length, 1)
+// Without the asset the level cannot be stated, and that is said rather than guessed.
+const unstatedStop = entered({ entryDate: '2026-08-25' })
+assert.deepEqual(unstatedStop.data.priceLevelsToRegister, [])
+assert.ok(has(unstatedStop, 'stop_level_unstated'))
+assert.equal(unstatedStop.diagnostics.find((row) => row.code === 'stop_level_unstated').severity, 'unevaluated')
+assert.equal(unstatedStop.data.hardStop.stopLevel, statedStop.data.hardStop.stopLevel, 'and the discipline itself is untouched by it')
+assert.deepEqual(unstatedStop.data.watchesToRegister.map((row) => row.kind), statedStop.data.watchesToRegister.map((row) => row.kind))
+// ⛔ No stop distance, no level — and no diagnostic either: there is nothing to state.
+const noDistance = run('exitDiscipline', { symbol: '035420', asset: { class: 'equity', symbol: '035420', market: 'XKRX' }, lane: 'main', entryDate: '2026-08-25', entryPrice: 100, price: 99, positionWeight: 0.2 })
+assert.deepEqual(noDistance.data.priceLevelsToRegister, [])
+assert.equal(has(noDistance, 'stop_level_unstated'), false, 'the unstated level is a level that exists and could not be spelled, never one that was never computed')
+
 // A due stop the proposal does not act on is the prose this replaced.
 assert.equal(entered().data.exitProposed, null, 'unjudged before the proposal exists')
 assert.equal(has(entered(), 'exit_due_unactioned'), false)
@@ -912,6 +951,83 @@ assert.ok(has(entered({ proposedExits: [] }), 'exit_due_unactioned'))
 assert.equal(entered({ proposedExits: [] }).diagnostics.find((row) => row.code === 'exit_due_unactioned').severity, 'blocked')
 assert.equal(has(entered({ proposedExits: ['DKS'] }), 'exit_due_unactioned'), false)
 assert.equal(has(entered({ proposedExits: [{ symbol: 'DKS' }] }), 'exit_due_unactioned'), false)
+
+/**
+ * ── The standing set, folded once (#756 · `untilled/aumos#758`) ────────────
+ *
+ * `priceLevels` **replaces** rather than adds, so the three cases below are
+ * three different statements and the field is the one place in the proposal
+ * where an empty array and an absent field mean opposite things.
+ */
+const levelSet = (input) => run('priceLevels', input)
+const dksAsset = { class: 'equity', symbol: 'DKS', market: 'XNAS' }
+assert.equal(levelSet({}).data.priceLevels, null, 'nothing said about levels leaves what was standing standing')
+assert.equal(levelSet({}).data.intent, 'unstated')
+assert.deepEqual(levelSet({ levels: [] }).data.priceLevels, [], 'an empty set is the explicit release')
+assert.equal(levelSet({ levels: [] }).data.intent, 'released')
+
+// A band is a range worked across, and it survives as a band.
+const band = levelSet({ levels: [{ purpose: 'entry', asset: dksAsset, low: 58, high: 62, reason: 'The accumulation range the three cases agree on.' }] })
+assert.equal(band.status, 'ok')
+assert.deepEqual(band.data.priceLevels[0].price, { kind: 'band', low: { currency: 'USD', minorUnits: 5800 }, high: { currency: 'USD', minorUnits: 6200 } })
+assert.deepEqual(band.data.byPurpose, { entry: 1, stop: 0, 'take-profit': 0 })
+// ⛔ Inverted ends are the document contradicting itself, and the host checks the same four.
+const inverted = levelSet({ levels: [{ purpose: 'entry', asset: dksAsset, low: 62, high: 58, reason: 'Written the wrong way round.' }] })
+assert.equal(inverted.status, 'blocked')
+assert.deepEqual(inverted.diagnostics.find((row) => row.code === 'price_level_defective').details.defects, ['band-inverted'])
+// ⛔ And «a stop is below the entry» is deliberately not one of them.
+assert.equal(levelSet({ levels: [{ purpose: 'stop', asset: dksAsset, point: 999, reason: 'Above the entry, which is correct for a short and this host does not know the direction.' }] }).status, 'ok')
+
+// A sub-cent price keeps its digits rather than rounding to zero.
+const fine = levelSet({ levels: [{ purpose: 'entry', asset: dksAsset, point: 0.0000094, reason: 'A price the cent cannot count.' }] })
+assert.deepEqual(fine.data.priceLevels[0].price.value, { currency: 'USD', minorUnits: 94, exponent: 7 })
+// ⛔ Beyond AMP's twelve decimals it is refused, never quietly moved.
+assert.equal(levelSet({ levels: [{ purpose: 'entry', asset: dksAsset, point: 1.2345678901234e-7, reason: 'More decimals than the wire carries.' }] }).status, 'blocked')
+
+// A purpose nobody stated, and a reason nobody wrote, are both refusals.
+assert.ok(has(levelSet({ levels: [{ purpose: 'trim', asset: dksAsset, point: 60, reason: 'Not one of the three.' }] }), 'price_level_purpose_unstated'))
+assert.ok(has(levelSet({ levels: [{ purpose: 'stop', asset: dksAsset, point: 60, reason: '   ' }] }), 'price_level_reason_missing'))
+// A market this package holds no currency for cannot carry a level.
+assert.ok(has(levelSet({ levels: [{ purpose: 'stop', asset: { class: 'equity', symbol: 'X', market: 'XLON' }, point: 60, reason: 'Unpriceable here.' }] }), 'price_level_currency_unknown'))
+
+/**
+ * The link, checked the way the host checks it — before submit, where it can
+ * still be fixed. On the run path the host only *reports* it, and the proposal
+ * is sealed with the pointer unresolved.
+ */
+const linked = levelSet({
+  levels: [{ purpose: 'stop', asset: dksAsset, point: 92, reason: 'The registered stop.', armedKey: 'stop:DKS' }],
+  watches: [{ key: 'stop:DKS', intent: 'Exit on the stop.', trigger: { kind: 'price-below', asset: { ...dksAsset, currency: 'USD' }, price: { currency: 'USD', minorUnits: 9200 } } }],
+})
+assert.equal(linked.status, 'ok')
+assert.deepEqual(linked.data.linkProblems, [])
+const linkCase = (levels, watches) => levelSet({ levels, watches }).data.linkProblems.map((row) => row.code)
+const stopLevelRow = { purpose: 'stop', asset: dksAsset, point: 92, reason: 'The registered stop.', armedKey: 'stop:DKS' }
+const stopWatch = { key: 'stop:DKS', intent: 'Exit on the stop.', trigger: { kind: 'price-below', asset: { ...dksAsset, currency: 'USD' }, price: { currency: 'USD', minorUnits: 9200 } } }
+assert.deepEqual(linkCase([stopLevelRow], []), ['dangling-armed-key'], 'a key naming nothing in this proposal cannot name a watch armed last week')
+assert.deepEqual(linkCase([stopLevelRow], [{ ...stopWatch, trigger: { kind: 'at-time', at: '2026-10-01T00:00:00Z' } }]), ['armed-not-a-price-watch'])
+assert.deepEqual(linkCase([stopLevelRow], [{ ...stopWatch, trigger: { ...stopWatch.trigger, asset: { class: 'equity', symbol: 'OTHER', market: 'XNAS', currency: 'USD' } } }]), ['armed-asset-mismatch'])
+assert.deepEqual(linkCase([stopLevelRow], [{ ...stopWatch, trigger: { ...stopWatch.trigger, price: { currency: 'USD', minorUnits: 9100 } } }]), ['armed-price-mismatch'])
+assert.deepEqual(linkCase([stopLevelRow], [stopWatch, { ...stopWatch, intent: 'A second row with one address.' }]), ['duplicate-armed-key'], 'and the finding is the duplicate, never the level judged against whichever row was read first')
+// ⚠️ A band contains the watch's price, so a linked band resolves — compared at the finer unit.
+assert.deepEqual(
+  linkCase(
+    [{ purpose: 'entry', asset: dksAsset, low: 58, high: 62, reason: 'The accumulation range.', armedKey: 'entry:DKS' }],
+    [{ key: 'entry:DKS', intent: 'Add on the way down.', trigger: { kind: 'price-below', asset: { ...dksAsset, currency: 'USD' }, price: { currency: 'USD', minorUnits: 600_000, exponent: 4 } } }],
+  ),
+  [],
+)
+
+/**
+ * And the pair the two operations produce goes through unchanged, which is the
+ * whole point of assembling it in one place.
+ */
+const foldedFromOperations = levelSet({
+  levels: statedStop.data.priceLevelsToRegister,
+  watches: statedStop.data.watchesToRegister.map((row) => ({ ...row, intent: 'Registered at entry.' })),
+})
+assert.equal(foldedFromOperations.status, 'ok', 'exitDiscipline’s own rows resolve against exitDiscipline’s own watches')
+assert.deepEqual(foldedFromOperations.data.priceLevels, statedStop.data.priceLevelsToRegister, 'and nothing is rewritten on the way through')
 
 /**
  * And where the closed outcome lands once the discipline produces one.

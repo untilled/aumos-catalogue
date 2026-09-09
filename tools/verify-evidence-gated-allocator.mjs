@@ -502,6 +502,14 @@ covers('research/single-name-tranche-plan')
 const trancheAsOf = methodology.asOf
 const naverPlan = {
   symbol: '035420',
+  /**
+   * ⚠️ **The asset in full, because a level cannot be stated without it**
+   * (#756). A level belongs to the currency its asset is quoted in, derived
+   * from the market, so a ladder called with a bare ticker answers
+   * `entry_level_unstated` / `unevaluated` — the rungs are still adjudicated
+   * and only the *stating* of them is lost. That is the case asserted below.
+   */
+  asset: { class: 'equity', symbol: '035420', market: 'XKRX' },
   lens: 'mean-reversion',
   maturity: 'observing',
   price: 180_000,
@@ -521,6 +529,48 @@ assert.deepEqual(
   staged.data.findings.map((row) => `${row.label}:${row.kind}`),
   ['T2:tranche_approach', 'T3:tranche_pending'],
   'a rung within 5% is re-read before it fires — the entry-side counterpart of trim_approach',
+)
+
+/**
+ * ── The rungs, as prices the host can name (#756 · `untilled/aumos#758`) ───
+ *
+ * The number a rung waits at reached Aumos only as a `price-below` and an
+ * opaque `intent` before this, and one `price-below` is a stop under a holding
+ * and an entry on a name nobody owns — so nothing downstream could tell which.
+ * These assertions are the four things that has to be true of the answer, and
+ * the last two are the ones a later edit would quietly lose.
+ */
+assert.deepEqual(
+  staged.data.priceLevelsToRegister,
+  [{
+    purpose: 'entry',
+    asset: { class: 'equity', symbol: '035420', market: 'XKRX', currency: 'KRW' },
+    price: { kind: 'point', value: { currency: 'KRW', minorUnits: 175_000 } },
+    reason: 'Rung T2 of a 3-rung staged entry for 1% of the book: the plan adds here and nowhere between the rungs.',
+    expiresAt: '2099-01-01T00:00:00Z',
+  }],
+  'a priced rung states an `entry` level in the currency its market is quoted in, and KRW carries no exponent',
+)
+assert.equal(
+  staged.data.priceLevelsToRegister.every((row) => row.armedKey === undefined),
+  true,
+  'this operation arms no watch, so it mints no `armedKey` — a key pointing at a watch it did not write is dangling by construction',
+)
+assert.equal(
+  staged.data.priceLevelsToRegister.some((row) => row.price.kind === 'band'),
+  false,
+  'three rungs are three points and never one band: a band is a range worked across, and this plan acts at three prices and nowhere between them',
+)
+const bareLadder = execute({ operation: 'entryTranchePlan', asOf: trancheAsOf, input: { ...naverPlan, asset: undefined } })
+assert.deepEqual(bareLadder.data.priceLevelsToRegister, [], 'without the market there is no currency, and a level with a guessed currency is never emitted')
+assert.deepEqual(
+  bareLadder.data.findings.map((row) => `${row.label}:${row.kind}`),
+  staged.data.findings.map((row) => `${row.label}:${row.kind}`),
+  'and the ladder verdicts are untouched by it — only the stating of the level is lost',
+)
+assert.ok(
+  bareLadder.diagnostics.some((row) => row.code === 'entry_level_unstated' && row.severity === 'unevaluated'),
+  'which is reported rather than silent: an unstated level is the exact failure #756 opens with',
 )
 const intention = execute({
   operation: 'entryTranchePlan',
@@ -843,7 +893,81 @@ for (const fixture of ampProposals.cases) {
     assert.ok(watch.intent && watch.trigger, `${fixture.name} WATCH has intent and trigger`)
     assert.notEqual(watch.trigger.kind, 'event', 'earnings scheduling never depends on a producer-less event trigger')
   }
+  /**
+   * ── The price levels, judged by the rules the host judges them by ─────────
+   *
+   * `priceLevelSet` is the package's own copy of `priceLevelDefects` and
+   * `priceLevelLinkProblems` (`untilled/aumos#758`), so running the fixture
+   * through it is the strongest offline statement available here: **a proposal
+   * this package would assemble is one the host's four defect rules and five
+   * link rules pass.** ⛔ It is not the schema — `tools/verify-amp-price-levels.mjs`
+   * validates these same bytes against the generated JSON Schema, and needs an
+   * `untilled/aumos` checkout, so it stays an operator step.
+   */
+  if (proposal.priceLevels !== undefined) {
+    const folded = execute({ operation: 'priceLevels', asOf: ampProposals.asOfLevels ?? '2026-08-25T00:00:00Z', input: { levels: proposal.priceLevels, watches: proposal.watches ?? [], plans: proposal.plans ?? [] } })
+    assert.equal(folded.status, 'ok', `${fixture.name} carries levels this package would not refuse`)
+    assert.deepEqual(folded.data.linkProblems, [], `${fixture.name} armedKey links resolve`)
+    assert.deepEqual(folded.data.priceLevels, proposal.priceLevels, `${fixture.name} levels survive the fold unrewritten`)
+    assert.equal(folded.data.intent, proposal.priceLevels.length === 0 ? 'released' : 'stated', `${fixture.name} says whether it is releasing or stating`)
+    for (const level of proposal.priceLevels) {
+      assert.ok(['entry', 'stop', 'take-profit'].includes(level.purpose), `${fixture.name} states a purpose Aumos defines`)
+      assert.equal(typeof level.reason === 'string' && level.reason.trim().length > 0, true, `${fixture.name} says why this price`)
+      assert.ok(level.asset.market && level.asset.currency, `${fixture.name} names the asset in full — the same symbol is two assets on two boards`)
+      /** ⛔ The ban, re-read on the field that most looks like an order. */
+      for (const banned of ['quantity', 'shares', 'side', 'limitPrice', 'order', 'broker', 'execute', 'timeInForce']) {
+        assert.equal(Object.hasOwn(level, banned), false, `${fixture.name} level carries no ${banned}: a level is a judgement about a price and never an instruction to a venue`)
+      }
+    }
+  }
 }
+/**
+ * ── Why `engines.aumos` is allowed to be a bet (#756 · `untilled/aumos#758`) ─
+ *
+ * `priceLevels` on a host that predates it is `unrecognized_keys` on a strict
+ * object, which loses the **whole judgement** rather than the field. The
+ * installer's refusal (`engines.aumos`, asserted above) is the enforcement, and
+ * it is a claim about a release *number* while the thing that must be true is a
+ * claim about release *contents* — uncheckable from here.
+ *
+ * What makes that acceptable is the run-time probe: `decision_submit`'s
+ * published `inputSchema` is derived from the host's own judge, so §6 tells the
+ * run to read it and omit the field when it is not declared. ⚠️ **That sentence
+ * is the reason the range may be one release too generous, so its absence is a
+ * failure and not a documentation gap.** `HOST-FOLLOWUPS.md` says the same.
+ */
+const levelsPrompt = await readFile(new URL('../PROMPT.md', fixtureRoot), 'utf8')
+assert.match(levelsPrompt, /priceLevels/, 'the prompt tells the run what the field is')
+assert.match(
+  levelsPrompt,
+  /decision_submit`'s own input schema is derived from\nthe host's judge at run time/,
+  'and to ask the host, at run time, whether it reads the field at all',
+)
+assert.match(
+  levelsPrompt,
+  /\*\*omit `priceLevels` entirely\*\*/,
+  'and to omit it rather than lose the judgement when the answer is no',
+)
+assert.match(
+  await readFile(new URL('../HOST-FOLLOWUPS.md', fixtureRoot), 'utf8'),
+  /raise this range before this version is published/,
+  'and the one remedy that is not checkable from here is written down where the host debts are',
+)
+
+/**
+ * ⚠️ And the two cases exist, because a loop over the field is vacuous while
+ * nothing carries it — which is how #756's own opening defect survived.
+ */
+assert.equal(
+  ampProposals.cases.filter((fixture) => fixture.proposal.priceLevels !== undefined).length,
+  2,
+  'a proposal that states levels and one that releases them, so neither branch of the loop above is unexercised',
+)
+assert.deepEqual(
+  [...new Set(ampProposals.cases.flatMap((fixture) => (fixture.proposal.priceLevels ?? []).map((level) => `${level.purpose}:${level.price.kind}`)))].sort(),
+  ['entry:band', 'stop:point', 'take-profit:point'],
+  'all three purposes and both shapes are represented — a band that is never fixtured is a band nothing proves survives',
+)
 
 /**
  * Web-research contract — consensus provenance, the macro layer and the IR cycle.
@@ -2909,7 +3033,7 @@ assert.equal(new Set(tabledOperations).size, tabledOperations.length, 'no operat
  * that a row which cannot fill all four is refused by name rather than
  * published half-wired.
  */
-assert.equal(Object.keys(OPERATIONS).length, 109, 'every operation the package answers has a definition row')
+assert.equal(Object.keys(OPERATIONS).length, 110, 'every operation the package answers has a definition row')
 assert.equal(PUBLISHED_OPERATIONS.length + INTERNAL_OPERATIONS.length, Object.keys(OPERATIONS).length, 'surface partitions the table; there is no third state')
 assert.deepEqual([...supportedOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'operation_unknown lists the published surface, projected from the definition')
 assert.deepEqual([...tabledOperations].sort(), [...PUBLISHED_OPERATIONS].sort(), 'and the skill table is that same surface')

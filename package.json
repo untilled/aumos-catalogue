@@ -21,6 +21,7 @@
     "check:diagnostic-codes": "node tools/verify-evidence-gated-diagnostic-codes.mjs",
     "check:delegation": "node tools/verify-evidence-gated-delegation-budget.mjs",
     "check:recipes": "node tools/verify-evidence-gated-recipes.mjs",
+    "check:amp-price-levels": "node tools/verify-amp-price-levels.mjs",
     "check:legacy-parity": "node tools/legacy-parity.mjs"
   },
   "dependencies": {
