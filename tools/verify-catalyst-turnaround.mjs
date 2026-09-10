@@ -54,6 +54,7 @@ import {
   accountConcentration,
   catalystLedger,
   cause,
+  round,
   runVerdict,
   scoreboards,
   stagedPlan,
@@ -792,7 +793,7 @@ check('the cumulative target and the increment are two different numbers', () =>
   assert.equal(entry.data.cumulativeTargetWeight, 0.12, 'the cumulative target is what the sizing produced')
   assert.equal(entry.data.currentWeight, 0, 'the book holds none of it')
   assert.equal(entry.data.incrementThisRun, 0.12, 'with no staged plan the increment is the whole gap')
-  assert.equal(entry.data.weightMeanings.cumulativeTargetWeight, 'cumulative-position-weight')
+  assert.equal(entry.data.weightMeanings.cumulativeTargetWeight, 'this-strategys-share-of-the-position')
   assert.equal(entry.data.weightMeanings.incrementThisRun, 'weight-added-this-run')
 
   // Every intent that is not one of the two purchases reports a zero increment,
@@ -803,6 +804,85 @@ check('the cumulative target and the increment are two different numbers', () =>
     if (result.data.increasesExposure) continue
     assert.equal(result.data.incrementThisRun, 0, `${item.name} carries a non-zero increment on ${result.data.intent}`)
   }
+})
+
+/**
+ * ── #817: the third weight, and it is the only one that may cross the wire ──
+ *
+ * `#813` and `#814` were the **reading** direction. This is the **writing** one:
+ * `cumulativeTargetWeight` is what `headroomForStrategy` leaves this desk — *«the
+ * smaller cap, less what every other strategy has»* — and the host's
+ * `targetWeight` is the **whole position**, executed by `rebalanceShadowBook`
+ * without attribution ever being read (`untilled/aumos#815`).
+ *
+ * ⛔ **Over an unattributed holding the difference is a sale.**
+ * `untilled/aumos#817` drove the real host over a 6% holding assigned to nobody:
+ * this package reached `enter-staged` with a cumulative target of `0.02`, and
+ * handing that over produced `sell:40`. `#786` refuses a judgement on **another
+ * manager's** position; an unattributed one has no manager for it to be.
+ *
+ * ⚠️ **Holdings are added and open proposals are not.** A pending total is
+ * exposure for a ceiling and is not a position for an order.
+ */
+check('#817 — the weight handed to the host carries the part of the position this desk does not run', () => {
+  const bookWith = (positions, proposals = []) => ({ positions, proposals, caps: { accountSingleName: 0.2 } })
+  const runWith = (book) => runVerdict({ ...structuredClone(positive.input), book }).data
+
+  const fresh = runWith(bookWith([], []))
+  assert.equal(fresh.intent, 'enter-staged')
+  assert.equal(fresh.otherHeldWeight, 0)
+  assert.equal(fresh.hostTargetWeight, fresh.cumulativeTargetWeight, 'on a name nobody holds the two totals coincide — which is why an unheld-name measurement saw none of this')
+
+  /** The issue's book: 6% assigned to nobody, and 12% pending under another manager. */
+  const unattributed = runWith(bookWith(
+    [{ symbol: 'A00007', weight: 0.06, strategy: 'unattributed' }],
+    [{ symbol: 'A00007', weight: undefined, targetWeight: 0.12, strategy: 'inst_shareholder_rerating' }],
+  ))
+  assert.equal(unattributed.intent, 'enter-staged', 'the run reaching the wire is a purchase')
+  assert.equal(unattributed.currentWeight, 0, 'a holding assigned to nobody was read as this desk\'s')
+  assert.equal(unattributed.otherHeldWeight, 0.06, 'a holding assigned to nobody was not carried as somebody else\'s')
+  assert.equal(unattributed.concentration.rows[0].total, 0.12, 'the ceiling axis still folds the pending total in')
+  assert.equal(unattributed.hostTargetWeight, round(0.06 + unattributed.cumulativeTargetWeight), 'the weight handed to the host sold a holding nobody asked to sell')
+  assert.ok(unattributed.hostTargetWeight > 0.06, 'an enter-staged left this package as a reduction')
+  assert.notEqual(unattributed.hostTargetWeight, round(0.12 + unattributed.cumulativeTargetWeight), 'a pending proposal was added to the order — it is exposure for a ceiling and not a position')
+
+  /** Another manager's holding is the same arithmetic, and it has to be. */
+  const theirs = runWith(bookWith([{ symbol: 'A00007', weight: 0.06, strategy: 'inst_shareholder_rerating' }]))
+  assert.equal(theirs.otherHeldWeight, 0.06)
+  assert.equal(theirs.hostTargetWeight, round(0.06 + theirs.cumulativeTargetWeight))
+
+  /**
+   * ⛔ **A position this desk runs is still reducible, and a close-out still
+   * closes.** #817 must not turn every reduction into a no-op — that is
+   * `untilled/aumos#782`'s «safely do nothing» coming back.
+   */
+  const mine = runVerdict({
+    ...structuredClone(cases.cases.find((item) => item.name === 'catalyst-cancelled').input),
+  }).data
+  assert.equal(mine.intent, 'close-out')
+  assert.equal(mine.otherHeldWeight, 0, 'the fixture book is this desk\'s own position')
+  assert.equal(mine.hostTargetWeight, 0, 'a close-out on a wholly-own position is the host\'s exit')
+
+  /** …and the same close-out beside somebody else's holding stops at their weight. */
+  const shared = runVerdict({
+    ...structuredClone(cases.cases.find((item) => item.name === 'catalyst-cancelled').input),
+    book: {
+      positions: [
+        { symbol: 'A00004', weight: 0.05, strategy: 'catalyst-turnaround' },
+        { symbol: 'A00004', weight: 0.04, strategy: 'inst_fundamental_mean_reversion' },
+      ],
+      proposals: [],
+      caps: { accountSingleName: 0.2 },
+    },
+  }).data
+  assert.equal(shared.intent, 'close-out')
+  assert.equal(shared.otherHeldWeight, 0.04)
+  assert.equal(shared.hostTargetWeight, 0.04, 'an exit liquidated another manager\'s holding of the same name')
+
+  /** An unread book has no target at all: a `0` here would be an order. */
+  const unread = runVerdict({ ...structuredClone(positive.input), book: { proposals: [], caps: { accountSingleName: 0.2 } } }).data
+  assert.equal(unread.otherHeldWeight, null)
+  assert.equal(unread.hostTargetWeight, null, 'an account nobody read produced a weight')
 })
 
 /**

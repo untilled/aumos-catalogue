@@ -76,8 +76,9 @@ a `null`. Both are mutation-tested.
 
 ## Two weights, two meanings
 
-`cumulativeTargetWeight` is *"the whole position should be this"*. `incrementThisRun` is *"buy this
-much more, now"*. They are separate fields on the verdict with a `weightMeanings` map beside them, and
+`cumulativeTargetWeight` is *"this strategy's share of the position should be this"*.
+`incrementThisRun` is *"buy this much more, now"*. ⚠️ A **third** weight, `hostTargetWeight`, is the
+only one the host may be handed — see «The weight that leaves is a third number» below (#817). They are separate fields on the verdict with a `weightMeanings` map beside them, and
 every intent that is not `enter-staged` or `add-next-stage` reports an increment of exactly zero —
 including the trims and the exits, which carry a **cumulative** target the host reduces to rather than
 a negative increment. The already-at-or-above-target case is defined: increment zero, intent `hold`,
@@ -126,6 +127,60 @@ ceiling has to hold in both of the states the account passes through.
 ⛔ **The netting lives here rather than in the caller.** A run that is asked to subtract before it
 calls is a run that can be argued out of subtracting, and every axis — the name, the sector and
 the whole book — has to fold the same way or one name is counted twice on one of them.
+
+## The weight that leaves is a third number (#817)
+
+`#813` and `#814` were both the **reading** direction. This is the **writing** one, and until #817
+nothing said anything about it.
+
+`headroomForStrategy` is *«the smaller of the account's cap and this strategy's, less what every
+**other** strategy holds or has proposed»*, so `cumulativeTargetWeight` answers «how much of this
+name may be mine». The host's `targetWeight` answers «what should this position weigh» — and
+`rebalanceShadowBook` executes it against the whole position without ever reading attribution
+(`untilled/aumos#815`). The conversion is one addition, and `runVerdict` does it:
+
+```
+hostTargetWeight = otherHeldWeight + (close-out ? 0 : cumulativeTargetWeight)
+```
+
+⛔ **Why the addition is code and not a sentence.** The same argument #813 settled: a run asked to
+add before it sends is a run that can be argued out of adding. `PROMPT.md` says what the number
+means and forbids assembling it by hand; the arithmetic is here.
+
+⛔ **`otherHeldWeight` counts holdings and never proposals.** `otherStrategies` — the term behind
+`headroomForStrategy` — folds pending totals in, which is right for a ceiling and wrong for an
+order: an unfilled proposal is not a position, and adding one would buy another manager's
+unapproved judgement on their behalf. Two fields, because the two directions need two numbers.
+
+⛔ **`close-out` reduces this desk's share to zero and no further.** Where nobody else holds the
+name that is `0`, which is the host's `exit`. Where somebody does, an `exit` would liquidate their
+position too, so the exit is expressed as this weight instead.
+
+**What #817 measured.** Fund ₩100,000,000 on XKRX, 20% single-name ceiling, a 6% holding assigned
+to **nobody**, 12% pending under another manager. This package reaches `enter-staged` with
+`cumulativeTargetWeight = 0.02`; the real host, driven to the exchange, turns that into `sell:40`.
+
+| the position's assignee | before #817 | after |
+|---|---|---|
+| another manager | `sell:40` — but `untilled/aumos#786` refuses the judgement first, `submitted: 0` | `0.06 + share`, a buy |
+| **this manager** | `sell:40`, and ⛔ **not a defect** — reducing a position this desk runs is a defined move on the ladder | unchanged: `otherHeldWeight` is 0 |
+| **unattributed** | `sell:40`, and **nothing stops it** — this is the issue | `0.06 + share`, a buy |
+
+⚠️ **Unattributed is not a rare state**: every holding bought by hand in a broker app, and every
+position whose approval did not name a manager to run it (`untilled/aumos#785`).
+
+⚠️ **#813's overstatement was conservative and this one is not.** #813 stopped this package
+buying. This one **sells**, out of a run whose intent is a purchase.
+
+⛔ **What was not done.** The host does not fold or add — a second answer to «how much did this
+judgement ask for» ends at the aggregate cap `untilled/aumos#781` rejected by name. Execution does
+not read attribution — `untilled/aumos#232` rejected the reconciler that needs. And `#786`'s gate
+was not widened to unattributed positions — that is `untilled/aumos#782`'s «safely do nothing»
+coming back.
+
+⚠️ **One rename came with it.** `weightMeanings.cumulativeTargetWeight` and `targetWeight`'s own
+`meaning` were `cumulative-position-weight`, which is the confusion itself written down: it is not
+the position's weight. Both now read `this-strategys-share-of-the-position`.
 
 ## The sector axis: the judgement #269 asked for, and what came of it
 

@@ -429,6 +429,84 @@ check('#814 — the assignee moves own/other and never the name total', () => {
   }
 })
 
+/**
+ * ── #817: the number that leaves, and it is neither of the two that stay ────
+ *
+ * `#813` and `#814` were both the **reading** direction — how the host's answer
+ * becomes a row of this package's `book`. This is the **writing** direction, and
+ * nothing had said anything about it:
+ *
+ *   `targetTotalWeight`  the cap **less what everyone else has** — this thesis's
+ *                        share of the position
+ *   host `targetWeight`  the **whole** position's weight, which
+ *                        `rebalanceShadowBook` executes without ever reading
+ *                        attribution (`untilled/aumos#815`)
+ *
+ * ⛔ **On an unattributed holding the difference is a sale.** `untilled/aumos#817`
+ * drove the real host over a 6% holding assigned to nobody: this package reached
+ * BUY, sized `0.0375`, and handing that number over produced `sell:22` — an order
+ * against a position no judgement on the fund ever asked to reduce. Nothing
+ * stopped it: `#786` refuses a judgement on **another manager's** position and an
+ * unattributed one has no manager to be somebody else's.
+ *
+ * ⚠️ **The addend is `otherHeldWeight` and never `otherWeight`.** The second folds
+ * open proposals in — right for a ceiling, since a limit must hold in every state
+ * the account passes through, and wrong for an order, since an unfilled proposal
+ * is not a position. Adding one would have this run buy another manager's
+ * unapproved judgement for them.
+ */
+check('#817 — a BUY over an unattributed holding leaves as a buy, and the addend is holdings only', () => {
+  const CAP = { singleNameCap: 0.2, grossCap: 0.9 }
+  const base = structuredClone(sizing.cases.find((row) => row.name === 'calm-series').input)
+  const sizeAgainst = (book) =>
+    execute({ operation: 'positionSizing', asOf: ASOF, input: { ...structuredClone(base), mandate: CAP, book, rows: rowsOf('shock-then-base') } })
+
+  /** The issue's book: 6% held by nobody, 12% pending under another manager. */
+  const unattributed = sizeAgainst({
+    holdings: [{ symbol: 'FMR001', sector: 'technology', weight: 0.06, strategy: 'unattributed' }],
+    openProposals: [{ symbol: 'FMR001', sector: 'technology', targetWeight: 0.12, strategy: 'inst_shareholder_rerating' }],
+  })
+  assert.equal(unattributed.status, 'ok')
+  assert.equal(unattributed.exposure.heldWeight, 0.06)
+  assert.equal(unattributed.exposure.ownHeldWeight, 0, 'a holding assigned to nobody was read as this manager\'s')
+  assert.equal(unattributed.exposure.otherHeldWeight, 0.06, 'a holding assigned to nobody was not carried as somebody else\'s')
+  assert.equal(unattributed.exposure.otherWeight, 0.12, 'the ceiling axis still folds the pending total in')
+  assert.equal(unattributed.targetTotalWeight, 0.04011194, 'this thesis\'s share of the position')
+  assert.equal(unattributed.incrementalWeight, 0.04011194)
+  assert.equal(unattributed.hostTargetWeight, 0.10011194, 'the weight handed to the host sold a holding nobody asked to sell')
+  assert.ok(unattributed.hostTargetWeight > unattributed.exposure.heldWeight, 'a BUY left this package as a reduction')
+  assert.notEqual(unattributed.hostTargetWeight, round(0.12 + unattributed.targetTotalWeight), 'a pending proposal was added to the order — it is exposure for a ceiling and not a position')
+
+  /**
+   * ⛔ **Assigned to this manager: the reduction still leaves.** Trimming a
+   * position this desk runs is what these methodologies are for, and #817 must
+   * not close that door. `otherHeldWeight` is 0, so the two numbers agree.
+   */
+  const mine = sizeAgainst({
+    holdings: [{ symbol: 'FMR001', sector: 'technology', weight: 0.12, strategy: STRATEGY_ID }],
+    openProposals: [],
+  })
+  assert.equal(mine.exposure.ownHeldWeight, 0.12)
+  assert.equal(mine.exposure.otherHeldWeight, 0)
+  assert.equal(mine.hostTargetWeight, mine.targetTotalWeight, 'with nothing of somebody else\'s in the name the two totals are one number')
+  assert.ok(mine.hostTargetWeight < 0.12, 'this manager could no longer reduce its own position')
+  assert.equal(mine.atOrAboveTarget, true, 'and it is a reduction question rather than a refusal')
+
+  /** Another manager's holding is the same arithmetic as an unattributed one, and it must be. */
+  const theirs = sizeAgainst({
+    holdings: [{ symbol: 'FMR001', sector: 'technology', weight: 0.06, strategy: 'inst_catalyst_turnaround' }],
+    openProposals: [],
+  })
+  assert.equal(theirs.exposure.otherHeldWeight, 0.06)
+  assert.equal(theirs.hostTargetWeight, unattributed.exposure.otherHeldWeight + theirs.targetTotalWeight)
+  assert.ok(theirs.hostTargetWeight > 0.06, 'a judgement on another manager\'s name left as a reduction of it')
+
+  /** An empty book is the case where the defect is invisible — the two totals coincide. */
+  const fresh = sizeAgainst({ holdings: [], openProposals: [] })
+  assert.equal(fresh.exposure.otherHeldWeight, 0)
+  assert.equal(fresh.hostTargetWeight, fresh.targetTotalWeight, 'and this is why an unheld-name measurement could not see any of it')
+})
+
 check('config may narrow the risk budget and may not widen it', () => {
   const widened = sized.get('config-may-not-widen-the-risk-budget')
   assert.equal(widened.riskBudget, THRESHOLDS.sizing.perThesisRiskBudget)

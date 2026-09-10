@@ -275,13 +275,37 @@ targetTotalWeight  = min( perThesisRiskBudget / effectiveLoss,
                           the Mandate's gross cap less what *other* strategies hold,
                           the Mandate's sector cap less what *other* strategies hold in it )
 incrementalWeight  = max(0, targetTotalWeight − what this thesis already holds)
+hostTargetWeight   = otherHeldWeight + targetTotalWeight
 ```
 
-⚠️ **Two weights, and they are never one field.** `targetTotalWeight` is *«the whole
-position should be this»*; `incrementalWeight` is *«buy this much more today»*. Say which one
-your proposal's target is. When the second is zero because the position is already complete,
-the answer is `target-weight-already-held` and a `WAIT` — that is a finished position, not a
-book with no room, and reporting the two as one zero would make them the same decision.
+⚠️ **Two weights, and they are never one field.** `targetTotalWeight` is *«this thesis's share
+of the position should be this»*; `incrementalWeight` is *«buy this much more today»*. When the
+second is zero because the position is already complete, the answer is
+`target-weight-already-held` and a `WAIT` — that is a finished position, not a book with no
+room, and reporting the two as one zero would make them the same decision.
+
+⛔ **And the number your proposal carries is neither of them — it is `hostTargetWeight`.** The
+host's `targetWeight` is the weight of the **whole position**, executed against the whole
+position without your attribution ever being read. Look at the formula above: every ceiling in
+it is *«the cap less what other strategies hold»*, so what comes out is this desk's share and
+not the name's total. The two differ by exactly what somebody else holds, and the difference
+**sells**: a 6% holding of this name that nobody is assigned to, sized here at 3.75%, sent as
+`0.0375` is an order to sell more than a third of a position no judgement on this fund ever
+asked to reduce — from a run whose own verdict is BUY. `0.06 + 0.0375 = 0.0975` is the weight
+that buys. `positionSizing` answers it as `hostTargetWeight`; do not assemble it yourself.
+
+⚠️ **Only *holdings* are added, and `exposure.otherWeight` is not the field.** That number folds
+open proposals in, which is right for a ceiling — a limit has to hold in every state the account
+passes through — and wrong for an order, because an unfilled proposal is not a position. Adding
+one would have you buy another manager's unapproved judgement for them.
+`exposure.otherHeldWeight` is the holdings-only figure and is the one in the formula.
+
+⚠️ **Unattributed lands in `otherHeldWeight`, and that is not a rare corner.** It is every
+holding bought by hand in a broker app and every position whose approval did not name a manager
+to run it. ⛔ **This is not «nobody may touch an unattributed position».** You may still buy into
+one — `hostTargetWeight` *adds to* what is there rather than replacing it — and once the position
+is assigned to you, `otherHeldWeight` is 0, the two totals become one number, and every reduction
+this methodology ever made still leaves.
 
 ⛔ **Every input to that formula must have been read.** A book you could not read is not a book
 with nothing in it; a cap you could not read is not an absent cap; a worst-session figure you
@@ -350,7 +374,9 @@ finished:
 - how the target range was derived, and **which kind of claim it is**;
 - the refutation conditions and the maximum wait;
 - the cumulative staged target;
-- the target weight and the downside calculation behind it;
+- the target weight and the downside calculation behind it — and, where the two differ, both
+  `targetTotalWeight` (this thesis's share) and `hostTargetWeight` (what the position becomes),
+  because a reader approving an order is approving the second;
 - the review you are arming, and the evidence ids.
 
 `counterArguments` carries the strongest case that the fall is correct. For this methodology

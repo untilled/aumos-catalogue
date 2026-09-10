@@ -317,6 +317,35 @@ targetWeight  = min(rawWeight, defaultSingleNameCap, mandate cap, whole-account 
 ⛔ **The cap is a ceiling, never the order.** If `edge` is not positive the answer is zero — the bet
 is not worth taking at these odds — and that is reported rather than rounded up to something small.
 
+⛔ **That weight is this desk's share of the position, and it is not what you send.** The
+whole-account headroom in the line above is *«the smaller cap, less what every **other** strategy
+already holds or has proposed»* — so `cumulativeTargetWeight` answers «how much of this name may
+be mine». The host's `targetWeight` answers a different question: it is the weight of the **whole
+position**, and `rebalanceShadowBook` executes it against the whole position without ever reading
+whose it is. The number that crosses is the third one:
+
+```
+hostTargetWeight = otherHeldWeight + (this desk's share of the position)
+```
+
+`runVerdict` answers it as `hostTargetWeight` and `otherHeldWeight` — **do not assemble it
+yourself**, and never send `cumulativeTargetWeight` in its place. A 6% holding of this name that
+nobody is assigned to, on a run this package sizes at 2%, sent as `0.02` is an order to sell two
+thirds of a position no judgement on this fund ever asked to reduce, out of a run whose own intent
+is `enter-staged`. ⚠️ And unattributed is not a rare corner: it is every holding bought by hand in
+a broker app and every position whose approval did not name a manager to run it.
+
+⚠️ **Holdings are added and open proposals are not.** `otherHeldWeight` counts positions only. A
+pending total is exposure for a **ceiling** — a limit has to hold in every state the account
+passes through — and is not a position for an **order**: adding one would buy another manager's
+unapproved judgement on their behalf.
+
+⚠️ **A reduction still leaves, and an exit still exits.** Where the position is assigned to you
+`otherHeldWeight` is 0, the two totals are one number, and every trim, resize and close-out works
+as it always did. Where somebody else holds part of the name, a `close-out` comes back as
+`hostTargetWeight` equal to **their** weight rather than as an `exit` — an `exit` is a real 0 and
+would liquidate their position with yours.
+
 **Enter in stages, and a stage is a plan.** Each stage carries an id, its own weight, a *date or
 price* condition, an expiry, and the originating decision id; the stages sum to the cumulative target
 and to nothing else. ⚠️ **On a re-run you add `due − already filled`, never `due`.** Re-reading a

@@ -134,15 +134,22 @@ export function targetWeight({
   return {
     data: {
       /**
-       * ⚠️ **This is a *cumulative* weight: «the whole position should be this».**
-       * It is never «buy this much more». The increment is computed against what
-       * the book already holds, by `runVerdict`, and carried under its own name —
-       * the two were one field next door (#265) and either reading by a host is
-       * wrong for the other case.
+       * ⚠️ **This is a *cumulative* weight and never «buy this much more».** The
+       * increment is computed against what the book already holds, by
+       * `runVerdict`, and carried under its own name — the two were one field
+       * next door (#265) and either reading by a host is wrong for the other.
+       *
+       * ⛔ **And it is *this strategy's* share of the position, not the position
+       * (#817).** `accountHeadroom` above already has every other strategy's
+       * exposure taken out of it, so this number is «what this desk may hold».
+       * The host's `targetWeight` is the whole position's weight; the two differ
+       * by exactly what somebody else holds, and handing this one over on a book
+       * where somebody does is an order to sell. `runVerdict.hostTargetWeight`
+       * is the number that crosses that boundary.
        */
       targetWeight: sized,
       cumulativeTargetWeight: sized,
-      meaning: 'cumulative-position-weight',
+      meaning: 'this-strategys-share-of-the-position',
       rawWeight: round(raw),
       bindingCap: round(bindingCap),
       capBinds,
@@ -428,6 +435,24 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
     }
     const otherStrategies = round(Math.max(0, total - (byStrategy[strategy] ?? 0)))
     /**
+     * ── Holdings only, split by attribution — the write direction (#817) ─────
+     *
+     * ⛔ **`otherStrategies` above folds open proposals in and this pair does
+     * not.** The distinction is which direction the number travels. A *ceiling*
+     * has to hold in every state the account passes through, so a pending buy
+     * counts against it before it fills. The weight this desk hands **back** to
+     * the host is executed against the position, and an unfilled proposal is not
+     * a position — adding one would buy another manager's unapproved judgement
+     * on their behalf.
+     *
+     * ⚠️ **An unattributed holding is in `otherHeld`.** A row with no `strategy`
+     * was bought by hand or approved without anyone being named to run it
+     * (`untilled/aumos#785`), and a position nobody is assigned to is not one
+     * this desk runs. It is not this desk's to shrink.
+     */
+    const ownHeld = round(entry.heldByStrategy[strategy] ?? 0)
+    const otherHeld = round(Math.max(0, held - ownHeld))
+    /**
      * What is left for *this* strategy in *this* name. The binding limit is the
      * smaller of the account's and this strategy's, minus whatever every other
      * strategy is already holding or has already proposed — which is the line
@@ -439,6 +464,13 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
       /** What the open proposals still require **on top of** the holding. Never negative. */
       proposed: round(total - held),
       total,
+      /** ⚠️ Holdings only: what is held and assigned to this strategy. */
+      ownHeld,
+      /**
+       * ⚠️ Holdings only: every other manager's holding of this name **and every
+       * unattributed one**. The term `hostTargetWeight` is built on (#817).
+       */
+      otherHeld,
       byStrategy,
       accountCap,
       breach: total > accountCap,
@@ -470,6 +502,14 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
       strategyCapTotal,
       unusedHeadroom,
       headroom: Object.fromEntries(rows.map((row) => [row.symbol, row.headroomForStrategy])),
+      /**
+       * ⚠️ **Holdings this desk is not responsible for, per name (#817).** What
+       * `runVerdict` adds to a cumulative target before anything leaves for the
+       * host. A name with no row is a name nobody holds, and the answer there is
+       * `0` rather than absent — but only because the *book was read*, which
+       * `readable` above is the only statement about.
+       */
+      otherHeld: Object.fromEntries(rows.map((row) => [row.symbol, row.otherHeld])),
       breaches: rows.filter((row) => row.breach).map((row) => row.symbol),
       /** The book and the limit were both read. Nothing downstream may size without it. */
       readable: true,

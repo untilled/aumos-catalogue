@@ -209,6 +209,33 @@ export function concentration(input = {}) {
   }
 
   const held = heldBySymbol.get(symbol)?.weight ?? 0
+  /**
+   * ── Whose holding is it, and why only this direction asks (#817) ──────────
+   *
+   * ⛔ **`existingExposure` above is attribution-blind on purpose and this pair
+   * is not.** A ceiling is a statement about the *account*: one name is one
+   * position however many desks are attached to it, so every holding and every
+   * pending total folds into the number the caps are checked against. That does
+   * not change here.
+   *
+   * What changes is the weight that goes back **out**. The host executes a
+   * `position-weight` target against the whole position and reads no attribution
+   * while doing it (`untilled/aumos#815`), so the number this package hands over
+   * has to carry the part of the position it is not entitled to move. That part
+   * is `otherHeld`, and it is holdings only — an open proposal is exposure for a
+   * ceiling and is not a position for an order.
+   *
+   * ⚠️ **A row with no `strategy` is `otherHeld`.** It was bought by hand in a
+   * broker app, or approved without anyone being named to run it
+   * (`untilled/aumos#785`); either way no judgement of this fund is responsible
+   * for it, and `aumos-catalogue#268` §1 forbids inferring otherwise from cost
+   * and quantity. So does a run that did not pass `strategy` at all: with
+   * nothing to compare against, nothing is this desk's.
+   */
+  const heldRow = heldBySymbol.get(symbol)
+  const ownHeld =
+    input.strategy !== undefined && heldRow !== undefined && heldRow.strategy === input.strategy ? heldRow.weight : 0
+  const otherHeld = Math.max(0, held - ownHeld)
   const existingExposure = exposureBySymbol.get(symbol)?.exposure ?? 0
   /** What the open proposals still require on top of the holding. Never negative. */
   const openSame = existingExposure - held
@@ -420,6 +447,14 @@ export function concentration(input = {}) {
     data: {
       symbol,
       held: round(held),
+      /** ⚠️ Holdings only: the part of the position assigned to this manager. */
+      ownHeld: round(ownHeld),
+      /**
+       * ⚠️ Holdings only: another manager's part of the position **and every
+       * unattributed one**. What the weight handed to the host is built on
+       * (#817), and never something this run may propose away.
+       */
+      otherHeld: round(otherHeld),
       openProposals: round(openSame),
       existingExposure: round(existingExposure),
       projectedExposure: round(projected),
@@ -457,6 +492,8 @@ function emptyAnswer(partial = {}) {
   return {
     symbol: null,
     held: null,
+    ownHeld: null,
+    otherHeld: null,
     openProposals: null,
     existingExposure: finite(partial.existingExposure) ? round(partial.existingExposure) : null,
     projectedExposure: finite(partial.projected) ? round(partial.projected) : null,

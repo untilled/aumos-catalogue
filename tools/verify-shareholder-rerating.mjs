@@ -49,6 +49,7 @@ import {
   capitalHeadroom,
   concentration,
   evaluateCase,
+  round,
   returnComposition,
   stagedIncrement,
 } from '../managers/shareholder-rerating/lib/index.mjs'
@@ -382,6 +383,10 @@ for (const scenario of HOST_ABC) {
  * pending row. #813's fold is keyed on the name for the same reason — a
  * `position-weight` target is executed against the whole position — so an
  * assignment arriving cannot move a number below.
+ *
+ * ⚠️ **`untilled/aumos#817` adds the one axis where it does move**, and the block
+ * after this one is that axis: not what the account *is*, but what this run may
+ * ask it to *become*. Every assertion below still holds unchanged.
  */
 {
   const MINE = 'inst_shareholder_rerating'
@@ -409,6 +414,105 @@ for (const scenario of HOST_ABC) {
     }
   }
   ok('#814 — a holding that names its assignee moves no number in this package, and the fold stays keyed on the name')
+}
+
+/**
+ * ── #817: the weight that leaves, and «above target» as a question about whose ─
+ *
+ * `#813` and `#814` were the **reading** direction. This is the **writing** one.
+ * `decision_submit` carries a `position-weight` **total** and `rebalanceShadowBook`
+ * executes it against the whole position without ever reading attribution
+ * (`untilled/aumos#815`), so the number that crosses the boundary has to carry
+ * the part of the position this run is not entitled to move:
+ *
+ *     hostTargetWeight = otherHeld + (ownHeld + incrementWeight)
+ *
+ * ⛔ **And `«the account is above it — this is a reduction question»` had to say
+ * whose account.** `untilled/aumos#817` drove the real host over a 6% holding
+ * assigned to nobody: this package sized the name at 5%, called it a reduction,
+ * and the order was `sell:10` against a position no judgement on this fund ever
+ * asked to reduce. This package already said the right sentence about pending
+ * rows — *«an excess made of somebody else's unapproved proposal is theirs to
+ * withdraw»* — and it now says it about holdings too.
+ *
+ * ⚠️ **This is not «nobody may touch an unattributed position»** — the state
+ * `untilled/aumos#782` undid. A BUY into an unattributed name still leaves here,
+ * and it leaves as a **buy**.
+ */
+{
+  const buyPath = (() => {
+    const fixture = cases.cases.find((row) => row.id === 'financial-positive-reaches-buy')
+    assert.ok(fixture, 'cases.json no longer carries the sized BUY case, so this regression is testing nothing')
+    return fixture.input
+  })()
+  const runWith = (holdings, openProposals = []) =>
+    evaluateCase({ ...structuredClone(buyPath), book: { holdings, openProposals } }).data
+
+  /** Nothing held: the two totals coincide, which is why an unheld-name measurement saw none of this. */
+  const fresh = runWith([], [])
+  assert.equal(fresh.proposedAction, 'BUY')
+  assert.equal(fresh.otherHeldWeight, 0)
+  assert.equal(fresh.hostTargetWeight, fresh.targetTotalWeight, 'on a name nobody holds the two totals differ')
+
+  /** 4% held by this manager: unchanged from before #817, and the identity holds. */
+  const own = runWith([{ symbol: '000000', sector: 'financials', weight: 0.04, strategy: 'shareholder-rerating' }])
+  assert.equal(own.proposedAction, 'BUY')
+  assert.equal(own.otherHeldWeight, 0)
+  assert.equal(own.hostTargetWeight, own.targetTotalWeight, 'a wholly-own position ends at the target it always ended at')
+
+  /**
+   * ⛔ **The issue's book.** 6% assigned to nobody, and this run's target is
+   * below it. Before #817 the answer was `RESIZE` and a target that sold a third
+   * of somebody's position; now nothing of this manager's is above anything.
+   */
+  const unattributed = runWith([{ symbol: '000000', sector: 'financials', weight: 0.06 }])
+  assert.equal(unattributed.heldWeight, 0.06)
+  assert.equal(unattributed.otherHeldWeight, 0.06, 'a holding assigned to nobody was carried as this manager\'s')
+  assert.equal(unattributed.outcomeCode, 'position_above_target', 'the account really is above the target, and that finding stands')
+  assert.equal(unattributed.proposedAction, 'WAIT', 'this run proposed a reduction of a position it does not run')
+  assert.equal(unattributed.hostTargetWeight, null, 'and it handed the host a weight anyway')
+  assert.ok(
+    codesOf(evaluateCase({ ...structuredClone(buyPath), book: { holdings: [{ symbol: '000000', sector: 'financials', weight: 0.06 }], openProposals: [] } }).diagnostics)
+      .includes('excess_is_not_this_managers_to_reduce'),
+    'the run said nothing about why it left the excess alone',
+  )
+
+  /** Another manager's holding is the same arithmetic, and it has to be. */
+  const theirs = runWith([{ symbol: '000000', sector: 'financials', weight: 0.06, strategy: 'catalyst-turnaround' }])
+  assert.equal(theirs.otherHeldWeight, 0.06)
+  assert.equal(theirs.proposedAction, 'WAIT')
+  assert.equal(theirs.hostTargetWeight, null)
+
+  /**
+   * ⛔ **And this desk's own 7% is still reduced**, to `targetTotalWeight`, which
+   * is the behaviour `boundaries.json` has asserted since finding ③.
+   */
+  const mineAbove = runWith([{ symbol: '000000', sector: 'financials', weight: 0.07, strategy: 'shareholder-rerating' }])
+  assert.equal(mineAbove.proposedAction, 'RESIZE')
+  assert.equal(mineAbove.otherHeldWeight, 0)
+  assert.equal(mineAbove.hostTargetWeight, mineAbove.targetTotalWeight, 'this manager could no longer reduce its own position')
+  assert.ok(mineAbove.hostTargetWeight < 0.07)
+
+  /**
+   * ⚠️ **Holdings are added and open proposals are not.** A 6% holding of this
+   * desk's under somebody else's pending total of 12% is 12% of exposure for the
+   * *ceiling* and 6% of *position* for the order. Buying up to their unfilled
+   * total would be this run executing their unapproved judgement.
+   */
+  const pending = evaluateCase({
+    ...structuredClone(buyPath),
+    book: {
+      holdings: [{ symbol: '000000', sector: 'financials', weight: 0.02, strategy: 'catalyst-turnaround' }],
+      openProposals: [{ symbol: '000000', sector: 'financials', targetWeight: 0.03, strategy: 'fundamental-mean-reversion' }],
+    },
+  }).data
+  assert.equal(pending.existingExposure, 0.03, 'the ceiling axis stopped folding the pending total in')
+  assert.equal(pending.otherHeldWeight, 0.02, 'a pending proposal was counted as a position')
+  assert.equal(pending.proposedAction, 'BUY')
+  assert.equal(pending.hostTargetWeight, round(0.02 + pending.incrementWeight), 'the order was assembled out of exposure rather than out of holdings')
+  assert.notEqual(pending.hostTargetWeight, round(0.03 + pending.incrementWeight), 'somebody else\'s unfilled proposal was bought on their behalf')
+
+  ok('#817 — the host weight is holdings-not-mine plus this desk\'s own end state, and «above target» is a question about this desk')
 }
 
 /**

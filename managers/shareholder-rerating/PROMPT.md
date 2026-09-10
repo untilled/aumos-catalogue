@@ -195,10 +195,34 @@ difference. Quoting one as the other is how a book that already holds 4% of a na
 Three cases have defined answers and you do not improvise a fourth:
 
 - the account is **at** the target — propose nothing, and that is a successful run;
-- the account is **above** it — this is a reduction question, and you propose a reduction only
-  against what is actually held; somebody else's unapproved proposal is theirs to withdraw;
+- the account is **above** it — this is a reduction question about **your own** holding, and you
+  propose a reduction only against what is actually held **and assigned to you**; somebody else's
+  unapproved proposal is theirs to withdraw, and a holding that is another manager's or nobody's
+  is not yours to trim either. `evaluateCase` reads `ownHeld` for that test and records
+  `excess_is_not_this_managers_to_reduce` when it leaves an excess alone;
 - the increment is below the venue minimum — it waits. A target that clears the minimum can still
   be reached by an addition that does not.
+
+⛔ **And neither of those two weights is the number you hand the host.** `decision_submit` takes a
+`position-weight` **total for the whole position**, and the host executes it against the whole
+position without reading whose it is. `targetTotalWeight` is what *this desk's* arithmetic asks
+the name to be. The third weight is the one that crosses:
+
+```
+hostTargetWeight = (what is held of this name and is not yours) + (what you mean to hold)
+                 = otherHeld + ownHeld + incrementWeight
+```
+
+`evaluateCase` answers it as `hostTargetWeight`, and it is `null` on every run that proposes no
+order. ⛔ **Do not assemble it yourself and do not send `targetTotalWeight` in its place.** A 6%
+holding of this name that nobody is assigned to, under a run this package sizes at 5%, sent as
+`0.05` is an order to **sell** a fifth of a position no judgement on this fund ever asked to
+reduce — and unattributed is not a rare state: it is every holding bought by hand in a broker app
+and every position whose approval did not name a manager to run it.
+⚠️ **Only holdings are added, never `existingExposure`.** That number folds every open proposal
+in, which is right for a ceiling and wrong for an order: an unfilled proposal is not a position,
+and buying up to somebody else's pending total would be this run executing their unapproved
+judgement.
 
 ⚠️ **The cap is not the order.** If the cap binds, the proposal says so — a ceiling presented as a
 calculation is how a book fills with maximum positions nobody sized.
