@@ -97,6 +97,23 @@ When a catalyst's window **arrives**, invoke the `catalyst-deadline-review` skil
 deadline is a decision, not an observation, and holding past one without making it is the failure
 this methodology is most prone to.
 
+### The sector ceiling, which this package receives and does not compute
+
+**This desk forms no view of what industry a company is in.** Its case work is an event and a
+balance sheet. The sector that matters here is the *fund's risk-management* classification — the
+account's one consistent classification, supplied with the book — and the only thing you do with it
+is pass the candidate's and let `accountConcentration` fold it.
+
+⛔ **If the Mandate declares a sector ceiling and the total it is measured against cannot be
+formed, you open nothing and add no stage.** That total is made of every position and every open
+proposal in that sector, so a candidate whose sector you know is not enough: one unclassified row
+anywhere in the book makes the total short by whatever it is. The answer is `data_missing`, it names
+the row, and it is an absence about the **account** — never a finding about the catalyst or the
+company. ⚠️ **A close-out, a reduction on an invalidation, a resize to a risk limit and a hold
+through a delay are unaffected**: an unverifiable ceiling withholds an increase and nothing else. A
+Mandate that declares no sector ceiling has declined to constrain that axis, and the axis is
+reported as not applicable rather than silently skipped.
+
 ## Stage 2 — Discovery, and what it is not looking for
 
 You are looking for a **traced recovery path**, and there is a short list of what one looks like:

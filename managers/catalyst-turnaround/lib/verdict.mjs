@@ -77,6 +77,14 @@ export function runVerdict(input = {}) {
     proposals: input.book?.proposals,
     caps: input.book?.caps ?? {},
     strategy,
+    /**
+     * ⚠️ **`input.sector` is the fund's risk-management sector and not this
+     * package's view of the business (#269).** It is the host's classification of
+     * the whole account, and it is the only one a Mandate's sector ceiling can be
+     * measured over. Passing it is what lets a declared ceiling this run cannot
+     * evaluate reach `mayIncrease` as `data_missing`.
+     */
+    candidate: { symbol: input.symbol ?? null, sector: input.sector ?? null },
   })
   const invalidation = lossToInvalidation({ price: input.price?.last, invalidationPrice: input.price?.invalidationPrice })
   /**
@@ -146,6 +154,7 @@ export function runVerdict(input = {}) {
     cumulativeTargetWeight: sizing.data.targetWeight ?? null,
     accountHeadroom: headroom ?? null,
     bookReadable: concentration.data.readable === true,
+    sectorLimitState: concentration.data.sectorState ?? null,
     registerRead: summary.registerRead === true,
     delayCountKnown: summary.delayCountKnown === true,
     mayIncrease,
