@@ -295,6 +295,13 @@ not the name's total. The two differ by exactly what somebody else holds, and th
 asked to reduce — from a run whose own verdict is BUY. `0.06 + 0.0375 = 0.0975` is the weight
 that buys. `positionSizing` answers it as `hostTargetWeight`; do not assemble it yourself.
 
+⛔ **And that total is the *entry* one — take the number from `classifyCase`, not from the
+sizing (#823).** `positionSizing` runs before any outcome is known, so the only judgement it can
+answer for is «add up to this desk's share»; it stamps `hostTargetWeightRole: "increase"` saying
+so. `classifyCase` knows which judgement was reached and answers `hostTargetWeight`,
+`weightRole` and `exposureDirection` — and it replaces the field on the `sizing` it carries, so
+whichever of the two you read on an answer you get the same number.
+
 ⚠️ **Only *holdings* are added, and `exposure.otherWeight` is not the field.** That number folds
 open proposals in, which is right for a ceiling — a limit has to hold in every state the account
 passes through — and wrong for an order, because an unfilled proposal is not a position. Adding
@@ -374,7 +381,32 @@ with it:
 ```
 hostTargetWeightFloor = otherHeldWeight          ← no target you send may be below this
 a close-out of this thesis = the floor, exactly  ← and it is `exit` only when the floor is 0
+hostTargetWeight      = otherHeldWeight + min(targetTotalWeight, ownHeldWeight)
+                                                ← the reduction's own total, bounded above by
+                                                  what this desk holds and below by the floor
 ```
+
+⛔ **A reduction is bounded by what *you* hold, and this is the one that was quiet (#823).** The
+sizing's total is `otherHeldWeight + targetTotalWeight`, and a review is reached most often while
+the position is still being staged in — you holding **less** than your own sizing target. Sent
+there, that total is a **purchase**: over a 2% holding wholly this desk's it left as `buy:16`,
+out of a `target-reached-trim`, and out of an `invalidated-re-adjudicate` whose own code is
+`thesis_refuted`. ⚠️ **Nothing on the answer looked wrong** — `incrementalWeight: 0.016…` and
+`atOrAboveTarget: false` are both true *of the entry question*, and the two defences above exist
+only where somebody else holds part of the name. So the total `classifyCase` answers on a
+reduction is
+
+```
+hostTargetWeight = otherHeldWeight + min(targetTotalWeight, ownHeldWeight)
+```
+
+⚠️ **and the `min` is a ceiling, never a floor** — where you hold more than the sizing target,
+which is what makes a reduction a reduction, it changes nothing and the trim, the resize and the
+exit leave exactly as before. ⚠️ On an outcome that changes no position at all — a completed
+position, a `WATCH` — the total is what the account holds today, so an answer that decided not to
+move the position does not carry a weight that moves it. `exposureDirection` on the answer says
+which way the total you were given actually points; if it disagrees with your verdict, do not
+send it.
 
 ⛔ **An `exit` bypasses every weight above it.** Its target is a real `0`, so no arithmetic
 protects it: sent on a name somebody else holds part of, it liquidates their position with
@@ -406,7 +438,8 @@ finished:
 - the cumulative staged target;
 - the target weight and the downside calculation behind it — and, where the two differ, both
   `targetTotalWeight` (this thesis's share) and `hostTargetWeight` (what the position becomes),
-  because a reader approving an order is approving the second;
+  because a reader approving an order is approving the second — and on a reduction say that the
+  second is bounded by what this desk holds;
 - the review you are arming, and the evidence ids.
 
 `counterArguments` carries the strongest case that the fall is correct. For this methodology

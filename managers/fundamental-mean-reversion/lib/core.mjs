@@ -199,3 +199,71 @@ export const VERDICT_ACTIONS = Object.freeze({
   TRIM: Object.freeze(['RESIZE', 'SELL']),
   RE_ADJUDICATE: Object.freeze(['RESIZE', 'SELL']),
 })
+
+/** The three things an answer of this package can ask a position to do. */
+export const WEIGHT_ROLES = Object.freeze(['increase', 'reduce', 'standstill'])
+
+/**
+ * ── What each outcome asks the position to do, as a table (#823) ───────────
+ *
+ * ⛔ **`positionSizing` answers one number without knowing which judgement it
+ * will be attached to, and until #823 the caller attached it to any of them.**
+ * `hostTargetWeight = otherHeldWeight + targetTotalWeight` is entry arithmetic:
+ * every ceiling that produced `targetTotalWeight` is *«the cap less what other
+ * strategies hold»*, so the sum is *«what the position becomes if this desk buys
+ * up to its share»*. `aumos-catalogue#278` carried that whole `sizing` answer
+ * onto the three review outcomes, and a review is reached most often while the
+ * position is still being staged in — this desk holding **less** than its own
+ * sizing target. There the number is a **buy**: measured to the exchange, a
+ * `target-reached-trim` over a 2% holding of this desk's own left as `buy:16`,
+ * and an `invalidated-re-adjudicate` — the outcome whose code is
+ * `thesis_refuted` — bought 1.6pp more of the name it had just refuted.
+ *
+ * ⚠️ **Nothing in the shape of the position stopped it, and nothing could.**
+ * `#819`'s two defences — the withdrawn `SELL` and `hostTargetWeightFloor` —
+ * exist only where `otherHeldWeight > 0`. On a position that is wholly this
+ * desk's the actions are the published `["RESIZE","SELL"]` and the floor is `0`,
+ * which is exactly the state this table is about. It was quiet because the
+ * larger holdings — 6%, 12% — happen to sit above the entry target and so
+ * happen to reduce, the same coincidence that made `catalyst-turnaround`'s
+ * `close-out` look safe until `aumos-catalogue#279` measured the rest of them.
+ *
+ * ⛔ **So the judgement decides the number, and it is a table rather than a
+ * condition written at each return.** `catalyst-turnaround` reached this shape
+ * first (`INTENT_WEIGHT_ROLES`, `aumos-catalogue#279`); this is the same table
+ * over this package's outcome vocabulary. A new outcome that is not in it throws
+ * rather than defaulting, because a default here is how the defect happened.
+ *
+ * | role | `hostTargetWeight` | outcomes |
+ * |---|---|---|
+ * | `increase` | `otherHeld + targetTotalWeight` — ⛔ `#817` unchanged | `mean-reversion-candidate` |
+ * | `reduce` | `otherHeld + min(targetTotalWeight, ownHeldWeight)` | the three review outcomes |
+ * | `standstill` | `otherHeld + ownHeld` — what the account holds today | everything else |
+ *
+ * ⚠️ **The clamp is a ceiling and never a floor.** `min` can only lower this
+ * desk's share, so where the sizing target is already below the holding — which
+ * is what makes a reduction a reduction — it is the identity, and the trim, the
+ * resize and the exit this methodology has always sent still leave
+ * (`untilled/aumos#782`). What can no longer leave is a purchase out of a
+ * judgement that says reduce.
+ *
+ * ⚠️ **`standstill` says a number rather than `null`.** `null` already means
+ * «the account was not folded» (#819) and one word cannot carry two states. An
+ * outcome that changes nothing asks the host for what the account already holds.
+ */
+export const OUTCOME_WEIGHT_ROLES = Object.freeze({
+  'mean-reversion-candidate': 'increase',
+  'target-reached-trim': 'reduce',
+  'invalidated-re-adjudicate': 'reduce',
+  'deadline-elapsed-re-adjudicate': 'reduce',
+  'target-weight-already-held': 'standstill',
+  'research-incomplete': 'standstill',
+  'risk-limit-exceeded': 'standstill',
+  'falling-knife': 'standstill',
+  'stabilization-unconfirmed': 'standstill',
+  'structural-earnings-damage': 'standstill',
+  'data-missing': 'standstill',
+  'price-artifact-suspected': 'standstill',
+  'uptrend-pullback-not-this-strategy': 'standstill',
+  'out-of-scope': 'standstill',
+})

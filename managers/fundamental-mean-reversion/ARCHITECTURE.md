@@ -231,9 +231,10 @@ three review answers carry the whole `sizing` answer with them. The numbers come
 `exposure` the buy path adds — holdings only, never `otherWeight`.
 
 ⑵ `hostTargetWeightFloor = otherHeldWeight` is the weight **no** target handed to the host may go
-below. This branch sizes nothing, so it cannot answer a `hostTargetWeight` the way
-`catalyst-turnaround`'s `runVerdict` does; a floor is the same statement in the form this branch
-can make it, and a close-out of this thesis *is* the floor exactly.
+below. A floor was what this branch could say at the time — a close-out of this thesis *is* the
+floor exactly — and ⛔ **the sentence that followed it here, «this branch sizes nothing, so it
+cannot answer a `hostTargetWeight`», stopped being true in the same commit**: carrying the whole
+`sizing` answer carried a `hostTargetWeight` with it. That is #823, one section down.
 
 ⑶ ⛔ **`exit` is withdrawn where somebody else holds part of the name.** This is the judgement the
 issue left open, and it is the same one in all three packages: *an `exit` is correct only when
@@ -263,6 +264,89 @@ fold or add (`untilled/aumos#781`), execution does not read attribution
 
 ⬜ `cash-weight` targets name no asset, so there is no position for a floor to attach to. This
 package's `PROMPT.md` never asks for one.
+
+## The number a judgement carries is the judgement's (#823)
+
+`#819` put the `sizing` answer on the three review outcomes so that the two attribution numbers
+would travel with them. What travelled with them was `positionSizing`'s `hostTargetWeight`, and
+that number is **entry arithmetic**: every ceiling behind `targetTotalWeight` is *«the cap less
+what other strategies hold»*, so the sum is *«what the position becomes if this desk buys up to
+its share»*. It is computed before any outcome is known, and the caller attached it to whichever
+outcome it reached.
+
+⛔ **The defect needs no unattributed holding.** It fires where the position is **wholly this
+desk's**, which is why `untilled/aumos#786`'s gate cannot reach it and why `#819`'s two defences
+are absent: the withdrawn `SELL` and the floor both require `otherHeldWeight > 0`, and here the
+actions are the published `["RESIZE","SELL"]` and the floor is `0`. A review is reached most
+often while the position is still being staged in — this desk holding *less* than its own sizing
+target — and there the entry total is a purchase.
+
+Measured to the exchange, one book, one entry share of `0.03623596`:
+
+| this desk's holding | outcome | before | after |
+|---|---|---|---|
+| 2% | `target-reached-trim`, and both `re-adjudicate`s | ⚠️ **`buy:16`** | `0.02` — no order |
+| 3% | the same three | ⚠️ **`buy:6`** | `0.03` — no order |
+| 6% | the same three | ✅ `sell:23` | ✅ unchanged |
+| 12% | the same three | ✅ `sell:83` | ✅ unchanged |
+
+⚠️ **The green rows were green by coincidence.** 6% and 12% sit above the entry target, so the
+entry total *happens* to reduce — the same coincidence that made `catalyst-turnaround`'s
+`close-out` look safe until `aumos-catalogue#279` measured the other twelve intents.
+
+⚠️ **And the answer said so, in the same object, with nothing reading it.** `incrementalWeight:
+0.01623596` and `atOrAboveTarget: false` — «buy 1.6pp more», «not at target yet» — on an outcome
+whose code is `thesis_refuted`, with an empty `diagnostics`. ⛔ Both readings are **true of the
+entry question**, which is what made them quiet: what was wrong is not the fields but the branch
+that read them.
+
+**The fix is a table, `OUTCOME_WEIGHT_ROLES` in `lib/core.mjs`**, and `classifyCase` chooses the
+total after the outcome is known:
+
+| role | `hostTargetWeight` | outcomes |
+|---|---|---|
+| `increase` | `otherHeld + targetTotalWeight` — ⛔ `#817` unchanged | `mean-reversion-candidate` |
+| `reduce` | `otherHeld + min(targetTotalWeight, ownHeldWeight)` | the three review outcomes |
+| `standstill` | `otherHeld + ownHeld` — what the account holds today | the other ten |
+
+⛔ **An outcome with no role throws.** «Whatever the sizing answered» is the default this section
+is about, and a fourteenth outcome must not inherit it.
+
+⚠️ **The clamp is a ceiling and never a floor.** `min` can only lower this desk's share, so where
+the sizing target is already below the holding — which is what makes a reduction a reduction — it
+is the identity and the trim, the resize and the exit still leave (`untilled/aumos#782`). The
+lower bound is `otherHeld`, unchanged: `#819`'s floor and this clamp meet exactly at a position
+none of which is this desk's, where the total *is* the floor and no order leaves.
+
+⚠️ **`standstill` says a number rather than `null`**, because `null` already means «the account
+was not folded» and one word cannot carry two states.
+
+**Two answers of the same family, outside the review branch.** `sizing` also rides on
+`target-weight-already-held` (`WAIT`) and on a `research-incomplete` produced by an unevaluated
+sizing (`WATCH`). Over a holding **above** the entry target that total is *below* what the
+account holds — so a `WAIT` meaning «the position is complete» carried a **sale** of part of it.
+Both are `standstill` now, and `standstill_total_is_the_position_as_held` says so in the answer.
+
+**One name, one number.** The review answer used to hold two fields called `hostTargetWeight` —
+the answer's and the `sizing`'s — with different values. `classifyCase` replaces the field on the
+`sizing` it carries and stamps `hostTargetWeightRole` beside it; the entry arithmetic is not
+hidden, it stays on `targetTotalWeight` under the name that says whose share it is.
+
+**And the check that fails when a word and a number disagree.** Eighty-six checks were green
+while a `TRIM` asked the host to buy, because nothing compared the verdict against the weight the
+same answer carried. `tools/verify-fundamental-mean-reversion.mjs` now runs every fixture case
+against five books — this desk's, unattributed, another manager's, shared, and an empty one — and
+reads only the two numbers on the answer: the floor bounds every non-`increase` total from below,
+`positionWeight` bounds it from above, `standstill` equals it, `exposureDirection` is recomputed
+rather than trusted, and a verdict may not leave with a direction that contradicts it.
+
+⛔ **What was not done**, as in `#817` and `#819`: the host does not fold or add
+(`untilled/aumos#781`), execution does not read attribution (`untilled/aumos#232`), `#786`'s gate
+was not widened (`untilled/aumos#782`), and execution does not refuse an order by reading the
+judgement's word (`untilled/aumos#822`).
+
+⬜ `cash-weight` names no asset and so has no position for a role to attach to; this package's
+`PROMPT.md` never asks for one.
 
 ## The sector axis: the judgement #269 asked for, and what came of it
 

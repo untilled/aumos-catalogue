@@ -45,7 +45,9 @@ import { fileURLToPath } from 'node:url'
 import {
   DIAGNOSIS_CODES,
   OUTCOMES,
+  OUTCOME_WEIGHT_ROLES,
   STRATEGY_ID,
+  WEIGHT_ROLES,
   THRESHOLDS,
   execute,
   concentration,
@@ -580,7 +582,19 @@ check('#819 — a review of a position this desk does not run may not leave as a
     assert.ok(codesOf(answer).includes('reviewed_position_is_not_this_desks'), `${label}: nothing said whose position it is`)
     /** ⚠️ The review branch answered no `sizing` at all, so neither weight reached the model. */
     assert.ok(answer.sizing?.exposure, `${label}: the review answer carries no sizing, so the run reading it has no numbers to reduce against`)
-    assert.equal(answer.sizing.hostTargetWeight, round(0.06 + answer.sizing.targetTotalWeight), `${label}: the buy-direction total is still assembled the way #817 assembles it`)
+    /**
+     * ⛔ **This assertion used to pin the buy-direction sum here, and that is
+     * what #823 was.** The review answer carried `otherHeld + targetTotalWeight`
+     * — an *entry* target — on an outcome whose whole content is «reduce», and
+     * this checker held it green. What the answer may carry is the reduction's
+     * own total, and over a position none of which is this desk's that total is
+     * the floor exactly: the review is written down and no order leaves.
+     */
+    assert.ok(answer.sizing.targetTotalWeight > 0, `${label}: the entry arithmetic is still on the answer under its own name`)
+    assert.equal(answer.sizing.hostTargetWeight, 0.06, `${label}: the reduction carried the entry target, which over a holding this desk has none of is a purchase`)
+    assert.equal(answer.sizing.hostTargetWeightRole, 'reduce', `${label}: the total on the answer does not say which judgement it is for`)
+    assert.equal(answer.hostTargetWeight, 0.06, `${label}: the answer's own total moved a position this desk does not run`)
+    assert.equal(answer.exposureDirection, 'unchanged', `${label}: the answer proposes a change to a position none of which is this desk's`)
     assert.ok(!codesOf(answer).includes('data_missing'), `${label}: an explicit book was reported as missing data, which is the state untilled/aumos#782 undid`)
   }
 
@@ -622,6 +636,244 @@ check('#819 — a review of a position this desk does not run may not leave as a
   assert.equal(unread.hostTargetWeightFloor, null)
   assert.deepEqual([...unread.ampActions], ['RESIZE', 'SELL'], 'the published actions moved on an answer that measured nothing')
   assert.ok(codesOf(unread).includes('review_exposure_unread'), 'the run was not told that its reduction has no floor')
+})
+
+/**
+ * ── The #823 harness: one book shape, five attributions, every outcome ─────
+ *
+ * ⛔ **The inputs are built here and no fixture was edited.** `execution` is
+ * declared the way XKRX requires (`dailyPriceLimit: true`), which is what makes
+ * the entry arithmetic answer the `0.03623596` the issue drove to the exchange —
+ * a share that sits *above* a 2% or 3% holding and *below* a 6% or 12% one, and
+ * that gap is the whole of the defect.
+ */
+const CAP823 = { singleNameCap: 0.1, grossCap: 0.9 }
+const sizingBase823 = structuredClone(sizing.cases.find((row) => row.name === 'calm-series').input)
+const SYMBOL823 = sizingBase823.symbol
+const held823 = (weight, strategy) => ({ symbol: SYMBOL823, sector: 'technology', weight, ...(strategy === undefined ? {} : { strategy }) })
+const sizeFor823 = (holdings, overrides = {}) =>
+  execute({
+    operation: 'positionSizing',
+    asOf: ASOF,
+    input: {
+      ...structuredClone(sizingBase823),
+      mandate: CAP823,
+      execution: { halted: false, dailyPriceLimit: true },
+      book: { holdings, openProposals: [] },
+      rows: rowsOf('shock-then-base'),
+      ...overrides,
+    },
+  })
+const case823 = (name) => {
+  const row = cases.cases.find((fixture) => fixture.name === name)
+  assert.ok(row, `fixtures/cases.json carries ${name}`)
+  return row
+}
+const classify823 = (name, sizingAnswer, extra = {}) => {
+  const row = case823(name)
+  return execute({
+    operation: 'classifyCase',
+    asOf: ASOF,
+    input: {
+      ...structuredClone(row.input),
+      series: { adjustment: row.declared ?? undefined, corporateActions: row.corporateActions ?? [], rows: rowsOf(row.series) },
+      sizing: sizingAnswer,
+      ...extra,
+    },
+  })
+}
+const codesOf823 = (answer) => answer.diagnostics.map((diag) => diag.code)
+/** The three review outcomes over a position **wholly this desk's** — where #819's defences do not exist. */
+const reviewAnswers = (holding) =>
+  ['invalidation-triggered', 'deadline-elapsed', 'target-reached-staged-trim'].map((name) => [
+    `${name}@${holding}`,
+    classify823(name, sizeFor823([held823(holding, STRATEGY_ID)])),
+  ])
+/** A held position whose review found nothing, so the run falls through to the sizing rungs. */
+const heldCase823 = (holding, review, overrides = {}) =>
+  classify823('temporary-shock-plus-stabilisation', sizeFor823([held823(holding, STRATEGY_ID)], overrides), {
+    position: { held: true, weight: holding },
+    review: { invalidationTriggered: false, deadlineElapsed: false, ...review },
+  })
+
+/**
+ * ── #823: the number a judgement carries is the judgement's ────────────────
+ *
+ * `#819` gave the review branch the whole `sizing` answer so that the two
+ * attribution numbers would travel with it. What travelled with them was
+ * `positionSizing`'s `hostTargetWeight` — `otherHeld + targetTotalWeight`, the
+ * **entry** total, assembled before any outcome was known. A review is reached
+ * most often while the position is still being staged in, this desk holding
+ * *less* than its own sizing target, and there that total is a **purchase**:
+ * driven to the exchange, a `target-reached-trim` over a 2% holding wholly this
+ * desk's left as `buy:16`, and `invalidated-re-adjudicate` — the outcome whose
+ * code is `thesis_refuted` — bought 1.6pp more of the name it had just refuted.
+ *
+ * ⛔ **`#819`'s two defences are absent in exactly this case.** The withdrawn
+ * `SELL` and `hostTargetWeightFloor` both need `otherHeldWeight > 0`; on a
+ * position wholly this desk's the actions are `["RESIZE","SELL"]` and the floor
+ * is `0`. Nothing was left to stop it, and nothing said so: the same answer
+ * carried `incrementalWeight: 0.016…` and `atOrAboveTarget: false` with an empty
+ * `diagnostics`.
+ *
+ * ⚠️ **The large holdings were green by coincidence** — 6% and 12% sit above the
+ * entry target, so the entry total happens to reduce. That is the coincidence
+ * that made `catalyst-turnaround`'s `close-out` look safe until
+ * `aumos-catalogue#279` measured the other twelve intents.
+ */
+check('#823 — a reduction over a position wholly this desk\'s may not leave as a purchase', () => {
+  const answers = reviewAnswers(0.02)
+  for (const [name, answer] of answers) {
+    assert.equal(answer.ownHeldWeight, 0.02, `${name}: the desk's own holding`)
+    assert.equal(answer.otherHeldWeight, 0, `${name}: nobody else is in this name — which is why #819 stops nothing here`)
+    assert.equal(answer.hostTargetWeightFloor, 0, `${name}: and the floor is 0, as it must be for a position this desk may close`)
+    assert.deepEqual([...answer.ampActions], ['RESIZE', 'SELL'], `${name}: the published actions are unchanged on this desk's own position`)
+    assert.equal(answer.weightRole, 'reduce', `${name}: an outcome that reduces was not typed as one`)
+    assert.equal(answer.positionWeight, 0.02, `${name}: what the account holds in the name`)
+    assert.ok(answer.sizing.targetTotalWeight > 0.02, `${name}: the entry arithmetic sizes this desk's share above the holding — this is the state the defect needs`)
+    assert.equal(answer.hostTargetWeight, 0.02, `${name}: a reduction asked the host for more than the account holds, which is a buy`)
+    assert.equal(answer.sizing.hostTargetWeight, 0.02, `${name}: the sizing carried on the answer still names the entry total`)
+    assert.equal(answer.sizing.hostTargetWeightRole, 'reduce', `${name}: the carried total does not say which judgement it is for`)
+    assert.equal(answer.exposureDirection, 'unchanged', `${name}: the answer increases the account's exposure to a name it judged should be reduced`)
+    assert.ok(codesOf823(answer).includes('reduction_target_clamped_to_own_holding'), `${name}: nothing in the answer said the entry total had been withheld`)
+    /** ⚠️ The two entry-direction readings are still there and still true — of the entry question. */
+    assert.equal(answer.sizing.atOrAboveTarget, false, `${name}: this desk does hold less than its own entry target, and that reading is not what was wrong`)
+    assert.ok(answer.sizing.incrementalWeight > 0)
+  }
+
+  /** 3%: the same shape one point higher, and the issue measured `buy:6` here. */
+  for (const [name, answer] of reviewAnswers(0.03)) {
+    assert.equal(answer.hostTargetWeight, 0.03, `${name}: a 3% holding was bought up to the entry target`)
+    assert.equal(answer.exposureDirection, 'unchanged', `${name}: exposureDirection`)
+  }
+})
+
+/**
+ * ⛔ **The reduction this fix must not kill (`untilled/aumos#782`).** Where the
+ * holding is above the entry target the clamp is the identity — `min` is a
+ * ceiling and never a floor — and the trim, the resize and the exit leave
+ * exactly as before. `sell:23` and `sell:83` are the orders the issue measured.
+ */
+check('#823 — a real reduction still leaves, and the clamp is a ceiling and not a floor', () => {
+  for (const holding of [0.06, 0.12]) {
+    for (const [name, answer] of reviewAnswers(holding)) {
+      const share = answer.sizing.targetTotalWeight
+      assert.ok(share < holding, `${name}/${holding}: the fixture no longer measures a holding above the entry target`)
+      assert.equal(answer.hostTargetWeight, share, `${name}/${holding}: a reduction of this desk's own position was clamped away`)
+      assert.equal(answer.exposureDirection, 'reduce', `${name}/${holding}: the order that leaves is no longer a reduction`)
+      assert.deepEqual([...answer.ampActions], ['RESIZE', 'SELL'], `${name}/${holding}: this desk stopped being able to close its own position`)
+      assert.ok(!codesOf823(answer).includes('reduction_target_clamped_to_own_holding'), `${name}/${holding}: the clamp reported itself as binding where it is the identity`)
+    }
+  }
+
+  /**
+   * ⚠️ **A shared position reduces this desk's share only.** The floor is what
+   * somebody else holds and the reduction lands above it — never at the entry
+   * total's expense, and never at theirs.
+   */
+  const shared = classify823('invalidation-triggered', sizeFor823([held823(0.04, STRATEGY_ID), held823(0.06, 'inst_shareholder_rerating')]))
+  assert.equal(shared.ownHeldWeight, 0.04)
+  assert.equal(shared.positionWeight, 0.1)
+  assert.equal(shared.hostTargetWeight, round(0.06 + Math.min(shared.sizing.targetTotalWeight, 0.04)), 'a shared position was reduced by more than this desk\'s share of it')
+  assert.ok(shared.hostTargetWeight >= shared.hostTargetWeightFloor, 'the reduction went below the floor, selling a holding this desk does not run')
+  assert.ok(shared.hostTargetWeight < shared.positionWeight, 'and this desk could no longer reduce the part of the position that is its own')
+  assert.equal(shared.exposureDirection, 'reduce')
+})
+
+/**
+ * ⛔ **The check that fails when a word and a number disagree.** Eighty-six
+ * checks were green while a `TRIM` asked the host to buy, because nothing
+ * compared the verdict with the weight the same answer carried. This reads only
+ * the two numbers on the answer and the outcome's role, so a new outcome, a new
+ * rung or a new arithmetic reaches it without anybody adding a case.
+ */
+check('#823 — every outcome, on five books: the total agrees with the judgement', () => {
+  const books = [
+    ['mine', [held823(0.06, STRATEGY_ID)]],
+    ['unattributed', [held823(0.06)]],
+    ['another manager', [held823(0.06, 'inst_catalyst_turnaround')]],
+    ['shared', [held823(0.04, STRATEGY_ID), held823(0.06, 'inst_shareholder_rerating')]],
+    ['empty book', []],
+  ]
+  /** The directions each verdict may leave with. A word that cannot be read off the number is not enforced. */
+  const allowed = { BUY: ['increase', 'unchanged'], TRIM: ['reduce', 'unchanged'], RE_ADJUDICATE: ['reduce', 'unchanged'], WAIT: ['unchanged'], WATCH: ['unchanged'] }
+  let measured = 0
+  for (const row of cases.cases) {
+    for (const [label, holdings] of books) {
+      const answer = classify823(row.name, sizeFor823(holdings))
+      const where = `${row.name}/${label}`
+      assert.equal(answer.weightRole, OUTCOME_WEIGHT_ROLES[answer.outcome], `${where}: the answer's role is not the one the table gives its outcome`)
+      if (answer.hostTargetWeight === null) {
+        assert.ok(answer.ownHeldWeight === null || answer.otherHeldWeight === null, `${where}: an answer that folded the account still named no total`)
+        continue
+      }
+      measured += 1
+      assert.equal(answer.positionWeight, round(answer.ownHeldWeight + answer.otherHeldWeight), `${where}: positionWeight is not what the account holds`)
+      if (answer.weightRole === 'increase') {
+        assert.equal(answer.hostTargetWeight, round(answer.otherHeldWeight + answer.sizing.targetTotalWeight), `${where}: #817's addition on the buy path moved`)
+        assert.ok(answer.hostTargetWeight >= answer.positionWeight, `${where}: a judgement to add left as a reduction`)
+      } else {
+        assert.ok(answer.hostTargetWeight >= answer.otherHeldWeight, `${where}: the total handed over is below the floor, so it sells a holding this desk does not run`)
+        assert.ok(answer.hostTargetWeight <= answer.positionWeight, `${where}: an outcome that does not add asked the host for more than the account holds`)
+      }
+      if (answer.weightRole === 'standstill') {
+        assert.equal(answer.hostTargetWeight, answer.positionWeight, `${where}: an outcome that changes nothing proposed a change`)
+      }
+      /** ⚠️ Recomputed here rather than trusted: a field that restates the outcome measures nothing. */
+      const direction = answer.hostTargetWeight > answer.positionWeight ? 'increase' : answer.hostTargetWeight < answer.positionWeight ? 'reduce' : 'unchanged'
+      assert.equal(answer.exposureDirection, direction, `${where}: exposureDirection is not the comparison of the two numbers on this answer`)
+      assert.ok(allowed[answer.verdict].includes(direction), `${where}: the verdict is ${answer.verdict} and the weight it carries is an ${direction} of the account's exposure`)
+      if (answer.sizing) assert.equal(answer.sizing.hostTargetWeight, answer.hostTargetWeight, `${where}: two fields named hostTargetWeight on one answer, and they disagree`)
+    }
+  }
+  assert.ok(measured > 40, 'the cross-check reached too few answers to be measuring anything')
+})
+
+/** ⛔ Every outcome has a role, and no role is invented for an outcome nobody published. */
+check('#823 — the role table covers this package\'s outcome vocabulary exactly', () => {
+  assert.deepEqual([...Object.keys(OUTCOME_WEIGHT_ROLES)].sort(), [...OUTCOMES].sort(), 'an outcome with no role would take whatever the sizing answered, which is the defect')
+  for (const [outcome, role] of Object.entries(OUTCOME_WEIGHT_ROLES)) {
+    assert.ok(WEIGHT_ROLES.includes(role), `${outcome}: ${role} is not one of the three`)
+  }
+  assert.deepEqual([...new Set(Object.values(OUTCOME_WEIGHT_ROLES))].sort(), [...WEIGHT_ROLES].sort(), 'a role nothing reaches is a role nothing was checked against')
+})
+
+/**
+ * ⚠️ **The same family, two outcomes over.** `aumos-catalogue#278` attached the
+ * sizing to three review outcomes; two more answers carry it — the completed
+ * position (`WAIT`) and a sizing carrying an unevaluated reading (`WATCH`) — and
+ * both carried the entry total. On a holding **above** the entry target that
+ * number is *below* what the account holds, so a `WAIT` was carrying a sale.
+ */
+check('#823 — an answer that changes nothing carries the position as held', () => {
+  const complete = heldCase823(0.12, { targetReached: false })
+  assert.equal(complete.outcome, 'target-weight-already-held')
+  assert.equal(complete.verdict, 'WAIT')
+  assert.equal(complete.weightRole, 'standstill')
+  assert.ok(complete.sizing.targetTotalWeight < 0.12, 'the entry total is below the holding, which is what made the WAIT a sale')
+  assert.equal(complete.hostTargetWeight, 0.12, 'an answer of «the position is complete» proposed to sell part of it')
+  assert.equal(complete.exposureDirection, 'unchanged')
+  assert.ok(codesOf823(complete).includes('standstill_total_is_the_position_as_held'), 'nothing said that the entry total had been set aside')
+
+  /** An unevaluated halt state: `research-incomplete`, `WATCH`, and the sizing rides along. */
+  const unevaluated = heldCase823(0.12, { targetReached: false }, { execution: {} })
+  assert.equal(unevaluated.outcome, 'research-incomplete')
+  assert.equal(unevaluated.verdict, 'WATCH')
+  assert.ok(unevaluated.sizing, 'the answer carries the sizing it could not evaluate, which is where the total came from')
+  assert.equal(unevaluated.hostTargetWeight, 0.12, 'unfinished research proposed a reduction of the position it could not finish researching')
+  assert.equal(unevaluated.exposureDirection, 'unchanged')
+})
+
+/** ⛔ And the buy path is untouched: `#817`'s addition is the `increase` role, unchanged. */
+check('#823 — the entry total is unchanged where the judgement is to enter (#817)', () => {
+  const answer = classify823('temporary-shock-plus-stabilisation', sizeFor823([held823(0.06)]))
+  assert.equal(answer.outcome, 'mean-reversion-candidate')
+  assert.equal(answer.verdict, 'BUY')
+  assert.equal(answer.weightRole, 'increase')
+  assert.equal(answer.otherHeldWeight, 0.06)
+  assert.equal(answer.hostTargetWeight, round(0.06 + answer.sizing.targetTotalWeight), '#817\'s addition moved on the path it was written for')
+  assert.equal(answer.exposureDirection, 'increase', 'a BUY over an unattributed holding stopped adding to it')
+  assert.ok(!codesOf823(answer).includes('reduction_target_clamped_to_own_holding'))
 })
 
 check('config may narrow the risk budget and may not widen it', () => {

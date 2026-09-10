@@ -32,7 +32,7 @@ import { positionSizing } from './sizing.mjs'
 import { applyStage, stagedPlanState } from './staged-plan.mjs'
 import { classifyCase } from './classify.mjs'
 
-export { THRESHOLDS, DIAGNOSIS_CODES, OUTCOMES, VERDICT_ACTIONS, diagnostic, finite, round } from './core.mjs'
+export { THRESHOLDS, DIAGNOSIS_CODES, OUTCOMES, VERDICT_ACTIONS, OUTCOME_WEIGHT_ROLES, WEIGHT_ROLES, diagnostic, finite, round } from './core.mjs'
 export * from './prices.mjs'
 export * from './stabilisation.mjs'
 export * from './reversion.mjs'
