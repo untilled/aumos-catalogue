@@ -82,6 +82,49 @@ position on a book with 5% of room left. ⚠️ Two managers naming the same tot
 end state rather than asked for two. ⚠️ And a pending **trim** does not reduce exposure before it
 fills — the book holds what it holds until the order goes through.
 
+
+⛔ **Where the two lists come from, and what the host does not put in them.** `accountConcentration`
+takes `positions` and `proposals`, and you assemble both out of **one** call, `portfolio_get`. A
+position is a row of `snapshot.positions[]`, and its `weight` is what is really held. A proposal is
+not a row of its own: `pending[]` carries one entry per unfinished judgement on this fund — yours
+and every other manager's — and the total that judgement asks for is in its `targetWeights[]`, one
+`{ asset, targetWeight }` per asset it named. Those are **total weights and not changes**, in the
+host's own words, and that number is what a `proposals` row's `targetWeight` carries.
+⛔ **`portfolio_read` has neither list.** It is the mark this run started from and says so itself;
+the pending judgements, and the assignment below, come back from `portfolio_get` alone.
+
+⚠️ **An asset with no entry in `targetWeights` said no size, and that absence is not zero.**
+`targetWeights` is a subset of the judgement's `assets`: a judgement may name a subject it states
+no target for, a `WAIT` states none at all, and a cash target names no asset. Read one of those as
+`0` and another manager's open buy becomes no exposure — the understatement this desk's ceilings
+cannot see. Build no `proposals` row for it, record it as `data_missing`, and name the decision
+whose size you could not read. An `exit` target **is** a real `0` and is carried as one. And a
+`position-weight` target is executed against the **whole** position rather than against its
+author's share of it — that is the fact the fold above stands on, and the reason the key is the
+name and never the pair (strategy, name).
+
+⛔ **Every position row says whose position it is, in `assignment`, and three of its four words are
+not yours.** `assignment.state` is present on every row and is one of `assigned`, `none`,
+`released` or `departed`. `assigned` names the running manager in `assignment.managerInstanceId`,
+and that is the same id `context_get` hands you for yourself — comparing the two is the **only**
+thing that tells your position from another manager's. `none` means no judgement of this fund ever
+named the asset, which is what a holding bought by hand in a broker app looks like; `released`
+means an assignment existed and ended when the position was fully sold; `departed` means the
+manager that ran it was removed. `managerInstanceId` is `null` in all three and ⛔ **none of them
+is yours to assume** — average cost and quantity do not tell you whose it is.
+
+So a row's `strategy` is filled where the state is `assigned` and **left off** otherwise: where
+`managerInstanceId` is you it is the same id you hand `accountConcentration` as `strategy`, and
+where it is another manager it is that manager's instance id, unchanged. The same field on a
+`proposals` row is the judgement's own `managerInstanceId`, and a `null` there is a judgement that
+named no manager rather than one that named you. ⚠️ **That word
+moves a number here.** `byStrategy` splits the name by it and `headroomForStrategy` opens only for
+the share that is already yours: a 6% position on a 20% cap leaves this desk 0.20 when the position
+is assigned to you and 0.14 when it is assigned to anyone else — and an unattributed one stays
+0.14, because a position nobody is assigned to is not a position you run. ⛔ Guessing the other way
+is how a manager buys on top of a position it already holds, which is the failure this field was
+put on the wire to end.
+
 ⛔ **Per-strategy limits never add up into a larger account limit.** Three managers each allowed 12%
 of one name is not 36% of it. Compute the whole-account exposure for the name and take the smaller
 of the account's limit and yours. A held name carrying two theses is still one position.
