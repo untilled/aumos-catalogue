@@ -52,6 +52,7 @@ import {
   round,
   returnComposition,
   stagedIncrement,
+  targetWeight,
 } from '../managers/shareholder-rerating/lib/index.mjs'
 
 const fixtureRoot = new URL('../managers/shareholder-rerating/fixtures/', import.meta.url)
@@ -1235,6 +1236,330 @@ const byId = (id) => {
   assert.equal(THRESHOLDS.relativeYieldTrap, 2)
   assert.equal(THRESHOLDS.nonRecurringShare, 0.3)
   ok('every case label has a route, and the four published thresholds are the four in the pull request')
+}
+
+/**
+ * ── #833: a ceiling made of other names sizes no sale ──────────────────────
+ *
+ * ⛔ **The second door of #830, and the measurement says it is the worse one.**
+ * #830 closed the three *gates*; this is the *fold* underneath them. Every
+ * declared axis is folded into `maxTotalWeightForName`, the sizing is bounded by
+ * it, and `index.mjs` subtracts what the account carries — so as another desk's
+ * names fill a sector or the whole book, the ceiling on **this** name falls, and
+ * a reduction sized against it grows. Measured through the real host on a 6%
+ * position wholly this desk's, its own thesis intact, `accountSectorCap` 0.25,
+ * this package sizing it at `0.05333333`:
+ *
+ *     other names in the sector   ceiling   the order          multiple
+ *     0     / 0.19                0.053     sell:6              1.0×
+ *     0.21                        0.04      sell:20             3.0×
+ *     0.24                        0.01      sell:50             7.5×   (83% of it)
+ *     0.245                       0.005     —                   8.2×
+ *     0.2451 and above            —         no order at all     deleted
+ *
+ * ⛔ **And an open proposal nobody approved produced the same number as a
+ * holding**, which is the mirror of what `aumos-catalogue#281` closed in
+ * `fundamental-mean-reversion` and `#284` closed in this package's gates.
+ *
+ * ── The judgement, because the arithmetic could not make it ─────────────────
+ *
+ * ⛔ **A residual is not an allocation.** A sector ceiling states no division of
+ * itself between the names under it, so reading *«the sector has 0.01 left»* as
+ * *«this position must become 0.01»* assigns the whole adjustment to whichever
+ * name was evaluated last — and to a desk that may not be able to reduce a
+ * single share of what filled the bucket. An arithmetic whose answer depends on
+ * evaluation order has not made a decision.
+ *
+ * ⚠️ **So the fix is not the `0` boundary the issue framed, it is the axis.**
+ * Stopping only at *«the ceiling derived 0»* would have left the 3.0× and the
+ * 7.5× rows exactly where the host measured them. What changed is which
+ * ceilings may size a sale: the ones that name **this position** — the
+ * single-name caps and the risk arithmetic — and never the account's leftover
+ * room after other names. That is this package's own sentence from #269 and
+ * #830, *a ceiling constrains additions rather than reductions*, applied to the
+ * last place it was not: the fold.
+ *
+ * ⛔ **`untilled/aumos#813` does not move**, and the entry rows below are the
+ * proof: an addition is still measured against holdings and open proposals
+ * together, and a full bucket still buys nothing.
+ */
+{
+  const MINE = 'shareholder-rerating'
+  const OTHER = 'catalyst-turnaround'
+  const buyPath = (() => {
+    const fixture = cases.cases.find((row) => row.id === 'financial-positive-reaches-buy')
+    assert.ok(fixture, 'cases.json no longer carries the sized BUY case, so this regression is testing nothing')
+    return fixture.input
+  })()
+  const SYMBOL = buyPath.symbol
+  /** The size this package's arithmetic gives this thesis, with no book in the way. */
+  const SIZED = 0.05333333
+  const SECTOR_CAPS = { accountPositionCap: 0.1, accountSectorCap: 0.25 }
+  const GROSS_CAPS = { accountPositionCap: 0.1, accountGrossCap: 0.5 }
+
+  /**
+   * ⚠️ **The bucket is filled by a *different name*, which is the whole point.**
+   * Nothing here touches this desk's position: the sector and the gross totals
+   * move because somebody else owns something else.
+   */
+  const bucket = (weight, kind, axis) => {
+    if (weight === 0) return { holdings: [], openProposals: [] }
+    const sector = axis === 'sector' ? 'financials' : 'industrials'
+    return kind === 'pending'
+      ? { holdings: [], openProposals: [{ symbol: 'OTHER1', sector, targetWeight: weight, strategy: OTHER, decisionId: 'dec_1' }] }
+      : { holdings: [{ symbol: 'OTHER1', sector, weight, strategy: OTHER }], openProposals: [] }
+  }
+  const run = ({ own = 0.06, ownStrategy = MINE, weight, kind, axis }) => {
+    const rest = bucket(weight, kind, axis)
+    const holdings = own === 0 ? rest.holdings : [{ symbol: SYMBOL, sector: 'financials', weight: own, ...(ownStrategy === undefined ? {} : { strategy: ownStrategy }) }, ...rest.holdings]
+    return evaluateCase({
+      ...structuredClone(buyPath),
+      strategy: MINE,
+      mandate: { ...structuredClone(buyPath.mandate), caps: axis === 'sector' ? SECTOR_CAPS : GROSS_CAPS },
+      book: { holdings, openProposals: rest.openProposals },
+    })
+  }
+
+  /**
+   * ⛔ **The four axes of this regression, and each of them separately.** Others'
+   * **holdings** and others' **open proposals** are one axis (a proposal nobody
+   * approved is not a position for an order); the **sector** and **gross**
+   * ceilings are the other (a fix that moved one leaves the defect reachable
+   * through the twin, which is how #830 nearly shipped half-fixed).
+   *
+   * ⚠️ **And the sweep is a sweep.** The host measured five points on the ramp
+   * and the threshold that deletes the order sits at `cap − minimumExecutable`;
+   * a single probe anywhere on it would have called this closed while three of
+   * the five rows were still wrong.
+   */
+  const RAMP = {
+    /** `0.1967` is `cap − sized`, where the remainder first bites; every row above it used to grow the sale. */
+    sector: [0, 0.19, 0.1967, 0.2, 0.21, 0.24, 0.245, 0.2451, 0.25, 0.3, 0.5],
+    gross: [0, 0.44, 0.4467, 0.45, 0.46, 0.49, 0.495, 0.4951, 0.5, 0.6, 0.8],
+  }
+  for (const axis of ['sector', 'gross']) {
+    for (const weight of RAMP[axis]) {
+      for (const kind of ['held', 'pending']) {
+        const answer = run({ weight, kind, axis }).data
+        const where = `${axis}/${kind}/${weight}`
+        assert.equal(answer.route, 'trim-or-exit-review', `${where}: other names in the bucket moved this desk off the reduction route`)
+        assert.equal(answer.proposedAction, 'RESIZE', `${where}: a real reduction became a no-op because somebody else filled the bucket`)
+        assert.equal(answer.ownHeldWeight, 0.06, `${where}: this desk's own holding moved`)
+        assert.equal(answer.otherHeldWeight, 0, `${where}: another name was carried as part of this position`)
+        assert.equal(
+          answer.hostTargetWeight,
+          SIZED,
+          `${where}: the account's leftover room after other names sized this desk's sale`,
+        )
+        assert.ok(answer.hostTargetWeight < 0.06, `${where}: the «reduction» did not reduce`)
+      }
+    }
+  }
+  ok('#833 — a reduction is sized by the ceilings that name this position, on both bucket axes and whether the bucket is held or merely proposed')
+
+  /**
+   * ⛔ **Others' holdings and others' unapproved proposals answer identically,
+   * and that is now true because neither reaches the number.** Before #833 they
+   * were identical because both reached it.
+   */
+  for (const axis of ['sector', 'gross']) {
+    for (const weight of RAMP[axis]) {
+      const held = run({ weight, kind: 'held', axis }).data
+      const pending = run({ weight, kind: 'pending', axis }).data
+      assert.equal(pending.hostTargetWeight, held.hostTargetWeight, `${axis}/${weight}: a proposal nobody approved sized this desk's order differently from a holding`)
+      assert.equal(pending.otherHeldWeight, 0, `${axis}/${weight}: a pending total was carried as a position`)
+    }
+  }
+  ok('#833 — an unapproved proposal in another name neither creates a reduction nor enlarges one')
+
+  /**
+   * ⚠️ **What was withheld is on the page.** `untilled/aumos#782` is only
+   * checkable if the order this fix deletes is reported beside the one that
+   * leaves — the same rule `aumos-catalogue#281` wrote as
+   * `hostTargetWeightIfPendingFolded`.
+   */
+  {
+    const CODE = 'reduction_is_not_sized_by_the_accounts_remaining_room'
+    const diverging = run({ weight: 0.24, kind: 'held', axis: 'sector' })
+    const said = diverging.diagnostics.find((row) => row.code === CODE)
+    assert.ok(said, 'nothing said that the reduction was measured against something other than the account\'s remaining room')
+    assert.equal(said.details.reduceTargetTotalWeight, SIZED)
+    assert.equal(said.details.entryTargetTotalWeight, 0.01)
+    assert.equal(said.details.maxTotalWeightBinding, 'accountSectorCap')
+    assert.equal(said.details.reductionNameLimitBinding, 'accountPositionCap')
+    assert.equal(said.details.hostTargetWeight, SIZED)
+    assert.equal(said.details.hostTargetWeightIfRoomFolded, 0.01, 'the order this fix withholds is not measurable, so the control is a restatement')
+
+    /** ⛔ **Silent when the two folds agree**, which is every ordinary account. */
+    for (const [label, weight] of [['an empty bucket', 0], ['a bucket with room to spare', 0.19]]) {
+      assert.ok(
+        !codesOf(run({ weight, kind: 'held', axis: 'sector' }).diagnostics).includes(CODE),
+        `${label}: a finding fired on a run where the two folds are one number`,
+      )
+    }
+
+    /** ⚠️ **And the account's excess is still named**, by the axis it belongs to. */
+    for (const [axis, weight, code] of [['sector', 0.3, 'sector_limit_exceeded'], ['gross', 0.6, 'gross_limit_exceeded']]) {
+      const codes = codesOf(run({ weight, kind: 'held', axis }).diagnostics)
+      assert.ok(codes.includes(code), `${axis}: the book really is over its ceiling and nothing said so`)
+    }
+  }
+  ok('#833 — the order the account\'s leftover room would have sent is reported beside the one that leaves, and the excess is still named')
+
+  /**
+   * ⛔ **#813, unmoved.** The entry direction reads every declared axis and folds
+   * an unapproved proposal into it, so a full bucket buys nothing — and the rows
+   * that still had room buy exactly what the room allows.
+   */
+  for (const axis of ['sector', 'gross']) {
+    const full = axis === 'sector' ? [0.25, 0.3, 0.5] : [0.5, 0.6, 0.8]
+    const room = axis === 'sector' ? [[0.21, 0.04], [0.24, 0.01]] : [[0.46, 0.04], [0.49, 0.01]]
+    for (const weight of full) {
+      for (const kind of ['held', 'pending']) {
+        const answer = run({ own: 0, weight, kind, axis }).data
+        assert.notEqual(answer.proposedAction, 'BUY', `${axis}/${kind}/${weight}: this run bought into a bucket the account has no room in`)
+        assert.equal(answer.hostTargetWeight, null, `${axis}/${kind}/${weight}: a weight left on a run that proposes nothing`)
+        assert.equal(answer.outcomeCode, 'risk_limit_exceeded')
+      }
+    }
+    for (const [weight, allowed] of room) {
+      for (const kind of ['held', 'pending']) {
+        const answer = run({ own: 0, weight, kind, axis }).data
+        assert.equal(answer.proposedAction, 'BUY', `${axis}/${kind}/${weight}: a bucket with room in it bought nothing`)
+        assert.equal(answer.incrementWeight, allowed, `${axis}/${kind}/${weight}: the addition was not bounded by the account's remaining room`)
+      }
+    }
+  }
+  ok('#813 — the entry direction still folds every declared axis and every unapproved proposal, and a full bucket still buys nothing')
+
+  /**
+   * ⛔ **A desk that holds less than its own sized target proposes nothing at
+   * all** — not a purchase into a bucket with no room, and not the liquidation
+   * the remainder names. This is the state the issue's option ⑶ was about, and
+   * it is a `WAIT` that says why.
+   */
+  for (const [own, weight, outcome] of [
+    [0.02, 0.24, 'position_at_target'],
+    [0.05, 0.24, 'position_at_target'],
+    [0.02, 0.3, 'risk_limit_exceeded'],
+  ]) {
+    const answer = run({ own, weight, kind: 'held', axis: 'sector' }).data
+    assert.equal(answer.proposedAction, 'WAIT', `own ${own}/bucket ${weight}: a desk below its own target proposed something`)
+    assert.equal(answer.hostTargetWeight, null, `own ${own}/bucket ${weight}: a weight left with a run that proposes nothing`)
+    assert.equal(answer.outcomeCode, outcome)
+  }
+  ok('#833 — a desk holding less than its own sized target neither buys into a full bucket nor liquidates itself into one')
+
+  /**
+   * ⛔ **The RESIZE/WAIT test reads the same fold the order is built from**, and
+   * a mutant that lets it read the entry fold survives every row above. The
+   * entry fold is the smaller of the two, so a test against it says `RESIZE` on
+   * a desk whose own holding is *below* the number the order then names — a
+   * **purchase sent out of a judgement to reduce**, which is what
+   * `aumos-catalogue#278` and `#280` are about, arriving through this door.
+   *
+   * ⚠️ **The bucket is crowded and this name carries somebody else's pending
+   * total**, which is the only shape where `ownHeld` sits between the two folds:
+   * a holding is one row per name, so a second desk's *holding* replaces this
+   * desk's rather than stacking on it.
+   */
+  {
+    const crowdedAndPending = (own) =>
+      evaluateCase({
+        ...structuredClone(buyPath),
+        strategy: MINE,
+        mandate: { ...structuredClone(buyPath.mandate), caps: SECTOR_CAPS },
+        book: {
+          holdings: [
+            { symbol: SYMBOL, sector: 'financials', weight: own, strategy: MINE },
+            { symbol: 'OTHER1', sector: 'financials', weight: 0.24, strategy: OTHER },
+          ],
+          openProposals: [{ symbol: SYMBOL, sector: 'financials', targetWeight: 0.12, strategy: OTHER, decisionId: 'dec_2' }],
+        },
+      }).data
+    for (const own of [0.01, 0.03, 0.05]) {
+      const answer = crowdedAndPending(own)
+      assert.equal(answer.proposedAction, 'WAIT', `own ${own}: a desk holding less than its own sized target was told to reduce`)
+      assert.equal(answer.hostTargetWeight, null, `own ${own}: a reduction handed the host a total above this desk's own holding, which is a purchase`)
+    }
+    /** And the desk that really is above it still reduces. */
+    const above = crowdedAndPending(0.06)
+    assert.equal(above.proposedAction, 'RESIZE')
+    assert.equal(above.hostTargetWeight, SIZED)
+    assert.ok(above.hostTargetWeight < 0.06)
+  }
+  ok('#833 — the RESIZE/WAIT test and the weight that leaves read one fold, so no reduction is sent as a purchase')
+
+  /**
+   * ⛔ **The single-name axes still bind in both directions**, which is the line
+   * this change draws: a ceiling that names *this* position needs no allocation
+   * across names and a desk over it reduces itself. `#830`'s standalone half.
+   */
+  for (const own of [0.101, 0.12, 0.2]) {
+    const answer = run({ own, weight: 0, kind: 'held', axis: 'sector' }).data
+    assert.equal(answer.proposedAction, 'RESIZE', `own ${own}: a desk over its own single-name ceiling could not reduce itself`)
+    assert.equal(answer.hostTargetWeight, SIZED)
+    assert.ok(answer.hostTargetWeight < own)
+  }
+  ok('#830 — a desk over a ceiling that names its own position still reduces itself, which #833 does not touch')
+
+  /**
+   * ⚠️ **The two folds, on `concentration` and `targetWeight` directly**, because
+   * the pair is the contract and a consumer reading either one has to be able to
+   * tell them apart.
+   */
+  {
+    const fold = (caps, others) =>
+      concentration({
+        proposed: { symbol: SYMBOL, sector: 'financials', weight: 0 },
+        holdings: [{ symbol: SYMBOL, sector: 'financials', weight: 0.06, strategy: MINE }, ...others],
+        openProposals: [],
+        caps,
+        strategy: MINE,
+      }).data
+    const alone = fold(SECTOR_CAPS, [])
+    assert.equal(alone.maxTotalWeightForName, alone.reductionNameLimit, 'with nothing else in the bucket the two folds are not one number')
+    assert.equal(alone.reductionNameLimitBinding, 'accountPositionCap')
+
+    const crowded = fold(SECTOR_CAPS, [{ symbol: 'OTHER1', sector: 'financials', weight: 0.24, strategy: OTHER }])
+    assert.equal(crowded.maxTotalWeightForName, 0.01, 'the entry ceiling stopped counting other names in the bucket')
+    assert.equal(crowded.maxTotalWeightBinding, 'accountSectorCap')
+    assert.equal(crowded.reductionNameLimit, 0.1, 'the reduction ceiling folded the account\'s leftover room after other names')
+    assert.equal(crowded.reductionNameLimitBinding, 'accountPositionCap')
+
+    /** ⚠️ **`strategyPositionCap` is a single-name axis and binds both folds.** */
+    const twoNameCaps = fold({ ...SECTOR_CAPS, strategyPositionCap: 0.08 }, [])
+    assert.equal(twoNameCaps.reductionNameLimit, 0.08)
+    assert.equal(twoNameCaps.reductionNameLimitBinding, 'strategyPositionCap')
+
+    /** An unreadable account answers neither. */
+    const unread = concentration({ proposed: { symbol: SYMBOL, weight: 0 }, holdings: undefined, openProposals: [], caps: SECTOR_CAPS })
+    assert.equal(unread.data.reductionNameLimit, null)
+    assert.equal(unread.data.reductionNameLimitBinding, null)
+
+    const sizedTwice = targetWeight({
+      riskBudgetWeight: 0.01,
+      lossFraction: 0.1875,
+      mandatePositionCap: 0.08,
+      accountNameLimit: 0.01,
+      accountNameLimitForReduction: 0.1,
+      minimumExecutableWeight: 0.005,
+    }).data
+    assert.equal(sizedTwice.targetTotalWeight, 0.01, 'the entry fold stopped reading the account limit')
+    assert.equal(sizedTwice.bindingCapName, 'accountNameLimit')
+    assert.equal(sizedTwice.reduceTargetTotalWeight, SIZED, 'the reduction fold read the account\'s leftover room')
+    assert.equal(sizedTwice.reduceBindingCapName, 'mandatePositionCap')
+
+    /** ⛔ **Absent means the same fold twice**, so a caller written before #833 is unchanged. */
+    const once = targetWeight({ riskBudgetWeight: 0.01, lossFraction: 0.1875, mandatePositionCap: 0.08, accountNameLimit: 0.01, minimumExecutableWeight: 0.005 }).data
+    assert.equal(once.reduceTargetTotalWeight, once.targetTotalWeight)
+
+    /** ⛔ **And the venue minimum still refuses both**, rather than the entry refusal travelling to a number it never measured. */
+    const tiny = targetWeight({ riskBudgetWeight: 0.0001, lossFraction: 0.1875, mandatePositionCap: 0.08, accountNameLimit: 0.08, accountNameLimitForReduction: 0.08, minimumExecutableWeight: 0.005 }).data
+    assert.equal(tiny.targetTotalWeight, null)
+    assert.equal(tiny.reduceTargetTotalWeight, null, 'a target below the venue minimum survived on the reduction fold')
+  }
+  ok('#833 — `concentration` and `targetWeight` publish both folds, and an absent reduction limit is the same fold twice')
 }
 
 console.log(`\nshareholder-rerating ok — ${checked} check(s)`)

@@ -521,15 +521,67 @@ export function concentration(input = {}) {
    * cap produced a target that was sometimes a total and sometimes an increment, and
    * a host reading it either way was wrong.
    */
-  const nameLimits = [
-    [positionCap.name, positionCap.value],
+  /**
+   * ── Two kinds of ceiling, and only one of them is about *this* position (#833) ──
+   *
+   * ⛔ **A ceiling that names this position and a ceiling that is the account's
+   * leftover room after *other names* are not the same statement**, and until
+   * #833 they were folded into one number that sized a **sale**.
+   *
+   *   ⚠️ **`nameAxes`** — `accountPositionCap`, `strategyPositionCap` — say
+   *      *«this name may be at most X of the account»*. They are about this
+   *      position, they need no allocation across names, and they bind in both
+   *      directions: a desk over its own single-name ceiling reduces itself.
+   *
+   *   ⚠️ **`residualAxes`** — the sector and gross ceilings *less everything
+   *      else in the bucket* — say *«after the other names, this much is left»*.
+   *      They are the right ceiling for an addition, because a limit has to hold
+   *      in every state the account passes through (#813). They are **not a size
+   *      for this position**, and the fold below publishes them apart so a sale
+   *      is never derived from one.
+   *
+   * ⛔ **Because a residual is not an allocation, folding it into a reduction
+   * makes the answer depend on evaluation order.** A sector ceiling states no
+   * division of itself between the names under it, so a run that reads *«the
+   * sector has 0.01 left»* as *«this position must become 0.01»* has quietly
+   * assigned the entire adjustment to whichever name was evaluated last —
+   * including when every other name in the bucket belongs to a desk this run
+   * cannot reduce at all. Measured through the real host on a 6% position wholly
+   * this desk's, its own thesis intact, under a 0.25 sector ceiling: another
+   * desk at 0.21 of the sector turned `sell:6` into `sell:20`, 0.24 into
+   * `sell:50` — **83% of the position** — and 0.2451 into no order at all. The
+   * gross axis is the same arithmetic with a wider bucket.
+   *
+   * ⚠️ **This is the sentence the file already carries, one altitude up.** #269
+   * and #830 established that *a ceiling constrains additions rather than
+   * reductions*, and applied it to the three **gates**. The **fold** was the
+   * last place it was not applied: the gates stopped withholding a reduction and
+   * the arithmetic went on sizing one.
+   *
+   * ⛔ **`untilled/aumos#813` does not move.** `maxTotalWeightForName` is every
+   * declared axis, it is what the entry path is bounded by, and an unfilled buy
+   * still counts in it before it fills.
+   */
+  const nameAxes = [[positionCap.name, positionCap.value]]
+  const residualAxes = [
     ['accountSectorCap', finite(sectorExcludingName) ? caps.accountSectorCap - sectorExcludingName : null],
     ['accountGrossCap', finite(caps.accountGrossCap) ? caps.accountGrossCap - grossExcludingName : null],
-  ].filter(([, value]) => finite(value))
-  const nameLimit = nameLimits.reduce(
-    (lowest, [name, value]) => (value < lowest.value ? { name, value } : lowest),
-    { name: nameLimits[0][0], value: nameLimits[0][1] },
-  )
+  ]
+  const fold = (rows) => {
+    const usable = rows.filter(([, value]) => finite(value))
+    return usable.reduce(
+      (lowest, [name, value]) => (value < lowest.value ? { name, value } : lowest),
+      { name: usable[0][0], value: usable[0][1] },
+    )
+  }
+  const nameLimits = [...nameAxes, ...residualAxes].filter(([, value]) => finite(value))
+  const nameLimit = fold(nameLimits)
+  /**
+   * ⚠️ **The same fold with the residual axes left out, and nothing else
+   * different.** With no other name in the bucket the two are the same number,
+   * which is why an ordinary account is byte-for-byte unchanged.
+   */
+  const reductionLimit = fold(nameAxes)
 
   const blocked = diagnostics.some((row) => row.severity === 'blocked')
   const unevaluated = diagnostics.some((row) => row.severity === 'unevaluated')
@@ -553,6 +605,19 @@ export function concentration(input = {}) {
       /** The most this name may ever be, across every axis the Mandate declared. */
       maxTotalWeightForName: round(Math.max(0, nameLimit.value)),
       maxTotalWeightBinding: nameLimit.name,
+      /**
+       * ── What a **reduction** is measured against (#833) ──────────────────
+       *
+       * ⛔ **The ceilings that name this position, and never the account's
+       * leftover room after other names.** `index.mjs`'s reduction branch is
+       * the only consumer and the entry path does not read it; published
+       * beside `maxTotalWeightForName` rather than folded into it because the
+       * two answer different questions and both are true. A caller asking why
+       * this desk may buy so little reads `maxTotalWeightBinding`; one asking
+       * what a sale is sized by reads `reductionNameLimitBinding`.
+       */
+      reductionNameLimit: round(Math.max(0, reductionLimit.value)),
+      reductionNameLimitBinding: reductionLimit.name,
       symbolHeadroom: round(Math.max(0, symbolHeadroom)),
       sectorExposure: finite(sectorExposure) ? round(sectorExposure) : null,
       sectorHeadroom: finite(sectorHeadroom) ? round(Math.max(0, sectorHeadroom)) : null,
@@ -591,6 +656,8 @@ function emptyAnswer(partial = {}) {
     bindingPositionCapName: null,
     maxTotalWeightForName: null,
     maxTotalWeightBinding: null,
+    reductionNameLimit: null,
+    reductionNameLimitBinding: null,
     symbolHeadroom: null,
     sectorExposure: null,
     sectorHeadroom: null,

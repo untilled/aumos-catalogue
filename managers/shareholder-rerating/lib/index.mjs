@@ -276,6 +276,8 @@ export function evaluateCase(input = {}) {
     lossFraction: loss.data.lossFraction,
     mandatePositionCap: mandate.mandatePositionCap,
     accountNameLimit: exposure.data.maxTotalWeightForName ?? undefined,
+    /** ⚠️ #833: the ceilings that name *this position*, which is what a sale is sized by. */
+    accountNameLimitForReduction: exposure.data.reductionNameLimit ?? undefined,
     minimumExecutableWeight: mandate.minimumExecutableWeight,
   })
   diagnostics.push(...sized.diagnostics)
@@ -291,18 +293,40 @@ export function evaluateCase(input = {}) {
     return wait(base, diagnostics, exposure.data.withinLimits === false ? 'risk_limit_exceeded' : 'data_missing')
   }
 
-  if (!finite(sized.data.targetTotalWeight)) {
-    const unexecutable = sized.diagnostics.some((row) => row.code === 'minimum_executable_not_met')
-    return wait(base, diagnostics, unexecutable ? 'position_not_executable' : 'data_missing')
-  }
-  if (sized.data.targetTotalWeight <= 0) {
-    return wait(base, diagnostics, 'risk_limit_exceeded')
+  /**
+   * ── The reduction question, asked before the ceilings that only bound additions (#833) ──
+   *
+   * ⛔ **Both refusals below are about a purchase, and until #833 they answered
+   * first.** A target the venue cannot express and a target of zero are reasons
+   * not to *buy*; a book already above what this desk should hold is a reason to
+   * *sell*, and the two refusals deleted that order on their way past. Measured:
+   * a 6% position wholly this desk's went nowhere at all once another desk's
+   * names filled the sector to within one venue-minimum of its ceiling.
+   *
+   * ⚠️ **The question is asked against `reduceTargetTotalWeight`, and asked
+   * once.** On an account with nothing else in the bucket that is the same
+   * number as `targetTotalWeight` and this block is entered on exactly the same
+   * rows as before.
+   */
+  const reduceTarget = sized.data.reduceTargetTotalWeight
+  const entryTarget = sized.data.targetTotalWeight
+  const reduces = finite(reduceTarget) && reduceTarget - exposure.data.existingExposure < -THRESHOLDS.weightTolerance
+
+  if (!reduces) {
+    if (!finite(entryTarget)) {
+      const unexecutable = sized.diagnostics.some((row) => row.code === 'minimum_executable_not_met')
+      return wait(base, diagnostics, unexecutable ? 'position_not_executable' : 'data_missing')
+    }
+    if (entryTarget <= 0) {
+      return wait(base, diagnostics, 'risk_limit_exceeded')
+    }
   }
 
   // ── the total, minus what the account already carries ────────────────────
-  const increment = sized.data.targetTotalWeight - exposure.data.existingExposure
+  const increment = (reduces ? reduceTarget : entryTarget) - exposure.data.existingExposure
 
-  if (increment < -THRESHOLDS.weightTolerance) {
+  if (reduces) {
+    base.targetTotalWeight = reduceTarget
     /**
      * ⚠️ **Already above target, which had no defined behaviour before.** The account
      * carries more of this name than the risk budget and the caps say it should. That
@@ -332,9 +356,8 @@ export function evaluateCase(input = {}) {
      * a position nobody made it responsible for.
      */
     const ownHeld = exposure.data.ownHeld ?? 0
-    base.proposedAction = ownHeld > sized.data.targetTotalWeight + THRESHOLDS.weightTolerance ? 'RESIZE' : 'WAIT'
-    base.hostTargetWeight =
-      base.proposedAction === 'RESIZE' ? round(exposure.data.otherHeld + sized.data.targetTotalWeight) : null
+    base.proposedAction = ownHeld > reduceTarget + THRESHOLDS.weightTolerance ? 'RESIZE' : 'WAIT'
+    base.hostTargetWeight = base.proposedAction === 'RESIZE' ? round(exposure.data.otherHeld + reduceTarget) : null
     if (ownHeld < heldWeight - THRESHOLDS.weightTolerance) {
       diagnostics.push(
         diagnostic(
@@ -342,7 +365,7 @@ export function evaluateCase(input = {}) {
           'info',
           `${round(exposure.data.otherHeld)} of this name is held by another manager or by nobody at all, and this run is not responsible for it. The reduction this package proposes is against its own ${round(ownHeld)} and no further: a target weight covering the whole position would sell somebody else's holding, and the host executes it against the whole position.`,
           'book.holdings',
-          { held: round(heldWeight), ownHeld: round(ownHeld), otherHeld: round(exposure.data.otherHeld), targetTotalWeight: sized.data.targetTotalWeight },
+          { held: round(heldWeight), ownHeld: round(ownHeld), otherHeld: round(exposure.data.otherHeld), targetTotalWeight: reduceTarget },
         ),
       )
     }
@@ -350,11 +373,12 @@ export function evaluateCase(input = {}) {
       diagnostic(
         'position_above_target_weight',
         'warn',
-        `This name is already ${round(exposure.data.existingExposure)} of the account and the arithmetic sizes it at ${round(sized.data.targetTotalWeight)}. Adding to it because the thesis is intact would be sizing the increment and not the position.`,
+        `This name is already ${round(exposure.data.existingExposure)} of the account and the arithmetic sizes it at ${round(reduceTarget)}. Adding to it because the thesis is intact would be sizing the increment and not the position.`,
         'book',
-        { existingExposure: exposure.data.existingExposure, targetTotalWeight: sized.data.targetTotalWeight, heldWeight },
+        { existingExposure: exposure.data.existingExposure, targetTotalWeight: reduceTarget, heldWeight },
       ),
     )
+    diagnostics.push(...roomNotFolded({ reduceTarget, entryTarget, exposure, hostTargetWeight: base.hostTargetWeight }))
     return { data: base, diagnostics }
   }
 
@@ -366,9 +390,10 @@ export function evaluateCase(input = {}) {
         'info',
         'What the account holds plus what it has already proposed is at the target weight. There is nothing to add, and nothing is wrong.',
         'book',
-        { existingExposure: exposure.data.existingExposure, targetTotalWeight: sized.data.targetTotalWeight },
+        { existingExposure: exposure.data.existingExposure, targetTotalWeight: entryTarget },
       ),
     )
+    diagnostics.push(...roomNotFolded({ reduceTarget, entryTarget, exposure, hostTargetWeight: null }))
     return wait(base, diagnostics, 'position_at_target')
   }
 
@@ -431,6 +456,67 @@ export function evaluateCase(input = {}) {
 }
 
 /** Every way this run declines to propose, in one place, so none of them forgets a field. */
+/**
+ * ── What the account's leftover room would have made this run do (#833) ─────
+ *
+ * ⛔ **A control nobody can measure is a restatement.** This package now sizes a
+ * sale by the ceilings that name the position and not by what a sector or the
+ * whole book has left after other names, and the order that difference deletes
+ * has to be reported next to the one that goes out — `untilled/aumos#782`'s
+ * sentence about reductions is only checkable if both numbers are on the page.
+ *
+ * ⚠️ **It says nothing when the two folds agree**, which is every account with
+ * nothing else in the bucket, and it says nothing on a purchase: an addition is
+ * bounded by the account's room, that is #813, and the entry fold reports it as
+ * `maxTotalWeightBinding` all by itself.
+ *
+ * ⚠️ **Two states reach it and they are one sentence.** The account is above what
+ * it has room for, and this run is either reducing its own holding by a
+ * different number than the room would have named, or is not reducing at all —
+ * the ceiling made this name's room zero and a liquidation is not what follows
+ * from that. `hostTargetWeight` is what leaves; `hostTargetWeightIfRoomFolded`
+ * is what used to.
+ */
+function roomNotFolded({ reduceTarget, entryTarget, exposure, hostTargetWeight }) {
+  if (!finite(reduceTarget) && !finite(entryTarget)) return []
+  if (finite(reduceTarget) && finite(entryTarget) && reduceTarget === entryTarget) return []
+  const otherHeld = exposure.data.otherHeld ?? 0
+  const ownHeld = exposure.data.ownHeld ?? 0
+  const wouldHave =
+    finite(entryTarget) && ownHeld > entryTarget + THRESHOLDS.weightTolerance ? round(otherHeld + entryTarget) : null
+  /** Whose names fill the bucket that produced the remainder, read off the axis that bound it. */
+  const bucket =
+    exposure.data.maxTotalWeightBinding === 'accountGrossCap'
+      ? round((exposure.data.grossExposure ?? 0) - exposure.data.existingExposure)
+      : exposure.data.maxTotalWeightBinding === 'accountSectorCap'
+        ? round((exposure.data.sectorExposure ?? 0) - exposure.data.existingExposure)
+        : null
+  const insteadOf =
+    wouldHave === null
+      ? 'the reduction that remainder would have named'
+      : ownHeld > 0 && wouldHave <= otherHeld + THRESHOLDS.weightTolerance
+        ? `${wouldHave}, which is this desk's share of it reduced to nothing`
+        : String(wouldHave)
+  return [
+    diagnostic(
+      'reduction_is_not_sized_by_the_accounts_remaining_room',
+      'info',
+      `Every declared axis folded together leaves this name ${finite(entryTarget) ? round(entryTarget) : 'nothing'} of the account${bucket === null ? '' : `, because ${bucket} of the bucket ${exposure.data.maxTotalWeightBinding} measures is other names`}. That is the ceiling on what may be **added** here and it is not a size for a position that is already held: a sector or gross limit states no division of itself between the names under it, so reading its remainder as this position's target hands the whole adjustment to whichever name was evaluated last. This reduction is measured against ${finite(reduceTarget) ? round(reduceTarget) : 'nothing'} — ${exposure.data.reductionNameLimitBinding ?? 'the ceilings that name this position'} and the risk arithmetic — so the host is handed ${hostTargetWeight === null ? 'no weight at all' : hostTargetWeight} and not ${insteadOf}. The excess the account really is carrying stands, and the axis that names it says so.`,
+      'book',
+      {
+        reduceTargetTotalWeight: finite(reduceTarget) ? reduceTarget : null,
+        entryTargetTotalWeight: finite(entryTarget) ? entryTarget : null,
+        maxTotalWeightBinding: exposure.data.maxTotalWeightBinding,
+        reductionNameLimitBinding: exposure.data.reductionNameLimitBinding,
+        ownHeld,
+        otherHeld,
+        hostTargetWeight,
+        hostTargetWeightIfRoomFolded: wouldHave,
+      },
+    ),
+  ]
+}
+
 function wait(base, diagnostics, outcomeCode) {
   base.route = 'wait'
   base.outcomeCode = outcomeCode
