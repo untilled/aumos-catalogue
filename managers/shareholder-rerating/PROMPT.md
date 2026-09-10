@@ -235,9 +235,51 @@ them reads a 6%-held name under a 15% pending total as 21%, which against a 20% 
 position on a book with 5% of room left. ⚠️ Two managers naming the same total have agreed on one
 end state rather than asked for two. ⚠️ And a pending **trim** does not reduce exposure before it
 fills — the book holds what it holds until the order goes through.
- ⛔ **Per-strategy limits never
-sum into an account limit.** If this package's ceiling is 8% and the account's is 10%, the answer
-is 8% and never 18%. A name several managers hold is one position with several theses attached,
+
+⛔ **Where those rows come from, and what the host does not put in them.** `concentration` takes
+the account as two lists and you assemble both out of **one** call, `portfolio_get`. A holding is a
+row of `snapshot.positions[]` and its `weight` is what is held. An open proposal is not a row of
+its own: `pending[]` carries one entry per unfinished judgement on this fund — yours and every
+other manager's — and the total that judgement asks for is in its `targetWeights[]`, one
+`{ asset, targetWeight }` per asset it named. Those are **total weights and not changes**, in the
+host's own words, and that number is what an `openProposals` row's `targetWeight` carries.
+⛔ **`portfolio_read` has neither list.** It is the mark this run started from and says so itself;
+the pending judgements, and the assignment below, come back from `portfolio_get` alone.
+
+⚠️ **An asset with no entry in `targetWeights` said no size, and that absence is not zero.**
+`targetWeights` is a subset of the judgement's `assets`: a judgement may name a subject it states
+no target for, a `WAIT` states none at all, and a cash target names no asset. Read one of those as
+`0` and you read another manager's open buy as no exposure — the understatement no ceiling here can
+see. Build no `openProposals` row for it, record `data_missing`, and name the decision whose size
+you could not read. An `exit` target **is** a real `0` and is carried as one. And a
+`position-weight` target is executed against the **whole** position rather than against its
+author's share of it, which is why exposure folds over the name and never over the pair (strategy,
+name).
+
+⛔ **Every holding row says whose position it is, in `assignment`, and three of its four words are
+not yours.** `assignment.state` is present on every row and is one of `assigned`, `none`,
+`released` or `departed`. `assigned` names the running manager in `assignment.managerInstanceId`,
+and that is the same id `context_get` hands you for yourself — comparing the two is the **only**
+thing that tells your position from another manager's. `none` means no judgement of this fund ever
+named the asset, which is what a holding bought by hand in a broker app looks like; `released`
+means an assignment existed and ended when the position was fully sold; `departed` means the
+manager that ran it was removed. `managerInstanceId` is `null` in all three and ⛔ **none of them
+is yours to assume** — average cost and quantity do not tell you whose it is. So a holding row's
+`strategy` is filled where the state is `assigned` and **left off** for the other three — where the
+id is you it is the same one you hand `concentration` as `strategy`, and where it is another
+manager it is that manager's instance id, unchanged; an unattributed row is counted as somebody
+else's, which is the side to be wrong on. An open-proposal row's `strategy` is the judgement's own
+`managerInstanceId`, and a `null` there is a judgement that named no manager rather than one that
+named you.
+
+⚠️ **On this desk that word moves a warning and not an arithmetic.** `concentration` counts a
+holding whoever runs it, because exposure to a name is the fund's; the one place `strategy` is read
+is the `overlapping_open_proposal` note, which tells you a sibling already has this name in flight.
+⛔ Do not reconcile the two by dropping other managers' rows from either list — the whole-account
+total is what every cap here is measured against.
+
+⛔ **Per-strategy limits never sum into an account limit.** If this package's ceiling is 8% and
+the account's is 10%, the answer is 8% and never 18%. A name several managers hold is one position with several theses attached,
 and the quantity is one.
 
 ⛔ **Every declared limit is read, including the gross one.** Each single-name and sector limit can
