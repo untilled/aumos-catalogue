@@ -303,6 +303,56 @@ export function concentration(input = {}) {
 
   const projected = existingExposure + proposed.weight
 
+  /**
+   * ── Is this proposal **adding** exposure, and why every ceiling below asks (#830) ──
+   *
+   * `weight: 0` is the first pass asking what the account permits this name to
+   * be, and a negative weight is a reduction. **Only an addition is withheld** —
+   * by a ceiling that could not be evaluated, which is the sentence this
+   * function has carried since #269, and by a ceiling the book has already
+   * passed, which is the sentence it did not.
+   *
+   * ⛔ **A limit that was exceeded is a fact about the account and not a verdict
+   * on a proposal that adds nothing to it.** Until #830 the three gates below
+   * raised `blocked` on `projected > cap` whoever put the account there, so the
+   * zero-weight pass came back `withinLimits: false` and `evaluateCase` turned
+   * the run into a `wait` before its reduction branch existed. Measured through
+   * the real host: a 6% position wholly this desk's went `sell:6` until another
+   * manager sealed a BUY **nobody approved** — `funding: unfunded`, no
+   * reservation, no order — and then went nowhere at all. The threshold was
+   * `projected > cap` exactly: a pending total of 0.1 kept the trim and 0.1001
+   * deleted it, and the diagnostic recorded `proposed: 0` about itself while
+   * doing it. `untilled/aumos#782` is the sentence that forbids it: *nothing
+   * here can turn a real reduction into a no-op.*
+   *
+   * ⚠️ **It fires with nobody else on the book, too.** A desk 0.1pp over its own
+   * single-name ceiling could not reduce itself, because the answer to *«you are
+   * over the limit»* was to withhold the only order that fixes it.
+   *
+   * ⛔ **`untilled/aumos#813` keeps its teeth, and it never depended on this.**
+   * A limit has to hold in every state the account passes through, so an
+   * unfilled buy still counts before it fills — in `existingExposure`, in
+   * `maxTotalWeightForName`, which bounds the sizing whatever direction the run
+   * is going, and in the second fold, whose `weight` is a real increment and
+   * whose gate is therefore as `blocked` as it ever was. What no longer follows
+   * from a full book is the deletion of the order that empties it.
+   *
+   * ⚠️ **`warn` and not silence.** The book *is* over the ceiling and a reader
+   * approving a reduction should see that; what changes is that saying so no
+   * longer withholds anything. The code is unchanged for the same reason
+   * `untilled/aumos#687` gives: a renamed field arrives at a model as
+   * `undefined` rather than as an error.
+   */
+  const increasesExposure = proposed.weight > THRESHOLDS.weightTolerance
+
+  /**
+   * The half-sentence all three gates append, written once so the axes cannot
+   * drift into three readings of one rule.
+   */
+  const withheldOrNot = increasesExposure
+    ? 'The claim may be right; the book cannot carry this much of it, so the increase is withheld.'
+    : 'Nothing is withheld — this run adds nothing to the account, and a ceiling constrains additions rather than reductions. An excess is reduced by the desks that hold it, and a run prevented from proposing that reduction is a limit deleting the order that satisfies it.'
+
   // ── the whole book, which is what a gross cap is about ───────────────────
   let grossExposure = 0
   for (const row of exposureBySymbol.values()) grossExposure += row.exposure
@@ -347,22 +397,15 @@ export function concentration(input = {}) {
     diagnostics.push(
       diagnostic(
         'concentration_limit_exceeded',
-        'blocked',
-        `${symbol} would reach ${round(projected)} of the account against a ${positionCap.name} of ${round(positionCap.value)}, counting ${round(held)} held and ${round(openSame)} already proposed. The claim may be right; the book cannot carry this much of it.`,
+        increasesExposure ? 'blocked' : 'warn',
+        `${symbol} would reach ${round(projected)} of the account against a ${positionCap.name} of ${round(positionCap.value)}, counting ${round(held)} held and ${round(openSame)} already proposed. ${withheldOrNot}`,
         'proposed.weight',
-        { symbol, held: round(held), openProposals: round(openSame), proposed: round(proposed.weight), projected: round(projected), cap: round(positionCap.value), capName: positionCap.name },
+        { symbol, held: round(held), openProposals: round(openSame), proposed: round(proposed.weight), projected: round(projected), cap: round(positionCap.value), capName: positionCap.name, increasesExposure },
       ),
     )
   }
 
   // ── the sector axis, on the same two sources ─────────────────────────────
-  /**
-   * Is this proposal **adding** exposure? `weight: 0` is the first pass asking what
-   * the account permits this name to be, and a negative weight is a reduction. Only
-   * an addition is withheld when a stated ceiling cannot be evaluated.
-   */
-  const increasesExposure = proposed.weight > THRESHOLDS.weightTolerance
-
   let sectorExposure = null
   let sectorExcludingName = null
   let sectorHeadroom = null
@@ -419,10 +462,10 @@ export function concentration(input = {}) {
         diagnostics.push(
           diagnostic(
             'sector_limit_exceeded',
-            'blocked',
-            `This sector would reach ${round(sectorExposure + proposed.weight)} against a ceiling of ${round(caps.accountSectorCap)}. A shareholder-return thesis is unusually likely to find several names in one sector at once, which is exactly when this limit is doing work.`,
+            increasesExposure ? 'blocked' : 'warn',
+            `This sector would reach ${round(sectorExposure + proposed.weight)} against a ceiling of ${round(caps.accountSectorCap)}. A shareholder-return thesis is unusually likely to find several names in one sector at once, which is exactly when this limit is doing work. ${withheldOrNot}`,
             'proposed.sector',
-            { sector, sectorExposure: round(sectorExposure), cap: round(caps.accountSectorCap) },
+            { sector, sectorExposure: round(sectorExposure), cap: round(caps.accountSectorCap), increasesExposure },
           ),
         )
       }
@@ -456,10 +499,10 @@ export function concentration(input = {}) {
       diagnostics.push(
         diagnostic(
           'gross_limit_exceeded',
-          'blocked',
-          `The account would be ${round(projectedGross)} invested against a gross ceiling of ${round(caps.accountGrossCap)}. Every single-name and sector limit can be satisfied by a book that is nonetheless fully committed, and this is the axis that says so.`,
+          increasesExposure ? 'blocked' : 'warn',
+          `The account would be ${round(projectedGross)} invested against a gross ceiling of ${round(caps.accountGrossCap)}. Every single-name and sector limit can be satisfied by a book that is nonetheless fully committed, and this is the axis that says so. ${withheldOrNot}`,
           'caps.accountGrossCap',
-          { grossExposure: round(grossExposure), projectedGross: round(projectedGross), cap: round(caps.accountGrossCap) },
+          { grossExposure: round(grossExposure), projectedGross: round(projectedGross), cap: round(caps.accountGrossCap), increasesExposure },
         ),
       )
     }

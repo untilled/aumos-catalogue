@@ -352,6 +352,81 @@ blocks are unchanged, and the rows themselves already named this manager.
 read attribution (`untilled/aumos#232`), and `#786`'s gate was not widened to unattributed
 positions (`untilled/aumos#782`).
 
+## A ceiling withholds an addition and never a reduction (#830)
+
+`#813`, `#817` and `#819` were all about **how much** an order was for. This one is about whether
+there was an order at all, and `untilled/aumos#782` is the sentence it breaks: *nothing here can
+turn a real reduction into a no-op.*
+
+`evaluateCase` folds concentration twice, and the first fold proposes nothing — `weight: 0`. It
+asks what the account permits this name to **be**; that ceiling goes into the sizing, and the
+sizing minus what the account already carries is what decides between a purchase and a reduction.
+Until #830 the three limit gates inside that fold raised `blocked` on `projected > cap` whoever put
+the account there, so `withinLimits` came back `false` and `index.mjs` turned the whole case into a
+`wait` **before the reduction branch existed**. The diagnostic recorded `proposed: 0` about itself
+while doing it.
+
+**What #830 measured** — through the real host, over this desk's own 6% holding under a 10%
+`accountPositionCap`, with `catalyst-turnaround` sealing a BUY **nobody approved**
+(`funding: unfunded`, no reservation, no order):
+
+| another desk's pending total | before #830 | after |
+|---|---|---|
+| none · 0.03 · 0.06 · 0.1 | `trim-or-exit-review` · `0.05333333` · **`sell:6`** | **unchanged** |
+| **0.1001** | ⚠️ `wait` · `null` · **no order** | `trim-or-exit-review` · `0.05333333` · `sell:6` |
+| 0.12 · 0.2 · 0.5 | `wait` · `null` · no order | `trim-or-exit-review` · `0.05333333` · `sell:6` |
+
+The threshold was `projected > cap` exactly: `0.1` kept the trim and `0.1001` deleted it.
+
+⚠️ **And it fires with nobody else on the book.** A desk holding 0.101 of a name under its own
+0.1 ceiling could not reduce itself, because the answer to *«you are over the limit»* was to
+withhold the only order that fixes it. That half has nothing to do with running beside another
+manager, and the same one condition closes both.
+
+⚠️ **The sentence was already in this file, one paragraph below the gate.**
+`sector_exposure_unevaluated` has carried it since #269 — *«Only an addition is withheld when a
+stated ceiling cannot be evaluated»* — and `index.mjs`'s trim branch says the other half — *«an
+excess made of somebody else's unapproved proposal is theirs to withdraw»*. Neither was reachable,
+because the gate answered first. So `increasesExposure` moved above the first gate and all three
+axes read it: `concentration_limit_exceeded`, `sector_limit_exceeded` and `gross_limit_exceeded`
+are `blocked` on an addition and `warn` on a run that adds nothing.
+
+⛔ **The ceiling itself did not move, and `#813` never depended on this gate.** A limit has to hold
+in every state the account passes through, so an unfilled buy still counts before it fills — in
+`existingExposure`, in `maxTotalWeightForName`, which bounds the sizing whichever direction the run
+is going, and in the **second** fold, whose `weight` is a real increment and whose gates are as
+`blocked` as they ever were. A book at or over its ceiling still buys nothing; what no longer
+follows from a full book is the deletion of the order that empties it.
+
+⚠️ **`warn` and not silence.** The book *is* over the ceiling and an investor approving a reduction
+should see that; what changed is that saying so no longer withholds anything. The diagnostic codes
+are unchanged for the reason `untilled/aumos#687` gives — a renamed field arrives at a model as
+`undefined` rather than as an error — and each now carries `increasesExposure`, so a reader can
+tell which direction was judged.
+
+⚠️ **One committed fixture moved, and only in which sentence declines it.**
+`account-concentration-caps-never-sum` is an account carrying 9% of a name against an 8% binding
+ceiling with **none of it this desk's**. It declined as `wait` / `risk_limit_exceeded` and now
+declines as `trim-or-exit-review` / `position_above_target` — the same answer #817 already blessed
+for an unattributed holding, and the same one the identical book already gave when the cap was
+0.10 rather than 0.08. Still `WAIT`, still no order, still `incrementWeight: 0`, and
+`concentration_limit_exceeded` still names the breach; what the fixture is *for* — that two caps
+fold by minimum and never by sum — is asserted unchanged. `risk_limit_exceeded` stays reached by
+the two `boundaries.json` rows where the ceilings leave a purchase no room at all, and the #254
+check now reads both fixture files.
+
+⬜ **A second door is open and this is not the pull request that closes it.** `index.mjs` refuses
+before sizing a second time, on `targetTotalWeight <= 0`, and that branch folds pending totals in
+through `maxTotalWeightForName`. Measured on the same book: a 6% holding of this desk's under an
+`accountSectorCap` of 0.25 reduces normally beside another desk's 0.10 of the sector and becomes
+`wait` / `risk_limit_exceeded` / no order beside their 0.30 — **or beside their unapproved
+proposal for 0.30**. The gross axis is the same. It is left open deliberately: closing it means
+deciding what a ceiling-derived `0` means for a position this desk already holds, and the only
+arithmetic answer is a total of `otherHeld`, which is a full liquidation of this desk's share
+chosen by a formula. This package's own rule forbids exactly that — `RESIZE` and never `EXIT`,
+because *the arithmetic cannot tell a breach from a bad week* — so the judgement is prose, and
+giving it a branch here is a different decision with a different argument.
+
 ## The fixed thresholds
 
 Stated in full, with formula and rationale, in `lib/thresholds.mjs`. In summary:

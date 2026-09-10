@@ -167,9 +167,23 @@ const routesReached = new Set(cases.cases.map((fixture) => fixture.expect.route)
 assert.ok(routesReached.size >= 4, `only ${routesReached.size} distinct routes are exercised`)
 ok(`the case set reaches ${reached.size} labels and ${routesReached.size} routes, including ${buys.length} sized BUY path(s)`)
 
-const outcomeCodes = new Set(cases.cases.map((fixture) => fixture.expect.outcomeCode).filter(Boolean))
+/**
+ * ⚠️ **Both fixture files, since `untilled/aumos#830`.** The four codes have to stay
+ * four things and each has to be reached by a committed fixture; which *file* the
+ * fixture lives in was never the claim. `risk_limit_exceeded` used to be reached in
+ * `cases.json` by an account carrying 9% of a name against an 8% ceiling with none of
+ * it this desk's — and #830 is the finding that a run adding nothing is not a run a
+ * ceiling withholds, so that row now declines as «the account is above target and the
+ * excess is not mine to reduce». The code is still reached, by the two `boundaries.json`
+ * rows where the ceilings genuinely leave a purchase no room at all.
+ */
+const outcomeCodes = new Set(
+  [...cases.cases, ...boundaries.cases.filter((fixture) => fixture.kind !== 'stagedIncrement')]
+    .map((fixture) => fixture.expect.outcomeCode)
+    .filter(Boolean),
+)
 for (const code of ['data_missing', 'research_incomplete', 'thesis_refuted', 'risk_limit_exceeded']) {
-  assert.ok(outcomeCodes.has(code), `${code} is never reached, so nothing shows it stays distinct from the other three (#254)`)
+  assert.ok(outcomeCodes.has(code), `${code} is never reached by any committed fixture, so nothing shows it stays distinct from the other three (#254)`)
 }
 ok('data_missing, research_incomplete, thesis_refuted and risk_limit_exceeded are each reached by a fixture')
 
@@ -612,6 +626,176 @@ for (const scenario of HOST_ABC) {
   assert.equal(pending.data.proposedAction, 'WAIT')
 
   ok('#819 — the routes that reduce ask whose position it is, and a floor leaves with every one of them')
+}
+
+/**
+ * ── #830: a ceiling withholds an addition, and this desk's reduction is not one ─
+ *
+ * ⛔ **The first defect in this series that removed a *reduction* rather than
+ * mis-sizing one**, and `untilled/aumos#782` names it: *nothing here can turn a
+ * real reduction into a no-op.*
+ *
+ * `evaluateCase` folds concentration twice. The first pass proposes nothing —
+ * `weight: 0` — and asks what the account permits this name to **be**; that
+ * ceiling goes into the sizing, and the sizing minus what the account already
+ * carries is what decides between a purchase and a reduction. Until #830 the
+ * three limit gates in that pass raised `blocked` on the *state of the book*
+ * rather than on anything the proposal asked for, so `withinLimits` came back
+ * `false` and `index.mjs` turned the whole case into a `wait` **before** the
+ * reduction branch was ever reached.
+ *
+ * Measured through the real host at `e571a88`: this desk holding 6% of a name
+ * under a 10% cap went `sell:6` — and stopped going anywhere the moment another
+ * manager sealed a BUY **nobody approved**, `funding: unfunded`, zero
+ * reservations, zero orders. The threshold was `projected > cap` exactly: a
+ * pending total of 0.1 kept the trim and 0.1001 deleted it. The diagnostic said
+ * `proposed: 0` about itself while doing it.
+ *
+ * ⚠️ **And it fires with nobody else on the book at all.** A desk 0.1pp over its
+ * own ceiling could not reduce itself: the projection that exceeded the cap was
+ * its own holding, and the answer to *«you are over the limit»* was to withhold
+ * the only order that fixes it.
+ *
+ * ⚠️ **The sentence this closes is one paragraph below the gate, in the same
+ * file.** `sector_exposure_unevaluated` has carried it since #269 — *«Only an
+ * addition is withheld when a stated ceiling cannot be evaluated»* — and
+ * `index.mjs`'s trim branch says the other half — *«an excess made of somebody
+ * else's unapproved proposal is theirs to withdraw»*. Neither was reachable,
+ * because the gate answered first.
+ *
+ * ⛔ **The ceiling itself does not move, and `untilled/aumos#813` is why.** A
+ * limit has to hold in every state the account passes through, so an unfilled
+ * buy counts before it fills — and it still does, on both of the paths that ask
+ * to *add*: `maxTotalWeightForName` bounds the sizing whatever the book is
+ * doing, and the second fold, whose `weight` is a real increment, blocks exactly
+ * as it did. What changed is the direction: a run that adds nothing is told the
+ * account is over its ceiling and is not prevented from doing the one thing that
+ * helps.
+ */
+{
+  const MINE = 'shareholder-rerating'
+  const buyPath = (() => {
+    const fixture = cases.cases.find((row) => row.id === 'financial-positive-reaches-buy')
+    assert.ok(fixture, 'cases.json no longer carries the sized BUY case, so this regression is testing nothing')
+    return fixture.input
+  })()
+  const SYMBOL = buyPath.symbol
+  const run = (holdings, openProposals = []) =>
+    evaluateCase({ ...structuredClone(buyPath), strategy: MINE, book: { holdings, openProposals } })
+  const holding = (weight, strategy) => ({ symbol: SYMBOL, sector: 'financials', weight, ...(strategy === undefined ? {} : { strategy }) })
+  const proposal = (targetWeight, strategy) => ({ symbol: SYMBOL, sector: 'financials', targetWeight, strategy })
+
+  /**
+   * The reference: 6% wholly this desk's, nobody else on the book, comfortably
+   * under the cap. This is the order #830 is about — every row below is this row
+   * with somebody else's paper added to it.
+   */
+  const alone = run([holding(0.06, MINE)]).data
+  assert.equal(alone.route, 'trim-or-exit-review')
+  assert.equal(alone.proposedAction, 'RESIZE')
+  assert.ok(alone.hostTargetWeight !== null && alone.hostTargetWeight < 0.06, 'the reference row is not a reduction, so nothing below measures one')
+
+  /**
+   * ⛔ **Somebody else's unapproved proposal deleted it.** `0.1001` is the
+   * issue's measured threshold — one basis point over a 10% cap — and every
+   * larger pending total is the same door.
+   */
+  for (const pendingTotal of [0.1001, 0.12, 0.2, 0.5]) {
+    const answer = run([holding(0.06, MINE)], [proposal(pendingTotal, 'catalyst-turnaround')])
+    assert.equal(answer.data.route, alone.route, `pending ${pendingTotal}: an unapproved proposal moved this desk off the reduction route`)
+    assert.equal(answer.data.proposedAction, 'RESIZE', `pending ${pendingTotal}: a real reduction became a no-op`)
+    assert.equal(answer.data.hostTargetWeight, alone.hostTargetWeight, `pending ${pendingTotal}: somebody else's unfilled proposal sized this desk's order`)
+    assert.equal(answer.data.ownHeldWeight, 0.06)
+    assert.equal(answer.data.otherHeldWeight, 0, `pending ${pendingTotal}: a pending total was carried as a position`)
+  }
+  ok('#830 — a reduction this desk makes out of its own holding survives another desk\'s unapproved proposal, whatever it asks for')
+
+  /**
+   * ⚠️ **The standalone half, which has nothing to do with other managers.** One
+   * holding, this desk's, over its own ceiling.
+   */
+  for (const own of [0.101, 0.12, 0.2]) {
+    const answer = run([holding(own, MINE)]).data
+    assert.equal(answer.route, 'trim-or-exit-review', `own ${own}: a desk over its own ceiling could not reach the reduction route`)
+    assert.equal(answer.proposedAction, 'RESIZE', `own ${own}: a desk over its own ceiling could not reduce itself`)
+    assert.equal(answer.hostTargetWeight, alone.hostTargetWeight, `own ${own}: the reduction went somewhere other than the sized target`)
+    assert.ok(answer.hostTargetWeight < own, `own ${own}: the «reduction» did not reduce`)
+  }
+  ok('#830 — a desk over its own single-name ceiling reduces itself, which is the standalone half and has nothing to do with other managers')
+
+  /**
+   * ⛔ **The ceiling still withholds an addition**, which is `#813` and the whole
+   * reason the gate exists. A book already at the cap with nothing of this
+   * desk's in it proposes no purchase, and one already over it proposes none
+   * either — the arithmetic that stops it is the increment, and it stopped it
+   * before this fix and stops it now.
+   */
+  for (const [label, holdings, proposals] of [
+    ['pending at the cap', [], [proposal(0.1, 'catalyst-turnaround')]],
+    ['pending over the cap', [], [proposal(0.2, 'catalyst-turnaround')]],
+    ['another desk holds the cap', [holding(0.1, 'catalyst-turnaround')], []],
+  ]) {
+    const answer = run(holdings, proposals).data
+    assert.notEqual(answer.proposedAction, 'BUY', `${label}: this run bought into a name the account has no room for`)
+    assert.equal(answer.hostTargetWeight, null, `${label}: a weight left on a run that proposes nothing`)
+  }
+
+  /**
+   * ⛔ **And a fold that is handed a real addition blocks exactly as before.**
+   * This is the gate's teeth: `weight` above the tolerance is a purchase, and a
+   * purchase over a stated ceiling is withheld whatever the book already holds.
+   */
+  const addOverCap = concentration({
+    proposed: { symbol: SYMBOL, sector: 'financials', weight: 0.05 },
+    holdings: [holding(0.06, MINE)],
+    openProposals: [],
+    caps: { accountPositionCap: 0.1 },
+    strategy: MINE,
+  })
+  assert.equal(addOverCap.data.withinLimits, false, 'an addition over a stated single-name ceiling was permitted')
+  assert.ok(addOverCap.diagnostics.some((row) => row.code === 'concentration_limit_exceeded' && row.severity === 'blocked'))
+  ok('#813 — an addition is still measured against holdings and open proposals together, and a full book still buys nothing')
+
+  /**
+   * ⚠️ **The same three axes, and each of them separately.** #830 was found on
+   * the single-name gate; the sector and gross gates are the same sentence with
+   * a different total behind it, and a fix that moved one of the three would
+   * leave the defect reachable through the other two.
+   */
+  const axes = [
+    ['accountPositionCap', { accountPositionCap: 0.1 }, 'concentration_limit_exceeded'],
+    ['accountSectorCap', { accountPositionCap: 0.9, accountSectorCap: 0.1 }, 'sector_limit_exceeded'],
+    ['accountGrossCap', { accountPositionCap: 0.9, accountGrossCap: 0.1 }, 'gross_limit_exceeded'],
+  ]
+  for (const [label, caps, code] of axes) {
+    const probe = (weight) =>
+      concentration({
+        proposed: { symbol: SYMBOL, sector: 'financials', weight },
+        holdings: [holding(0.2, MINE)],
+        openProposals: [],
+        caps,
+        strategy: MINE,
+      })
+    const asked = probe(0)
+    const said = asked.diagnostics.find((row) => row.code === code)
+    assert.ok(said, `${label}: the axis said nothing about a book that is over it`)
+    assert.equal(said.severity, 'warn', `${label}: a run that adds nothing was withheld by a ceiling it did not approach`)
+    assert.equal(said.details.increasesExposure, false, `${label}: the diagnostic does not say which direction it judged`)
+    assert.equal(asked.data.withinLimits, true, `${label}: «what may this name be?» came back as a refusal`)
+
+    /** A reduction is not an addition either. */
+    const reducing = probe(-0.05)
+    assert.equal(reducing.data.withinLimits, true, `${label}: a reduction was withheld by a ceiling it moves away from`)
+
+    /** And the addition is still withheld. */
+    const adding = probe(0.05)
+    const blockedRow = adding.diagnostics.find((row) => row.code === code)
+    assert.ok(blockedRow && blockedRow.severity === 'blocked', `${label}: an addition over the ceiling lost its teeth`)
+    assert.equal(blockedRow.details.increasesExposure, true, `${label}: the diagnostic does not say which direction it judged`)
+    assert.equal(adding.data.withinLimits, false, `${label}: an addition over a declared ceiling was permitted`)
+  }
+
+  ok('#830 — all three declared axes withhold an addition and none of them withholds a reduction')
 }
 
 /**

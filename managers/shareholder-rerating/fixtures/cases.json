@@ -809,7 +809,7 @@
     },
     {
       "id": "account-concentration-caps-never-sum",
-      "note": "Another manager holds 6% of this name and a sibling has 3% proposed and unapproved. This package's own ceiling is 8% and the account's is 10%; the binding number is the smaller of the two and never their sum, so 9% already on the book leaves nothing and the answer is WAIT under risk_limit_exceeded rather than a position sized against 18%.",
+      "note": "Another manager holds 6% of this name and a sibling has 3% proposed and unapproved. This package's own ceiling is 8% and the account's is 10%; the binding number is the smaller of the two and never their sum, so 9% already on the book leaves nothing and this run proposes no position rather than one sized against 18%. \u26a0\ufe0f untilled/aumos#830 moved which sentence declines it: the 9% is over the 8% ceiling and this desk holds none of it, so the answer is «the account is above target and the excess is not mine to reduce» rather than «my purchase was refused by a risk limit» \u2014 a run that adds nothing is not a run a ceiling withholds. Nothing moved that an investor sees: still WAIT, still no order, still increment 0, and concentration_limit_exceeded still names the breach.",
       "input": {
         "symbol": "000010",
         "sector": "financials",
@@ -905,12 +905,14 @@
         ]
       },
       "expect": {
-        "route": "wait",
-        "outcomeCode": "risk_limit_exceeded",
+        "route": "trim-or-exit-review",
+        "outcomeCode": "position_above_target",
         "proposedAction": "WAIT",
         "diagnosticCodes": [
           "strategy_caps_do_not_sum",
-          "overlapping_open_proposal"
+          "overlapping_open_proposal",
+          "concentration_limit_exceeded",
+          "excess_is_not_this_managers_to_reduce"
         ],
         "incrementWeight": 0
       }
