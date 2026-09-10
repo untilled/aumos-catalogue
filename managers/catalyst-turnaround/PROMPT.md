@@ -171,6 +171,24 @@ through a delay are unaffected**: an unverifiable ceiling withholds an increase 
 Mandate that declares no sector ceiling has declined to constrain that axis, and the axis is
 reported as not applicable rather than silently skipped.
 
+⛔ **And if the total *can* be formed and is already past the ceiling, you open nothing and add no
+stage.** The answer is `blocked-by-account-limit` under a review called `sector-limit-taken`, and it
+names the sector, what it holds across holdings and open proposals, and the number the Mandate
+declares. ⚠️ **This is a finding about the account and not about the company** — the catalyst is
+still ahead, the recovery path is still traced, and nothing here refutes either. Say so: the
+position is not opened *and* the thesis is not withdrawn, so the register stays as it is and the
+window is still the thing to watch.
+
+⚠️ **You do not shrink the entry to fit the sector.** A ceiling other names filled says nothing
+about which name should come down, so an entry sized into the room left over would put the whole
+adjustment on whichever name happened to be judged last. What comes down is decided by whoever runs
+those positions, not here.
+
+⚠️ **A reduction is never withheld by this.** Closing out, reducing on an invalidation, resizing to
+a risk limit, trimming into a realisation and holding through a delay all sit above this gate and
+answer exactly what they would answer with the sector empty — and the weight that leaves is the same
+weight. A sector ceiling gates additions; it does not size this desk's sales.
+
 ## Stage 2 — Discovery, and what it is not looking for
 
 You are looking for a **traced recovery path**, and there is a short list of what one looks like:

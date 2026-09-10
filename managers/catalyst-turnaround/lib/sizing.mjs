@@ -404,6 +404,14 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
   const sectorCapReading = readDeclared(caps.accountSector)
   let sectorState = 'not-applicable'
   let sectorRows = null
+  /**
+   * ⛔ **`null` and `false` are two facts here (#836).** `false` is «the total
+   * was formed and it is inside the ceiling»; `null` is «nobody declared one»
+   * or «this run could not form the total». A gate written as `!== true` reads
+   * the second as the first, which is the arithmetic of an account with no
+   * limits — the failure `readDeclared` exists for, one field over.
+   */
+  let sectorBreach = null
   if (sectorCapReading.state === 'value') {
     const candidateSector = typeof candidate?.sector === 'string' && candidate.sector.length > 0 ? candidate.sector : null
     const unclassified = []
@@ -442,7 +450,8 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
       }
       sectorRows = Object.fromEntries(bySector)
       const candidateExposure = bySector.get(candidateSector) ?? 0
-      if (candidateExposure > sectorCapReading.value) {
+      sectorBreach = candidateExposure > sectorCapReading.value
+      if (sectorBreach) {
         causes.push(
           cause('risk_limit_exceeded', `${candidateSector} reaches ${round(candidateExposure)} of the book across holdings and open proposals, past the declared sector ceiling of ${sectorCapReading.value}`, 'caps.accountSector', {
             sector: candidateSector,
@@ -592,6 +601,24 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
       accountCapState: accountReading.state,
       /** `not-applicable` (no ceiling declared), `evaluated`, or `unevaluated` (declared and unformable). */
       sectorState,
+      /**
+       * ⛔ **The finding, as a field a gate can read (#836).** `risk_limit_exceeded`
+       * was raised here from #269 and read by nobody: `runVerdict`'s `mayIncrease`
+       * filters `data_missing`, so a ceiling this run *could not* check withheld an
+       * entry and a ceiling it checked and found **exceeded** did not. Measured
+       * before the fix: 0.36 of one sector under a declared 0.3, `enter-staged`,
+       * `hostTargetWeight 0.12`, and the `blocked` finding sitting in `causes`.
+       *
+       * ⚠️ **The severity could not have been the fix instead.** `cause()` reads
+       * severity from `CAUSE_CODES` per *code*, never per site, and the same code
+       * carries the single-name limit that is wired — so downgrading it here is
+       * downgrading it there, and a fifth code is refused by `diagnostics.mjs`'s
+       * own header. A finding that says `blocked` beside a run that increased
+       * exposure is the shape this catalogue has now been wrong about eight times.
+       *
+       * `true` · `false` · `null` — see above.
+       */
+      sectorBreach,
       accountSectorCap: sectorCapReading.state === 'value' ? sectorCapReading.value : null,
       sectorExposure: sectorRows,
       units: { held: 'portfolio-weight', proposed: 'portfolio-weight', total: 'portfolio-weight' },
