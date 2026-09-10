@@ -16,7 +16,7 @@
  * file says which one and what changed.
  */
 
-export { METHODOLOGY, CATALYST_STATES, CATALYST_TRANSITIONS, TERMINAL_STATES, RECOVERY_CHANNELS, CASE_CLASSES, INTENTS } from './constants.mjs'
+export { METHODOLOGY, CATALYST_STATES, CATALYST_TRANSITIONS, TERMINAL_STATES, RECOVERY_CHANNELS, CASE_CLASSES, INTENTS, INTENT_WEIGHT_ROLES, INTENT_WEIGHT_ROLE_NAMES } from './constants.mjs'
 export { CAUSE_CODES, CAUSE_LANES, cause, diagnostic, isRefutation, round, finite } from './diagnostics.mjs'
 export { catalystLedger, LEDGER_VOCABULARY } from './ledger.mjs'
 export { recoveryComparison, financialSurvivability } from './recovery.mjs'

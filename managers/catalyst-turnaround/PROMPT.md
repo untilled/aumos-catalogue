@@ -346,6 +346,44 @@ as it always did. Where somebody else holds part of the name, a `close-out` come
 `hostTargetWeight` equal to **their** weight rather than as an `exit` — an `exit` is a real 0 and
 would liquidate their position with yours.
 
+⛔ **And the addition is not the whole conversion: what is added depends on what you decided.** The
+weight above is the weight a **purchase** targets. Sent on a judgement that is not a purchase it is
+an order in the wrong direction, so `runVerdict` resolves it per intent and you send what it
+answers:
+
+| your judgement | `hostTargetWeight` is | |
+|---|---|---|
+| a staged entry, a due stage | `otherHeldWeight + cumulativeTargetWeight` | the position grows by your share |
+| a trim, a reduction, a resize | `otherHeldWeight + min(cumulativeTargetWeight, ownHeldWeight)` | **you reduce inside your own share** |
+| a close-out | `otherHeldWeight` | your share to zero, and no further |
+| a hold, an exit review, a watch, a wait | `otherHeldWeight + ownHeldWeight` — what the account holds | nothing moves |
+
+⚠️ **A reduction is a decision about the part of the position that is yours.** Re-sizing it out of
+the entry arithmetic can name a weight *above* what you hold, and added to somebody else's holding
+that leaves as a purchase of **their** position: over a 6% holding assigned to nobody, a trim went
+out as `buy:16`, a reduction on a refuted thesis as `buy:39` and a resize to a risk limit as
+`buy:60` — a run whose stated cause was `risk_limit_exceeded` doubling the position it was sizing
+down. ⛔ **This does not stop you reducing what you run.** Where the position is yours the clamp is
+the identity and the trim leaves exactly as before.
+
+⛔ **A judgement that changes nothing says so with the weight the account already holds** — not with
+the weight an entry would target, and not with a `0`. A `hold` is «nothing is added and nothing is
+closed»; an `exit-review` is «adjudicate against the benchmark **before** deciding anything else»,
+and a `0` there is the decision it exists to defer.
+
+⛔ **Where none of the position is yours, the reduction is withdrawn and the review is not.** A run
+that reaches a trim, a reduction, a resize or a close-out over a name it holds no assigned share of
+comes back as **`reduction-not-this-desks`** with the review intact and armed, `hostTargetWeight`
+equal to the holding, and a `held_position_is_not_this_desks` note. ⚠️ It is **not** `data_missing`:
+the book was read and said something definite, and calling it an absence would make every holding
+bought by hand in a broker app un-reviewable. Say the finding, arm the review, send no order.
+
+⚠️ **Read `increasesExposure` as what it now is: a measurement.** It is `hostTargetWeight` against
+`positionWeight` — what the account holds in the name, whoever runs it — and not a restatement of
+your intent. `addsToThisDesksShare` is the other sentence, and the two can genuinely disagree:
+a due stage on a plan whose cumulative target sits below what the book already holds adds to your
+share and reduces the position.
+
 **Enter in stages, and a stage is a plan.** Each stage carries an id, its own weight, a *date or
 price* condition, an expiry, and the originating decision id; the stages sum to the cumulative target
 and to nothing else. ⚠️ **On a re-run you add `due − already filled`, never `due`.** Re-reading a
@@ -378,10 +416,16 @@ channels or no cash-flow link is a research watch; an account limit already take
 smaller position but a refusal; a non-positive edge is a research watch. Only when all of those pass
 do you propose the staged entry.
 
+⛔ **On every one of the held rungs, ask the second question too: whose position is this?** The rung
+above judges the *thesis*; `ownHeldWeight` says how much of the position is yours to act on. Where
+it is `0` — the whole name another manager's, or assigned to nobody at all — a trim, a reduction, a
+resize and a close-out are all **`reduction-not-this-desks`**: the review stands and is armed, and
+no order goes out. Where it is part of the position, you reduce your part.
+
 ⚠️ **Those are this package's words, and the host has its own.** Map them: a staged entry and a due
 stage are purchases; a trim, a reduction and a resize are reductions of an existing position; a
-close-out is an exit; an exit review and the research watches are a WATCH or a WAIT carrying the
-finding. Read `decision_submit`'s published schema for which action takes which target, and follow it
+close-out is an exit; an exit review, a `reduction-not-this-desks` and the research watches are a
+WATCH or a WAIT carrying the finding. Read `decision_submit`'s published schema for which action takes which target, and follow it
 wherever anything here disagrees with it.
 
 **Keep the four findings apart, always**: `data_missing`, `research_incomplete`, `thesis_refuted`,

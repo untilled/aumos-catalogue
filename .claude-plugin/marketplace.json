@@ -197,7 +197,7 @@
       "name": "catalyst-turnaround",
       "source": "./managers/catalyst-turnaround",
       "description": "Korea-listed companies with an identifiable event that would repair the business and its balance sheet, held for as long as the event's own window and no longer. Keeps a catalyst ledger — scheduled, in progress, realised, delayed, failed — and never records a rising share price as a catalyst that worked.",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "metadata": {
         "name": "Catalyst Turnaround",
         "publisher": "aumos",
