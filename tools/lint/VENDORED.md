@@ -7,7 +7,9 @@ moment a copy differs from its source.
 
 Do not edit it here. A fix made here would pass this repository's CI and be
 refused at the merge, which is the exact failure this arrangement exists to
-prevent.
+prevent. It is also **found**: Aumos reads this copy over https every day and
+fails its own check when it stops matching the bytes it generated, so an edit
+here is a red tick over there rather than a surprise at the merge.
 
 | file | source |
 |---|---|
@@ -31,7 +33,9 @@ publishes anything.
 순간 저쪽 테스트가 Aumos 자신의 빌드를 깬다.
 
 여기서 고치지 마라. 여기서 한 수정은 이 저장소의 CI를 통과하고 머지에서 거부된다 —
-이 구조가 막으려는 실패가 정확히 그것이다.
+이 구조가 막으려는 실패가 정확히 그것이다. 그리고 **발견된다**: Aumos가 이 사본을
+매일 https로 읽어 자기가 생성한 바이트와 다르면 자기 검사를 깬다. 여기서 한 편집은
+머지에서의 놀람이 아니라 저쪽의 빨간 틱이다.
 
 | 파일 | 출처 |
 |---|---|
