@@ -552,6 +552,254 @@ check('#269 end to end — the entry waits and the exits stay open', () => {
   }
 })
 
+
+/**
+ * ── #836: a ceiling that was measured and exceeded, and read by nobody ──────
+ *
+ * ⛔ **#269 wired the case it could not check and left the case it could.** A
+ * sector total this run cannot form is `data_missing`, which `mayIncrease`
+ * holds; a sector total this run forms and finds **past the investor's declared
+ * ceiling** was `risk_limit_exceeded` — `severity: 'blocked'` in the closed
+ * table in `diagnostics.mjs` — and nothing anywhere read it. Measured on this
+ * branch before the fix: a book holding 0.36 of one sector under an
+ * `accountSector` of 0.3 answered `enter-staged`, `hostTargetWeight 0.12`,
+ * `increasesExposure: true`, with the finding sitting in `causes` saying
+ * `blocked`.
+ *
+ * ⚠️ **The asymmetry is what decides it.** *Could not check* withheld the
+ * entry and *checked, and demonstrably over* did not, which is not a rule
+ * anybody would write down. And the ceiling is the **Mandate's** — the
+ * investor's own declared limit, not a constant of this package — so the host
+ * not enforcing it (`untilled/aumos#792`, `#793`: `SectorCheck` is always
+ * `not-required`) is the reason this has to bind here rather than a reason it
+ * need not.
+ *
+ * ⚠️ **`severity` could not have been the fix.** `cause()` reads the severity
+ * from `CAUSE_CODES`, per code and never per site, and the same code carries the
+ * single-name limit that *is* wired. Downgrading it unwires that one; a fifth
+ * word is refused by that file's own header. So the two branches of this issue
+ * were never symmetric: ⑵ was not available at the price ⑴ costs.
+ *
+ * ⛔ **It gates additions and does not size reductions** — `aumos-catalogue#284`
+ * and `#286` wrote that sentence twice for `accountSectorCap`, and this is the
+ * third. A trim, a reduction on an invalidation, a resize, a hold and a
+ * close-out are all above the gate and reach exactly the answers they reached
+ * before.
+ */
+const SECTOR_CAP = 0.3
+/** The account in the issue's own measurement: 0.36 of `utilities`, none of it this name. */
+const overfullSector = (symbol, extra = []) => ({
+  positions: [
+    { symbol: 'B00001', sector: 'utilities', weight: 0.2, strategy: 'evidence-gated' },
+    { symbol: 'B00002', sector: 'utilities', weight: 0.16, strategy: 'shareholder-rerating' },
+    ...extra.map((row) => ({ ...row, symbol })),
+  ],
+  proposals: [],
+  caps: { accountSingleName: 0.2, accountSector: SECTOR_CAP },
+})
+/** The same book with room: one name lighter, so the only thing that moved is the total. */
+const roomySector = (symbol, extra = []) => {
+  const book = overfullSector(symbol, extra)
+  book.positions[1] = { ...book.positions[1], weight: 0.02 }
+  return book
+}
+const inSector = (name, book) => {
+  const input = structuredClone(cases.cases.find((row) => row.name === name).input)
+  input.sector = 'utilities'
+  input.book = book(input.symbol)
+  return input
+}
+
+check('#836 — an entry into a sector already past its declared ceiling does not go out', () => {
+  const answer = runVerdict(inSector('completed-positive-thesis-reaches-the-buy-path', overfullSector))
+  const data = answer.data
+
+  assert.equal(data.context.sectorLimitState, 'evaluated', 'the total this ceiling is measured against was not formed, so this case is not the one it is about')
+  assert.ok(has(answer.causes, 'risk_limit_exceeded'), 'the sector total was over its ceiling and no finding said so')
+  assert.equal(
+    data.intent,
+    'blocked-by-account-limit',
+    `a purchase went out into a sector holding 0.36 of the book against a declared ceiling of ${SECTOR_CAP}: ${data.intent}`,
+  )
+  assert.equal(data.review.name, 'sector-limit-taken', 'the answer did not name which limit stopped it')
+  assert.equal(data.incrementThisRun, 0, 'exposure was increased past a limit this investor declared')
+  assert.equal(data.increasesExposure, false)
+  assert.equal(data.hostTargetWeight, data.positionWeight, 'a standstill handed the host a weight the account does not hold')
+  assert.equal(data.context.sectorCeilingTaken, true)
+
+  /** ⛔ It is a **limit**, not an absence: nothing here says the run could not read something, or that the thesis is wrong. */
+  assert.ok(!has(answer.causes, 'data_missing'), 'a measured breach was filed as an unread input')
+  assert.ok(!has(answer.causes, 'thesis_refuted'), 'a finding about the account was filed against the company')
+
+  /**
+   * ⚠️ **Two limits taken: the review names one and `causes` carries both.** The
+   * name's own account limit is answered by the rungs above this one, so the
+   * headline stays `account-limit-taken` — and the sector finding is still in
+   * the list beside it rather than displaced by it.
+   */
+  const both = runVerdict(
+    inSector('completed-positive-thesis-reaches-the-buy-path', (symbol) => {
+      const book = overfullSector(symbol)
+      book.positions[0] = { ...book.positions[0], symbol }
+      return book
+    }),
+  )
+  assert.equal(both.data.intent, 'blocked-by-account-limit')
+  assert.equal(both.data.review.name, 'account-limit-taken', 'a full single-name limit lost its own word to the sector')
+  assert.deepEqual(
+    both.causes.filter((row) => row.code === 'risk_limit_exceeded').map((row) => row.path).sort(),
+    ['accountHeadroom', 'caps.accountSector'],
+    'one limit displaced the other in the list of what was taken',
+  )
+  assert.equal(both.data.incrementThisRun, 0)
+})
+
+check('#836 — a stage due in a sector already past its ceiling does not fire', () => {
+  const staged = (book) => {
+    const input = inSector('completed-positive-thesis-reaches-the-buy-path', book)
+    input.held = true
+    input.plan = structuredClone(staging.plan)
+    input.book.positions.push({ symbol: input.symbol, sector: 'utilities', weight: 0.02, strategy: 'catalyst-turnaround' })
+    return runVerdict(input)
+  }
+
+  const over = staged(overfullSector)
+  assert.equal(over.data.intent, 'blocked-by-account-limit', `a due stage added to a full sector: ${over.data.intent}`)
+  assert.equal(over.data.review.name, 'sector-limit-taken')
+  assert.equal(over.data.incrementThisRun, 0, 'a stage fired past the declared sector ceiling')
+  assert.equal(over.data.increasesExposure, false)
+  assert.equal(over.data.hostTargetWeight, over.data.positionWeight, 'a stage that did not fire still moved the position')
+
+  /** ⛔ The regression the gate must not become: a sector with room fires the stage exactly as before. */
+  const roomy = staged(roomySector)
+  assert.equal(roomy.data.intent, 'add-next-stage', 'the gate stopped a stage in a sector that had room')
+  assert.ok(roomy.data.incrementThisRun > 0)
+  assert.ok(!has(roomy.causes, 'risk_limit_exceeded'), 'a sector with room was reported as past its ceiling')
+})
+
+/**
+ * ⚠️ **Where two true sentences are available the more precise one is said.** A
+ * desk that has already reached what it would size to adds nothing whatever the
+ * sector holds, so the gate is the **last** rung on each ladder rather than the
+ * first. A gate hoisted above them answers `sector-limit-taken` on a run the
+ * sector did not decide — same weights, wrong reason — and nothing else here
+ * catches that.
+ */
+check('#836 — the gate is last on both ladders, so a desk that has arrived still says so', () => {
+  const arrived = [{ sector: 'utilities', weight: 0.15, strategy: 'catalyst-turnaround' }]
+
+  const entry = runVerdict(inSector('completed-positive-thesis-reaches-the-buy-path', (symbol) => overfullSector(symbol, arrived))).data
+  assert.equal(entry.context.sectorCeilingTaken, true, 'this case is not the one it is about')
+  assert.equal(entry.intent, 'hold')
+  assert.equal(entry.review.name, 'already-at-target', 'a desk that had arrived was told the sector stopped it')
+
+  const stagedInput = inSector('completed-positive-thesis-reaches-the-buy-path', (symbol) => overfullSector(symbol, arrived))
+  stagedInput.held = true
+  stagedInput.plan = structuredClone(staging.plan)
+  const staged = runVerdict(stagedInput).data
+  assert.equal(staged.context.sectorCeilingTaken, true)
+  assert.equal(staged.intent, 'hold')
+  assert.equal(staged.review.name, 'already-at-target', 'a due stage over a holding at its target was told the sector stopped it')
+
+  /** ⛔ And neither of them moves a weight, whichever word they use. */
+  for (const data of [entry, staged]) {
+    assert.equal(data.incrementThisRun, 0)
+    assert.equal(data.hostTargetWeight, data.positionWeight)
+  }
+})
+
+check('#836 — a full sector gates additions and does not size reductions', () => {
+  /**
+   * ⛔ **The half of this that must not move.** Every reduction rung sits above
+   * the gate, and a ceiling other desks' names filled says nothing about how
+   * much of its own share this desk sells — `aumos-catalogue#286`'s table, one
+   * package over.
+   */
+  for (const [name, intent] of [
+    ['catalyst-cancelled', 'close-out'],
+    ['receivable-re-growth-fires-a-declared-invalidation', 'reduce-on-invalidation'],
+    ['refinancing-deterioration', 'resize-to-risk-limit'],
+    ['one-delay-with-new-evidence', 'hold-through-delay'],
+    ['catalyst-realised-and-priced-in', 'trim-into-realisation'],
+  ]) {
+    const held = [{ sector: 'utilities', weight: 0.06, strategy: 'catalyst-turnaround' }]
+    const over = runVerdict(inSector(name, (symbol) => overfullSector(symbol, held))).data
+    const roomy = runVerdict(inSector(name, (symbol) => roomySector(symbol, held))).data
+    assert.equal(over.intent, intent, `${name}: a full sector withheld a reduction`)
+    assert.equal(over.hostTargetWeight, roomy.hostTargetWeight, `${name}: the sector ceiling sized this desk's reduction`)
+    assert.equal(over.cumulativeTargetWeight, roomy.cumulativeTargetWeight, `${name}: the sector ceiling moved this desk's own target`)
+  }
+
+  /** …and an entry into a sector with room is the answer it always was. */
+  const within = runVerdict(inSector('completed-positive-thesis-reaches-the-buy-path', roomySector)).data
+  assert.equal(within.intent, 'enter-staged', 'an entry into a sector with room was gated')
+  assert.equal(within.hostTargetWeight, 0.12, 'the entry that had room did not leave with the weight it always left with')
+  assert.equal(within.context.sectorCeilingTaken, false)
+
+  /**
+   * ⚠️ **The ceiling is the ceiling and not one tick under it.** A sector
+   * sitting exactly on the declared number is inside it, and `>` is the whole of
+   * that: a `>=` here refuses an account that is precisely where its investor
+   * said it could be.
+   */
+  const exactly = runVerdict(
+    inSector('completed-positive-thesis-reaches-the-buy-path', (symbol) => {
+      const book = overfullSector(symbol)
+      book.positions[1] = { ...book.positions[1], weight: 0.1 }
+      return book
+    }),
+  ).data
+  assert.equal(exactly.context.sectorLimitState, 'evaluated')
+  assert.equal(exactly.context.sectorCeilingTaken, false, `a sector holding exactly the declared ${SECTOR_CAP} was read as past it`)
+  assert.equal(exactly.intent, 'enter-staged')
+})
+
+check('#836 — the breach is measured once, where the finding is raised', () => {
+  const over = accountConcentration({
+    positions: [{ symbol: 'B', sector: 'utilities', weight: 0.34, strategy: 'evidence-gated' }],
+    proposals: [],
+    caps: { accountSingleName: 0.4, accountSector: SECTOR_CAP },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A', sector: 'utilities' },
+  })
+  assert.equal(over.data.sectorBreach, true, 'the run raised the finding and published no field a gate could read')
+  assert.equal(has(over.causes, 'risk_limit_exceeded'), over.data.sectorBreach, 'the field and the finding disagree about the same book')
+
+  const within = accountConcentration({
+    positions: [{ symbol: 'B', sector: 'utilities', weight: 0.06, strategy: 'evidence-gated' }],
+    proposals: [],
+    caps: { accountSingleName: 0.2, accountSector: SECTOR_CAP },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A', sector: 'utilities' },
+  })
+  assert.equal(within.data.sectorBreach, false, 'a sector with room reported a breach')
+
+  /**
+   * ⛔ **`false` and `null` are two facts.** A ceiling nobody declared and a
+   * ceiling this run could not form a total for have not been checked, and a
+   * gate reading `!== true` would let both through as room. They are `null`.
+   */
+  const notApplicable = accountConcentration({
+    positions: [{ symbol: 'B', weight: 0.06, strategy: 'evidence-gated' }],
+    proposals: [],
+    caps: { accountSingleName: 0.2 },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A', sector: 'utilities' },
+  })
+  assert.equal(notApplicable.data.sectorState, 'not-applicable')
+  assert.equal(notApplicable.data.sectorBreach, null, 'an axis nobody declared reported that it had been checked and found within')
+
+  const unformable = accountConcentration({
+    positions: [{ symbol: 'B', weight: 0.06, strategy: 'evidence-gated' }],
+    proposals: [],
+    caps: { accountSingleName: 0.2, accountSector: SECTOR_CAP },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A', sector: 'utilities' },
+  })
+  assert.equal(unformable.data.sectorState, 'unevaluated')
+  assert.equal(unformable.data.sectorBreach, null, 'a total this run could not form reported that it had been checked and found within')
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. Two ledgers that never become one.
 // ─────────────────────────────────────────────────────────────────────────────

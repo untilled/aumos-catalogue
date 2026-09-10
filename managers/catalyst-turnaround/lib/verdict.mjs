@@ -181,6 +181,37 @@ export function runVerdict(input = {}) {
   const mayIncrease = unread.length === 0
 
   /**
+   * ⛔ **The other half of that rule, which #269 wrote and did not wire (#836).**
+   * A declared sector ceiling whose total this run cannot form is `data_missing`
+   * and `mayIncrease` holds it. A declared sector ceiling whose total this run
+   * **forms, and finds past the ceiling** was `risk_limit_exceeded` and nothing
+   * read it — so *could not check* withheld the entry and *checked, and
+   * demonstrably over* did not. Measured on the branch before this line existed:
+   * a book holding 0.36 of one sector under an `accountSector` of 0.3 answered
+   * `enter-staged` with `hostTargetWeight 0.12` and `increasesExposure: true`,
+   * beside a finding that said `blocked`.
+   *
+   * ⚠️ **It is the investor's number.** `caps.accountSector` arrives with the
+   * book from the Mandate; it is not a constant of this package. The host does
+   * not enforce it — `untilled/aumos#793`'s `SectorCheck` is always
+   * `not-required` because the axis is not in the Mandate schema (`#792`) — and
+   * #269's own conditional is that *either* the host enforces the ceiling *or*
+   * this package acts on what it receives. Neither was true.
+   *
+   * ⛔ **It gates additions and does not size reductions.** Every reduction rung
+   * sits above this gate, exactly as they sit above `mayIncrease`: a ceiling
+   * other desks' names filled says nothing about how much of its own share this
+   * desk should sell, which is `aumos-catalogue#284` and `#286`'s sentence for
+   * this same cap one package over. What this withholds is an **increase**.
+   *
+   * ⚠️ **`=== true`, never `!== false`.** `sectorBreach` is `null` where no
+   * ceiling was declared and where the total could not be formed; the second of
+   * those is already `data_missing`, and reading either as room is the defect
+   * `readDeclared` exists for.
+   */
+  const sectorCeilingTaken = concentration.data.sectorBreach === true
+
+  /**
    * ── The plan's target, against the room this name still has (#825, #828) ──
    *
    * ⛔ **A plan's cumulative target is frozen at the run that wrote it; the room
@@ -240,6 +271,8 @@ export function runVerdict(input = {}) {
     accountHeadroom: headroom ?? null,
     bookReadable: concentration.data.readable === true,
     sectorLimitState: concentration.data.sectorState ?? null,
+    /** ⛔ The declared sector ceiling was formed **and exceeded** on this run, so no increase leaves it (#836). */
+    sectorCeilingTaken,
     registerRead: summary.registerRead === true,
     delayCountKnown: summary.delayCountKnown === true,
     mayIncrease,
@@ -405,6 +438,29 @@ export function runVerdict(input = {}) {
             review: review('account-limit-taken', { at: windowEnd, kind: 'catalyst-window', reason: `The plan builds toward ${plannedCumulative} of the book and ${stageCumulative} is what this name has left for this desk once the ${otherHeldWeight} other desks hold of it is out of the ${concentration.data.accountCap} account limit. The book already holds ${ownHeldWeight} of this desk's own, so there is nothing this stage may add` }),
           }
         }
+        /**
+         * ⛔ **The stage would have added something, and its sector is full (#836).**
+         * Below the two rungs above rather than above them: a stage over a
+         * holding that has already reached its target adds nothing whatever the
+         * sector holds, and *«this desk arrived»* is the more precise of two true
+         * sentences. This one is said where the sector is what stopped a stage
+         * that was otherwise going out.
+         *
+         * ⚠️ **Not folded into rung 8's own condition.** A stage that merely
+         * stopped satisfying it falls through to `scheduled-review` — *«the
+         * catalyst is still ahead and nothing in the ledger changed»* — which is
+         * a sentence about the company, on a run stopped by the account.
+         */
+        if (sectorCeilingTaken) {
+          return {
+            intent: 'blocked-by-account-limit',
+            review: review('sector-limit-taken', {
+              at: windowEnd,
+              kind: 'catalyst-window',
+              reason: `A stage came due and ${input.sector ?? 'this name\u2019s sector'} already holds ${concentration.data.sectorExposure?.[input.sector] ?? 'more'} of the book across holdings and open proposals, against the ${concentration.data.accountSectorCap} ceiling this Mandate declares. The plan is unchanged and nothing is added; what has to come down is the sector and not this thesis`,
+            }),
+          }
+        }
         return {
           intent: 'add-next-stage',
           review: review('stage-filled', { at: windowEnd, kind: 'catalyst-window', reason: `Stage conditions met; ${plan.data.addedThisRun} added against a cumulative target of ${stageCumulative}` }),
@@ -542,6 +598,31 @@ export function runVerdict(input = {}) {
         review: review('account-limit-taken', { at: windowEnd, kind: 'catalyst-window', reason: `Measured against the positions on this book this desk would hold ${sizing.data.heldOnlyTargetWeight} of this name. The ${concentration.data.accountCap} account limit leaves it ${headroom} once every other desk's holdings and open proposals are out, against ${heldOnlyHeadroom} once only their holdings are, and the book already holds ${ownHeldWeight} of this desk's own — so there is nothing this entry may add` }),
       }
     }
+    /**
+     * ⛔ **The declared ceiling this run measured and found taken (#836).**
+     * Last on this ladder, beside the entry it stops, and for the reason the two
+     * rungs above it are where they are: a desk that has already arrived adds
+     * nothing whatever the sector holds, and *«this desk arrived»* / *«this
+     * name's own limit is full»* are the more precise of two true sentences.
+     * This one is said where the sector is what stopped an entry that was
+     * otherwise going out.
+     *
+     * ⚠️ **Where two limits are taken the review names one and `causes` carries
+     * both.** A name whose own account limit is full is answered by the rungs
+     * above, under `account-limit-taken`, with this axis's own
+     * `risk_limit_exceeded` sitting beside theirs. Neither reading is wrong and
+     * neither is lost: the review is the headline, the causes are the list.
+     */
+    if (sectorCeilingTaken) {
+      return {
+        intent: 'blocked-by-account-limit',
+        review: review('sector-limit-taken', {
+          at: windowEnd,
+          kind: 'catalyst-window',
+          reason: `${input.sector ?? 'This name\u2019s sector'} already holds ${concentration.data.sectorExposure?.[input.sector] ?? 'more'} of the book across holdings and open proposals, against the ${concentration.data.accountSectorCap} ceiling this Mandate declares. The thesis is not what stopped this: nothing may be opened in that sector until it comes down`,
+        }),
+      }
+    }
     return {
       intent: 'enter-staged',
       review: review('staged-entry-armed', { at: windowEnd, kind: 'catalyst-window', reason: `Entering in stages toward a cumulative ${sizing.data.targetWeight} of the book, reviewed at the catalyst window end` }),
@@ -630,6 +711,8 @@ export function runVerdict(input = {}) {
     increment = finite(firstStage) && firstStage > 0 ? firstStage : round(Math.max(0, (cumulative ?? 0) - (ownHeldWeight ?? 0)))
   }
   if (increment > 0 && !mayIncrease) throw new Error('an increment survived an unread input, which is the whole defect this gate exists for')
+  /** ⛔ The same structural line for the ceiling that *was* read (#836): a measured breach may not leave an increment behind it. */
+  if (increment > 0 && sectorCeilingTaken) throw new Error('an increment survived a declared sector ceiling this run measured and found exceeded')
 
   /**
    * ── The third weight, and it is the only one the host may be handed (#817) ──

@@ -461,7 +461,7 @@ finding anywhere. The absence of a concept was the mechanism, not the defence.
 | Mandate | classification | `data.sectorState` | effect |
 |---|---|---|---|
 | no `accountSector` | — | `not-applicable` | `sector_cap_not_applicable` · `note`; nothing constrained |
-| declared | complete | `evaluated` | the sector total is folded; past the ceiling is `risk_limit_exceeded` |
+| declared | complete | `evaluated` | the sector total is folded; past the ceiling is `risk_limit_exceeded`, and since #836 an increase is withheld with it |
 | declared | candidate **or any book row** unclassified | `unevaluated` | `data_missing` cause |
 
 ⛔ **The withheld case reaches `mayIncrease`, which already existed.** `runVerdict` computes
@@ -479,6 +479,88 @@ not ask it to: its case work is about an event and a balance sheet.
 total, and one unclassified holding or open proposal makes that total short by whatever it is. The
 `#269 —` checks in `tools/verify-catalyst-turnaround.mjs` build that case explicitly, because a run
 that looked only at the candidate passes every other one.
+
+## The half of that wiring #269 left behind (#836)
+
+**The observation.** `untilled/aumos#836` measured the case the paragraph above does not cover: a
+sector total this run *can* form, and which is already past the declared ceiling. That produced
+`risk_limit_exceeded` — `severity: 'blocked'` — and **nothing read it**. `mayIncrease` filters
+`data_missing` and only `data_missing`, so on a book holding 0.36 of one sector under an
+`accountSector` of 0.3 the answer was `enter-staged`, `hostTargetWeight 0.12`,
+`increasesExposure: true`, with a finding beside it saying it was blocked. Five catalogue commits
+apart, unchanged.
+
+**The judgement: enforce, and the asymmetry is what decides it.** *Could not check* withheld the
+entry and *checked, and demonstrably over* did not — which is not a rule anybody writes down, and
+the second is the stronger fact of the two. Three things say the same:
+
+- ⛔ **the number is the investor's.** `caps.accountSector` arrives with the book, from the Mandate.
+  A ceiling a package sets for itself may be a reference it declines to enforce; a limit the person
+  whose money this is has declared is not.
+- ⛔ **nobody else enforces it.** `untilled/aumos#793`'s `SectorCheck` answers `not-required` on
+  every run because the axis is not in the Mandate schema (`#792`), and #269's own conditional was
+  *either the host enforces the ceiling or this package acts on what it receives.*
+- ⛔ **`severity` was never available as the alternative.** `cause()` reads severity from
+  `CAUSE_CODES` per *code* and never per site, and the same code carries the single-name limit that
+  **is** wired through `headroom`. Downgrading it here downgrades it there; a fifth code is refused
+  by `diagnostics.mjs`'s own header. So «record it and stop calling it blocked» costs a vocabulary
+  and buys an account that can be taken through a limit its investor declared.
+
+**What was changed.** `accountConcentration` publishes `sectorBreach` — `true` · `false` · `null` —
+set where the cause is raised, so the finding and the field cannot disagree about one book.
+`runVerdict` reads it as `sectorCeilingTaken` and gates the **two increase returns**: the one under
+`enter-staged` and the one under `add-next-stage`. Both answer `blocked-by-account-limit`, which is
+already a `standstill` in `INTENT_WEIGHT_ROLES`, under a review named `sector-limit-taken`. An
+invariant beside `mayIncrease`'s throws if an increment ever survives it.
+
+⚠️ **Last on each ladder rather than first, and that placement is a judgement.** Above the two
+arrival rungs the gate answers `sector-limit-taken` on runs the sector did not decide: a desk that
+has already reached what it would size to adds nothing whatever the sector holds, and *«this desk
+arrived»* and *«this name's own limit is full»* are the more precise of two true sentences. Placed
+last, the word is said exactly where the sector stopped something that was otherwise going out.
+Measured: hoisting either gate moves 66 rows of the differential below and is caught by a check
+written for it.
+
+⚠️ **Where two limits are taken the review names one and `causes` carries both.** A candidate whose
+own account limit is full is answered by the rungs above, under `account-limit-taken`, with this
+axis's `risk_limit_exceeded` sitting beside theirs. The review is the headline; the causes are the
+list, and nothing is displaced from it.
+
+⛔ **Not folded into rung 8's own condition, either.** A stage that merely stopped satisfying it
+falls through to `scheduled-review` — *«the catalyst is still ahead and nothing in the ledger
+changed»* — which is a sentence about the company on a run stopped by the account.
+
+**What moved, measured.** 9,900 runs — every ladder case × three attributions × six own holdings ×
+five pending totals × with and without a plan × five sector shapes — read on the commit before this
+one and on this one, comparing intent, review, `hostTargetWeight`, `cumulativeTargetWeight`,
+`incrementThisRun`, `increasesExposure` and `exposureDirection`:
+
+    436 rows moved, and every one of them is a book whose sector total is past a declared ceiling
+      0 rows moved where the Mandate declares no sector ceiling
+      0 rows moved where the ceiling was declared and the total could not be formed
+      0 rows moved on any intent whose weight role is not `increase`
+      2 transitions, both of them an increase becoming a standstill:
+        396  add-next-stage / stage-filled        → blocked-by-account-limit / sector-limit-taken
+         40  enter-staged   / staged-entry-armed  → blocked-by-account-limit / sector-limit-taken
+
+⚠️ **No order grew and none was invented.** Every moved row loses an increment and hands the host
+the weight the account already holds.
+
+⛔ **`null` and `false` are two facts and the gate is `=== true`.** No ceiling declared, and a
+ceiling whose total could not be formed, are both `null`: reading either as room is the defect
+`readDeclared` exists for, one field over.
+
+⛔ **It gates additions and does not size reductions.** `close-out`, `reduce-on-invalidation`,
+`resize-to-risk-limit`, `trim-into-realisation` and `hold-through-delay` sit above the gate and hand
+the host the same weight over a full sector as over an empty one — asserted, not assumed. That is
+`aumos-catalogue#284` and `#286`'s sentence for this same cap one package over, and this is the
+third time it is written: *a ceiling other desks' names filled says nothing about which name should
+come down, so folding it into a sale puts the whole adjustment on whichever name was judged last.*
+
+⚠️ **A new intent was not invented.** `blocked-by-account-limit` is already the word for «the
+account, not the thesis, stopped this», already a `standstill` in `INTENT_WEIGHT_ROLES`, and the
+sector ceiling **is** an account limit. What is new is the review name, because a reader has to be
+able to tell which limit was taken.
 
 ## Which fixture stands behind which rule
 

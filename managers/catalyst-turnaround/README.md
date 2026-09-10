@@ -218,8 +218,14 @@ not receiving it, so under such a Mandate a correct-looking answer could take th
 limit you had declared. **If a sector ceiling is stated and the account's sector classification is
 incomplete — the candidate, or any position or open proposal in the book — this manager opens
 nothing and adds no stage.** It waits, names the row it could not classify, and records it as
-missing data. Closing out, reducing on an invalidation, resizing to a risk limit and holding through
-a delay are untouched: what an unverifiable ceiling withholds is the increase.
+missing data. **And if the total *can* be formed and is already past the ceiling, it opens nothing
+and adds no stage either** — it says which sector, what it holds and what you declared, and the
+answer is about the account rather than about the company. For a while only the first of those two
+was wired: a ceiling this manager could not check withheld the entry, and a ceiling it checked and
+found exceeded did not. Closing out, reducing on an invalidation, resizing to a risk limit and
+holding through a delay are untouched by either. **What a sector ceiling withholds is an increase**;
+it never decides how much of its own position this desk sells, because a ceiling other names filled
+says nothing about which name should come down.
 
 **Running it beside other managers.** Exposure is measured across the whole account — real holdings
 and open proposals together — and per-strategy limits do not add up into a larger account limit. If
