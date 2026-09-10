@@ -1,9 +1,31 @@
 ---
 name: financial-capital-headroom
-description: How a bank, insurer or financial holding company's return capacity is measured — CET1 against the issuer's own policy target, ROE, credit costs and property project-finance exposure. Load when the candidate is a financial.
+description: How a bank or bank-led financial holding company's return capacity is measured — CET1 against the issuer's own policy target, ROE, credit costs and property project-finance exposure — and why an insurer or a securities firm is classified and then left unevaluated. Load when the candidate is a financial of any kind.
 ---
 
 # The capital a return is paid out of
+
+## First: which kind of financial, and on what evidence
+
+⛔ **«It is financial» does not select this arithmetic; «it is a bank» does.** State the issuer kind
+as one of `bank`, `insurance`, `securities` or `unclassified`, and state the disclosure or business
+report you read it off in `classification.basis`. A financial holding company is `bank` only when
+what it consolidates is a bank; a group whose principal subsidiary is an insurer or a broker is not.
+
+⛔ **`insurance`, `securities` and `unclassified` stop here, explicitly.** An insurer's solvency is
+measured by K-ICS and a securities firm's by the NCR. Those are different ratios answering different
+questions, and how much is distributable under each has to be worked out separately.
+`capitalHeadroom` returns `unevaluated` naming the ratio that would answer it, and that is the
+answer you carry: a wait with a reason. **Do not put a K-ICS or an NCR figure into the `cet1`
+slot.** Handing in a `cet1` for a non-bank is refused outright, and the refusal is recorded as *this
+run read the wrong number*.
+
+⚠️ **Say `consolidated` or `standalone` in `classification.consolidationBasis`.** A holding
+company's consolidated CET1 and its banking subsidiary's standalone ratio are two numbers about two
+entities, and a headroom quoted without saying which is one a reader cannot check. It does not
+refuse the case; it is reported wherever the capital position is quoted.
+
+## Then: the arithmetic, for a bank
 
 A bank does not pay a dividend out of profit. It pays it out of capital it is allowed to stop
 holding, and the amount it is allowed to stop holding is the gap between the ratio it runs at and

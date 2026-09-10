@@ -56,12 +56,33 @@ be traded at all.
 
 ### Sector-appropriate, which is a rule and not an aspiration
 
-**A financial company is judged on capital and a non-financial company is judged on cash.** Return
-on equity, the CET1 ratio against the issuer's **own** stated policy target, credit costs and
-property project-finance exposure for a bank or a financial holding company; operating cash flow,
-maintenance capex, committed investment and debt for everything else. `capitalHeadroom` refuses a
-bank ratio asked of an industrial rather than computing it, and that refusal is recorded as *this
-run read the wrong number*, never as a finding about the company.
+**«Sector» is two things and you must never mix them.** The *issuer kind* — 기업 분석용 업종 — is
+which balance sheet a company has, and it decides which arithmetic is even meaningful. You judge it,
+from filings, one company at a time. The *fund risk-management sector* is the account's one
+consistent classification and it is what a Mandate's sector ceiling is measured over. That one is
+the host's; you only read it, and you pass it to `concentration` as `sector`.
+
+**State the issuer kind as one of five, and say what you read it off.** `bank` (은행·은행계
+금융지주), `non-financial` (일반 비금융), `insurance` (보험), `securities` (증권), `unclassified`
+(복합·기타·분류 미확인). ⛔ **«It is financial» is not a classification** — it names the set that
+contains banks, insurers and brokers, so it cannot select one of them, and `capitalHeadroom` returns
+`issuer_kind_not_specific` · `unevaluated` for it. Alongside the kind, state
+`classification.basis` — the disclosure or business report it was read off — and
+`classification.consolidationBasis`, `consolidated` or `standalone`, because a holding company's
+consolidated CET1 and its banking subsidiary's are two numbers about two entities.
+
+**Two of the five have an arithmetic here.** For a `bank`: return on equity, the CET1 ratio against
+the issuer's **own** stated policy target, credit costs and property project-finance exposure. For
+`non-financial`: operating cash flow, maintenance capex, committed investment and debt.
+⛔ **`insurance`, `securities` and `unclassified` are explicitly `unevaluated`** — an insurer's
+solvency is K-ICS and a broker's is the NCR, and this package does not implement either. **Do not
+put a K-ICS or an NCR figure into the `cet1` slot.** What the ratio means and how distributable
+capital is computed under it both have to be designed, and until they are, saying *not supported* is
+the honest answer. Report it as a wait with a reason; it is never a finding about the company.
+
+`capitalHeadroom` refuses a bank ratio asked of anything that is not a bank — an industrial *and* an
+insurer — rather than computing it, and that refusal is recorded as *this run read the wrong
+number*, never as a finding about the company.
 
 ## The run
 
@@ -209,6 +230,16 @@ and the quantity is one.
 be satisfied by a book that is nevertheless fully committed; if the Mandate states a whole-account
 exposure ceiling, it caps this position too, and it is reported as the binding axis when it is.
 
+⛔ **A sector ceiling that is stated and cannot be checked holds the increase.** If the Mandate
+declares no sector ceiling, the axis is `not_applicable` and constrains nothing — that is a
+declared absence, not a gap. If it declares one, the total it is measured against has to be
+formable, and that total is made of **every** holding and **every** open proposal in that sector.
+So a candidate whose own sector you know is not enough: one unclassified row anywhere in the book
+makes the total short by whatever it is, and `concentration` answers `withinLimits: null`. Then you
+propose no purchase and no increase, you record `data_missing`, and you name the row you could not
+classify so the next run knows what to fetch. ⚠️ **You keep holding, keep analysing, and may still
+reduce** — an unverifiable ceiling withholds the thing it constrains, which is an addition.
+
 If the account is full, the finding is `risk_limit_exceeded`: the claim may be right and the book
 cannot carry it. That is not a refutation of the thesis and you do not record it as one.
 
@@ -273,9 +304,10 @@ account state is missing, you cannot judge or size, and the answer is `WAIT` or 
 
 Everything above happens on every run. These are loaded when the run reaches them:
 
-- **`financial-capital-headroom`** — the candidate is a bank, an insurer or a financial holding
-  company.
-- **`nonfinancial-cash-headroom`** — everything else.
+- **`financial-capital-headroom`** — the candidate is a bank or a bank-led financial holding
+  company. An insurer or a securities firm is classified and then reported as unevaluated; this
+  stage has no arithmetic for either.
+- **`nonfinancial-cash-headroom`** — an operating company.
 - **`return-policy-evidence`** — turning a return policy into filings, and the announced/executed
   distinction as Korean disclosure actually expresses it.
 - **`staged-plan-and-ledger`** — writing a staged plan, and re-running one without adding twice.

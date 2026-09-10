@@ -44,7 +44,7 @@
 export { finite, round, diagnostic, isBlocked, isUnevaluated } from './numbers.mjs'
 export { THRESHOLDS } from './thresholds.mjs'
 export { returnComposition } from './return-composition.mjs'
-export { capitalHeadroom } from './capital-headroom.mjs'
+export { capitalHeadroom, ISSUER_KINDS } from './capital-headroom.mjs'
 export { classifyCase, REQUIRED_OUTPUTS, ROUTES } from './classify.mjs'
 export { lossToInvalidation, targetWeight } from './sizing.mjs'
 export { stagedIncrement } from './staged-plan.mjs'
@@ -64,8 +64,19 @@ import { concentration } from './concentration.mjs'
  */
 export function evaluateCase(input = {}) {
   const composition = returnComposition(input.valuation ?? {})
+  /**
+   * ⚠️ **Two words that both look like «sector», and they answer to different people
+   * (#269).** `input.issuerKind` is 기업 분석용 업종 — bank, insurer, broker, operating
+   * company — and this package decides it from filings, because it selects which
+   * capital arithmetic is even meaningful. `input.sector` is the fund's
+   * risk-management sector, the host's consistent classification of the whole account,
+   * and this package only ever reads it: it is what a Mandate's sector ceiling is
+   * measured over, down in `concentration`. `sectorKind` is the retired name of the
+   * first and is still read so an older caller gets a diagnostic rather than a throw.
+   */
   const capital = capitalHeadroom({
-    sector: input.sectorKind,
+    issuerKind: input.issuerKind ?? input.sectorKind,
+    classification: input.classification,
     financial: input.financial,
     nonFinancial: input.nonFinancial,
   })

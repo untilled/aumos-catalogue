@@ -26,11 +26,32 @@ nothing. This manager measures how much of a programme has actually been done ag
 the programme's own time window has passed, and a programme running at less than half its own
 schedule is treated as evidence for the announcement and nothing else.
 
-**Banks and factories are read differently.** For a bank or a financial holding company the
-question is capital: how much sits above the ratio the company itself has promised to hold, which
-is what a dividend or a buyback is paid out of. For everything else the question is cash: what is
-left after the investment the business cannot skip. Asking a bank ratio of a shipbuilder produces a
-number about nothing, and the package refuses to do it rather than produce one.
+**Banks, insurers, brokers and factories are read differently — and only two of them are read
+here.** For a bank or a bank-led financial holding company the question is capital: how much sits
+above the ratio the company itself has promised to hold, which is what a dividend or a buyback is
+paid out of. For an operating company the question is cash: what is left after the investment the
+business cannot skip. Asking a bank ratio of a shipbuilder produces a number about nothing, and the
+package refuses to do it rather than produce one.
+
+**An insurer, a securities firm and a mixed group are told apart from a bank, and then left
+alone.** An insurer's solvency is measured by K-ICS and a broker's by the NCR — different ratios,
+answering different questions, out of which a different amount is distributable. This manager
+implements the bank and the operating-company arithmetic and no others, so it says which of the
+five kinds a company is, states the disclosure it read that off, and then reports the other three
+as **not evaluated** rather than pushing an unfamiliar ratio through a bank's formula. That is a
+wait with a reason, not a rejection of the company — and being *financial* is never by itself a
+reason to be read as a bank.
+
+**Two things are called a sector and they belong to different people.** One is the fund's
+risk-management sector: your Mandate's consistent classification of the whole account, which is
+what a "no more than 25% in one sector" limit is measured over. That one is the host's, and this
+manager only reads it. The other is the kind of business a company is in, which decides which
+capital arithmetic is even meaningful; that one this manager decides from filings, for one company
+at a time. **If your Mandate states a sector ceiling and this manager cannot work out the account's
+total in that sector — because the candidate is unclassified, or because a position or pending
+proposal somewhere in the account is — it will not increase a position.** It waits and says which
+row it could not classify. Holding, analysing and reducing carry on as normal: what an unverifiable
+limit withholds is the thing the limit constrains.
 
 **Three yields are not one yield.** The expected return has exactly two parts — what re-rating is
 worth, and the cash dividend after tax. A company's buyback is in neither: it pays you nothing
@@ -75,7 +96,7 @@ flowchart TD
   G --> H[Complete one thesis: cause, evidence, difference, catalysts, scenarios, refutation]
   H --> I[Argue against it]
   I --> J[Two-leg total return: re-rating + net dividend, buyback reported apart]
-  J --> K[Sector headroom: capital for financials, cash for the rest]
+  J --> K[Issuer kind: capital for a bank, cash for an operating company, unevaluated otherwise]
   K --> L{Enough evidence?}
   L -->|no data| M[WAIT — data_missing, arm a re-check]
   L -->|unfinished| N[WAIT — research_incomplete, name what is left]
@@ -111,7 +132,9 @@ wakes the manager next, so a failed run has a defined way back.
   and routes the order. There is no capability in this package that can place one.
 - **What your Mandate must state.** A risk budget and a single-name cap. This package carries no
   default for either, so an account that states neither gets a wait and an explanation rather than
-  a size somebody guessed.
+  a size somebody guessed. A sector ceiling is optional — state none and the sector axis simply
+  does not apply. State one and it is checked; if the account's sector classification is
+  incomplete, purchases wait until it is not.
 
 ## What it is bad at
 
@@ -125,6 +148,9 @@ wakes the manager next, so a failed run has a defined way back.
   sharp deterioration late. It is not a trading system and it will not behave like one.
 - **Companies with little disclosure.** Its evidence is filings. A company that discloses little
   gives it little, and the honest answer it produces is "I could not tell", repeatedly.
+- **Insurers, securities firms and mixed groups.** It can tell them apart from a bank and it cannot
+  size their return capacity. Install it expecting an explicit "not evaluated" on those, not a
+  verdict.
 - **Who should not install it.** Anyone wanting broad diversification from one manager — it holds a
   small number of researched positions; anyone who wants an answer every day; anyone who wants a
   quantitative screen. And anyone expecting the historical example below to be a promise.

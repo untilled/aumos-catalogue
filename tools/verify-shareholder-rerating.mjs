@@ -43,6 +43,7 @@ import { readFile } from 'node:fs/promises'
 
 import {
   REQUIRED_OUTPUTS,
+  ISSUER_KINDS,
   ROUTES,
   THRESHOLDS,
   capitalHeadroom,
@@ -277,6 +278,261 @@ for (const fixture of staged.cases) {
 }
 
 /**
+ * ── ⑹ #269: a stated ceiling that could not be checked, and «financial» as four
+ *      balance sheets ────────────────────────────────────────────────────────
+ *
+ * Two contracts, and the reason they are in one section is that they are the same
+ * mistake at two altitudes: a classification nobody supplied being read as a
+ * classification that permits something.
+ *
+ * ⚠️ **Every case below builds its own input or mutates a `structuredClone` of a
+ * committed one.** No fixture file was reshaped to make an assertion here pass; the
+ * only edit to `cases.json` in this change is the vocabulary migration asserted at
+ * the end of this block.
+ */
+const byId = (id) => {
+  const fixture = cases.cases.find((row) => row.id === id)
+  assert.ok(fixture, `cases.json no longer carries ${id}, so a #269 regression is testing nothing`)
+  return structuredClone(fixture.input)
+}
+
+/** The five situations of #269's table, on `concentration` directly. */
+{
+  const book = {
+    holdings: [{ symbol: 'B', sector: 'financials', weight: 0.05 }],
+    openProposals: [],
+    caps: { accountPositionCap: 0.1, accountSectorCap: 0.25 },
+  }
+
+  // ① no ceiling stated → not applicable, and every other axis still runs.
+  const noCap = concentration({
+    proposed: { symbol: 'A', weight: 0.03 },
+    holdings: book.holdings,
+    openProposals: [],
+    caps: { accountPositionCap: 0.1 },
+  })
+  assert.equal(noCap.data.sectorLimitState, 'not-applicable')
+  assert.equal(noCap.data.withinLimits, true, 'an absent sector ceiling stopped a proposal it never constrained')
+  assert.ok(codesOf(noCap.diagnostics).includes('sector_cap_not_applicable'), 'the code has to say not-applicable rather than merely not-stated')
+  assert.ok(!codesOf(noCap.diagnostics).includes('sector_exposure_unevaluated'))
+
+  // ② stated and every classification present → the axis is judged, both ways.
+  const withinSector = concentration({
+    proposed: { symbol: 'A', sector: 'financials', weight: 0.03 },
+    holdings: book.holdings,
+    openProposals: [],
+    caps: book.caps,
+  })
+  assert.equal(withinSector.data.sectorLimitState, 'evaluated')
+  assert.equal(withinSector.data.sectorExposure, 0.05)
+  assert.equal(withinSector.data.withinLimits, true)
+  const overSector = concentration({
+    proposed: { symbol: 'A', sector: 'financials', weight: 0.03 },
+    holdings: [{ symbol: 'B', sector: 'financials', weight: 0.23 }],
+    openProposals: [],
+    caps: book.caps,
+  })
+  assert.equal(overSector.data.withinLimits, false)
+  assert.equal(overSector.data.outcomeCode, 'risk_limit_exceeded')
+  assert.ok(codesOf(overSector.diagnostics).includes('sector_limit_exceeded'))
+
+  // ③ stated and the candidate carries no sector → the increase is withheld.
+  const candidateUnclassified = concentration({
+    proposed: { symbol: 'A', weight: 0.03 },
+    holdings: book.holdings,
+    openProposals: [],
+    caps: book.caps,
+  })
+  assert.equal(candidateUnclassified.data.sectorLimitState, 'unevaluated')
+  assert.equal(candidateUnclassified.data.withinLimits, null, 'a stated sector ceiling that could not be checked let an increase through')
+  assert.equal(candidateUnclassified.data.outcomeCode, 'data_missing', 'an unformable sector total was filed as something other than an absence')
+  assert.ok(codesOf(candidateUnclassified.diagnostics).includes('sector_exposure_unevaluated'))
+  assert.ok(!codesOf(candidateUnclassified.diagnostics).includes('proposal_has_no_sector'), 'the warn that did not stop anything is gone')
+
+  /**
+   * ⛔ **③′ the hole #269 names by name: the candidate is classified and the *book*
+   * is not.** A sector ceiling is measured over a total, and a total made of rows one
+   * of which has no sector is not a total. A run that looked only at the candidate
+   * would pass this, which is exactly why it is here.
+   */
+  const otherHoldingUnclassified = concentration({
+    proposed: { symbol: 'A', sector: 'financials', weight: 0.03 },
+    holdings: [
+      { symbol: 'B', sector: 'financials', weight: 0.05 },
+      { symbol: 'C', weight: 0.07 },
+    ],
+    openProposals: [],
+    caps: book.caps,
+  })
+  assert.equal(otherHoldingUnclassified.data.withinLimits, null, 'the candidate named its sector and the book could not form one, and the increase went through anyway')
+  assert.equal(otherHoldingUnclassified.data.outcomeCode, 'data_missing')
+  assert.deepEqual(
+    otherHoldingUnclassified.diagnostics.find((row) => row.code === 'sector_exposure_unevaluated')?.details.unclassifiedRows,
+    ['C'],
+    'the run has to name which row it could not classify',
+  )
+  // …and the same for an unapproved proposal, which is exposure about to exist.
+  const otherProposalUnclassified = concentration({
+    proposed: { symbol: 'A', sector: 'financials', weight: 0.03 },
+    holdings: book.holdings,
+    openProposals: [{ symbol: 'D', weight: 0.04, strategy: 'catalyst-turnaround' }],
+    caps: book.caps,
+  })
+  assert.equal(otherProposalUnclassified.data.withinLimits, null, 'an unclassified open proposal was left out of the sector total')
+
+  // ⑤ a reduction, and the `weight: 0` question, are not withheld by the same gap.
+  for (const [label, weight] of [['the question the sizing asks', 0], ['a reduction', -0.02]]) {
+    const answer = concentration({
+      proposed: { symbol: 'A', sector: 'financials', weight },
+      holdings: [{ symbol: 'B', sector: 'financials', weight: 0.05 }, { symbol: 'C', weight: 0.07 }],
+      openProposals: [],
+      caps: book.caps,
+    })
+    assert.equal(answer.data.withinLimits, true, `${label} was withheld by a ceiling that only constrains additions`)
+    const row = answer.diagnostics.find((entry) => entry.code === 'sector_exposure_unevaluated')
+    assert.equal(row?.severity, 'warn', `${label} should still say the sector total could not be formed`)
+    assert.equal(row?.details.increasesExposure, false)
+  }
+  ok('#269 ①②③⑤ — an unformable sector total withholds the increase, names the rows, and stops neither a reduction nor the sizing question')
+}
+
+/**
+ * The same five situations end to end, because `concentration` returning `null` only
+ * matters if `evaluateCase` refuses to call it permission.
+ */
+{
+  // ③ through the whole ladder, from the one fixture that reaches a sized BUY.
+  const buy = byId('financial-positive-reaches-buy')
+  buy.mandate.caps.accountSectorCap = 0.25
+  buy.book.holdings = [{ symbol: '999999', weight: 0.07, strategy: 'evidence-gated' }]
+  const withheld = evaluateCase(buy)
+  assert.equal(withheld.data.proposedAction, 'WAIT', 'a BUY went onto a book whose sector total nobody could form')
+  assert.equal(withheld.data.outcomeCode, 'data_missing')
+  assert.notEqual(withheld.data.outcomeCode, 'thesis_refuted', 'a missing classification was filed as a refuted thesis')
+  assert.deepEqual(withheld.diagnostics.filter((row) => row.severity === 'blocked'), [], 'an absence was recorded as a refusal')
+  assert.ok(codesOf(withheld.diagnostics).includes('sector_exposure_unevaluated'))
+
+  // …and classifying that same row is the whole of the difference.
+  const classified = structuredClone(buy)
+  classified.book.holdings[0].sector = 'materials'
+  const allowed = evaluateCase(classified)
+  assert.equal(allowed.data.proposedAction, 'BUY', 'classifying the book was not enough to let the same proposal through')
+
+  // ④ an existing position is still analysed and still reachable for a reduction.
+  const rerated = byId('rerated-reaches-trim-review')
+  rerated.mandate ??= {}
+  rerated.mandate.caps ??= {}
+  rerated.mandate.caps.accountSectorCap = 0.25
+  if (Array.isArray(rerated.book?.holdings)) rerated.book.holdings = rerated.book.holdings.map(({ sector, ...rest }) => rest)
+  const held = evaluateCase(rerated)
+  assert.equal(held.data.case, 'rerated', 'a sector ceiling nobody could check changed the verdict about the company')
+  assert.equal(held.data.proposedAction, 'RESIZE', 'a risk-reducing reduction was withheld by a limit that only constrains increases')
+
+  // ⑤ the buy-path name already above its target — the other way a reduction is reached.
+  const above = byId('financial-positive-reaches-buy')
+  above.mandate.caps.accountSectorCap = 0.25
+  above.book.holdings = [{ symbol: '000000', weight: 0.07, strategy: 'shareholder-rerating' }]
+  const reduced = evaluateCase(above)
+  assert.equal(reduced.data.proposedAction, 'RESIZE', 'a position above target with an unformable sector total could not be reduced')
+  assert.equal(reduced.data.outcomeCode, 'position_above_target')
+  ok('#269 ③④⑤ end to end — the increase waits as data_missing, the company keeps its verdict, and both reduction paths stay open')
+}
+
+/** ② the five issuer kinds, and what each may enter. */
+{
+  assert.deepEqual(
+    Object.keys(ISSUER_KINDS).sort(),
+    ['bank', 'insurance', 'non-financial', 'securities', 'unclassified'],
+    'the five issuer kinds of #269 are not the five here',
+  )
+  assert.deepEqual(
+    Object.entries(ISSUER_KINDS).filter(([, row]) => row.supported).map(([name]) => name).sort(),
+    ['bank', 'non-financial'],
+    'this change was scoped to keeping the bank and operating-company arithmetic and no more',
+  )
+
+  const insuranceInputs = { cet1: 0.128, policyTargetCet1: 0.125, riskWeightedAssets: 2e14, marketCap: 1.2e13 }
+
+  /**
+   * ⛔ **The hole, stated as its own assertion.** `financial` used to admit anything
+   * financial to the bank arithmetic. An insurer handing in a CET1 is now refused
+   * outright — and refused as *the run's* mistake, which is what `classify.mjs` reads
+   * `bank_metric_out_of_sector` as.
+   */
+  const insurerWithCet1 = capitalHeadroom({ issuerKind: 'insurance', financial: insuranceInputs })
+  assert.ok(codesOf(insurerWithCet1.diagnostics).includes('bank_metric_out_of_sector'), 'an insurer was let into the bank arithmetic because it was financial')
+  assert.equal(insurerWithCet1.data.headroomRatio, undefined, 'a refused issuer kind still published a capital headroom')
+  assert.equal(insurerWithCet1.data.adequate, null)
+
+  for (const [kind, ratio] of [['insurance', 'K-ICS'], ['securities', 'NCR']]) {
+    const answer = capitalHeadroom({ issuerKind: kind, classification: { basis: '사업보고서', consolidationBasis: 'consolidated' } })
+    const row = answer.diagnostics.find((entry) => entry.code === 'capital_headroom_method_unsupported')
+    assert.ok(row, `${kind} passed silently instead of being stated as unsupported`)
+    assert.equal(row.severity, 'unevaluated', `${kind} was refused rather than left unevaluated — an unsupported method is not a finding about the company`)
+    assert.equal(row.details.ratio, ratio, `${kind} has to name the ratio that would answer it`)
+    assert.equal(answer.data.adequate, null, `${kind} produced a capital verdict from an arithmetic that does not exist here`)
+    assert.equal(answer.data.returnHeadroomYield, null)
+  }
+
+  const conglomerate = capitalHeadroom({ issuerKind: 'unclassified' })
+  assert.ok(codesOf(conglomerate.diagnostics).includes('issuer_kind_unclassified'))
+  assert.equal(conglomerate.data.adequate, null)
+
+  const legacy = capitalHeadroom({ issuerKind: 'financial', financial: insuranceInputs })
+  assert.ok(codesOf(legacy.diagnostics).includes('issuer_kind_not_specific'), '"financial" still selected the bank arithmetic')
+  assert.equal(legacy.data.adequate, null)
+  assert.equal(legacy.data.headroomRatio, undefined)
+
+  const bank = capitalHeadroom({
+    issuerKind: 'bank',
+    classification: { basis: '2026 사업보고서 Ⅱ. 사업의 내용', consolidationBasis: 'consolidated' },
+    financial: { ...insuranceInputs, regulatoryMinimumCet1: 0.105 },
+  })
+  assert.equal(bank.data.adequate, true, 'the bank arithmetic that already worked stopped working')
+  assert.equal(bank.data.issuerKind, 'bank')
+  assert.deepEqual(bank.data.classification, { basis: '2026 사업보고서 Ⅱ. 사업의 내용', consolidationBasis: 'consolidated' }, 'the classification receipts have to travel in the answer')
+  assert.ok(!codesOf(bank.diagnostics).includes('issuer_classification_basis_not_stated'))
+  assert.ok(!codesOf(bank.diagnostics).includes('capital_basis_not_stated'))
+
+  const unsourced = capitalHeadroom({ issuerKind: 'bank', financial: { ...insuranceInputs, regulatoryMinimumCet1: 0.105 } })
+  assert.ok(codesOf(unsourced.diagnostics).includes('issuer_classification_basis_not_stated'), 'the kind was asserted with no document behind it and nothing said so')
+  assert.ok(codesOf(unsourced.diagnostics).includes('capital_basis_not_stated'), 'a consolidated group CET1 and a bank standalone one were left indistinguishable')
+  assert.equal(unsourced.data.adequate, true, 'an absent receipt was turned into a refusal of the company')
+
+  // The industrial arithmetic keeps its own refusal, now against every financial kind.
+  const industrialWithBankRatio = capitalHeadroom({ issuerKind: 'non-financial', financial: insuranceInputs })
+  assert.ok(codesOf(industrialWithBankRatio.diagnostics).includes('bank_metric_out_of_sector'))
+  const brokerWithLeverage = capitalHeadroom({ issuerKind: 'securities', nonFinancial: { netDebt: 1e12, ebitda: 2e11 } })
+  assert.ok(codesOf(brokerWithLeverage.diagnostics).includes('industrial_metric_out_of_sector'))
+  ok('#269 ② — five issuer kinds; insurance, securities and unclassified are explicitly unevaluated, and a CET1 on an insurer is refused rather than divided')
+}
+
+/** An unsupported kind end to end is a wait, and never a verdict on the capital. */
+{
+  const insurer = byId('financial-positive-reaches-buy')
+  insurer.sectorKind = 'insurance'
+  delete insurer.financial
+  const answer = evaluateCase(insurer)
+  assert.notEqual(answer.data.proposedAction, 'BUY', 'an issuer whose capital arithmetic does not exist here reached a sized BUY')
+  assert.notEqual(answer.data.case, 'capital-inadequate', 'an unimplemented method was filed as an inadequate balance sheet')
+  assert.notEqual(answer.data.outcomeCode, 'thesis_refuted')
+  assert.equal(answer.data.returnHeadroomYield, null)
+  assert.ok(codesOf(answer.diagnostics).includes('capital_headroom_method_unsupported'))
+
+  const legacyWord = byId('financial-positive-reaches-buy')
+  legacyWord.sectorKind = 'financial'
+  const stale = evaluateCase(legacyWord)
+  assert.notEqual(stale.data.proposedAction, 'BUY', 'the retired word still reached a BUY through the bank arithmetic')
+  assert.ok(codesOf(stale.diagnostics).includes('issuer_kind_not_specific'))
+
+  for (const fixture of cases.cases) {
+    assert.notEqual(fixture.input.sectorKind, 'financial', `cases/${fixture.id} still carries the retired issuer kind`)
+    assert.notEqual(fixture.input.issuerKind, 'financial', `cases/${fixture.id} still carries the retired issuer kind`)
+  }
+  ok('#269 ② end to end — an unsupported or unspecific issuer kind waits, is never a capital verdict, and no fixture carries the retired word')
+}
+
+/**
  * ── The boundary regressions from the review of `d36e32b` ──────────────────
  *
  * Four P1 findings, and three of them were one defect: an input that was **absent**
@@ -397,14 +653,14 @@ for (const fixture of staged.cases) {
  */
 {
   const industrial = capitalHeadroom({
-    sector: 'non-financial',
+    issuerKind: 'non-financial',
     nonFinancial: { operatingCashFlow: 300000000000, maintenanceCapex: 60000000000, plannedReturnCash: 200000000000, marketCap: 3000000000000 },
   })
   assert.equal(industrial.data.adequate, null, 'an unstated committed investment was treated as zero, which is the reading that makes coverage look best')
   assert.ok(codesOf(industrial.diagnostics).includes('required_investment_not_stated'))
 
   const noMinimum = capitalHeadroom({
-    sector: 'financial',
+    issuerKind: 'bank',
     financial: { cet1: 0.128, policyTargetCet1: 0.125, riskWeightedAssets: 200000000000000, marketCap: 12000000000000 },
   })
   assert.ok(codesOf(noMinimum.diagnostics).includes('regulatory_minimum_not_stated'), 'an unstated regulatory minimum passed silently')

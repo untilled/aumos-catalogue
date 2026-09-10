@@ -40,6 +40,33 @@
  * duplicate is reported, because a book that produced one has two managers who each
  * think they own it.
  *
+ * ── A stated ceiling that cannot be checked holds the increase (#269) ───────
+ *
+ * ⛔ **A sector ceiling the Mandate states and this run cannot evaluate does not
+ * become a sector ceiling that passed.** The proposal used to carry a `warn` and go
+ * through: the name and gross axes were checked, the sector axis was skipped out
+ * loud, and a position went onto a book whose sector total nobody had formed. What
+ * the investor declared was a limit, and approving an order under a warning is not
+ * the same act as releasing the limit.
+ *
+ * ⚠️ **The candidate's own sector is not the whole of the question.** The total a
+ * sector ceiling is measured against is made of *every* holding and *every* open
+ * proposal in that sector. A candidate that names its sector and a book carrying one
+ * row that does not is a book whose sector total is short by whatever that row is —
+ * and a run that checked only the candidate would pass it. Both are the same gap and
+ * both are reported here.
+ *
+ * ⚠️ **What is withheld is the *increase*, and only the increase.** The severity of
+ * this finding depends on the direction of the proposal, which is unusual here and is
+ * the point: a ceiling that could not be checked stops the thing the ceiling
+ * constrains. A reduction moves the way the limit points, so an unevaluable sector
+ * total is a `warn` on it and an `unevaluated` on an addition. Asking «what may this
+ * name be?» — the `weight: 0` pass — is a question and not an addition, so it is not
+ * withheld either; the pass that carries the increment is.
+ *
+ * ⚠️ **And the finding is about the *account*, never about the company.** It is
+ * `data_missing`. A classification nobody supplied is not a thesis anybody refuted.
+ *
  * ⚠️ **Derived from `managers/evidence-gated/lib/sizing.mjs`'s `concentration`** in
  * shape only — positions plus proposed rows folded against a cap table, headroom
  * reported per axis. Its sleeve budgets, currency conversion and theme axis are that
@@ -51,7 +78,8 @@ import { THRESHOLDS } from './thresholds.mjs'
 
 /**
  * @param {object} input
- * @param {{symbol:string, sector?:string, weight:number}} input.proposed  weight is the **increment** being added
+ * @param {{symbol:string, sector?:string, weight:number}} input.proposed  weight is the **increment** being added;
+ *   `sector` is the **fund risk-management sector** the host classifies the account by, not this package's issuer kind
  * @param {Array} input.holdings       real positions: `{ symbol, sector, weight, strategy }` — required
  * @param {Array} input.openProposals  unapproved proposals: `{ symbol, sector, weight, strategy, decisionId }` — required
  * @param {object} [input.caps]        `{ accountPositionCap, strategyPositionCap, accountSectorCap, accountGrossCap }`
@@ -62,7 +90,7 @@ export function concentration(input = {}) {
   const proposed = input.proposed ?? {}
   const caps = input.caps ?? {}
   const symbol = proposed.symbol
-  const sector = proposed.sector ?? null
+  const sector = typeof proposed.sector === 'string' && proposed.sector.length > 0 ? proposed.sector : null
 
   if (typeof symbol !== 'string' || symbol.length === 0 || !finite(proposed.weight)) {
     diagnostics.push(
@@ -202,20 +230,61 @@ export function concentration(input = {}) {
   }
 
   // ── the sector axis, on the same two sources ─────────────────────────────
+  /**
+   * Is this proposal **adding** exposure? `weight: 0` is the first pass asking what
+   * the account permits this name to be, and a negative weight is a reduction. Only
+   * an addition is withheld when a stated ceiling cannot be evaluated.
+   */
+  const increasesExposure = proposed.weight > THRESHOLDS.weightTolerance
+
   let sectorExposure = null
   let sectorExcludingName = null
   let sectorHeadroom = null
+  /** `not-applicable` — no ceiling; `evaluated` — checked; `unevaluated` — stated and unformable. */
+  let sectorLimitState = 'not-applicable'
   if (finite(caps.accountSectorCap)) {
-    if (sector === null) {
+    const unclassified = []
+    for (const row of [...heldBySymbol.values(), ...openProposals]) {
+      if (typeof row.sector === 'string' && row.sector.length > 0) continue
+      if (!finite(row.weight) || row.weight === 0) continue
+      if (!unclassified.includes(row.symbol)) unclassified.push(row.symbol)
+    }
+    if (sector === null || unclassified.length > 0) {
+      sectorLimitState = 'unevaluated'
+      const parts = []
+      if (sector === null) parts.push('this proposal does not say which sector it is in, so there is no bucket for it to join')
+      if (unclassified.length > 0) {
+        parts.push(
+          `${unclassified.length} of the account's own rows ${unclassified.length === 1 ? 'carries' : 'carry'} no sector (${unclassified.join(', ')}), so the total this ceiling is measured against is short by whatever they are — a candidate that names its sector does not make that total formable`,
+        )
+      }
       diagnostics.push(
         diagnostic(
-          'proposal_has_no_sector',
-          'warn',
-          'A sector ceiling is stated for this account and this proposal does not say which sector it is in, so the sector axis could not be checked for it. The name and gross axes still were.',
-          'proposed.sector',
+          'sector_exposure_unevaluated',
+          /**
+           * ⛔ The severity is the direction of the proposal, and that is deliberate.
+           * A ceiling that could not be checked withholds the thing it constrains —
+           * an addition — and says nothing about a reduction or about the question
+           * «what may this name be?». `unevaluated` here makes `withinLimits` `null`,
+           * and `null` is not a pass anywhere in this package.
+           */
+          increasesExposure ? 'unevaluated' : 'warn',
+          `A sector ceiling of ${round(caps.accountSectorCap)} is stated for this account and ${parts.join('; and ')}. ${
+            increasesExposure
+              ? 'The increase is withheld: a limit the investor declared and this run could not verify is not a limit that passed, and approving an order under a warning is not the act of releasing it.'
+              : 'Nothing is withheld — this proposal does not increase exposure, and a ceiling that could not be checked constrains additions rather than reductions.'
+          } This is an absence and is recorded as \`data_missing\`: a classification nobody supplied is not a thesis anybody refuted.`,
+          sector === null ? 'proposed.sector' : 'holdings',
+          {
+            cap: round(caps.accountSectorCap),
+            increasesExposure,
+            proposalSectorStated: sector !== null,
+            unclassifiedRows: unclassified,
+          },
         ),
       )
     } else {
+      sectorLimitState = 'evaluated'
       sectorExposure = 0
       for (const row of heldBySymbol.values()) if (row.sector === sector) sectorExposure += row.weight
       for (const row of openProposals) if (row.sector === sector) sectorExposure += row.weight
@@ -245,7 +314,12 @@ export function concentration(input = {}) {
      * the screen where they approve.
      */
     diagnostics.push(
-      diagnostic('sector_cap_not_stated', 'info', 'This Mandate states no sector ceiling, so the sector axis constrains nothing on this run. It is said out loud rather than left as a silently skipped check.', 'caps.accountSectorCap'),
+      diagnostic(
+        'sector_cap_not_applicable',
+        'info',
+        'This Mandate states no sector ceiling, so the sector axis is **not applicable** on this run rather than unchecked. It is said out loud rather than left as a silently skipped check, and the code says which of the two it is: nothing was skipped, because there was nothing to skip.',
+        'caps.accountSectorCap',
+      ),
     )
   }
 
@@ -306,6 +380,8 @@ export function concentration(input = {}) {
       symbolHeadroom: round(Math.max(0, symbolHeadroom)),
       sectorExposure: finite(sectorExposure) ? round(sectorExposure) : null,
       sectorHeadroom: finite(sectorHeadroom) ? round(Math.max(0, sectorHeadroom)) : null,
+      /** `not-applicable` (no ceiling stated), `evaluated`, or `unevaluated` (stated and unformable). */
+      sectorLimitState,
       grossExposure: round(grossExposure),
       projectedGrossExposure: round(projectedGross),
       grossHeadroom: finite(grossHeadroom) ? round(Math.max(0, grossHeadroom)) : null,
@@ -340,6 +416,7 @@ function emptyAnswer(partial = {}) {
     symbolHeadroom: null,
     sectorExposure: null,
     sectorHeadroom: null,
+    sectorLimitState: null,
     grossExposure: finite(partial.grossExposure) ? round(partial.grossExposure) : null,
     projectedGrossExposure: null,
     grossHeadroom: null,

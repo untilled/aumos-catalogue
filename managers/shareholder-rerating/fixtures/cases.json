@@ -7,7 +7,7 @@
       "input": {
         "symbol": "000000",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "strategy": "shareholder-rerating",
         "valuation": {
           "price": 16000,
@@ -114,7 +114,7 @@
       "input": {
         "symbol": "316140",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "strategy": "shareholder-rerating",
         "technical": {
           "rsi14": 61.4,
@@ -209,7 +209,7 @@
       "input": {
         "symbol": "000001",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "valuation": {
           "price": 25000,
           "fairValue": {
@@ -284,7 +284,7 @@
       "input": {
         "symbol": "000002",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "valuation": {
           "price": 14000,
           "fairValue": {
@@ -491,7 +491,7 @@
       "input": {
         "symbol": "000005",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "valuation": {
           "price": 11000,
           "fairValue": {
@@ -560,7 +560,7 @@
       "input": {
         "symbol": "000006",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "valuation": {
           "price": 12000,
           "fairValue": {
@@ -628,7 +628,7 @@
       "input": {
         "symbol": "000007",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "valuation": {
           "price": 12000,
           "fairValue": {
@@ -732,7 +732,7 @@
       "input": {
         "symbol": "000009",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "valuation": {
           "price": 16000,
           "fairValue": {
@@ -811,7 +811,7 @@
       "input": {
         "symbol": "000010",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "strategy": "shareholder-rerating",
         "valuation": {
           "price": 16000,
@@ -919,7 +919,7 @@
       "input": {
         "symbol": "000011",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "strategy": "shareholder-rerating",
         "valuation": {
           "price": 16000,
@@ -1025,7 +1025,7 @@
       "input": {
         "symbol": "000012",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "valuation": {
           "price": 16000,
           "fairValue": {
@@ -1115,7 +1115,7 @@
       "input": {
         "symbol": "000013",
         "sector": "financials",
-        "sectorKind": "financial",
+        "sectorKind": "bank",
         "valuation": {
           "price": 16000,
           "fairValue": {
