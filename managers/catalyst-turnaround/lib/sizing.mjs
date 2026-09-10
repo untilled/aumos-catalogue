@@ -59,6 +59,21 @@ export function targetWeight({
   conviction,
   mandatePositionCap,
   accountHeadroom,
+  /**
+   * ⚠️ **The same room, measured against positions only (`untilled/aumos#828`).**
+   * `accountHeadroom` above has every other strategy's exposure out of it and
+   * that exposure folds their **open proposals** in (#813) — right for *«how
+   * much may this desk buy»*, because a limit has to hold in every state the
+   * account passes through. It is the wrong number for the weight that travels
+   * **back**: that one is executed against the position, and an unfilled
+   * proposal is not a position.
+   *
+   * ⛔ **`null` where the caller did not split it**, and never a silent fall
+   * back to `accountHeadroom`: that fall back *is* the defect, and a caller
+   * that has not answered this question must not be given the other one's
+   * answer as if it had.
+   */
+  heldOnlyAccountHeadroom,
   config = {},
 } = {}) {
   const diagnostics = []
@@ -75,6 +90,7 @@ export function targetWeight({
    */
   const mandate = readDeclared(mandatePositionCap)
   const headroom = readDeclared(accountHeadroom)
+  const heldOnlyHeadroom = readDeclared(heldOnlyAccountHeadroom)
   for (const [name, reading] of [
     ['mandatePositionCap', mandate],
     ['accountHeadroom', headroom],
@@ -86,7 +102,7 @@ export function targetWeight({
     }
   }
   if (mandate.state === 'unread' || headroom.state === 'unread') {
-    return { data: { targetWeight: null, cumulativeTargetWeight: null }, diagnostics, causes }
+    return { data: { targetWeight: null, cumulativeTargetWeight: null, heldOnlyTargetWeight: null }, diagnostics, causes }
   }
   if (mandate.state === 'not-declared') {
     diagnostics.push(
@@ -96,11 +112,11 @@ export function targetWeight({
 
   if (![expectedActiveReturn, stopDistance, conviction].every(finite)) {
     causes.push(cause('data_missing', 'Sizing needs the expected active return, the distance to invalidation and a stated conviction. Any one of them missing and the answer is a weight this run made up', 'sizing'))
-    return { data: { targetWeight: null }, diagnostics, causes }
+    return { data: { targetWeight: null, heldOnlyTargetWeight: null }, diagnostics, causes }
   }
   if (stopDistance <= 0 || conviction < 0 || conviction > 1) {
     diagnostics.push(diagnostic('sizing_inputs_invalid', 'blocked', 'stopDistance must be positive and conviction must lie in [0,1]', 'sizing'))
-    return { data: { targetWeight: null }, diagnostics, causes }
+    return { data: { targetWeight: null, heldOnlyTargetWeight: null }, diagnostics, causes }
   }
 
   const rewardRisk = expectedActiveReturn / stopDistance
@@ -118,10 +134,22 @@ export function targetWeight({
     )
   }
 
-  const caps = [houseCap, mandate.value, headroom.value].filter(finite)
-  const bindingCap = caps.length > 0 ? Math.max(0, Math.min(...caps)) : 0
-  const sized = round(Math.min(raw, bindingCap))
-  const capBinds = raw > bindingCap
+  /**
+   * ── One list of caps, folded twice (`untilled/aumos#828`) ─────────────────
+   *
+   * ⛔ **A pending total is a ceiling and is not a position for an order.** The
+   * two folds differ in exactly one term — the account headroom, which counts
+   * other desks' unfilled proposals in the first and only their holdings in the
+   * second — and the house and Mandate caps are properties of the thesis, so on
+   * a book with no open proposals the two are the same number, byte for byte.
+   */
+  const foldCaps = (room) => {
+    const caps = [houseCap, mandate.value, room].filter(finite)
+    const bindingCap = caps.length > 0 ? Math.max(0, Math.min(...caps)) : 0
+    return { bindingCap, sized: round(Math.min(raw, bindingCap)), capBinds: raw > bindingCap }
+  }
+  const { bindingCap, sized, capBinds } = foldCaps(headroom.value)
+  const heldOnly = heldOnlyHeadroom.state === 'unread' ? null : foldCaps(heldOnlyHeadroom.value)
 
   if (headroom.state === 'value' && headroom.value <= 0) {
     causes.push(
@@ -149,6 +177,23 @@ export function targetWeight({
        */
       targetWeight: sized,
       cumulativeTargetWeight: sized,
+      /**
+       * ⚠️ **The same arithmetic with nobody's unfilled proposal in it (#828).**
+       * `runVerdict`'s `reduce` role is the only consumer and the entry path
+       * does not read it: #813's fold stands for the buying question, and what
+       * may not follow from it is a *sale*. A judgement to reduce that reads a
+       * ceiling another desk narrowed by writing a proposal down sells more of
+       * this desk's own position the moment that proposal is sealed — measured
+       * here, a 6% holding trimmed to `0.01666668` went to `0.01` on a proposal
+       * nobody approved, and to zero as it grew.
+       *
+       * ⚠️ **Published rather than folded in, because both are true and they
+       * answer different questions.** A reader asking why this desk may buy so
+       * little reads `bindingCap`; one asking what a reduction is measured
+       * against reads this.
+       */
+      heldOnlyTargetWeight: heldOnly === null ? null : heldOnly.sized,
+      heldOnlyBindingCap: heldOnly === null ? null : round(heldOnly.bindingCap),
       meaning: 'this-strategys-share-of-the-position',
       rawWeight: round(raw),
       bindingCap: round(bindingCap),
@@ -162,7 +207,7 @@ export function targetWeight({
         riskBudget: round(riskBudget),
         stopDistance: round(stopDistance),
       },
-      caps: { house: houseCap, mandate: mandate.value, mandateState: mandate.state, accountHeadroom: headroom.value, accountHeadroomState: headroom.state },
+      caps: { house: houseCap, mandate: mandate.value, mandateState: mandate.state, accountHeadroom: headroom.value, accountHeadroomState: headroom.state, heldOnlyAccountHeadroom: heldOnlyHeadroom.value, heldOnlyAccountHeadroomState: heldOnlyHeadroom.state },
       units: { targetWeight: 'portfolio-weight', rawWeight: 'portfolio-weight', bindingCap: 'portfolio-weight' },
     },
     diagnostics,
@@ -475,6 +520,17 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
       accountCap,
       breach: total > accountCap,
       headroomForStrategy: round(Math.max(0, Math.min(accountCap, strategyCap) - otherStrategies)),
+      /**
+       * ⚠️ **The same room with only the positions in it (`untilled/aumos#828`).**
+       * `headroomForStrategy` subtracts `otherStrategies`, which folds the open
+       * proposals in — a ceiling has to hold in every state the account passes
+       * through, so somebody's unfilled buy counts before it fills. This one
+       * subtracts `otherHeld`, and it is the term the weight travelling **back**
+       * to the host is folded into: `hostTargetWeight` adds `otherHeld` back, so
+       * folding a target into the *other* number reads two different books at
+       * the two ends of one sum and lands under the cap by the difference.
+       */
+      heldOnlyHeadroomForStrategy: round(Math.max(0, Math.min(accountCap, strategyCap) - otherHeld)),
     }
     if (row.breach) {
       causes.push(
@@ -502,6 +558,12 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
       strategyCapTotal,
       unusedHeadroom,
       headroom: Object.fromEntries(rows.map((row) => [row.symbol, row.headroomForStrategy])),
+      /**
+       * ⚠️ **Its holdings-only twin, per name (#828).** Same fallback for a name
+       * with no row: nobody holds it and nobody has proposed it, so the two folds
+       * are `unusedHeadroom` alike.
+       */
+      heldOnlyHeadroom: Object.fromEntries(rows.map((row) => [row.symbol, row.heldOnlyHeadroomForStrategy])),
       /**
        * ⚠️ **Holdings this desk is not responsible for, per name (#817).** What
        * `runVerdict` adds to a cumulative target before anything leaves for the
