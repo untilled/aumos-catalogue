@@ -1028,6 +1028,343 @@ check('#826 — every axis that reads the book has a holdings-only term', () => 
 })
 
 /**
+ * ── #835: a residual is not an allocation, and it may not size a sale ───────
+ *
+ * `#826` closed one axis under `#823` — a pending total is a ceiling and is not
+ * a position. This is the other one, and it was open the whole time:
+ * `positionSizing` folds **six** ceilings into one number, and two of them are
+ * `cap − everything else in the bucket`. A sector ceiling states no division of
+ * itself between the names under it, so reading *«the sector has 0.01 left»* as
+ * *«this position must become 0.01»* hands the whole adjustment to whichever
+ * name was evaluated last.
+ *
+ * Driven to the real host on a 6% position **wholly this desk's**, its thesis
+ * invalidated, under a 0.25 sector ceiling — another *name* filling the sector:
+ *
+ *     other name held   hostTargetWeight   order
+ *     0 … 0.21          0.03623596         sell:23
+ *     0.24              0.01               sell:50
+ *     0.245             0.005              sell:55
+ *     0.3 / 0.5         0                  sell:60   ← the whole position
+ *
+ * ⛔ **Nobody asked for that liquidation and nothing in the answer said so.**
+ * `deadline-elapsed-re-adjudicate` did not differ by one value, the gross axis
+ * is the same arithmetic with a wider bucket, and the owner of that other name —
+ * another desk, this desk, or nobody at all — made no difference, so `#786`'s
+ * gate never reaches it.
+ *
+ * ⛔ **The inputs are built here and no fixture was edited.**
+ */
+const CAP835 = { singleNameCap: 0.1, grossCap: 0.9, sectorCap: 0.25 }
+/** A **different name** in the same sector. `strategy` omitted means unattributed. */
+const otherName835 = (weight, strategy) => ({ symbol: 'OTHER9', sector: 'technology', weight, ...(strategy === undefined ? {} : { strategy }) })
+const pendingName835 = (weight, strategy = 'inst_catalyst_turnaround') => ({ symbol: 'OTHER9', sector: 'technology', targetWeight: weight, strategy })
+const size835 = (holdings, mandate = CAP835, proposals = []) =>
+  sizeFor823(holdings, { mandate, sector: 'technology', book: { holdings, openProposals: proposals } })
+const REVIEWS835 = ['invalidation-triggered', 'deadline-elapsed', 'target-reached-staged-trim']
+const reviews835 = (holdings, mandate = CAP835, proposals = []) =>
+  REVIEWS835.map((name) => [name, classify823(name, size835(holdings, mandate, proposals))])
+/** The order the issue measured with nothing else in the bucket: `sell:23` out of a 6% holding. */
+const SHARE835 = 0.03623596
+const SECTOR_SWEEP835 = [0, 0.1, 0.19, 0.2, 0.21, 0.24, 0.245, 0.2451, 0.3, 0.5]
+
+/**
+ * ⛔ **The two axes are enumerated, not sampled.** «One place fixed and its twin
+ * missed» is the shape three of this series' defects had, so the roster is
+ * asserted whole: every ceiling this package folds is either one that **names**
+ * this position or one that is the account's **leftover room**, and the
+ * reduction fold is exactly the first list.
+ */
+check('#835 — every ceiling is a name axis or a residual, and a sale reads only the first', () => {
+  const declared = { singleNameCap: 0.1, grossCap: 0.9, sectorCap: 0.25, strategyCap: 0.08 }
+  const answer = size835([held823(0.06, STRATEGY_ID), otherName835(0.1, 'inst_catalyst_turnaround')], declared)
+  assert.equal(answer.status, 'ok')
+  const NAME_AXES = ['risk-budget', 'liquidity', 'single-name-headroom', 'strategy-headroom']
+  const RESIDUAL_AXES = ['gross-headroom', 'sector-headroom']
+  assert.deepEqual(
+    answer.ceilings.map((row) => row.name),
+    [...NAME_AXES, ...RESIDUAL_AXES],
+    'the roster of ceilings moved — every new axis has to be judged a name axis or a residual before it folds',
+  )
+  assert.deepEqual(
+    answer.heldOnlyCeilings.map((row) => row.name),
+    [...NAME_AXES, ...RESIDUAL_AXES],
+    '#826\'s fold reads every axis, which is what leaves the residual question open',
+  )
+  assert.deepEqual(answer.reductionCeilings.map((row) => row.name), NAME_AXES, 'the reduction fold reads an axis it may not size a sale with')
+  for (const row of answer.reductionCeilings) {
+    assert.ok(!RESIDUAL_AXES.includes(row.name), `${row.name} is the account's leftover room after other names and sized a sale`)
+  }
+  /** ⚠️ And each name axis is measured against holdings only — the two corrections compose. */
+  const withPending = size835(
+    [held823(0.06, STRATEGY_ID)],
+    declared,
+    [{ symbol: SYMBOL823, sector: 'technology', targetWeight: 0.15, strategy: 'inst_shareholder_rerating' }],
+  )
+  assert.ok(
+    ['single-name-headroom', 'strategy-headroom'].includes(withPending.bindingConstraint),
+    `the pending total stopped narrowing the entry ceiling: ${withPending.bindingConstraint}`,
+  )
+  assert.ok(withPending.targetTotalWeight < SHARE835, 'the entry share was not narrowed by the pending total')
+  assert.equal(withPending.reductionTargetTotalWeight, SHARE835, 'the reduction fold read another desk\'s unfilled proposal')
+})
+
+/**
+ * ⛔ **The sector ramp, flat.** Every row here narrows the *entry* ceiling — the
+ * pre-conditions are asserted below so this is not a test of a number nobody
+ * moved — and not one of them may move the sale.
+ */
+check('#835 — another name filling the sector does not enlarge this desk\'s sale', () => {
+  for (const other of SECTOR_SWEEP835) {
+    const holdings = other === 0 ? [held823(0.06, STRATEGY_ID)] : [held823(0.06, STRATEGY_ID), otherName835(other, 'inst_catalyst_turnaround')]
+    for (const [name, answer] of reviews835(holdings)) {
+      const where = `${name}@sector=${other}`
+      assert.equal(answer.weightRole, 'reduce', `${where}: an outcome that reduces was not typed as one`)
+      assert.equal(answer.ownHeldWeight, 0.06, `${where}: the desk's own holding`)
+      assert.equal(answer.otherHeldWeight, 0, `${where}: nobody else holds *this* name — the other name is a different position`)
+      assert.equal(answer.hostTargetWeight, SHARE835, `${where}: a sector filled by another name changed the total this desk hands the exchange`)
+      assert.equal(answer.exposureDirection, 'reduce', `${where}: the order that leaves is no longer a reduction`)
+      assert.ok(answer.hostTargetWeight > 0, `${where}: the account's leftover room liquidated a position this desk runs`)
+    }
+  }
+
+  /** ⛔ And the entry ceiling really did collapse, so the rows above are the state the defect needs. */
+  const measured = SECTOR_SWEEP835.map((other) => [
+    other,
+    size835(other === 0 ? [held823(0.06, STRATEGY_ID)] : [held823(0.06, STRATEGY_ID), otherName835(other, 'inst_catalyst_turnaround')]),
+  ])
+  const at = (other) => measured.find((row) => row[0] === other)[1]
+  assert.equal(at(0.21).targetTotalWeight, SHARE835, 'the sector axis binds earlier than the issue measured')
+  assert.equal(at(0.24).targetTotalWeight, 0.01, 'the entry share at 0.24 is not the 1% the issue measured')
+  assert.equal(at(0.24).bindingConstraint, 'sector-headroom', 'the sector axis stopped binding the entry ceiling — #813 was reverted')
+  assert.equal(at(0.245).targetTotalWeight, 0.005, 'the entry share at 0.245 moved')
+  assert.equal(at(0.3).targetTotalWeight, 0, 'a sector past its ceiling no longer refuses the entry')
+  assert.equal(at(0.3).status, 'refused', 'and it no longer refuses with a code')
+  assert.equal(at(0.3).code, 'risk_limit_exceeded')
+  for (const other of SECTOR_SWEEP835) {
+    assert.equal(at(other).reductionTargetTotalWeight, SHARE835, `sector=${other}: a refused *entry* took the reduction ceiling down with it`)
+    assert.equal(at(other).reductionBindingConstraint, 'risk-budget', `sector=${other}: the reduction fold read a bucket-wide ceiling`)
+  }
+})
+
+/**
+ * ⛔ **The gross axis is the same arithmetic with a wider bucket**, and it would
+ * have carried the same defect the first time it bound. Measured on its own,
+ * with no sector ceiling declared at all.
+ */
+check('#835 — and the gross axis, which is the same arithmetic one bucket wider', () => {
+  const GROSS835 = { singleNameCap: 0.1, grossCap: 0.3 }
+  for (const other of [0, 0.2, 0.26, 0.27, 0.295, 0.2951, 0.3, 0.5]) {
+    const holdings = other === 0 ? [held823(0.06, STRATEGY_ID)] : [held823(0.06, STRATEGY_ID), otherName835(other, 'inst_catalyst_turnaround')]
+    for (const [name, answer] of reviews835(holdings, GROSS835)) {
+      const where = `${name}@gross=${other}`
+      assert.equal(answer.weightRole, 'reduce', `${where}: an outcome that reduces was not typed as one`)
+      assert.equal(answer.hostTargetWeight, SHARE835, `${where}: the book's leftover room after other names sized this desk's sale`)
+      assert.equal(answer.exposureDirection, 'reduce', `${where}: the order that leaves is no longer a reduction`)
+    }
+  }
+  const crowded = size835([held823(0.06, STRATEGY_ID), otherName835(0.27, 'inst_catalyst_turnaround')], GROSS835)
+  assert.equal(crowded.bindingConstraint, 'gross-headroom', 'the gross axis stopped binding the entry ceiling')
+  assert.equal(crowded.targetTotalWeight, 0.03, 'the entry share under a crowded book moved')
+  assert.equal(crowded.reductionTargetTotalWeight, SHARE835, 'the reduction fold read the book\'s leftover room')
+  const full = size835([held823(0.06, STRATEGY_ID), otherName835(0.3, 'inst_catalyst_turnaround')], GROSS835)
+  assert.equal(full.targetTotalWeight, 0, 'a book at its gross ceiling no longer refuses the entry')
+  assert.equal(full.reductionTargetTotalWeight, SHARE835, 'and it took the reduction ceiling down with it')
+})
+
+/**
+ * ⛔ **Whose the other name is makes no difference, and that is the point.**
+ * `untilled/aumos#786`'s handover gate fires where the *position under review*
+ * is somebody else's; here the position is wholly this desk's and the name
+ * filling the bucket is a different one. Another desk, this desk, and nobody at
+ * all give one answer — so no attribution rule reaches this, and it is not a
+ * multi-manager defect.
+ */
+check('#835 — the owner of the name that filled the bucket is not the axis', () => {
+  for (const other of [0.24, 0.245, 0.3]) {
+    const answers = [
+      ['another desk', otherName835(other, 'inst_catalyst_turnaround')],
+      ['this desk', otherName835(other, STRATEGY_ID)],
+      ['nobody', otherName835(other)],
+    ].map(([owner, row]) => [owner, classify823('invalidation-triggered', size835([held823(0.06, STRATEGY_ID), row]))])
+    for (const [owner, answer] of answers) {
+      assert.equal(answer.hostTargetWeight, SHARE835, `sector=${other}/${owner}: the sale depended on who filled the bucket`)
+      assert.equal(answer.ownHeldWeight, 0.06, `sector=${other}/${owner}: this desk's holding in the name under review`)
+      assert.equal(answer.otherHeldWeight, 0, `sector=${other}/${owner}: the other *name* was counted as part of this position`)
+      assert.deepEqual([...answer.ampActions], ['RESIZE', 'SELL'], `sector=${other}/${owner}: #819's withdrawal fired on a position wholly this desk's`)
+    }
+  }
+})
+
+/**
+ * ⚠️ **Said out loud, because five answers before this one were not.** The
+ * counterfactual travels with it: an observation that cannot be measured against
+ * what it withheld is a restatement.
+ */
+check('#835 — the answer says that the account\'s leftover room was not folded into its sale', () => {
+  for (const [name, answer] of reviews835([held823(0.06, STRATEGY_ID), otherName835(0.3, 'inst_catalyst_turnaround')])) {
+    const row = answer.diagnostics.find((diag) => diag.code === 'reduction_is_not_sized_by_the_accounts_remaining_room')
+    assert.ok(row, `${name}: the sale was measured against a different ceiling and nothing said so`)
+    assert.equal(row.severity, 'info')
+    assert.equal(row.details.heldOnlyTargetTotalWeight, 0, `${name}: the remainder the diagnostic names`)
+    assert.equal(row.details.reductionTargetTotalWeight, SHARE835, `${name}: the share this sale was measured against`)
+    assert.equal(row.details.reductionBindingConstraint, 'risk-budget', `${name}: what actually bound the sale`)
+    assert.equal(row.details.heldOnlyBindingConstraint, 'sector-headroom', `${name}: the axis whose remainder was set aside`)
+    assert.equal(row.details.hostTargetWeight, answer.hostTargetWeight, `${name}: the diagnostic names a total the answer did not send`)
+    assert.equal(row.details.hostTargetWeightIfRoomFolded, 0, `${name}: the liquidation that would have gone out is not carried, so nobody can measure what was withheld`)
+  }
+
+  /** ⛔ And it is silent where the two folds agree — a line on every answer is a line nobody reads. */
+  for (const [name, answer] of reviews835([held823(0.06, STRATEGY_ID)])) {
+    assert.ok(
+      !answer.diagnostics.some((diag) => diag.code === 'reduction_is_not_sized_by_the_accounts_remaining_room'),
+      `${name}: reported a divergence on an account with no other name in the bucket`,
+    )
+  }
+  /** ⛔ And silent on a purchase: an addition **is** bounded by the account's room (#813). */
+  const buy = classify823('temporary-shock-plus-stabilisation', size835([held823(0.06), otherName835(0.18, 'inst_catalyst_turnaround')]), {
+    position: { held: false },
+    review: { invalidationTriggered: false, deadlineElapsed: false },
+  })
+  assert.equal(buy.weightRole, 'increase')
+  assert.ok(
+    !buy.diagnostics.some((diag) => diag.code === 'reduction_is_not_sized_by_the_accounts_remaining_room'),
+    'an entry answer reported a reduction finding',
+  )
+})
+
+/**
+ * ⚠️ **`#823`'s clamp reports the number it actually clamps, and that is a
+ * second reader of this fold.** A mutant that left it on `heldOnlyTarget`
+ * survived every check above: the two folds only disagree where the bucket is
+ * crowded, and the clamp only fires where the target is above the holding, so
+ * the case that separates them needs **both** at once — a small holding under a
+ * nearly-full sector. There `heldOnlyTarget` is at the holding and says nothing
+ * while the sale really is being clamped, which is the silence `#826` named.
+ */
+check('#835 — the clamp names the fold it clamps, not the account\'s leftover room', () => {
+  const crowded = [held823(0.02, STRATEGY_ID), otherName835(0.23, 'inst_catalyst_turnaround')]
+  const measured = size835(crowded)
+  assert.equal(measured.reductionTargetTotalWeight, SHARE835, 'the reduction fold is not this desk\'s own target')
+  assert.equal(measured.heldOnlyTargetTotalWeight, 0.02, 'the sector remainder is no longer exactly the holding — the case no longer separates the two folds')
+  for (const [name, answer] of reviews835(crowded)) {
+    assert.equal(answer.ownHeldWeight, 0.02)
+    assert.equal(answer.hostTargetWeight, 0.02, `${name}: the sale was not clamped to this desk's own holding`)
+    const row = answer.diagnostics.find((diag) => diag.code === 'reduction_target_clamped_to_own_holding')
+    assert.ok(row, `${name}: the sale was clamped and the answer said nothing — the clamp is reporting a fold it does not use`)
+    assert.equal(row.path, 'sizing.reductionTargetTotalWeight', `${name}: the clamp names a fold it did not clamp`)
+    assert.equal(row.details.reductionTargetTotalWeight, SHARE835, `${name}: the share the clamp actually bounded`)
+    assert.equal(row.details.heldOnlyTargetTotalWeight, 0.02, `${name}: the remainder fold is carried beside it and is not the subject`)
+    assert.equal(row.details.hostTargetWeight, answer.hostTargetWeight)
+  }
+})
+
+/**
+ * ⛔ **Two invariants over the whole sweep, and neither may have an exception.**
+ * A sale may never exceed what the ceilings that name this position size it at,
+ * and a judgement to reduce may never hand the host a total above what the
+ * account holds. Both are measured on the sector axis, the gross axis, all three
+ * review outcomes, and all three owners of the name that filled the bucket.
+ */
+check('#835 — no sale is larger than this desk\'s own target, and no reduction leaves as a purchase', () => {
+  const books = []
+  for (const other of SECTOR_SWEEP835) {
+    for (const owner of ['inst_catalyst_turnaround', STRATEGY_ID, undefined]) {
+      books.push([
+        `sector=${other}/${owner ?? 'nobody'}`,
+        other === 0 ? [held823(0.06, STRATEGY_ID)] : [held823(0.06, STRATEGY_ID), otherName835(other, owner)],
+        CAP835,
+      ])
+    }
+  }
+  for (const other of [0, 0.2, 0.27, 0.295, 0.3, 0.5]) {
+    books.push([
+      `gross=${other}`,
+      other === 0 ? [held823(0.06, STRATEGY_ID)] : [held823(0.06, STRATEGY_ID), otherName835(other, 'inst_catalyst_turnaround')],
+      { singleNameCap: 0.1, grossCap: 0.3 },
+    ])
+  }
+  /** ⚠️ And the pending twin of each, so `#826`'s axis is swept here too. */
+  for (const other of [0.15, 0.3]) {
+    books.push([`pendingName=${other}`, [held823(0.06, STRATEGY_ID)], CAP835, [pendingName835(other)]])
+  }
+  let measured = 0
+  for (const [where, holdings, mandate, proposals] of books) {
+    for (const [name, answer] of reviews835(holdings, mandate, proposals ?? [])) {
+      assert.equal(answer.weightRole, 'reduce', `${name}@${where}: an outcome that reduces was not typed as one`)
+      const own = answer.ownHeldWeight
+      const share = answer.sizing.reductionTargetTotalWeight
+      assert.ok(typeof share === 'number', `${name}@${where}: the answer does not publish what its sale was measured against`)
+      assert.equal(answer.hostTargetWeight, round(answer.otherHeldWeight + Math.min(share, own)), `${name}@${where}: the sale is not this desk's own target clamped to its own holding`)
+      assert.ok(answer.hostTargetWeight >= round(answer.otherHeldWeight + Math.min(share, own)), `${name}@${where}: the sale went past what the ceilings naming this position size it at`)
+      assert.ok(answer.hostTargetWeight <= answer.positionWeight, `${name}@${where}: a judgement to reduce left as a purchase`)
+      assert.ok(share <= own || answer.hostTargetWeight === answer.positionWeight, `${name}@${where}: a reduction target above the holding was not clamped`)
+      measured += 1
+    }
+  }
+  assert.equal(measured, books.length * 3, 'the sweep did not reach every review outcome on every book')
+})
+
+/**
+ * ⛔ **The regressions this fix must not kill.** `#813`/`#275` bounds the entry
+ * by the account's leftover room and still does; `#817` adds what others hold to
+ * the buy total; `#819` withdraws `SELL` and floors the target where part of the
+ * position is not this desk's.
+ */
+check('#835 — the buy path is still bounded by the account\'s leftover room (#813)', () => {
+  /**
+   * ⚠️ **The position under review is part of its own sector bucket**, so an
+   * unattributed 6% plus another name at 0.18 is 0.24 of a 0.25 ceiling: 0.01
+   * left, and that is what the entry may become.
+   */
+  const crowded = size835([held823(0.06), otherName835(0.18, 'inst_catalyst_turnaround')])
+  assert.equal(crowded.targetTotalWeight, 0.01, 'the entry ceiling stopped reading the sector remainder')
+  assert.equal(crowded.bindingConstraint, 'sector-headroom')
+  const buy = classify823('temporary-shock-plus-stabilisation', crowded, {
+    position: { held: false },
+    review: { invalidationTriggered: false, deadlineElapsed: false },
+  })
+  assert.equal(buy.weightRole, 'increase')
+  /** ⛔ `#817` unmoved: what others hold is added to the entry share, and the sum is what buys. */
+  assert.equal(buy.hostTargetWeight, round(0.06 + 0.01), 'the buy path read the reduction fold and bought room the sector does not have')
+
+  /** ⛔ A sector past its ceiling still refuses the entry outright. */
+  const full = size835([held823(0.06), otherName835(0.3, 'inst_catalyst_turnaround')])
+  assert.equal(full.status, 'refused')
+  assert.equal(full.code, 'risk_limit_exceeded')
+  assert.equal(full.targetTotalWeight, 0)
+
+  /** ⚠️ `#819`: where the position under review is somebody else's, nothing here changed. */
+  const anothers = classify823('invalidation-triggered', size835([held823(0.06, 'inst_catalyst_turnaround'), otherName835(0.24, 'inst_catalyst_turnaround')]))
+  assert.equal(anothers.ownHeldWeight, 0, 'the position under review is not this desk\'s')
+  assert.deepEqual([...anothers.ampActions], ['WATCH'], '#819\'s withdrawal stopped firing on a position wholly another desk\'s')
+  assert.equal(anothers.hostTargetWeightFloor, 0.06, 'the floor is what somebody else holds')
+  assert.equal(anothers.hostTargetWeight, 0.06, 'a review of somebody else\'s position proposed to move it')
+})
+
+/**
+ * ⚠️ **The three folds are one fold on an account with nothing else in the
+ * bucket**, which is the common case and the reason this change is invisible
+ * almost everywhere. Measured over every sizing fixture rather than asserted.
+ */
+check('#835 — with no other name in the bucket the three folds are one number', () => {
+  let measured = 0
+  for (const row of sizing.cases) {
+    const answer = sized.get(row.name)
+    if (typeof answer?.targetTotalWeight !== 'number') continue
+    const holdings = Array.isArray(row.input?.book?.holdings) ? row.input.book.holdings : []
+    const proposals = Array.isArray(row.input?.book?.openProposals) ? row.input.book.openProposals : []
+    if (proposals.length > 0) continue
+    if (holdings.some((held) => held?.symbol !== row.input?.symbol)) continue
+    measured += 1
+    assert.equal(answer.reductionTargetTotalWeight, answer.heldOnlyTargetTotalWeight, `${row.name}: a book with no other name folded to two different shares`)
+    assert.equal(answer.reductionTargetTotalWeight, answer.targetTotalWeight, `${row.name}: and to a third`)
+    assert.equal(answer.reductionBindingConstraint, answer.bindingConstraint, `${row.name}: and to two different binding constraints`)
+  }
+  assert.ok(measured >= 5, 'too few sizing fixtures reached the identity to be measuring it')
+})
+
+/**
  * ⚠️ **The same family, two outcomes over.** `aumos-catalogue#278` attached the
  * sizing to three review outcomes; two more answers carry it — the completed
  * position (`WAIT`) and a sizing carrying an unevaluated reading (`WATCH`) — and

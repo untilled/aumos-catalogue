@@ -306,7 +306,7 @@ total after the outcome is known:
 | role | `hostTargetWeight` | outcomes |
 |---|---|---|
 | `increase` | `otherHeld + targetTotalWeight` — ⛔ `#817` unchanged | `mean-reversion-candidate` |
-| `reduce` | `otherHeld + min(heldOnlyTargetTotalWeight, ownHeldWeight)` — ⚠️ `#826` moved this term | the three review outcomes |
+| `reduce` | `otherHeld + min(reductionTargetTotalWeight, ownHeldWeight)` — ⚠️ `#826` and `#835` each moved this term | the three review outcomes |
 | `standstill` | `otherHeld + ownHeld` — what the account holds today | the other ten |
 
 ⛔ **An outcome with no role throws.** «Whatever the sizing answered» is the default this section
@@ -402,6 +402,75 @@ withdrawn `SELL` are untouched. And the host does not fold, execution does not r
 
 ⬜ `cash-weight` names no asset and so has no position for a role to attach to; this package's
 `PROMPT.md` never asks for one.
+
+## A residual is not an allocation (`untilled/aumos#835`)
+
+The other axis under `#823`, and it was open the whole time. `positionSizing` folds **six**
+ceilings into one number and two of them are not ceilings on this position at all:
+
+|  | what it says | bounds an addition | sizes a sale |
+|---|---|---|---|
+| `risk-budget` · `liquidity` | this thesis, this tape | ✅ | ✅ |
+| `single-name-headroom` · `strategy-headroom` | *«this name may be at most X»*, less what others hold **of it** | ✅ | ✅ |
+| `gross-headroom` · `sector-headroom` | *«after the **other names**, this much is left»* | ✅ | ⛔ |
+
+⛔ **A sector ceiling states no division of itself between the names under it.** Reading *«the
+sector has 0.01 left»* as *«this position must become 0.01»* hands the whole adjustment to
+whichever name was evaluated last — and to a desk that may not be able to reduce a single share
+of what filled the bucket. **An arithmetic whose answer depends on evaluation order has not made
+a judgement**: run the same book starting from another name and that one pays instead.
+
+Driven through the real host on a 6% position **wholly this desk's**, thesis invalidated, under a
+`sectorCap` of 0.25, with another *name* filling the sector:
+
+| the other name held | `targetTotalWeight` | `bindingConstraint` | exchange |
+|---|---|---|---|
+| none / 0.19 / 0.20 / 0.21 | `0.03623596` | `risk-budget` | `sell:23` |
+| **0.24** | **`0.01`** | `sector-headroom` | ⚠️ **`sell:50`** |
+| **0.245** | **`0.005`** | `sector-headroom` | ⚠️ **`sell:55`** |
+| **0.30 / 0.50** | **`0`** | `sector-headroom` | ⛔ **`sell:60` — the whole position** |
+
+⛔ **Nobody asked for that liquidation and nothing in the answer said so.**
+`deadline-elapsed-re-adjudicate` did not differ by one value; the gross axis is the same
+arithmetic one bucket wider; and the **owner** of that other name — another desk, this desk, or
+nobody at all — produced the same three numbers, so `untilled/aumos#786`'s handover gate never
+reaches it. This is not a multi-manager defect.
+
+⚠️ **`shareholder-rerating` carried this sentence first** (`untilled/aumos#833`,
+`aumos-catalogue#286`), and it ended one row better than this package did: there the ceiling
+collapsing to zero **deleted** the order, here it **sends** one.
+
+**The fix is the same shape as `#826`'s, one axis over.** `positionSizing` splits its ceiling
+list into `nameAxes` and `residualAxes` and folds a third time —
+`reductionTargetTotalWeight` / `reductionBindingConstraint` / `reductionCeilings`, the name axes
+measured against **holdings only**, which is where `#826`'s correction and this one compose.
+⛔ `targetTotalWeight`, `bindingConstraint` and `ceilings` are byte-for-byte unmoved, and
+`classifyCase`'s `reduce` role is the only consumer.
+
+⚠️ **Said out loud, because five answers before it were not.**
+`reduction_is_not_sized_by_the_accounts_remaining_room` fires wherever the two folds disagree on
+an outcome that reduces, and carries `hostTargetWeightIfRoomFolded` — the order that would
+otherwise have gone out — beside the one that did. It is silent where they agree, which is every
+account with no other name in the bucket, and silent on a purchase.
+
+⚠️ **What this gives up, named.** Where a sector really is over its ceiling and it is *this
+desk's other holdings* that filled it, this package no longer trims *this* name on the sector
+axis. The excess stands, `sector_limit_exceeded` still names it, and the reduction that fixes it
+comes from a ceiling that names a position — the single-name cap or the risk budget of whichever
+name is actually oversized. Dividing a sector budget between this desk's names is portfolio
+construction, and a name-at-a-time evaluator has no input with which to choose it.
+
+⛔ **What is unchanged.** `#813`'s residual still bounds the **entry** — a 0.24 sector under a
+0.25 ceiling still buys at most 0.01 and a full one still refuses outright. `#826`'s held-only
+fold, `#817`'s buy total, `#823`'s role table and `min` clamp, `#819`'s floor and withdrawn
+`SELL` all stand. No fixture was edited, there is no migration, and the host does not fold, does
+not add, and does not read attribution while executing.
+
+⚠️ **Measured before and after over 5,760 books** (two gross ceilings × three sector states ×
+ten other-name weights × three owners × four holdings × two pending states × four cases):
+**sales larger: 0 · reductions deleted: 0 · BUY answers changed: 0 · sales smaller: 1,098.**
+Every order this change moves gets **smaller**, because the reduction fold can never be the
+lower of the two.
 
 ## The sector axis: the judgement #269 asked for, and what came of it
 
