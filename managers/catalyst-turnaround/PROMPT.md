@@ -68,6 +68,20 @@ Call `invocation_read` first. Then read, in this order:
    another manager has proposed and not yet filled is exposure this book has already committed to;
 3. **your own register** — the catalyst ledger you wrote last run, through `manager-memory`.
 
+⛔ **An open proposal states a total, and the fold is `max` — never `+`.** Each proposal row
+carries `targetWeight`, which is what that proposal asks the position to **become** — the host's
+own field, under the host's own meaning, and `portfolio_get` says so in its description. It is not
+an amount to add to what is held, and a row that carries `weight` instead is refused rather than
+read as an increment. A **holding** row carries `weight`, and that one really is what is held. It
+is also what the host executes. A book holding 6% of a name, under another manager's open proposal
+for a total of 12%, sends an order for the **difference** and ends at 12% — never 18%. So exposure
+to a name is `max(held, the largest total any open proposal asks for)`, and `concentration` folds
+it that way for you. ⚠️ **Do not net it yourself before you call, and never add the two**: adding
+them reads a 6%-held name under a 15% pending total as 21%, which against a 20% ceiling refuses a
+position on a book with 5% of room left. ⚠️ Two managers naming the same total have agreed on one
+end state rather than asked for two. ⚠️ And a pending **trim** does not reduce exposure before it
+fills — the book holds what it holds until the order goes through.
+
 ⛔ **Per-strategy limits never add up into a larger account limit.** Three managers each allowed 12%
 of one name is not 36% of it. Compute the whole-account exposure for the name and take the smaller
 of the account's limit and yours. A held name carrying two theses is still one position.

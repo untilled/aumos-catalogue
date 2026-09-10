@@ -3,7 +3,7 @@
   "id": "fundamental-mean-reversion",
   "publisher": "aumos",
   "name": "Fundamental Mean Reversion",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Korea-listed single names whose price has fallen further than the damage to the business justifies. Researches the fall's causes before the chart, takes the recovery only after pre-registered stabilisation evidence, and names a target range that says whether it is a price band, a moving average or a valuation.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",

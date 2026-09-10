@@ -1,5 +1,5 @@
 {
- "note": "What the sizing arithmetic answers, including the two things it refuses to forget: a stop price is not a fill, and the account's limit is the account's.",
+ "note": "What the sizing arithmetic answers, including the two things it refuses to forget: a stop price is not a fill, and the account's limit is the account's. ⚠️ An `openProposals` row states the weight that proposal asks the position to *become* — the host's total, not an increment (#813) — so a name's exposure is the larger of what is held and what is pending, never their sum.",
  "asOf": "2026-08-29T00:00:00Z",
  "cases": [
   {
@@ -139,7 +139,7 @@
      "openProposals": [
       {
        "symbol": "FMR001",
-       "targetWeight": 0.025,
+       "targetWeight": 0.085,
        "strategy": "shareholder-rerating"
       }
      ]
@@ -189,7 +189,7 @@
      "openProposals": [
       {
        "symbol": "FMR001",
-       "targetWeight": 0.025,
+       "targetWeight": 0.085,
        "strategy": "shareholder-rerating"
       }
      ]

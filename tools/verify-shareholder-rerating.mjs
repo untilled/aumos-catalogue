@@ -224,12 +224,15 @@ for (const fixture of staged.cases) {
   const answer = concentration({
     proposed: { symbol: 'A', sector: 'financials', weight: 0.03 },
     holdings: [{ symbol: 'A', sector: 'financials', weight: 0.06, strategy: 'evidence-gated' }],
-    openProposals: [{ symbol: 'A', sector: 'financials', weight: 0.03, strategy: 'catalyst-turnaround', decisionId: 'dec_x' }],
+    // ⚠️ A total, not an addition: `catalyst-turnaround` is asking for this name to *be* 0.09 of the book (#813).
+    openProposals: [{ symbol: 'A', sector: 'financials', targetWeight: 0.09, strategy: 'catalyst-turnaround', decisionId: 'dec_x' }],
     caps: { accountPositionCap: 0.1, strategyPositionCap: 0.08, accountSectorCap: 0.3, accountGrossCap: 0.9 },
     strategy: 'shareholder-rerating',
   })
   assert.equal(answer.data.bindingPositionCap, 0.08, 'the binding cap is the smaller of the two, never their sum')
   assert.equal(answer.data.existingExposure, 0.09, 'an open proposal from another strategy is exposure and is counted')
+  assert.equal(answer.data.held, 0.06)
+  assert.equal(answer.data.openProposals, 0.03, 'the open proposal was added to the holding instead of folded against it')
   assert.equal(answer.data.withinLimits, false)
   assert.equal(answer.data.outcomeCode, 'risk_limit_exceeded')
   assert.ok(codesOf(answer.diagnostics).includes('strategy_caps_do_not_sum'))
@@ -248,7 +251,7 @@ for (const fixture of staged.cases) {
   const withOpen = concentration({
     proposed: { symbol: 'A', weight: 0.03 },
     holdings: [{ symbol: 'A', weight: 0.06 }],
-    openProposals: [{ symbol: 'A', weight: 0.03 }],
+    openProposals: [{ symbol: 'A', targetWeight: 0.09 }],
     caps: { accountPositionCap: 0.1 },
   })
   const unreadable = concentration({
@@ -275,6 +278,137 @@ for (const fixture of staged.cases) {
   assert.equal(duplicated.data.held, 0.06, 'one position was counted twice because two theses were attached to it')
   assert.ok(codesOf(duplicated.diagnostics).includes('duplicate_position_rows'))
   ok('a position is one quantity however many theses point at it')
+}
+
+/**
+ * ── ⑺ #813: the host states a **total**, and three books it is measured on ─
+ *
+ * The scenarios are the A/B/C of `untilled/aumos` PR #815, which drove the real
+ * host — `Kernel.decide`, real `position_assignments`, `discoveryService`'s
+ * `portfolio-get` — and fed its answer to this package's own `lib`. The fund is
+ * ₩100,000,000 on XKRX with a 20% single-name ceiling, and the third column is
+ * what that host actually produces once the orders go out:
+ *
+ *   A  held 0%  · pending total 8%   → 8%   (unchanged by #813)
+ *   B  held 6%  · pending total 12%  → 12%  (this package said 18%)
+ *   C  held 6%  · pending total 15%  → 15%  (this package said 21%, and refused)
+ *
+ * ⚠️ **B and C are the shape of the defect**: a name that is *already held* and
+ * *also* has a pending total. In A the two readings coincide — nobody holds the
+ * name — which is why #810's measurement, all of whose rows were unheld names,
+ * could not tell them apart.
+ */
+const HOST_ABC = [
+  { label: 'A — held 0%, pending total 8%', held: 0, pendingTotal: 0.08, exposure: 0.08, naive: 0.08, headroom: 0.12 },
+  { label: 'B — held 6%, pending total 12%', held: 0.06, pendingTotal: 0.12, exposure: 0.12, naive: 0.18, headroom: 0.08 },
+  { label: 'C — held 6%, pending total 15%', held: 0.06, pendingTotal: 0.15, exposure: 0.15, naive: 0.21, headroom: 0.05 },
+]
+
+for (const scenario of HOST_ABC) {
+  const answer = concentration({
+    proposed: { symbol: '005930', sector: 'technology', weight: 0 },
+    holdings: scenario.held > 0 ? [{ symbol: '005930', sector: 'technology', weight: scenario.held }] : [],
+    openProposals: [{ symbol: '005930', sector: 'technology', targetWeight: scenario.pendingTotal, strategy: 'fundamental-mean-reversion', decisionId: 'dec_other' }],
+    caps: { accountPositionCap: 0.2 },
+    strategy: 'shareholder-rerating',
+  })
+  assert.equal(answer.data.existingExposure, scenario.exposure, `${scenario.label}: the account's exposure to this name`)
+  if (scenario.naive !== scenario.exposure) {
+    assert.notEqual(answer.data.existingExposure, scenario.naive, `${scenario.label}: the holding and the pending total were added`)
+  }
+  assert.equal(answer.data.symbolHeadroom, scenario.headroom, `${scenario.label}: what is left of the 20% ceiling`)
+  assert.equal(answer.data.withinLimits, true, `${scenario.label}: a book with room refused the question the sizing asks`)
+  assert.equal(answer.data.outcomeCode, null)
+  ok(`#813 ${scenario.label} — the pending total is folded by maximum and the ceiling still has room`)
+}
+{
+  /**
+   * ⛔ **A pending *trim* does not reduce exposure before it fills.** The fold is
+   * `max` rather than «the latest total wins»: this book holds 14% right now, and
+   * a ceiling has to hold in both of the states it passes through.
+   */
+  const trimming = concentration({
+    proposed: { symbol: 'A', weight: 0 },
+    holdings: [{ symbol: 'A', weight: 0.14 }],
+    openProposals: [{ symbol: 'A', targetWeight: 0.08, strategy: 'catalyst-turnaround' }],
+    caps: { accountPositionCap: 0.2 },
+  })
+  assert.equal(trimming.data.existingExposure, 0.14, 'a pending trim was read as though it had already filled')
+  assert.equal(trimming.data.openProposals, 0, 'a pending total below the holding asks for nothing on top of it')
+
+  /**
+   * ⛔ **Two managers naming the same total have agreed on one end state.** The
+   * host says so — it publishes each judgement's own total and adds nothing —
+   * and a run that summed them would put this name at 24% of a 20% book.
+   */
+  const twoManagers = concentration({
+    proposed: { symbol: 'A', weight: 0 },
+    holdings: [{ symbol: 'A', weight: 0.06 }],
+    openProposals: [
+      { symbol: 'A', targetWeight: 0.12, strategy: 'catalyst-turnaround' },
+      { symbol: 'A', targetWeight: 0.12, strategy: 'fundamental-mean-reversion' },
+    ],
+    caps: { accountPositionCap: 0.2 },
+  })
+  assert.equal(twoManagers.data.existingExposure, 0.12, 'two proposals for the same total were read as a request for twice it')
+  assert.equal(twoManagers.data.withinLimits, true)
+
+  // …and the whole-book axis is folded the same way, or a gross ceiling counts one name twice.
+  const gross = concentration({
+    proposed: { symbol: 'A', weight: 0 },
+    holdings: [
+      { symbol: 'A', weight: 0.06 },
+      { symbol: 'B', weight: 0.1 },
+    ],
+    openProposals: [{ symbol: 'A', targetWeight: 0.12, strategy: 'catalyst-turnaround' }],
+    caps: { accountPositionCap: 0.2, accountGrossCap: 0.9 },
+  })
+  assert.equal(gross.data.grossExposure, 0.22, 'the gross axis added a holding and its own pending total')
+  ok('#813 — a pending trim, two managers agreeing on one total, and the gross axis that folds the same way')
+}
+/**
+ * ── #814/#816: a holding row that names its assignee changes nothing here ──
+ *
+ * `untilled/aumos#816` puts an `assignment` — `assigned` · `none` · `released` ·
+ * `departed`, plus the assignee's **instance** id — on every holding row
+ * `portfolio_get` answers, and the adapter into this package's `holdings` is one
+ * expression: `assigned` and mine → this instance's strategy id, `assigned` and
+ * somebody else's → that instance, the other three words → `unattributed`.
+ *
+ * ⛔ **This package's exposure arithmetic does not read it, and that is correct
+ * rather than an oversight.** `held` is counted over the whole account whoever it
+ * belongs to, because a cap is a cap on the *position*; `strategy` is read in one
+ * place only, the `overlapping_open_proposal` diagnostic about somebody else's
+ * pending row. #813's fold is keyed on the name for the same reason — a
+ * `position-weight` target is executed against the whole position — so an
+ * assignment arriving cannot move a number below.
+ */
+{
+  const MINE = 'inst_shareholder_rerating'
+  const strategyOf = (row) =>
+    row.state === 'assigned' ? (row.managerInstanceId === MINE ? 'shareholder-rerating' : row.managerInstanceId) : 'unattributed'
+  const views = [
+    { state: 'assigned', managerInstanceId: MINE },
+    { state: 'assigned', managerInstanceId: 'inst_catalyst_turnaround' },
+    { state: 'none', managerInstanceId: null },
+    { state: 'released', managerInstanceId: null },
+    { state: 'departed', managerInstanceId: null },
+  ]
+  for (const [label, held, pendingTotal, exposure] of [['A', 0, 0.08, 0.08], ['B', 0.06, 0.12, 0.12], ['C', 0.06, 0.15, 0.15]]) {
+    for (const view of views) {
+      const answer = concentration({
+        proposed: { symbol: '005930', sector: 'technology', weight: 0 },
+        holdings: held > 0 ? [{ symbol: '005930', sector: 'technology', weight: held, strategy: strategyOf(view) }] : [],
+        openProposals: [{ symbol: '005930', sector: 'technology', targetWeight: pendingTotal, strategy: 'fundamental-mean-reversion' }],
+        caps: { accountPositionCap: 0.2 },
+        strategy: 'shareholder-rerating',
+      })
+      assert.equal(answer.data.existingExposure, exposure, `${label}/${view.state}: the fold read the assignment`)
+      assert.equal(answer.data.held, held, `${label}/${view.state}: the holding moved with the assignment`)
+      assert.equal(answer.data.withinLimits, true)
+    }
+  }
+  ok('#814 — a holding that names its assignee moves no number in this package, and the fold stays keyed on the name')
 }
 
 /**
@@ -375,7 +509,7 @@ const byId = (id) => {
   const otherProposalUnclassified = concentration({
     proposed: { symbol: 'A', sector: 'financials', weight: 0.03 },
     holdings: book.holdings,
-    openProposals: [{ symbol: 'D', weight: 0.04, strategy: 'catalyst-turnaround' }],
+    openProposals: [{ symbol: 'D', targetWeight: 0.04, strategy: 'catalyst-turnaround' }],
     caps: book.caps,
   })
   assert.equal(otherProposalUnclassified.data.withinLimits, null, 'an unclassified open proposal was left out of the sector total')

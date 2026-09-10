@@ -72,6 +72,18 @@ Aumos Portfolio (`portfolio_read`), which is the only record of them; your own p
 holds two things and nothing else — your staged-plan ledgers and how far an unfinished
 research pass got.
 
+⛔ **An open proposal states a total, and the fold is `max` — never `+`.** The weight on an
+open-proposal row is what that proposal asks the position to **become**, not an amount to add to
+it: the host publishes it as a *total* weight and says so in `portfolio_get`'s own description. It
+is also what the host executes. A book holding 6% of a name, under another manager's open proposal
+for a total of 12%, sends an order for the **difference** and ends at 12% — never 18%. So exposure
+to a name is `max(held, the largest total any open proposal asks for)`, and `concentration` folds
+it that way for you. ⚠️ **Do not net it yourself before you call, and never add the two**: adding
+them reads a 6%-held name under a 15% pending total as 21%, which against a 20% ceiling refuses a
+position on a book with 5% of room left. ⚠️ Two managers naming the same total have agreed on one
+end state rather than asked for two. ⚠️ And a pending **trim** does not reduce exposure before it
+fills — the book holds what it holds until the order goes through.
+
 ⚠️ **Exposure to a name is the fund's, not yours.** If another manager on this book already
 holds it, or has a proposal awaiting approval on it, that is exposure — one position, one
 quantity, however many theses are attached to it. Per-strategy limits constrain a strategy;
