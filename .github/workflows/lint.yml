@@ -186,6 +186,28 @@ jobs:
       # Before `check:pins`, and the paragraph below is why anything after it
       # does not run on a pull request that adds a package.
       - run: npm run check:catalyst-turnaround
+      # `fundamental-mean-reversion` is mostly prose, like most packages here,
+      # and the small part of it that is not is the part where being wrong is
+      # **silent**: a drawdown taken over an unadjusted series, a stabilisation
+      # condition re-derived on the run that wants the trade, a stop price
+      # treated as a fill, a re-run adding the same staged rung twice, a moving
+      # average written up as a valuation. None of those looks wrong from inside
+      # the run that makes it, which is exactly the class of thing a fixture can
+      # hold and a reviewer cannot.
+      #
+      # It also pins that package's thresholds **as literals**, which is the one
+      # assertion here that is not about the code. #259 fixes the period, RSI and
+      # price conditions in the pull request that adds the package and forbids
+      # adjusting them so that a known case comes out as a buy; a second copy in
+      # a file whose only subject is that they did not move is what makes a later
+      # edit arrive as its own diff instead of as a number inside one.
+      #
+      # ⛔ Its bars are synthetic and there is no host: proposal storage, WATCH
+      # re-arming, decision-to-fill linkage and cross-manager exposure
+      # attribution are `#256`'s criteria and the checker says out loud that it
+      # cannot reach them. Plain Node over committed JSON — no install, no
+      # network, no test framework, for the same reasons `check:allocator` is.
+      - run: npm run check:fundamental-mean-reversion
 
       # ── Last, and that position is the point ──────────────────────────────
       #

@@ -1,0 +1,1019 @@
+{
+ "note": "One case per outcome this package can reach. `measured` is what the code computes today: it is committed so that a change in the arithmetic shows up as a fixture diff rather than as a quiet re-ranking.",
+ "asOf": "2026-08-29T00:00:00Z",
+ "cases": [
+  {
+   "name": "temporary-shock-plus-stabilisation",
+   "series": "shock-then-base",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "mean-reversion-candidate",
+    "verdict": "BUY",
+    "code": null,
+    "lens": "fundamental-mean-reversion"
+   },
+   "measured": {
+    "drawdownFromHigh": -0.35686486,
+    "rsi14": 60.714533,
+    "ma200Distance": -0.17388779,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "confirmed",
+    "sessionsSinceLow": 67,
+    "reclaimAboveBaseLow": 0.1022517,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "continuing-new-lows",
+   "series": "new-lows-continuing",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "falling-knife",
+    "verdict": "WATCH",
+    "code": null,
+    "lens": "fundamental-mean-reversion"
+   },
+   "measured": {
+    "drawdownFromHigh": -0.43112359,
+    "rsi14": 6.561557,
+    "ma200Distance": -0.27724994,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "falling-knife",
+    "sessionsSinceLow": 0,
+    "reclaimAboveBaseLow": 0.00806668,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "structural-earnings-damage",
+   "series": "shock-then-base",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "operating-deterioration",
+     "evidenceIds": [
+      "ev_fmr_filing_09"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "structural-earnings-damage",
+    "verdict": "WAIT",
+    "code": "thesis_refuted",
+    "lens": "fundamental-mean-reversion"
+   },
+   "measured": {
+    "drawdownFromHigh": -0.35686486,
+    "rsi14": 60.714533,
+    "ma200Distance": -0.17388779,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "confirmed",
+    "sessionsSinceLow": 67,
+    "reclaimAboveBaseLow": 0.1022517,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "damage-asserted-without-evidence",
+   "series": "shock-then-base",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "operating-deterioration",
+     "evidenceIds": []
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "research-incomplete",
+    "verdict": "WATCH",
+    "code": "research_incomplete",
+    "lens": "fundamental-mean-reversion"
+   },
+   "measured": {
+    "drawdownFromHigh": -0.35686486,
+    "rsi14": 60.714533,
+    "ma200Distance": -0.17388779,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "confirmed",
+    "sessionsSinceLow": 67,
+    "reclaimAboveBaseLow": 0.1022517,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "business-question-unanswered",
+   "series": "shock-then-base",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "unknown",
+     "evidenceIds": []
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "research-incomplete",
+    "verdict": "WATCH",
+    "code": "research_incomplete",
+    "lens": "fundamental-mean-reversion"
+   },
+   "measured": {
+    "drawdownFromHigh": -0.35686486,
+    "rsi14": 60.714533,
+    "ma200Distance": -0.17388779,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "confirmed",
+    "sessionsSinceLow": 67,
+    "reclaimAboveBaseLow": 0.1022517,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "data-missing-short-history",
+   "series": "short-history",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "data-missing",
+    "verdict": "WATCH",
+    "code": "data_missing",
+    "lens": null
+   },
+   "measured": {
+    "drawdownFromHigh": -0.2786182,
+    "rsi14": 60.689657,
+    "ma200Distance": null,
+    "ma200Rising": null,
+    "researchOpen": false,
+    "stabilisation": null,
+    "sessionsSinceLow": null,
+    "reclaimAboveBaseLow": null,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "data-missing-undeclared-basis",
+   "series": "shock-then-base",
+   "declared": null,
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "data-missing",
+    "verdict": "WATCH",
+    "code": "data_missing",
+    "lens": null
+   },
+   "measured": {
+    "drawdownFromHigh": -0.35686486,
+    "rsi14": 60.714533,
+    "ma200Distance": -0.17388779,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": null,
+    "sessionsSinceLow": null,
+    "reclaimAboveBaseLow": null,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "unadjusted-split-declared-adjusted",
+   "series": "unadjusted-split-declared-adjusted",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "price-artifact-suspected",
+    "verdict": "WATCH",
+    "code": "data_missing",
+    "lens": null
+   },
+   "measured": {
+    "drawdownFromHigh": -0.87137147,
+    "rsi14": 27.716289,
+    "ma200Distance": -0.79510504,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": null,
+    "sessionsSinceLow": null,
+    "reclaimAboveBaseLow": null,
+    "jumpCount": 1
+   }
+  },
+  {
+   "name": "ex-dividend-unadjusted-series",
+   "series": "high-payout-unadjusted",
+   "declared": "unadjusted",
+   "corporateActions": [
+    {
+     "kind": "cash-dividend",
+     "exDate": "2026-06-25"
+    }
+   ],
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "data-missing",
+    "verdict": "WATCH",
+    "code": "data_missing",
+    "lens": null
+   },
+   "measured": {
+    "drawdownFromHigh": -0.34137306,
+    "rsi14": 19.632711,
+    "ma200Distance": -0.18868282,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": null,
+    "sessionsSinceLow": null,
+    "reclaimAboveBaseLow": null,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "ex-dividend-same-rows-called-adjusted",
+   "series": "high-payout-unadjusted",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "falling-knife",
+    "verdict": "WATCH",
+    "code": null,
+    "lens": "fundamental-mean-reversion"
+   },
+   "counterfactual": "the same rows a vendor mislabelled as adjusted: the discovery gate opens on a fall the price never took",
+   "measured": {
+    "drawdownFromHigh": -0.34137306,
+    "rsi14": 19.632711,
+    "ma200Distance": -0.18868282,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "falling-knife",
+    "sessionsSinceLow": 0,
+    "reclaimAboveBaseLow": 0.00806475,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "ex-dividend-truly-adjusted-series",
+   "series": "high-payout-adjusted",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "out-of-scope",
+    "verdict": "WAIT",
+    "code": null,
+    "lens": null
+   },
+   "measured": {
+    "drawdownFromHigh": -0.26818233,
+    "rsi14": 22.627689,
+    "ma200Distance": -0.14714927,
+    "ma200Rising": false,
+    "researchOpen": false,
+    "stabilisation": "falling-knife",
+    "sessionsSinceLow": 0,
+    "reclaimAboveBaseLow": 0.00806099,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "uptrend-pullback",
+   "series": "uptrend-pullback",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "uptrend-pullback-not-this-strategy",
+    "verdict": "WAIT",
+    "code": null,
+    "lens": null
+   },
+   "measured": {
+    "drawdownFromHigh": -0.3106865,
+    "rsi14": 8.238172,
+    "ma200Distance": 0.180288,
+    "ma200Rising": true,
+    "researchOpen": true,
+    "stabilisation": "stabilization-unconfirmed",
+    "sessionsSinceLow": 119,
+    "reclaimAboveBaseLow": 0.61585535,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "reference-plan-shape",
+   "series": "reference-shape-first-bounce",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "stabilization-unconfirmed",
+    "verdict": "WATCH",
+    "code": null,
+    "lens": "fundamental-mean-reversion"
+   },
+   "measured": {
+    "drawdownFromHigh": -0.51815889,
+    "rsi14": 44.828361,
+    "ma200Distance": -0.24593104,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "stabilization-unconfirmed",
+    "sessionsSinceLow": 29,
+    "reclaimAboveBaseLow": 0.0406759,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "target-reached-staged-trim",
+   "series": "shock-then-base",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    },
+    "position": {
+     "held": true,
+     "weight": 0.035
+    },
+    "review": {
+     "targetReached": true
+    }
+   },
+   "expect": {
+    "outcome": "target-reached-trim",
+    "verdict": "TRIM",
+    "code": null,
+    "lens": "fundamental-mean-reversion"
+   },
+   "measured": {
+    "drawdownFromHigh": -0.35686486,
+    "rsi14": 60.714533,
+    "ma200Distance": -0.17388779,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "confirmed",
+    "sessionsSinceLow": 67,
+    "reclaimAboveBaseLow": 0.1022517,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "invalidation-triggered",
+   "series": "new-lows-continuing",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    },
+    "position": {
+     "held": true,
+     "weight": 0.035
+    },
+    "review": {
+     "invalidationTriggered": true
+    }
+   },
+   "expect": {
+    "outcome": "invalidated-re-adjudicate",
+    "verdict": "RE_ADJUDICATE",
+    "code": "thesis_refuted",
+    "lens": "fundamental-mean-reversion"
+   },
+   "measured": {
+    "drawdownFromHigh": -0.43112359,
+    "rsi14": 6.561557,
+    "ma200Distance": -0.27724994,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "falling-knife",
+    "sessionsSinceLow": 0,
+    "reclaimAboveBaseLow": 0.00806668,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "deadline-elapsed",
+   "series": "shock-then-base",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    },
+    "position": {
+     "held": true,
+     "weight": 0.035
+    },
+    "review": {
+     "deadlineElapsed": true
+    }
+   },
+   "expect": {
+    "outcome": "deadline-elapsed-re-adjudicate",
+    "verdict": "RE_ADJUDICATE",
+    "code": null,
+    "lens": "fundamental-mean-reversion"
+   },
+   "measured": {
+    "drawdownFromHigh": -0.35686486,
+    "rsi14": 60.714533,
+    "ma200Distance": -0.17388779,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "confirmed",
+    "sessionsSinceLow": 67,
+    "reclaimAboveBaseLow": 0.1022517,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "risk-limit-exceeded",
+   "series": "shock-then-base",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "refused",
+     "code": "risk_limit_exceeded"
+    }
+   },
+   "expect": {
+    "outcome": "risk-limit-exceeded",
+    "verdict": "WAIT",
+    "code": "risk_limit_exceeded",
+    "lens": "fundamental-mean-reversion"
+   },
+   "measured": {
+    "drawdownFromHigh": -0.35686486,
+    "rsi14": 60.714533,
+    "ma200Distance": -0.17388779,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "confirmed",
+    "sessionsSinceLow": 67,
+    "reclaimAboveBaseLow": 0.1022517,
+    "jumpCount": 0
+   }
+  },
+  {
+   "name": "no-future-rows-across-an-earnings-date",
+   "series": "shock-then-base-with-future-rows",
+   "declared": "adjusted",
+   "input": {
+    "business": {
+     "damage": "intact",
+     "evidenceIds": [
+      "ev_fmr_business_01"
+     ]
+    },
+    "research": {
+     "fallCauses": [
+      "one-off regulatory charge booked in the quarter",
+      "a sector-wide de-rating of the same multiple"
+     ],
+     "targetBasis": "historical-price-band",
+     "invalidationPrice": 148000,
+     "invalidationConditions": [
+      "a close below the base low",
+      "operating margin below the pre-shock range for two consecutive quarters"
+     ],
+     "maxWaitDays": 120,
+     "reviewAt": "2026-09-30T08:00:00Z",
+     "evidenceIds": [
+      "ev_fmr_price_01",
+      "ev_fmr_filing_01"
+     ],
+     "complete": true
+    },
+    "sizing": {
+     "status": "ok",
+     "plannedTotalWeight": 0.035,
+     "targetWeight": 0.035,
+     "downsideValue": 1200000
+    }
+   },
+   "expect": {
+    "outcome": "mean-reversion-candidate",
+    "verdict": "BUY",
+    "code": null,
+    "lens": "fundamental-mean-reversion"
+   },
+   "sameTechnicalAs": "shock-then-base",
+   "measured": {
+    "drawdownFromHigh": -0.35686486,
+    "rsi14": 60.714533,
+    "ma200Distance": -0.17388779,
+    "ma200Rising": false,
+    "researchOpen": true,
+    "stabilisation": "confirmed",
+    "sessionsSinceLow": 67,
+    "reclaimAboveBaseLow": 0.1022517,
+    "jumpCount": 0
+   }
+  }
+ ]
+}

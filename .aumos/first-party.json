@@ -9,6 +9,7 @@
       "catalyst-turnaround",
       "earnings-drift-watcher",
       "evidence-gated",
+      "fundamental-mean-reversion",
       "prudent-allocator",
       "shareholder-rerating",
       "undervalued-now"

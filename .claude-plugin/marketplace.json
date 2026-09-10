@@ -325,6 +325,52 @@
       }
     },
     {
+      "name": "fundamental-mean-reversion",
+      "source": "./managers/fundamental-mean-reversion",
+      "description": "Korea-listed single names whose price has fallen further than the damage to the business justifies. Researches the fall's causes before the chart, takes the recovery only after pre-registered stabilisation evidence, and names a target range that says whether it is a price band, a moving average or a valuation.",
+      "version": "0.1.0",
+      "metadata": {
+        "name": "Fundamental Mean Reversion",
+        "publisher": "aumos",
+        "methodology": "Finds Korea-listed companies whose share price has fallen further than the damage to the business justifies, and takes the recovery toward a normal range only after stabilisation is confirmed. The technical state sets the order of research and is never the buy case; the buy case is a filing-level separation of a one-off charge from operating deterioration. Entry requires pre-registered stabilisation evidence, sizing carries a gap-and-halt haircut because a stop price is not a fill, staged additions never fire on price or elapsed time alone, and every position has a deadline it cannot be quietly reclassified out of.",
+        "assetClasses": [
+          "equity"
+        ],
+        "markets": [
+          "XKRX"
+        ],
+        "tasks": [
+          "PORTFOLIO_REVIEW",
+          "ASSET_REVIEW",
+          "THESIS_REVIEW",
+          "EVENT_REVIEW"
+        ],
+        "capabilities": [
+          "portfolio:read",
+          "thesis:read",
+          "evidence:read",
+          "source:passthrough",
+          "connection:passthrough",
+          "manager-memory:read",
+          "manager-memory:write"
+        ],
+        "requiresSkills": [
+          "source_request",
+          "connection_request"
+        ],
+        "enginesAumos": ">=0.4.0",
+        "provenance": {
+          "sourceRepo": "https://github.com/morethanmin/trading-harness",
+          "commit": "1fa18c595baa742f7323366a3c220fec5c6535a7",
+          "license": "MIT",
+          "licenseHolder": "Lee Sang Min"
+        },
+        "homepage": null,
+        "publishedAt": "2026-09-10T00:00:00.000Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJGdW5kYW1lbnRhbCBNZWFuIFJldmVyc2lvbiI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMyQzNFNjMiLz48cGF0aCBkPSJNOCAyNGg0OCIgc3Ryb2tlPSIjOEZBNkQ4IiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWRhc2hhcnJheT0iNCA0IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNOSAxN2w5IDggOCAxNSA4IDEwIDgtOSA4LTYgNS00IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMzQiIGN5PSI1MCIgcj0iNC41IiBmaWxsPSIjRjJCNDQxIi8+PC9zdmc+Cg=="
+      }
+    },
+    {
       "name": "prudent-allocator",
       "source": "./managers/prudent-allocator",
       "description": "Top-down and risk-budget-first. Starts from the book rather than from the asset, sizes every judgement by what a bad outcome costs the portfolio, and acts only when the exposure is wrong.",
