@@ -94,12 +94,23 @@ export function runVerdict(input = {}) {
    * position.
    */
   const headroom = concentration.data.readable === true ? (concentration.data.headroom[input.symbol] ?? concentration.data.unusedHeadroom) : undefined
+  /**
+   * ⚠️ **The same room with only the positions in it (`untilled/aumos#828`).**
+   * `headroom` above folds every other desk's *open proposals* in and that is
+   * what a ceiling is for. The weight this run hands **back** is executed
+   * against the position, and an unfilled proposal is not a position — so a
+   * second number, read from the same book, travels the other way.
+   */
+  const heldOnlyHeadroom = concentration.data.readable === true
+    ? (concentration.data.heldOnlyHeadroom?.[input.symbol] ?? concentration.data.unusedHeadroom)
+    : undefined
   const sizing = targetWeight({
     expectedActiveReturn: input.sizing?.expectedActiveReturn,
     stopDistance: invalidation.data.stopDistance,
     conviction: input.sizing?.conviction,
     mandatePositionCap: input.sizing?.mandatePositionCap,
     accountHeadroom: headroom,
+    heldOnlyAccountHeadroom: heldOnlyHeadroom,
     config,
   })
   const plan = input.plan ? stagedPlan({ previous: input.register?.plan, plan: input.plan, price: input.price?.last, asOf: input.asOf }) : null
@@ -170,21 +181,36 @@ export function runVerdict(input = {}) {
   const mayIncrease = unread.length === 0
 
   /**
-   * ── The plan's target, against the room this name still has (#825) ────────
+   * ── The plan's target, against the room this name still has (#825, #828) ──
    *
    * ⛔ **A plan's cumulative target is frozen at the run that wrote it; the room
-   * left for this desk is not.** `enter-staged` is sized through
-   * `accountHeadroom` on every run and lands exactly on the cap.
-   * `add-next-stage` read the same `accountCap` into its own answer and then
-   * ignored it, so over 15% of the name held by somebody else it asked for a
-   * position of 27% under a 20% limit — and the host does not trim that back,
-   * it downgrades the **whole judgement** to WAIT. Nothing moved wrongly; a
-   * stage merely stopped arriving and no line said why.
+   * left for this desk is not.** `enter-staged` is sized through the account
+   * headroom on every run and lands exactly on the cap. `add-next-stage` read
+   * the same `accountCap` into its own answer and then ignored it, so over 15%
+   * of the name held by somebody else it asked for a position of 27% under a
+   * 20% limit — and the host does not trim that back, it downgrades the **whole
+   * judgement** to WAIT. Nothing moved wrongly; a stage merely stopped arriving
+   * and no line said why.
+   *
+   * ⛔ **And the room it folds into is measured against holdings
+   * (`untilled/aumos#828`).** #825 folded into `headroom`, which subtracts every
+   * other desk's exposure *including their open proposals* (#813) — so a manager
+   * on the other side of the fund sealing a BUY nobody approved, nobody funded
+   * and nobody filled took this desk's stage from `buy:60` to `buy:50` and then
+   * to no order at all. `sizing.mjs` had already written the sentence that
+   * refuses it three hundred lines above the fold: *the weight this desk hands
+   * back to the host is executed against the position, and an unfilled proposal
+   * is not a position.*
+   *
+   * ⚠️ **The arithmetic was incoherent and not merely generous.** The fold takes
+   * `min(cap, strategyCap) − otherStrategies` and `hostTargetWeight` adds back
+   * `otherHeldWeight`; where those two differ the sum reads two different books
+   * at its two ends and lands under the cap by exactly the difference.
    *
    * ⚠️ **A ceiling and reported when it binds.** Where the room is there the
-   * plan's own number is what leaves, untouched. Where it is not, the stage
-   * fits into what is left rather than vanishing, and a note names both numbers
-   * — a fold nobody can see is the silence this fixes, one level down.
+   * plan's own number is what leaves, untouched. Where it is not, the stage fits
+   * into what is left rather than vanishing, and a note names both numbers — a
+   * fold nobody can see is the silence this fixes, one level down.
    *
    * ⚠️ **The floor below is what makes this safe.** Folding a target *down* is
    * the same arithmetic that turns a purchase into a sale, and on a partly
@@ -193,20 +219,10 @@ export function runVerdict(input = {}) {
    * what this desk holds, so this fold can stop a stage and can never sell one.
    */
   const plannedCumulative = plan?.data.cumulativeTargetWeight ?? null
-  const stageHeadroom = finite(headroom) ? headroom : null
-  const stageFolded = finite(plannedCumulative) && finite(stageHeadroom) && stageHeadroom < plannedCumulative
-  const stageCumulative = stageFolded ? round(stageHeadroom) : plannedCumulative
-  if (stageFolded) {
-    diagnostics.push(
-      diagnostic(
-        'stage_target_folded_into_headroom',
-        'note',
-        `The plan builds toward ${plannedCumulative} of the book and ${stageHeadroom} is what this name has left for this desk once every other strategy's exposure is out of the account limit. The stage is folded into the room that is there; the plan's own target is unchanged and is reported beside it`,
-        'plan.cumulativeTargetWeight',
-        { plannedCumulativeTargetWeight: plannedCumulative, accountHeadroom: stageHeadroom, foldedTo: stageCumulative },
-      ),
-    )
-  }
+  const stageRoom = finite(heldOnlyHeadroom) ? heldOnlyHeadroom : null
+  const pendingRoom = finite(headroom) ? headroom : null
+  const stageFolded = finite(plannedCumulative) && finite(stageRoom) && stageRoom < plannedCumulative
+  const stageCumulative = stageFolded ? round(stageRoom) : plannedCumulative
 
   const context = {
     classification: classification.data.classification,
@@ -350,10 +366,32 @@ export function runVerdict(input = {}) {
          * rungs and its own causes. What is true here is only that there is
          * nothing to add, which is what `hold` says.
          */
-        if (finite(ownHeldWeight) && finite(stageCumulative) && ownHeldWeight >= stageCumulative - 1e-9) {
+        if (finite(ownHeldWeight) && finite(plannedCumulative) && ownHeldWeight >= plannedCumulative - 1e-9) {
           return {
             intent: 'hold',
-            review: review('already-at-target', { at: windowEnd, kind: 'catalyst-window', reason: `A stage came due and the book already holds ${ownHeldWeight} of this desk's own against a cumulative target of ${stageCumulative}. The increment is zero, and reducing to the plan's target is a judgement this run did not make` }),
+            review: review('already-at-target', { at: windowEnd, kind: 'catalyst-window', reason: `A stage came due and the book already holds ${ownHeldWeight} of this desk's own against a cumulative target of ${plannedCumulative}. The increment is zero, and reducing to the plan's target is a judgement this run did not make` }),
+          }
+        }
+        /**
+         * ⛔ **The stage has somewhere to go and this name does not
+         * (`untilled/aumos#828`).** The rung above answers a plan this desk has
+         * *reached*; this one answers a plan the account limit will not let it
+         * reach, and until #828 the two shared one word. Read against the
+         * folded number the sentence became a tautology — *«already holds 0.06
+         * against a cumulative target of 0.06»* — which is true of every folded
+         * answer and says nothing about any of them, and the reason underneath
+         * it went unsaid.
+         *
+         * ⚠️ **This package has carried the true word since #265** and the entry
+         * side has been reaching it all along: `blocked-by-account-limit` is a
+         * `standstill`, so the weights do not move — what changes is that the
+         * answer names what stopped it and how much of the name is somebody
+         * else's.
+         */
+        if (finite(ownHeldWeight) && finite(stageCumulative) && ownHeldWeight >= stageCumulative - 1e-9) {
+          return {
+            intent: 'blocked-by-account-limit',
+            review: review('account-limit-taken', { at: windowEnd, kind: 'catalyst-window', reason: `The plan builds toward ${plannedCumulative} of the book and ${stageCumulative} is what this name has left for this desk once the ${otherHeldWeight} other desks hold of it is out of the ${concentration.data.accountCap} account limit. The book already holds ${ownHeldWeight} of this desk's own, so there is nothing this stage may add` }),
           }
         }
         return {
@@ -520,7 +558,21 @@ export function runVerdict(input = {}) {
    * are the same conflation one sign over.
    */
   const increases = weightRole === 'increase'
-  const cumulative = outcome.intent === 'add-next-stage' ? stageCumulative : sizing.data.targetWeight ?? null
+  /**
+   * ⛔ **And the same split one rung over (`untilled/aumos#828`).** A reduction
+   * is `min(cumulative, ownHeldWeight)`, so the ceiling underneath it decides
+   * how much of its own position this desk sells — and that ceiling folded other
+   * desks' *open proposals* in. Measured here: a 6% holding trimmed to
+   * `0.01666668` went to `0.01` when another manager sealed a 25% BUY nobody
+   * approved, and to zero as that proposal grew. `heldOnlyTargetWeight` is the
+   * same arithmetic with the unfilled proposals out of it; the entry path is
+   * untouched and #813's fold still narrows what this desk may *buy*.
+   */
+  const cumulative = outcome.intent === 'add-next-stage'
+    ? stageCumulative
+    : weightRole === 'reduce'
+      ? sizing.data.heldOnlyTargetWeight ?? null
+      : sizing.data.targetWeight ?? null
   let increment = 0
   if (outcome.intent === 'add-next-stage') increment = plan.data.addedThisRun
   else if (outcome.intent === 'enter-staged') {
@@ -627,6 +679,55 @@ export function runVerdict(input = {}) {
   const hostTargetWeight = finite(otherHeldWeight) && finite(ownTarget)
     ? round(otherHeldWeight + ownTarget)
     : null
+
+  /**
+   * ── The two folds, reported where they actually decided something ─────────
+   *
+   * ⚠️ **Pushed here rather than beside the arithmetic, because a fold that
+   * bound nothing is not an observation.** Both of these describe the stage
+   * that left, so they are said only on the run where a stage did.
+   *
+   * ⚠️ **The second is the fifth quiet answer in this series**
+   * (`increasesExposure` #821 · `atOrAboveTarget` #823 · `exposureDirection`
+   * #825 · `aumos-catalogue#281`'s divergence). Until #828 a stage narrowed by
+   * a proposal nobody had approved left with an empty line beside it, so the
+   * divergence is now named **and the order that did not go out is carried with
+   * it** — an observation is not one unless a reader can measure what it
+   * withheld.
+   */
+  if (outcome.intent === 'add-next-stage') {
+    if (stageFolded) {
+      diagnostics.push(
+        diagnostic(
+          'stage_target_folded_into_headroom',
+          'note',
+          `The plan builds toward ${plannedCumulative} of the book and ${stageRoom} is what this name has left for this desk once every other desk's holding of it is out of the account limit. The stage is folded into the room that is there; the plan's own target is unchanged and is reported beside it`,
+          'plan.cumulativeTargetWeight',
+          { plannedCumulativeTargetWeight: plannedCumulative, heldOnlyAccountHeadroom: stageRoom, accountHeadroom: pendingRoom, foldedTo: stageCumulative },
+        ),
+      )
+    }
+    /**
+     * ⚠️ **The gate is «did it decide anything», not «do the two differ».** A
+     * proposal that narrows a ceiling the plan was never going to reach changed
+     * no number, and a note beside every such run is noise a reader stops
+     * reading — which is how the runs where it *did* decide something get lost.
+     */
+    if (finite(plannedCumulative) && finite(stageRoom) && finite(pendingRoom) && pendingRoom < Math.min(plannedCumulative, stageRoom)) {
+      const wouldHaveBeen = finite(otherHeldWeight) && finite(ownHeldWeight)
+        ? round(otherHeldWeight + Math.max(Math.min(plannedCumulative, pendingRoom), ownHeldWeight))
+        : null
+      diagnostics.push(
+        diagnostic(
+          'stage_target_ignores_others_pending',
+          'note',
+          `The ceiling that decides how much this desk may buy folds other desks' open proposals in, which leaves ${pendingRoom} of this name; measured against holdings alone it is ${stageRoom}. A pending total is exposure for a ceiling and is not a position for an order, so this stage is folded into the second: the host is handed ${hostTargetWeight} and not ${wouldHaveBeen}${wouldHaveBeen === hostTargetWeight ? ', which the holding happens to clamp to the same number here' : ''}`,
+          'plan.cumulativeTargetWeight',
+          { plannedCumulativeTargetWeight: plannedCumulative, heldOnlyAccountHeadroom: stageRoom, accountHeadroom: pendingRoom, hostTargetWeight, hostTargetWeightIfPendingFolded: wouldHaveBeen },
+        ),
+      )
+    }
+  }
 
   /**
    * ── The field that made all of this quiet (`untilled/aumos#821`) ──────────

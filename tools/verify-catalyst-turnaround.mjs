@@ -1201,7 +1201,17 @@ check('#825 — a purchase never reaches a target below what this desk holds, an
   assert.equal(data.otherHeldWeight, 0.15)
   assert.equal(data.positionWeight, 0.25)
   assert.ok(data.cumulativeTargetWeight < data.ownHeldWeight, 'the room left for this desk is no longer below what it holds, and this row no longer stands where the two clamps meet')
-  assert.equal(data.intent, 'hold', 'a stage fired into a target below what this desk already holds')
+  /**
+   * ⚠️ **The word here became `blocked-by-account-limit` in
+   * `untilled/aumos#828`, and not one number moved.** #825 answered this state
+   * with `already-at-target`, whose reason restated the folded target against
+   * itself; the room here is taken by another desk's **holding** and this
+   * package has carried the true word for that since #265. Both are
+   * `standstill`, so what #825 established — a stage that cannot be added is
+   * not a sale — is asserted by the two weights below exactly as it was.
+   */
+  assert.equal(data.intent, 'blocked-by-account-limit', 'a stage fired into a target below what this desk already holds')
+  assert.equal(INTENT_WEIGHT_ROLES[data.intent], 'standstill', 'the rung that answers this state stopped being a standstill')
   assert.equal(data.hostTargetWeight, 0.25, 'the weight that leaves sold 5pp of a position on a run whose word is «add»')
   assert.equal(data.exposureDirection, 'unchanged')
   assert.equal(data.addsToThisDesksShare, false)
@@ -1276,6 +1286,246 @@ check('#825 — a due stage is folded into the room this name still has, and say
   assert.equal(roomy.data.hostTargetWeight, 0.18)
   assert.ok(!has(roomy.diagnostics, 'stage_target_folded_into_headroom'), 'a fold that did not bind was reported')
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// `untilled/aumos#828` — a pending total is a ceiling and is not a position.
+//
+// ⚠️ **`#825` opened this one itself.** Its «⬜ 함께 고친 것» folded the plan's
+// cumulative target into `headroomForStrategy`, and that headroom subtracts
+// `otherStrategies` — the `max` of what other desks **hold** and what their open
+// proposals **ask for** (`#813`). Right for a ceiling: a limit has to hold in
+// every state the account passes through, so somebody's unfilled buy counts
+// before it fills. Wrong for the number that goes **back** to the host, and
+// `sizing.mjs` says so three hundred lines above the fold: *the weight this desk
+// hands back is executed against the position, and an unfilled proposal is not a
+// position.*
+//
+// Measured through the host (`shareholder-rerating` sealing a BUY nobody
+// approved — `funding: unfunded`, no reservation, no order), over a 6% position
+// wholly this desk's, on a plan building toward 12%:
+//
+//   pending 0.08 → `buy:60`   pending 0.15 → `buy:50`   pending 0.20 → no order
+//
+// ⚠️ **And the arithmetic was incoherent, not merely generous.** The fold
+// subtracts `otherStrategies` from the cap and `hostTargetWeight` adds back only
+// `otherHeldWeight`, so the two ends of one sum read two different books.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The same staged run, re-booked: 6% held by this desk, and somebody else's unapproved proposal on top. */
+const stagedWithPending = (pendingTotal, ownWeight = 0.06) => {
+  const input = structuredClone(positive.input)
+  input.held = true
+  input.plan = structuredClone(staging.plan)
+  input.book = {
+    positions: [{ symbol: input.symbol, strategy: 'catalyst-turnaround', weight: ownWeight }],
+    proposals: pendingTotal === null ? [] : [{ symbol: input.symbol, strategy: 'inst_shareholder_rerating', targetWeight: pendingTotal }],
+    caps: CAPS,
+  }
+  return runVerdict(input)
+}
+
+/**
+ * ⑴ **The row the issue measured, all four of it.** Nobody else holds a share of
+ * this name; another desk has merely written a total down. The stage is the same
+ * stage in every row and the weight that leaves is the same weight.
+ */
+check('#828 — a due stage is measured against holdings, and another desk’s unfilled proposal moves nothing', () => {
+  const baseline = stagedWithPending(null).data
+  assert.equal(baseline.intent, 'add-next-stage', 'the fixture no longer reaches the staged-add rung')
+  assert.equal(baseline.cumulativeTargetWeight, 0.12)
+  assert.equal(baseline.hostTargetWeight, 0.12)
+
+  for (const pending of [0.08, 0.15, 0.2, 0.25]) {
+    const answer = stagedWithPending(pending).data
+    const where = `#828 → pending ${pending}`
+    assert.equal(answer.intent, 'add-next-stage', `${where}: a proposal nobody approved withheld this desk's stage`)
+    assert.equal(answer.review.name, 'stage-filled', `${where}: the review changed on a book whose holdings did not`)
+    assert.equal(answer.incrementThisRun, 0.04, `${where}: the stage that came due`)
+    assert.equal(
+      answer.cumulativeTargetWeight,
+      0.12,
+      `${where}: the plan's target was folded into a ceiling that counts an unfilled proposal as a position`,
+    )
+    assert.equal(
+      answer.hostTargetWeight,
+      0.12,
+      `${where}: ${answer.hostTargetWeight} left for the exchange against the ${baseline.hostTargetWeight} the same holdings produce with no proposal on the name`,
+    )
+    assert.equal(answer.exposureDirection, 'increase', `${where}: a stage that adds became something else`)
+    assert.equal(answer.addsToThisDesksShare, true, `${where}`)
+  }
+})
+
+/**
+ * ⑵ **The divergence is said out loud.** `#826` is the record of why: an answer
+ * whose number moved because of a proposal on the other side of the fund, with
+ * an empty `diagnostics` beside it, is the fifth quiet answer in this series.
+ * So the two folds are reported whenever they disagree, and the total that
+ * *would* have gone to the exchange is carried with it — an observation is not
+ * one unless a reader can measure what it withheld.
+ */
+check('#828 — where the two folds disagree the answer names both, and the order that was not sent', () => {
+  const quiet = stagedWithPending(0.08)
+  assert.ok(
+    !has(quiet.diagnostics, 'stage_target_ignores_others_pending'),
+    'a proposal that does not narrow anything was reported as if it had',
+  )
+
+  for (const [pending, wouldHaveBeen] of [[0.15, 0.11], [0.2, 0.06]]) {
+    const answer = stagedWithPending(pending)
+    const where = `#828 → pending ${pending}`
+    assert.ok(
+      has(answer.diagnostics, 'stage_target_ignores_others_pending'),
+      `${where}: the folds disagree and nothing said so: ${codes(answer.diagnostics).join(', ') || '(none)'}`,
+    )
+    const row = answer.diagnostics.find((entry) => entry.code === 'stage_target_ignores_others_pending')
+    assert.equal(row.severity, 'note', `${where}: an observation is not a refusal`)
+    assert.equal(
+      row.details.hostTargetWeightIfPendingFolded,
+      wouldHaveBeen,
+      `${where}: the withheld order is not measurable from the observation that withheld it`,
+    )
+    assert.equal(row.details.hostTargetWeight, 0.12, `${where}`)
+  }
+})
+
+/**
+ * ⑶ **The word, where the fold does bind.** A holdings fold that leaves this
+ * desk no room above what it already holds is the account limit taken by other
+ * desks' **positions**, and this package has carried the true word for that
+ * since #265 — `blocked-by-account-limit` / `account-limit-taken`. `#825`'s new
+ * rung stood in front of it and answered `already-at-target` instead, whose
+ * reason read *«already holds 0.06 … against a cumulative target of 0.06»*: a
+ * tautology built out of the folded number, hiding the reason underneath it.
+ *
+ * ⛔ **The weights do not move**, and that is the point — this is the word being
+ * wrong beside numbers that were right.
+ */
+check('#828 — a stage the account limit stops says the account limit stopped it', () => {
+  const input = structuredClone(positive.input)
+  input.held = true
+  input.plan = structuredClone(staging.plan)
+  input.book = {
+    positions: [
+      { symbol: input.symbol, strategy: 'catalyst-turnaround', weight: 0.1 },
+      { symbol: input.symbol, strategy: 'inst_shareholder_rerating', weight: 0.15 },
+    ],
+    proposals: [],
+    caps: CAPS,
+  }
+  const answer = runVerdict(input)
+  const data = answer.data
+
+  assert.equal(data.intent, 'blocked-by-account-limit', 'a stage the account limit stopped answered in the vocabulary of a plan that was already met')
+  assert.equal(data.review.name, 'account-limit-taken')
+  assert.equal(INTENT_WEIGHT_ROLES[data.intent], 'standstill', 'the word changed and the money must not')
+  assert.equal(data.hostTargetWeight, 0.25, 'the weight that leaves moved with the word')
+  assert.equal(data.positionWeight, 0.25)
+  assert.equal(data.exposureDirection, 'unchanged')
+  assert.equal(data.addsToThisDesksShare, false)
+  assert.ok(data.review.reason.includes('0.12'), `the reason does not name the target the plan actually builds toward: ${data.review.reason}`)
+  assert.ok(data.review.reason.includes('0.15'), `the reason does not name what other desks hold of this name: ${data.review.reason}`)
+
+  /**
+   * ⛔ And the tautology it replaces: the folded number restated against itself.
+   * `already-at-target`'s sentence is true of a plan this desk has reached and
+   * says nothing at all when the plan was cut down to the holding first.
+   */
+  assert.ok(
+    !/against a cumulative target of 0\.05/.test(data.review.reason),
+    `the reason is built out of the folded number rather than the reason it was folded: ${data.review.reason}`,
+  )
+})
+
+/**
+ * ⑷ **The sweep, with the axis that was missing.** `#825`'s own sweep added a
+ * `plan` dimension because without one no row reached the staged-add rung. It
+ * had no **`pending`** dimension, so no row separated what other desks *hold*
+ * from what they have merely *written down* — and this defect sat inside that
+ * gap for exactly as long as it existed.
+ *
+ * ⚠️ **The claim is narrow and it is the whole sentence:** on the staged-add
+ * path an open proposal by another desk changes nothing about the order. It may
+ * — and does — still change the entry ceiling, the causes and the diagnostics.
+ */
+check('#828 — on the held path, another desk’s open proposal changes no number this run hands the host', () => {
+  for (const item of cases.cases) {
+    for (const [label, make] of [
+      ['mine', (symbol) => bookOf(symbol, 'catalyst-turnaround')],
+      ['unattributed', (symbol) => bookOf(symbol, 'none')],
+      ['theirs', (symbol) => bookOf(symbol, 'inst_shareholder_rerating')],
+      ['over-target', (symbol) => ({ positions: [{ symbol, strategy: 'catalyst-turnaround', weight: 0.15 }], proposals: [], caps: CAPS })],
+    ]) {
+      const held = structuredClone(item.input)
+      held.held = true
+      held.plan = structuredClone(staging.plan)
+      held.book = make(held.symbol)
+      const without = runVerdict(held).data
+
+      for (const pending of [0.08, 0.15, 0.2, 0.25]) {
+        const withPending = structuredClone(held)
+        withPending.book = make(withPending.symbol)
+        withPending.book.proposals = [{ symbol: withPending.symbol, strategy: 'inst_shareholder_rerating', targetWeight: pending }]
+        const answer = runVerdict(withPending).data
+        const where = `#828 → ${item.name} → ${label} + pending ${pending}`
+
+        /**
+         * ⚠️ **`cumulativeTargetWeight` is asserted on the two roles that read
+         * it, and the exception is real rather than a convenience.** It decides
+         * `ownTarget` under `increase` and `reduce` and under no other: a
+         * `standstill` hands over the holding and a `close` hands over zero, and
+         * the share reported beside either is the *entry* sizing — which reads
+         * the entry ceiling, folds open proposals in, and is right to (#813). A
+         * `close-out` over a 6% holding moves that number with somebody's
+         * pending total and moves no order at all.
+         */
+        const role = INTENT_WEIGHT_ROLES[without.intent]
+        const fields = role === 'increase' || role === 'reduce'
+          ? ['intent', 'cumulativeTargetWeight', 'incrementThisRun', 'hostTargetWeight', 'exposureDirection', 'addsToThisDesksShare']
+          : ['intent', 'incrementThisRun', 'hostTargetWeight', 'exposureDirection', 'addsToThisDesksShare']
+        for (const field of fields) {
+          assert.deepEqual(
+            answer[field],
+            without[field],
+            `${where}: [${without.intent}] ${field} went from ${JSON.stringify(without[field])} to ${JSON.stringify(answer[field])} on a proposal nobody approved and nothing filled`,
+          )
+        }
+      }
+    }
+  }
+})
+
+/**
+ * ⑸ **⛔ And the entry ceiling is not what changed.** `#813` folds pending
+ * totals into every book-derived ceiling and that judgement stands for the
+ * buying question: a desk opening a *new* position beside another desk's
+ * unfilled buy is the state a limit exists for. What #828 splits off is the
+ * weight that travels back, and this is the assertion that it split rather than
+ * removed.
+ */
+check('#828 — the entry ceiling still folds open proposals in, and still stops an opening', () => {
+  const entering = (pendingTotal) => {
+    const input = structuredClone(positive.input)
+    input.held = false
+    input.book = {
+      positions: [],
+      proposals: pendingTotal === null ? [] : [{ symbol: input.symbol, strategy: 'inst_shareholder_rerating', targetWeight: pendingTotal }],
+      caps: CAPS,
+    }
+    return runVerdict(input).data
+  }
+
+  assert.equal(entering(null).intent, 'enter-staged', 'the entry fixture no longer opens')
+  const taken = entering(0.2)
+  assert.equal(taken.intent, 'blocked-by-account-limit', 'an opening beside a full account limit stopped being refused')
+  assert.equal(taken.review.name, 'account-limit-taken')
+  const narrowed = entering(0.15)
+  assert.ok(
+    narrowed.cumulativeTargetWeight <= 0.05 + 1e-9,
+    `an entry sized past the room a pending total leaves: ${narrowed.cumulativeTargetWeight}`,
+  )
+})
+
 
 /**
  * ⑷ **A share of the name, not all of it.** The clamp is a ceiling on the

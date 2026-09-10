@@ -394,6 +394,18 @@ was written — is folded into what is left, and `stage_target_folded_into_headr
 numbers. Report the fold; it is the difference between «the stage was smaller than the plan» and
 «the stage did not arrive».
 
+⛔ **That room is what other desks *hold*, and never what they have merely written down.** A pending
+total is exposure for a **ceiling** — a limit has to hold in every state the account passes through,
+so an unfilled buy counts against how much you may buy before it fills — and it is **not a position
+for an order**. Another manager sealing a BUY nobody approved, nobody funded and nobody filled took
+this desk's stage from `buy:60` to `buy:50` and then to no order at all, and took a 6% trim to the
+whole position. Where the two ceilings disagree on something that mattered,
+`stage_target_ignores_others_pending` names both and carries the order that did not go out. ⚠️ **Say
+which of the two stopped you**: a stage the account limit will not let you reach is
+**`blocked-by-account-limit` / `account-limit-taken`** and names what other desks hold of the name;
+`hold` / `already-at-target` is for a plan you have genuinely reached, against the plan's own target.
+The two used to share one word, and the shared sentence restated the folded number against itself.
+
 ⚠️ **Read `increasesExposure` as what it now is: a measurement.** It is `hostTargetWeight` against
 `positionWeight` — what the account holds in the name, whoever runs it — and not a restatement of
 your intent. `addsToThisDesksShare` is the other sentence, measured the same way: it is true only

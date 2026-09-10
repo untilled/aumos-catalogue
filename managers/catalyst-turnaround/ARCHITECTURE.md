@@ -335,7 +335,8 @@ WAIT (`target weight 0.27 exceeds max position weight 0.2`). Nothing moved wrong
 arriving and no line said why.
 
 The target is now folded into the room that is there, and `stage_target_folded_into_headroom` names
-both numbers when it binds. ⚠️ **The floor is what makes that safe**: folding a target *down* is the
+both numbers when it binds. ⚠️ **That room is measured against holdings** — see `#828` below, which
+this fold opened. ⚠️ **The floor is what makes that safe**: folding a target *down* is the
 same arithmetic that turns a purchase into a sale, and on a position 10% this desk's under 5% of
 remaining room it would be `sell:5pp` on a run whose word is «add». The two clamps compose — the
 fold can stop a stage and can never sell one.
@@ -344,6 +345,52 @@ fold can stop a stage and can never sell one.
 (`untilled/aumos#781`), execution does not read attribution (`#232`), `#786`'s gate was not widened
 to unattributed positions (`#782`), and the host does not read a judgement's *words* to refuse a
 weight — `REBALANCE` alone walks past such a check (`#822`).
+
+### A pending total is a ceiling and is not a position (`untilled/aumos#828`)
+
+⚠️ **The fold above opened this one itself, and it is the axis `aumos-catalogue#281` had closed in
+`fundamental-mean-reversion` on the same day.** `headroomForStrategy` subtracts `otherStrategies`,
+which is the `max` of what other desks **hold** and what their open proposals **ask for** (`#813`).
+That is right for a ceiling — a limit has to hold in every state the account passes through, so an
+unfilled buy counts before it fills — and wrong for the weight that travels **back**, which
+`sizing.mjs` had already said three hundred lines above the fold: *the weight this desk hands back
+to the host is executed against the position, and an unfilled proposal is not a position.*
+
+Measured through the host, with `shareholder-rerating` sealing a BUY nobody approved
+(`funding: unfunded`, no reservation, no order), over a 6% position wholly this desk's on a plan
+building toward 12%:
+
+| that desk's pending total | `cumulativeTargetWeight` | the exchange |
+|---|---|---|
+| none · 0.08 | 0.12 | `buy:60` |
+| **0.15** | **0.11** | ⚠️ `buy:50` |
+| **0.20** | **0.06** | ⚠️ no order |
+
+⚠️ **The arithmetic was incoherent and not merely generous.** The fold takes
+`min(cap, strategyCap) − otherStrategies` and `hostTargetWeight` adds back `otherHeldWeight`; where
+those differ the sum reads two different books at its two ends.
+
+⚠️ **And the same sentence one rung over, which the sweep below found rather than the issue.** A
+reduction is `min(cumulative, ownHeldWeight)` and that `cumulative` was sized against the same entry
+ceiling: a 6% holding trimmed to `0.01666668` went to `0.01` on a 25% proposal nobody approved, and
+to **zero — the whole position — at 30%**. Identical in shape to `#826`, in this package.
+
+**One list of ceilings, folded twice.** `accountConcentration` publishes
+`heldOnlyHeadroomForStrategy` beside `headroomForStrategy` and `targetWeight` publishes
+`heldOnlyTargetWeight` beside `targetWeight` — the two differ in exactly one term, so on a book with
+no open proposals they are the same number byte for byte. The entry path reads the first; the staged
+fold and the `reduce` clamp read the second. ⛔ `#813`'s fold is unmoved and still narrows what this
+desk may **buy**.
+
+**And the word.** `#825`'s new rung answered this state with `already-at-target`, whose reason read
+*«already holds 0.06 … against a cumulative target of 0.06»* — a tautology built out of the folded
+number, true of every folded answer and saying nothing about any of them. The rung is now two: a plan
+this desk has *reached* is `hold` / `already-at-target` against the **plan's own** target, and a plan
+the account limit will not let it reach is `blocked-by-account-limit` / `account-limit-taken`, the
+word this package has carried since #265. Both are `standstill`, so ⛔ **no weight moved with the
+word.** `stage_target_ignores_others_pending` names the divergence wherever it decided something and
+carries `hostTargetWeightIfPendingFolded` — the order that did not go out, because an observation is
+not one unless a reader can measure what it withheld.
 
 ## The sector axis: the judgement #269 asked for, and what came of it
 
