@@ -155,17 +155,69 @@ export function concentration(input = {}) {
     return { data: emptyAnswer(), diagnostics }
   }
 
+  /**
+   * ── An open proposal states a **total**, so the fold is `max` (#813) ──────
+   *
+   * ⛔ **The weight on an open-proposal row is what that proposal asks the
+   * position to *become*, not an amount to add to it.** It is the host's
+   * `targetWeight`, and `portfolio_get` says so in its own published description.
+   * It is also what the host executes: a book holding 6% of a name, under another
+   * manager's open proposal for a total of 12%, sends an order for the
+   * *difference* and ends at 12%. Never 18%. So exposure to one name is
+   *
+   *     exposure = max(held, the largest total any open proposal asks for)
+   *              = held + max(0, thatTotal − held)
+   *
+   * and what this function reports as `openProposals` is the second term — what
+   * the pending proposals still require on top of the holding.
+   *
+   * ⚠️ **This package added the two until #813, and the overstatement refuses
+   * positions.** A 6%-held name under a 15% pending total was read as 21%, which
+   * against a 20% single-name ceiling is `risk_limit_exceeded` on a book with 5%
+   * of room left. Two managers naming the same total have agreed on one end state
+   * rather than asked for two, so their totals fold by `max` as well — that is
+   * the host's own reading of the field, and the reason it publishes no sum.
+   *
+   * ⚠️ **`max`, and not «the latest total wins».** A pending *trim* does not
+   * reduce exposure before it fills: a 14% holding under a proposal to take it to
+   * 8% is 14% of this book right now, and a ceiling has to hold in both of the
+   * states this account passes through.
+   */
+  const pendingBySymbol = new Map()
+  for (const row of openProposals) {
+    const entry = pendingBySymbol.get(row.symbol) ?? { peak: 0, sector: null }
+    if (row.weight > entry.peak) entry.peak = row.weight
+    if (entry.sector === null && typeof row.sector === 'string' && row.sector.length > 0) entry.sector = row.sector
+    pendingBySymbol.set(row.symbol, entry)
+  }
+
+  /** One row per name this account is exposed to, already folded. */
+  const exposureBySymbol = new Map()
+  for (const name of new Set([...heldBySymbol.keys(), ...pendingBySymbol.keys()])) {
+    const heldRow = heldBySymbol.get(name)
+    const heldWeight = heldRow?.weight ?? 0
+    const pending = pendingBySymbol.get(name) ?? { peak: 0, sector: null }
+    const rowSector = typeof heldRow?.sector === 'string' && heldRow.sector.length > 0 ? heldRow.sector : pending.sector
+    exposureBySymbol.set(name, {
+      symbol: name,
+      sector: typeof rowSector === 'string' && rowSector.length > 0 ? rowSector : null,
+      held: heldWeight,
+      exposure: Math.max(heldWeight, pending.peak),
+    })
+  }
+
   const held = heldBySymbol.get(symbol)?.weight ?? 0
-  let openSame = 0
+  const existingExposure = exposureBySymbol.get(symbol)?.exposure ?? 0
+  /** What the open proposals still require on top of the holding. Never negative. */
+  const openSame = existingExposure - held
   for (const row of openProposals) {
     if (row.symbol !== symbol) continue
-    openSame += row.weight
     if (input.strategy !== undefined && row.strategy !== undefined && row.strategy !== input.strategy) {
       diagnostics.push(
         diagnostic(
           'overlapping_open_proposal',
           'warn',
-          `${row.strategy} already has an unapproved proposal on ${symbol} for ${round(row.weight)} of the book. It is exposure that is about to exist and it is counted here; if both are approved the account holds the sum, and neither manager would have seen it.`,
+          `${row.strategy} already has an unapproved proposal taking ${symbol} to ${round(row.weight)} of the book. That is a total and not an addition: if it is approved the account holds the larger of it and what is already there, so it is folded here by maximum rather than added to the holding.`,
           'openProposals',
           { symbol, strategy: row.strategy, weight: round(row.weight), decisionId: row.decisionId ?? null },
         ),
@@ -173,13 +225,11 @@ export function concentration(input = {}) {
     }
   }
 
-  const existingExposure = held + openSame
   const projected = existingExposure + proposed.weight
 
   // ── the whole book, which is what a gross cap is about ───────────────────
   let grossExposure = 0
-  for (const row of heldBySymbol.values()) grossExposure += row.weight
-  for (const row of openProposals) grossExposure += row.weight
+  for (const row of exposureBySymbol.values()) grossExposure += row.exposure
   const grossExcludingName = grossExposure - existingExposure
   const projectedGross = grossExposure + proposed.weight
 
@@ -244,9 +294,9 @@ export function concentration(input = {}) {
   let sectorLimitState = 'not-applicable'
   if (finite(caps.accountSectorCap)) {
     const unclassified = []
-    for (const row of [...heldBySymbol.values(), ...openProposals]) {
-      if (typeof row.sector === 'string' && row.sector.length > 0) continue
-      if (!finite(row.weight) || row.weight === 0) continue
+    for (const row of exposureBySymbol.values()) {
+      if (row.sector !== null) continue
+      if (row.exposure === 0) continue
       if (!unclassified.includes(row.symbol)) unclassified.push(row.symbol)
     }
     if (sector === null || unclassified.length > 0) {
@@ -286,8 +336,7 @@ export function concentration(input = {}) {
     } else {
       sectorLimitState = 'evaluated'
       sectorExposure = 0
-      for (const row of heldBySymbol.values()) if (row.sector === sector) sectorExposure += row.weight
-      for (const row of openProposals) if (row.sector === sector) sectorExposure += row.weight
+      for (const row of exposureBySymbol.values()) if (row.sector === sector) sectorExposure += row.exposure
       sectorExcludingName = sectorExposure - existingExposure
       sectorHeadroom = caps.accountSectorCap - sectorExposure
       if (sectorExposure + proposed.weight > caps.accountSectorCap + THRESHOLDS.weightTolerance) {

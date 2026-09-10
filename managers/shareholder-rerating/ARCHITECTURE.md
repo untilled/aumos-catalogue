@@ -159,12 +159,51 @@ book, half an unread book, an unreadable row, absent caps, the declared gross ca
 a held position below / at / above target, an increment under the venue minimum, an unstated venue
 minimum, and the three classification inputs whose absence used to skip a test silently.
 
+## An open proposal states a total, and the fold is `max` (#813)
+
+The host publishes each unapproved judgement's **total** weight per asset — `portfolio_get` says
+so in its own description — and the host executes it as a total: a book holding 6% of a name,
+under another manager's open proposal for a total of 12%, sends an order for the **difference**
+and ends at 12%. Never 18%. `untilled/aumos` PR #815 measured that through the real execution
+path, and then measured what this package did with the same rows.
+
+So exposure to one name is
+
+```
+exposure = max(held, the largest total any open proposal asks for)
+         = held + max(0, thatTotal − held)
+```
+
+and this package reports the second term — what the pending proposals still require **on top of**
+the holding — as the open-proposal figure, so that `held + open = exposure` stays an identity.
+
+⚠️ **This package added the two until #813**, and the overstatement is not conservative in any
+useful sense — it refuses positions on books with room:
+
+| | held | pending total | the host produces | this package said |
+|---|---|---|---|---|
+| A | 0% | 8% | **8%** | 8% |
+| B | 6% | 12% | **12%** | 18% |
+| C | 6% | 15% | **15%** | 21% |
+
+⚠️ **Two managers naming the same total have agreed on one end state**, not asked for two, so
+their totals fold by `max` as well. That is the host's own reading of the field and the reason it
+publishes no sum — a host-side sum is the aggregate cap `untilled/aumos#781` rejected by name.
+
+⚠️ **`max`, and not «the latest total wins».** A pending *trim* does not reduce exposure before it
+fills: a 14% holding under a proposal to take it to 8% is 14% of this book right now, and a
+ceiling has to hold in both of the states the account passes through.
+
+⛔ **The netting lives here rather than in the caller.** A run that is asked to subtract before it
+calls is a run that can be argued out of subtracting, and every axis — the name, the sector and
+the whole book — has to fold the same way or one name is counted twice on one of them.
+
 ## The two weights, and the rule behind the boundary cases
 
 `targetTotalWeight` is what the name should **be**: the risk budget over the loss to invalidation,
 under the single-name cap and under what the sector and gross ceilings leave once the rest of the
-book is counted. `incrementWeight` is `targetTotalWeight − (held + open)`, which is what a
-proposal carries. At target the run proposes nothing; above target it is a reduction question and
+book is counted. `incrementWeight` is `targetTotalWeight − existingExposure`, which is what a
+proposal carries — and `existingExposure` is the fold above, not the sum of the two rows. At target the run proposes nothing; above target it is a reduction question and
 this manager proposes a reduction only against what is actually held; an increment below the venue
 minimum waits.
 

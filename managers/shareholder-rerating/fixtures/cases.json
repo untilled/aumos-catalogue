@@ -883,7 +883,7 @@
             {
               "symbol": "000010",
               "sector": "financials",
-              "weight": 0.03,
+              "weight": 0.09,
               "strategy": "catalyst-turnaround",
               "decisionId": "dec_sibling_1"
             }
@@ -915,7 +915,7 @@
     },
     {
       "id": "a-cap-binds-the-total-and-the-increment-is-what-is-left",
-      "note": "The single-name cap this Mandate states is 4% and the risk arithmetic asks for 5.33%, so the cap binds the **total**. The account already carries 3% of the name - 2% held by another manager and 1% this package has proposed and nobody has approved - so what is proposed here is the 1% between them. This fixture replaced one whose premise was finding 3 itself: it previously held 9% of the name and still bought 1% more against a 5.33% target, which is the arithmetic that the split into targetTotalWeight and incrementWeight exists to prevent.",
+      "note": "The single-name cap this Mandate states is 4% and the risk arithmetic asks for 5.33%, so the cap binds the **total**. The account already carries 3% of the name - 2% held by another manager, and an unapproved proposal of this package's own asking for a total of 3% - so what is proposed here is the 1% between that and the cap. An open proposal states a total and not an addition (#813), so the exposure is the larger of the two rows rather than their sum. This fixture replaced one whose premise was finding 3 itself: it previously held 9% of the name and still bought 1% more against a 5.33% target, which is the arithmetic that the split into targetTotalWeight and incrementWeight exists to prevent.",
       "input": {
         "symbol": "000011",
         "sector": "financials",
@@ -990,7 +990,7 @@
             {
               "symbol": "000011",
               "sector": "financials",
-              "weight": 0.01,
+              "weight": 0.03,
               "strategy": "shareholder-rerating",
               "decisionId": "dec_own_1"
             }
