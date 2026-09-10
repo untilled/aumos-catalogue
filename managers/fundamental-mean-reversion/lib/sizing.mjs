@@ -234,6 +234,32 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
    * increment, or an increment as a target.
    */
   const ownWeight = round(byStrategy[strategyId] ?? 0)
+  /**
+   * ── The one number the host's `targetWeight` needs, and `otherWeight` is not it (#817) ──
+   *
+   * ⛔ **`otherWeight` folds open proposals in, and an open proposal is not a
+   * position.** It is the right number for a *ceiling* — a limit has to hold in
+   * every state the account passes through, so a pending buy counts before it
+   * fills. It is the wrong number for the weight this run hands the host,
+   * because the host executes a `position-weight` target against the **whole
+   * position** and a position is what is actually held. Adding somebody's
+   * unfilled proposal to the target would buy their proposal for them.
+   *
+   * So the write direction needs holdings only, split by attribution:
+   *
+   *     ownHeldWeight   what is held and assigned to this manager
+   *     otherHeldWeight everything else that is held — another manager's, and
+   *                     every unattributed row, which is not this desk's either
+   *
+   * ⚠️ **Unattributed lands in `otherHeldWeight`, and that is the point.** A row
+   * bought by hand in a broker app, or one whose approval never named a manager,
+   * carries no `strategy` and reads as `unattributed` — and a position nobody is
+   * assigned to is not a position this desk runs (`untilled/aumos#785`,
+   * `aumos-catalogue#268` §1). Guessing the other way is how a BUY leaves here as
+   * a sale of a holding nobody asked to sell.
+   */
+  const ownHeldWeight = round(entry.heldByStrategy[strategyId] ?? 0)
+  const otherHeldWeight = round(Math.max(0, heldWeight - ownHeldWeight))
   let grossExisting = 0
   let grossHeld = 0
   for (const row of byName.values()) {
@@ -251,6 +277,15 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
     ownWeight,
     /** The part of it belonging to every other strategy and open proposal. */
     otherWeight: round(Math.max(0, existingWeight - ownWeight)),
+    /** ⚠️ **Holdings only.** What is really held and assigned to this manager. */
+    ownHeldWeight,
+    /**
+     * ⚠️ **Holdings only, and the term the host's `targetWeight` is built on
+     * (#817).** Another manager's holding plus every unattributed one. No open
+     * proposal is in here: an unfilled proposal is not a position, and the host
+     * executes against positions.
+     */
+    otherHeldWeight,
     byStrategy,
     grossHeld,
     /** What every open proposal on the fund still requires on top of what is held. */
@@ -330,6 +365,14 @@ export function sectorConcentration(book, sector, symbol, strategyId = STRATEGY_
  * `atOrAboveTarget` says when the second is zero because the position is
  * already there — a defined state rather than a refusal or a zero that reads
  * like «no room».
+ *
+ * ── And a third, which is the only one the host may be handed (#817) ───────
+ *
+ * `hostTargetWeight` is *«the whole position should be this»* — `targetTotalWeight`
+ * plus every holding of this name that is **not** this manager's. The two above
+ * are this thesis's arithmetic; this one is the wire. Handing over
+ * `targetTotalWeight` on a book where somebody else holds the name is an order
+ * to sell down to this desk's share, and the run that does it can be a BUY.
  */
 export function positionSizing(input = {}) {
   const diagnostics = []
@@ -552,6 +595,36 @@ export function positionSizing(input = {}) {
     targetTotalWeight,
     incrementalWeight,
     atOrAboveTarget,
+    /**
+     * ── The number that leaves this package, and it is neither of the two above (#817) ──
+     *
+     *     hostTargetWeight = otherHeldWeight + targetTotalWeight
+     *
+     * ⛔ **`targetTotalWeight` is this thesis's share of the position and the
+     * host's `targetWeight` is the position.** Every ceiling above is measured
+     * against what *everyone else* has, so what comes out of the fold is what
+     * this desk may hold — «the cap less what is not mine». The host's field is
+     * the other total: `rebalanceShadowBook` reads a position's whole weight and
+     * never its attribution (`untilled/aumos#815`), so handing it this desk's
+     * share tells it to make the **whole** position that size.
+     *
+     * ⚠️ **The two totals differ by exactly what somebody else holds, and the
+     * difference sells.** A 6% holding assigned to nobody, sized here at 3.75%,
+     * handed over as 0.0375 is an order to sell a third of a position no
+     * judgement in this fund ever asked to reduce — on a run whose own verdict
+     * is BUY. `0.06 + 0.0375 = 0.0975` is the weight that buys.
+     *
+     * ⚠️ **Only holdings are added, never `otherWeight`.** A pending proposal is
+     * not a position; adding one would have this run buy another manager's
+     * unapproved judgement on its behalf, and that is the second answer to «how
+     * much did this judgement ask for» that `untilled/aumos#781` refused.
+     *
+     * ⚠️ **A reduction still leaves here.** When the position is this manager's,
+     * `otherHeldWeight` is 0, this number *is* `targetTotalWeight`, and a target
+     * below the holding sends the trim it always sent. What it can no longer do
+     * is trim somebody else's.
+     */
+    hostTargetWeight: round(exposure.otherHeldWeight + targetTotalWeight),
     /** The cumulative staged target: the whole position, not the rung. Same number as `targetTotalWeight`, under the name the staged plan uses. */
     plannedTotalWeight: targetTotalWeight,
     /** What the book loses if the whole position is held and reaches invalidation. */
