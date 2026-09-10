@@ -1,0 +1,154 @@
+{
+  "note": "The mechanical properties of the catalyst ledger, one scenario per rule. `baseCatalyst` is a well-formed row; each scenario shallow-merges its overrides onto it, so a scenario's diff is exactly the thing being tested. Every figure is illustrative.",
+  "asOf": "2026-06-30T07:00:00Z",
+  "baseCatalyst": {
+    "id": "cat-base",
+    "kind": "tariff-or-price-revision",
+    "source": { "url": "https://example.invalid/gazette/2026-0505", "publisher": "ministry", "documentId": "gazette-2026-0505" },
+    "publishedAt": "2026-05-05T00:00:00Z",
+    "reportDate": "2026-05-04T00:00:00Z",
+    "dateStatus": "confirmed",
+    "expectedWindow": { "startsAt": "2026-07-01T00:00:00Z", "endsAt": "2026-10-31T00:00:00Z" },
+    "confirmingIndicator": { "name": "regulated unit price", "unit": "KRW/unit", "source": "Q3 report" },
+    "successCondition": "The revised unit price appears in Q3 revenue",
+    "failureCondition": "The revision is suspended before Q3 closes",
+    "evidenceIds": ["ev_gazette_0505"],
+    "state": "scheduled"
+  },
+  "scenarios": [
+    {
+      "name": "a-well-formed-row-registers",
+      "why": "The control. Without it a scenario that fails for an unrelated reason reads as the rule working.",
+      "overrides": {},
+      "expect": { "diagnosticCodes": [], "registered": true, "state": "scheduled", "confirmedDates": 1, "estimatedDates": 0 }
+    },
+    {
+      "name": "confirmed-and-estimated-are-distinguished",
+      "why": "A reasoned range with its uncertainty is an honest record; the same range presented as confirmed is a date somebody invented.",
+      "overrides": {
+        "id": "cat-estimated",
+        "dateStatus": "estimated",
+        "expectedWindow": {
+          "startsAt": "2026-07-01T00:00:00Z",
+          "endsAt": "2026-10-31T00:00:00Z",
+          "uncertaintyDays": 45,
+          "basis": "the ministry's stated semi-annual review schedule"
+        }
+      },
+      "expect": { "diagnosticCodes": [], "registered": true, "state": "scheduled", "confirmedDates": 0, "estimatedDates": 1 }
+    },
+    {
+      "name": "a-confirmed-date-may-not-carry-uncertainty",
+      "why": "Promotion by adjective: an estimate that has been called confirmed and given a margin anyway.",
+      "overrides": {
+        "expectedWindow": { "startsAt": "2026-07-01T00:00:00Z", "endsAt": "2026-10-31T00:00:00Z", "uncertaintyDays": 30 }
+      },
+      "expect": { "diagnosticCodes": ["confirmed_date_carries_uncertainty"], "registered": false }
+    },
+    {
+      "name": "an-estimate-states-what-it-is-reasoned-from",
+      "why": "Without a basis the range is a date this run made up, wearing a margin.",
+      "overrides": {
+        "dateStatus": "estimated",
+        "expectedWindow": { "startsAt": "2026-07-01T00:00:00Z", "endsAt": "2026-10-31T00:00:00Z", "uncertaintyDays": 45 }
+      },
+      "expect": { "diagnosticCodes": ["estimate_without_basis"], "registered": false }
+    },
+    {
+      "name": "the-report-date-and-the-announcement-are-not-swapped",
+      "why": "A document covering a period that ends after it was published is two instants the wrong way round, and it is six weeks of hindsight.",
+      "overrides": { "reportDate": "2026-06-30T00:00:00Z", "publishedAt": "2026-05-05T00:00:00Z" },
+      "expect": { "diagnosticCodes": ["report_date_after_announcement"], "registered": false }
+    },
+    {
+      "name": "a-price-move-is-never-catalyst-success",
+      "why": "The share price rose while everyone waited. That is the market's opinion of the wait.",
+      "overrides": {},
+      "transitions": [
+        {
+          "catalystId": "cat-base",
+          "to": "realised",
+          "observedAt": "2026-06-20T00:00:00Z",
+          "evidenceIds": ["ev_price"],
+          "evidenceKinds": ["price-move"],
+          "confirmingIndicatorMet": true
+        }
+      ],
+      "expect": { "diagnosticCodes": ["price_move_is_not_catalyst_success"], "state": "scheduled" }
+    },
+    {
+      "name": "a-filing-is",
+      "why": "The same transition with the confirming indicator arriving in a document is accepted, so the rule above is about the evidence and not about transitions.",
+      "overrides": {},
+      "transitions": [
+        {
+          "catalystId": "cat-base",
+          "to": "realised",
+          "observedAt": "2026-06-20T00:00:00Z",
+          "evidenceIds": ["ev_q2"],
+          "evidenceKinds": ["filing"],
+          "confirmingIndicatorMet": true
+        }
+      ],
+      "expect": { "diagnosticCodes": [], "state": "realised" }
+    },
+    {
+      "name": "a-finished-catalyst-is-not-reopened",
+      "why": "Contrary evidence cannot be overwritten after the fact, and a state machine that lets failed leave is how it would be.",
+      "overrides": { "state": "failed" },
+      "transitions": [
+        { "catalystId": "cat-base", "to": "in-progress", "observedAt": "2026-06-20T00:00:00Z", "evidenceIds": ["ev_hope"], "evidenceKinds": ["company-disclosure"] }
+      ],
+      "expect": { "diagnosticCodes": ["catalyst_state_terminal"], "state": "failed" }
+    },
+    {
+      "name": "contrary-evidence-cannot-be-dropped-on-restatement",
+      "why": "The row came back clean. The carried record wins, the finding is reinstated, and the run stops rather than proceeding on a laundered ledger.",
+      "overrides": {},
+      "previous": {
+        "version": 1,
+        "catalysts": [
+          { "id": "cat-base", "state": "scheduled", "delayCount": 0, "cancelled": false, "contraryEvidence": ["ev_contrary_0601"], "history": [] }
+        ]
+      },
+      "expect": { "diagnosticCodes": ["contrary_evidence_dropped"], "contraryEvidenceIncludes": ["ev_contrary_0601"] }
+    },
+    {
+      "name": "a-terminal-state-cannot-be-restated-away",
+      "why": "The other half of the same rule: the carried record says failed and this run handed back scheduled.",
+      "overrides": { "state": "scheduled" },
+      "previous": {
+        "version": 1,
+        "catalysts": [{ "id": "cat-base", "state": "failed", "delayCount": 0, "cancelled": false, "contraryEvidence": [], "history": [] }]
+      },
+      "expect": { "diagnosticCodes": ["catalyst_state_regressed"], "state": "failed" }
+    },
+    {
+      "name": "a-delay-costs-three-things",
+      "why": "New evidence, the return still expected from here, and the additional downside now accepted. Without them the extension is the position defending itself.",
+      "overrides": {},
+      "transitions": [
+        {
+          "catalystId": "cat-base",
+          "to": "delayed",
+          "observedAt": "2026-06-20T00:00:00Z",
+          "evidenceIds": ["ev_slip"],
+          "evidenceKinds": ["company-disclosure"],
+          "newWindowEndsAt": "2026-12-31T00:00:00Z"
+        }
+      ],
+      "expect": { "diagnosticCodes": ["delay_without_new_evidence"], "state": "scheduled" }
+    },
+    {
+      "name": "a-deadline-that-arrived-is-adjudicated",
+      "why": "A window that closed with the row still open is a decision nobody made. It is flagged rather than assumed to be a delay.",
+      "overrides": {
+        "id": "cat-past",
+        "publishedAt": "2026-01-05T00:00:00Z",
+        "reportDate": "2026-01-04T00:00:00Z",
+        "expectedWindow": { "startsAt": "2026-03-01T00:00:00Z", "endsAt": "2026-05-31T00:00:00Z" }
+      },
+      "expect": { "diagnosticCodes": [], "dueForAdjudication": true, "causeCodes": ["research_incomplete"] }
+    }
+  ]
+}

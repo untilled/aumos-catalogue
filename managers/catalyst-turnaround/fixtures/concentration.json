@@ -1,0 +1,51 @@
+{
+  "note": "Whole-account single-name exposure, across real holdings and open proposals, on one fund running three managers. Illustrative weights.",
+  "scenarios": [
+    {
+      "name": "open-proposals-count-before-they-fill",
+      "why": "Another manager's unfilled proposal is exposure this book has already committed to; counting it only after a fill is how a book ends up at twice the limit for one afternoon.",
+      "strategy": "catalyst-turnaround",
+      "positions": [{ "symbol": "A00007", "strategy": "shareholder-rerating", "weight": 0.14 }],
+      "proposals": [{ "symbol": "A00007", "strategy": "fundamental-mean-reversion", "weight": 0.06 }],
+      "caps": { "accountSingleName": 0.2 },
+      "expect": { "total": { "A00007": 0.2 }, "headroom": { "A00007": 0 }, "breaches": [], "causeCodes": [] }
+    },
+    {
+      "name": "per-strategy-caps-do-not-sum-into-a-larger-account-limit",
+      "why": "Three managers each allowed 0.12 of one name is not 0.36 of it. The sum is reported as its own finding, because the way that mistake reaches a book is that nobody adds the three numbers up.",
+      "strategy": "catalyst-turnaround",
+      "positions": [{ "symbol": "A00007", "strategy": "shareholder-rerating", "weight": 0.1 }],
+      "proposals": [],
+      "caps": {
+        "accountSingleName": 0.2,
+        "perStrategy": { "catalyst-turnaround": 0.12, "shareholder-rerating": 0.12, "fundamental-mean-reversion": 0.12 }
+      },
+      "expect": {
+        "strategyCapTotal": 0.36,
+        "headroom": { "A00007": 0.02 },
+        "diagnosticCodes": ["per_strategy_caps_exceed_account_cap"]
+      }
+    },
+    {
+      "name": "a-proposal-restates-its-own-strategys-holding",
+      "why": "A trim from 0.14 to 0.08 is a target state, not a purchase of 0.08 on top. Summing the two would refuse the trim as a breach.",
+      "strategy": "catalyst-turnaround",
+      "positions": [{ "symbol": "A00011", "strategy": "catalyst-turnaround", "weight": 0.14 }],
+      "proposals": [{ "symbol": "A00011", "strategy": "catalyst-turnaround", "weight": 0.08 }],
+      "caps": { "accountSingleName": 0.2 },
+      "expect": { "total": { "A00011": 0.08 }, "breaches": [], "causeCodes": [] }
+    },
+    {
+      "name": "one-name-under-two-theses-is-still-one-position",
+      "why": "Two managers both right about the same company is one exposure, and past the account limit it is a breach whichever thesis you read.",
+      "strategy": "catalyst-turnaround",
+      "positions": [
+        { "symbol": "A00012", "strategy": "shareholder-rerating", "weight": 0.15 },
+        { "symbol": "A00012", "strategy": "catalyst-turnaround", "weight": 0.09 }
+      ],
+      "proposals": [],
+      "caps": { "accountSingleName": 0.2 },
+      "expect": { "total": { "A00012": 0.24 }, "breaches": ["A00012"], "causeCodes": ["risk_limit_exceeded"] }
+    }
+  ]
+}

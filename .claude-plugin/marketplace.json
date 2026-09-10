@@ -194,6 +194,52 @@
       }
     },
     {
+      "name": "catalyst-turnaround",
+      "source": "./managers/catalyst-turnaround",
+      "description": "Korea-listed companies with an identifiable event that would repair the business and its balance sheet, held for as long as the event's own window and no longer. Keeps a catalyst ledger — scheduled, in progress, realised, delayed, failed — and never records a rising share price as a catalyst that worked.",
+      "version": "0.1.0",
+      "metadata": {
+        "name": "Catalyst Turnaround",
+        "publisher": "aumos",
+        "methodology": "Registers a catalyst as a record with a primary source, a publication time, a confirmed or estimated window, the indicator that will confirm it, and the conditions that count as success and failure — all written before the window opens. Sizes from the distance to the price invalidation rather than from a cap, enters in stages that cannot be added twice on a re-run, and adjudicates success, delay or failure when the window arrives. A policy expectation with no traced path to this issuer's earnings stays a research candidate; a low valuation multiple is never a qualifying condition.",
+        "assetClasses": [
+          "equity"
+        ],
+        "markets": [
+          "XKRX"
+        ],
+        "tasks": [
+          "PORTFOLIO_REVIEW",
+          "ASSET_REVIEW",
+          "THESIS_REVIEW",
+          "EVENT_REVIEW"
+        ],
+        "capabilities": [
+          "portfolio:read",
+          "thesis:read",
+          "evidence:read",
+          "manager-memory:read",
+          "manager-memory:write",
+          "source:passthrough",
+          "connection:passthrough"
+        ],
+        "requiresSkills": [
+          "source_request",
+          "connection_request"
+        ],
+        "enginesAumos": ">=0.4.0",
+        "provenance": {
+          "sourceRepo": "https://github.com/morethanmin/trading-harness",
+          "commit": "1fa18c595baa742f7323366a3c220fec5c6535a7",
+          "license": "MIT",
+          "licenseHolder": "Lee Sang Min"
+        },
+        "homepage": null,
+        "publishedAt": "2026-09-10T00:00:00.000Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJDYXRhbHlzdCBUdXJuYXJvdW5kIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0iIzNCMkE1QSIvPjxwYXRoIGQ9Ik0xMiA0NGM2LTIgMTAtOCAxNC0xNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iLjQ1Ii8+PHBhdGggZD0iTTI2IDI4YzQtOCAxMC0xMiAxOC0xMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0zOCAxMmg4djgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSIyNiIgY3k9IjI4IiByPSI1IiBmaWxsPSIjRjJCNDQxIi8+PC9zdmc+Cg=="
+      }
+    },
+    {
       "name": "earnings-drift-watcher",
       "source": "./managers/earnings-drift-watcher",
       "description": "Judges one thing only: whether the market has finished reacting to a reported surprise. Compares the reported figure against what was expected, then against how far the price has already travelled, and mostly concludes that it is too late.",

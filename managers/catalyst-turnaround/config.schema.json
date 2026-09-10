@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Catalyst Turnaround instance configuration",
+  "description": "Reaches the manager as ManagerInvocation.config. These are the constants of the methodology, exposed because an investor's tolerance for a company that has to survive its own catalyst is theirs and not the author's. What is NOT configurable from here is the shape of the method: the catalyst record's required fields, the state machine, the separation of announcement from execution from results, and the refusal to read a price move as catalyst success. Nothing in this file can loosen the Mandate. Every value here is also written into PROMPT.md and into lib/constants.mjs, because an invocation may carry no config block at all, and tools/verify-catalyst-turnaround.mjs asserts the three agree.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "catalystHorizonDays": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 540,
+      "default": 180,
+      "description": "Calendar days. A catalyst whose window neither opens nor closes within this many days of asOf is research rather than a position. 180 is two Korean quarterly reporting cycles: the hold is scoped to the catalyst window and the earnings release that can confirm it, so the horizon has to still contain a confirming report after one slip. One cycle does not."
+    },
+    "priorYearStaleDays": {
+      "type": "integer",
+      "minimum": 90,
+      "maximum": 730,
+      "default": 365,
+      "description": "Calendar days between a source's publication and asOf, above which it is not a current catalyst. 365 is one full annual reporting cycle: an announcement a year old has had a complete set of results to appear in, and if it has not appeared the thing to record is that absence. This is what stops a near-identical story from an earlier year being re-registered as today's."
+    },
+    "maxDelays": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4,
+      "default": 2,
+      "description": "How many times one catalyst's deadline may move before the position goes to an exit review. A first delay is information, a second is a pattern, a third is the failure mode this rule exists to stop — the same threat recorded again and again while the capital stays. With a 180-day horizon two delays already carry the hold past a full year. This is a stated policy and not a measurement."
+    },
+    "minRunwayMonths": {
+      "type": "number",
+      "minimum": 3,
+      "maximum": 36,
+      "default": 12,
+      "description": "Months of cash burn the company must be funded for, computed as liquidAssets divided by monthlyCashBurn. 12 is twice the catalyst horizon: the position is survivable only if the company outlives its own catalyst with the same margin again for one delay. A company that is not funded through its catalyst is a refinancing bet wearing a turnaround's clothes."
+    },
+    "debtCoverageFloor": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 3,
+      "default": 1,
+      "description": "The ratio (liquidAssets + securedRefinancing) / debtMaturingWithinYear that must be cleared. 1.0 is an accounting identity rather than a preference: below it the company needs money nobody has promised it. There is deliberately no headroom, because headroom here would be an opinion about a lender."
+    },
+    "minImprovingChannels": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "default": 2,
+      "description": "How many DISTINCT recovery channels must be improving before a candidate is a position. One improving indicator is a point; the claim being made is a path — the leading indicator and the link to cash — and two distinct channels is the smallest number that can draw one. Distinctness is the load-bearing word: a receivable balance and the interest it stops accruing are one fact written down twice."
+    },
+    "kellyFraction": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 0.5,
+      "default": 0.25,
+      "description": "The fraction of the Kelly risk budget the position sizing uses. Quarter-Kelly is the standard haircut for parameter uncertainty and is inherited rather than chosen: full Kelly assumes the probability estimate is correct, which for a catalyst date is exactly the thing that is uncertain."
+    },
+    "defaultSingleNameCap": {
+      "type": "number",
+      "minimum": 0.02,
+      "maximum": 0.4,
+      "default": 0.2,
+      "description": "Portfolio weight. The most any one name may reach from this strategy when the Mandate declares nothing narrower. It is a ceiling and never a default order size: the target weight is the minimum of this, the Mandate's own cap, the whole-account headroom for that name, and what the distance to invalidation actually funds."
+    },
+    "trimPriceProgress": {
+      "type": "number",
+      "minimum": 0.3,
+      "maximum": 1,
+      "default": 0.7,
+      "description": "Progress along (price − entry) / (target − entry) at which a realised catalyst is trimmed. 0.7 draws the line the phrase «trim once the recovery is in the price» needs: the last 30% of the path is the part earned only if the assumption was exactly right, and a methodology whose subject is whether an estimate lands should not be paid for precision it never claimed."
+    },
+    "stabilisationWindowDays": {
+      "type": "integer",
+      "minimum": 20,
+      "maximum": 250,
+      "default": 60,
+      "description": "Sessions of price behind the secondary confirmation that the fall has stopped. Roughly a quarter of trading. It confirms and it never qualifies: nothing in this package may turn price stabilisation, an oscillator or a valuation multiple into a universal entry condition, and the deepest fall is never preferred for being the deepest."
+    }
+  }
+}
