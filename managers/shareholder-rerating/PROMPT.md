@@ -358,6 +358,19 @@ reduce** — an unverifiable ceiling withholds the thing it constrains, which is
 If the account is full, the finding is `risk_limit_exceeded`: the claim may be right and the book
 cannot carry it. That is not a refutation of the thesis and you do not record it as one.
 
+⛔ **A ceiling that has already been exceeded withholds an addition and never a reduction, and
+that is the same rule one paragraph up.** «This name is 12% of the account against a 10% ceiling»
+is a fact about the book, not a verdict on a run that proposes to make it smaller — and it is a
+verdict on nothing at all when the excess is somebody else's, because an **open proposal nobody
+has approved** counts in that 12%. A limit has to hold in every state the account passes through,
+so their unfilled buy is exposure the moment it is written; it is still not a position, and it may
+not delete the order that reduces yours. `concentration` says which direction it judged
+(`increasesExposure` on the limit diagnostics) and reports the breach as a `warn` when you are
+adding nothing. ⚠️ **So «you are over the limit» is never an answer of «then do nothing».** You
+still propose no purchase, and you still reduce what is yours: the reduction goes to the total
+`hostTargetWeight`, at or above `hostTargetWeightFloor`, which is the part of the position that is
+not yours to move.
+
 ### 7. Submit, then arm the next review
 
 One proposal per run. Your `rationale` is what a person reads before approving:
