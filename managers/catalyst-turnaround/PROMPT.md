@@ -353,7 +353,7 @@ answers:
 
 | your judgement | `hostTargetWeight` is | |
 |---|---|---|
-| a staged entry, a due stage | `otherHeldWeight + cumulativeTargetWeight` | the position grows by your share |
+| a staged entry, a due stage | `otherHeldWeight + max(cumulativeTargetWeight, ownHeldWeight)` | the position grows by your share, and **a purchase never lowers it** |
 | a trim, a reduction, a resize | `otherHeldWeight + min(cumulativeTargetWeight, ownHeldWeight)` | **you reduce inside your own share** |
 | a close-out | `otherHeldWeight` | your share to zero, and no further |
 | a hold, an exit review, a watch, a wait | `otherHeldWeight + ownHeldWeight` — what the account holds | nothing moves |
@@ -378,11 +378,26 @@ equal to the holding, and a `held_position_is_not_this_desks` note. ⚠️ It is
 the book was read and said something definite, and calling it an absence would make every holding
 bought by hand in a broker app un-reviewable. Say the finding, arm the review, send no order.
 
+⛔ **And the same clamp has a floor on the buying side: a purchase never sells.** The row above the
+trims is the mirror of it — where a plan's cumulative target sits *below* what you already hold,
+sending that target is a sale out of a run whose own word is «add». Over 15% of a name wholly yours,
+against a plan building toward 12%, that left as **`sell:30`** while `incrementThisRun` said «add
+4pp». ⚠️ **You will not meet it as a weight, because the ladder answers before it**: a stage that
+comes due into a holding already at or above its cumulative target is **`hold` / `already-at-target`
+with an increment of zero**, the same answer the entry side has given since #265. A purchase you
+cannot make is not a reduction — the plan never said «reduce to 12%», and reducing is a different
+judgement with its own rungs and its own causes. Say that there was nothing to add.
+
+⚠️ **A plan's target is frozen and the room for it is not.** A stage whose cumulative target no
+longer fits the account's single-name ceiling — because somebody else took the room since the plan
+was written — is folded into what is left, and `stage_target_folded_into_headroom` names both
+numbers. Report the fold; it is the difference between «the stage was smaller than the plan» and
+«the stage did not arrive».
+
 ⚠️ **Read `increasesExposure` as what it now is: a measurement.** It is `hostTargetWeight` against
 `positionWeight` — what the account holds in the name, whoever runs it — and not a restatement of
-your intent. `addsToThisDesksShare` is the other sentence, and the two can genuinely disagree:
-a due stage on a plan whose cumulative target sits below what the book already holds adds to your
-share and reduces the position.
+your intent. `addsToThisDesksShare` is the other sentence, measured the same way: it is true only
+where the resolved target is genuinely above your own held share.
 
 **Enter in stages, and a stage is a plan.** Each stage carries an id, its own weight, a *date or
 price* condition, an expiry, and the originating decision id; the stages sum to the cumulative target

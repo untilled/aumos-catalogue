@@ -232,10 +232,15 @@ export const INTENTS = Object.freeze([
  *
  * | role | `hostTargetWeight` is | why |
  * |---|---|---|
- * | `increase` | `otherHeldWeight + cumulativeTargetWeight` | #817's addition, unchanged |
+ * | `increase` | `otherHeldWeight + max(cumulativeTargetWeight, ownHeldWeight)` | #817's addition, with #825's floor: a purchase moves this desk's share **up** and never down. A due stage on a plan targeting less than is already held handed the host that target and sold 30 shares on a run whose word is «add» |
  * | `reduce` | `otherHeldWeight + min(cumulativeTargetWeight, ownHeldWeight)` | a reduction happens **inside this desk's own share**. It may take that share down; it may never take it up, and it may never touch anybody else's |
  * | `close` | `otherHeldWeight` | this desk's share to zero and no further (#817) |
  * | `standstill` | `otherHeldWeight + ownHeldWeight` — what the account holds now | the rung's own prose is «nothing is added and nothing is closed». The number now says the same thing |
+ *
+ * ⚠️ **The two clamps are one sentence in two signs (#825).** A judgement moves this desk's own
+ * share in the direction it says and no further: `min` on the way down, `max` on the way up.
+ * Neither is ever the other — `min` cannot turn a real reduction into a no-op and `max` cannot turn
+ * a real purchase into a larger one — and #821 wrote only the first half.
  *
  * ⚠️ **`standstill` is not «no answer».** The weight is stated rather than left
  * `null`, because `null` already means «the book was not read» and one word may
