@@ -120,6 +120,8 @@ export function lossToInvalidation(input = {}) {
  * @param {number} input.lossFraction            from `lossToInvalidation`
  * @param {number} input.mandatePositionCap      the Mandate's single-name ceiling
  * @param {number} input.accountNameLimit        `maxTotalWeightForName` from `concentration` — every account axis, folded
+ * @param {number} [input.accountNameLimitForReduction] `reductionNameLimit` from `concentration` — the axes that name
+ *   *this position*, without the account's leftover room after other names (#833). Absent means the same fold twice
  * @param {number} input.minimumExecutableWeight the smallest position this venue can express
  */
 export function targetWeight(input = {}) {
@@ -177,17 +179,36 @@ export function targetWeight(input = {}) {
     return { data: emptyWeight(), diagnostics }
   }
 
-  const caps = [
-    ['mandatePositionCap', input.mandatePositionCap],
-    ['accountNameLimit', input.accountNameLimit],
-  ].filter(([, value]) => finite(value))
-  const binding = caps.reduce(
-    (lowest, [name, value]) => (value < lowest.value ? { name, value } : lowest),
-    { name: caps[0][0], value: caps[0][1] },
+  /**
+   * ── One list of caps, folded twice, and a residual is what separates them (#833) ──
+   *
+   * ⛔ **`accountNameLimit` folds the account's leftover room after other names
+   * into the ceiling on this one, and that is right for «how much may this desk
+   * buy» and wrong for «how much should this desk sell».** `concentration`
+   * publishes the second fold — the ceilings that name *this position* — and
+   * `index.mjs`'s reduction branch is the only thing that reads what comes back
+   * from it. With no other name in the bucket the two folds are one number,
+   * which is why an ordinary account is byte-for-byte unchanged.
+   */
+  const capsAgainst = (accountLimit) =>
+    [
+      ['mandatePositionCap', input.mandatePositionCap],
+      ['accountNameLimit', accountLimit],
+    ].filter(([, value]) => finite(value))
+  const foldCaps = (rows) =>
+    rows.reduce(
+      (lowest, [name, value]) => (value < lowest.value ? { name, value } : lowest),
+      { name: rows[0][0], value: rows[0][1] },
+    )
+  const caps = capsAgainst(input.accountNameLimit)
+  const binding = foldCaps(caps)
+  const reduceBinding = foldCaps(
+    capsAgainst(finite(input.accountNameLimitForReduction) ? input.accountNameLimitForReduction : input.accountNameLimit),
   )
 
   const raw = riskBudgetWeight / lossFraction
   const sized = round(Math.min(raw, Math.max(0, binding.value)))
+  const reduceSized = round(Math.min(raw, Math.max(0, reduceBinding.value)))
 
   if (raw > binding.value) {
     diagnostics.push(
@@ -215,11 +236,32 @@ export function targetWeight(input = {}) {
   }
 
   const blocked = isBlocked(diagnostics)
+  /**
+   * ⚠️ **The venue minimum applies to the reduction fold on its own terms.** A
+   * target below the smallest position this venue can express is refused
+   * whichever fold produced it — and because the reduction fold is never the
+   * smaller of the two, this is only ever reached when the entry fold was
+   * refused for the same reason. What it stops is the entry fold's refusal
+   * travelling to a number it was not measured against.
+   */
+  const reduceUnexecutable = finite(minimum) && reduceSized > 0 && reduceSized + 1e-12 < minimum
   return {
     data: {
       rawWeight: round(raw),
       bindingCap: round(binding.value),
       bindingCapName: binding.name,
+      /**
+       * ── The same fold with the account's leftover room left out (#833) ────
+       *
+       * ⛔ **`index.mjs`'s reduction branch is the only consumer and the entry
+       * path does not read this.** A ceiling constrains additions rather than
+       * reductions — this package's own sentence since #269 — so a sale is
+       * sized by what the arithmetic says this position should be and by the
+       * ceilings that name it, never by what is left of a sector or of the
+       * whole book after somebody else's names.
+       */
+      reduceTargetTotalWeight: reduceUnexecutable ? null : reduceSized,
+      reduceBindingCapName: reduceBinding.name,
       /** ⚠️ A **total**. What to propose is this minus what the account already carries. */
       targetTotalWeight: blocked ? null : sized,
       riskAtTarget: blocked ? null : round(sized * lossFraction),
@@ -240,6 +282,8 @@ function emptyWeight() {
     rawWeight: null,
     bindingCap: null,
     bindingCapName: null,
+    reduceTargetTotalWeight: null,
+    reduceBindingCapName: null,
     targetTotalWeight: null,
     riskAtTarget: null,
     units: { targetTotalWeight: 'portfolio-weight' },

@@ -415,17 +415,106 @@ fold by minimum and never by sum — is asserted unchanged. `risk_limit_exceeded
 the two `boundaries.json` rows where the ceilings leave a purchase no room at all, and the #254
 check now reads both fixture files.
 
-⬜ **A second door is open and this is not the pull request that closes it.** `index.mjs` refuses
-before sizing a second time, on `targetTotalWeight <= 0`, and that branch folds pending totals in
-through `maxTotalWeightForName`. Measured on the same book: a 6% holding of this desk's under an
-`accountSectorCap` of 0.25 reduces normally beside another desk's 0.10 of the sector and becomes
-`wait` / `risk_limit_exceeded` / no order beside their 0.30 — **or beside their unapproved
-proposal for 0.30**. The gross axis is the same. It is left open deliberately: closing it means
-deciding what a ceiling-derived `0` means for a position this desk already holds, and the only
-arithmetic answer is a total of `otherHeld`, which is a full liquidation of this desk's share
-chosen by a formula. This package's own rule forbids exactly that — `RESIZE` and never `EXIT`,
-because *the arithmetic cannot tell a breach from a bad week* — so the judgement is prose, and
-giving it a branch here is a different decision with a different argument.
+⬜ **A second door was left open here and `#833` closed it.** The paragraph that stood in this
+place said that `index.mjs` refuses a second time on `targetTotalWeight <= 0`, that the branch
+folds the account's leftover room in through `maxTotalWeightForName`, and that closing it meant
+deciding what a ceiling-derived `0` means for a position this desk already holds. The section
+below is that decision.
+
+## A ceiling made of other names sizes no sale (#833)
+
+`#830` closed the three **gates**. This is the **fold** underneath them, and the measurement that
+opened it says the door was worse than the paragraph above guessed: the reduction does not simply
+vanish at the boundary — **it grows all the way to the boundary first.**
+
+Every declared axis folds into `maxTotalWeightForName`; the sizing is bounded by it; `index.mjs`
+subtracts what the account carries. So as another desk's **other names** fill a sector or the whole
+book, the ceiling on *this* name falls, and a reduction sized against it grows. Measured through
+the real host on a 6% position wholly this desk's, its own thesis intact, `accountSectorCap` 0.25,
+this package sizing the thesis at `0.05333333`:
+
+| other names in the sector | `hostTargetWeight` | the order | multiple |
+|---|---|---|---|
+| 0 · 0.19 | `0.05333333` | `sell:6` | 1.0× |
+| **0.21** | `0.04` | **`sell:20`** | **3.0×** |
+| **0.24** | `0.01` | **`sell:50`** — 83% of the position | **7.5×** |
+| **0.245** | `0.005` | — | **8.2×** |
+| **0.2451 and above** | `null` | ⛔ **no order at all** | deleted |
+
+The threshold that deletes it is `cap − minimumExecutableWeight` (0.245 on the sector axis, 0.495
+on the gross axis). The gross axis is the same arithmetic with a wider bucket.
+
+⛔ **And an unapproved proposal produced the same number as a holding** — 0.21/0.24/0.245 → 0.04 /
+0.01 / 0.005 either way, `null` either way past the threshold. That is the mirror of what
+`aumos-catalogue#281` closed in `fundamental-mean-reversion` and what `#284` closed in this
+package's gates: *a pending total is exposure for a ceiling and is not a position for an order.*
+
+### The judgement, because the arithmetic could not make it
+
+⛔ **A residual is not an allocation.** A sector ceiling states no division of itself between the
+names under it. Reading *«the sector has 0.01 left»* as *«this position must become 0.01»* silently
+assigns the entire adjustment to whichever name was evaluated last — and to a desk that may not be
+able to reduce a single share of what filled the bucket. **An arithmetic whose answer depends on
+evaluation order has not made a decision.** Evaluate the same book starting from the other name and
+the other name pays instead; nothing in the Mandate chose either.
+
+So the fix is **not the `0` boundary** the issue framed. Option ⑴ — *«when the ceiling derives 0,
+answer this desk's own holding»* — was written believing the failure was the disappearance, and it
+would have left the 3.0× and the 7.5× rows exactly where the host measured them. What changed is
+**which ceilings may size a sale**:
+
+| | binds an addition | sizes a reduction |
+|---|---|---|
+| `accountPositionCap`, `strategyPositionCap` — *«this name may be at most X»* | ✅ | ✅ |
+| the risk arithmetic, `mandatePositionCap` — this thesis's own size | ✅ | ✅ |
+| `accountSectorCap`, `accountGrossCap` **less every other name in the bucket** | ✅ | ⛔ |
+
+A ceiling that **names this position** needs no allocation across names, so a desk over one reduces
+itself and always could — that is `#830`'s standalone half and it is untouched. A ceiling that is
+the account's **leftover room after other names** is a statement about the account, and this
+package already carried the sentence that decides it, twice, since #269 and #830: *a ceiling
+constrains additions rather than reductions.* The **fold** was the last place it was not applied.
+The gates stopped withholding a reduction and the arithmetic went on sizing one.
+
+⚠️ **Option ⑶'s word exists and it is a finding rather than a route.**
+`reduction_is_not_sized_by_the_accounts_remaining_room` fires wherever the two folds diverge and
+carries **the order this fix withholds** — `hostTargetWeightIfRoomFolded` — beside the one that
+leaves. `untilled/aumos#782` is only checkable if both numbers are on the page; the same rule
+`aumos-catalogue#281` wrote as `hostTargetWeightIfPendingFolded`. It is silent when the two folds
+agree, which is every account with nothing else in the bucket.
+
+### What it is made of
+
+`concentration` splits its axis list into `nameAxes` and `residualAxes` and folds it **twice**:
+`maxTotalWeightForName` / `maxTotalWeightBinding` (every declared axis — ⛔ **not one byte
+different**) and `reductionNameLimit` / `reductionNameLimitBinding`. `targetWeight` folds its cap
+list twice the same way — `targetTotalWeight` and `reduceTargetTotalWeight` — and an absent
+`accountNameLimitForReduction` is the same fold twice, so a caller written before #833 is
+unchanged. `index.mjs`'s reduction branch is the **only** consumer of the second fold, and it asks
+the direction question **before** the two refusals that are about a purchase (`targetTotalWeight`
+below the venue minimum, and `targetTotalWeight <= 0`) rather than after them.
+
+⚠️ **The RESIZE/WAIT test and the weight that leaves read one fold.** They have to: the entry fold
+is the smaller of the two, so a test against it says `RESIZE` on a desk whose own holding is *below*
+the number the order then names — a **purchase sent out of a judgement to reduce**. A mutant that
+splits them survives the whole ramp and is caught by one case, and that case is in the verifier.
+
+⛔ **`untilled/aumos#813` did not move.** The entry direction still folds every declared axis and
+every unapproved proposal: a bucket with 0.04 of room buys 0.04, a full one buys nothing, and a
+pending total counts before it fills. ⛔ `#817`'s `otherHeld + target`, `#819`'s floor and the
+`ownHeld > target` test are unchanged. ⛔ No fixture file was reshaped, no diagnostic code was
+renamed, and the venue minimum still refuses a target below it on **both** folds.
+
+⚠️ **What is genuinely lost, said out loud.** When a sector really is over its ceiling and the
+names filling it are this desk's *other* holdings, this package will no longer trim **this** name
+on the sector axis. It reports `sector_limit_exceeded` as a `warn` — the excess stands and is
+named — and the reduction that follows comes from a ceiling that names a position: this desk's own
+single-name cap, or the risk budget, on whichever name is actually oversized. Dividing a sector
+budget across this desk's own names is portfolio construction, and a per-name evaluator has no
+input that would let it choose. ⚠️ **No sale grows and none is invented**: the reduction fold is
+never the smaller of the two, so every order this change moves gets *smaller*, and the state it
+newly declines to act in is a `WAIT` that says why rather than the silent no-op that was there at
+`0.2451`.
 
 ## The fixed thresholds
 

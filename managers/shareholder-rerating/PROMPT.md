@@ -184,6 +184,9 @@ the same field:
 lossFraction      = (entryPrice − invalidationPrice − dividendReceivedBeforeThen) / entryPrice
 rawWeight         = riskBudgetWeight / lossFraction
 targetTotalWeight = min(rawWeight, mandate cap, what the sector ceiling leaves, what the gross ceiling leaves)
+                    ↑ the ceiling on what you may ADD. A reduction is sized without the last two
+                      terms: they are the account's leftover room after other names, not a size
+                      for a position you already hold (`reduceTargetTotalWeight`).
 incrementWeight   = targetTotalWeight − (already held + already proposed and unapproved)
 ```
 
@@ -370,6 +373,23 @@ adding nothing. ⚠️ **So «you are over the limit» is never an answer of «t
 still propose no purchase, and you still reduce what is yours: the reduction goes to the total
 `hostTargetWeight`, at or above `hostTargetWeightFloor`, which is the part of the position that is
 not yours to move.
+
+⛔ **And a ceiling made of *other names* sizes no sale of yours.** A sector or gross limit less
+everything else in the bucket says *«after the other names, this much is left»*. That is the right
+ceiling on what you may **add** — it is why a full sector buys nothing — and it is not a size for a
+position you already hold: those limits state no division of themselves between the names under
+them, so reading the remainder as your target hands the whole adjustment to whichever name happened
+to be evaluated last, and to a desk that may not be able to reduce one share of what filled the
+bucket. Measured: a 6% position wholly this desk's, thesis intact, went from `sell:6` to `sell:20`
+to **`sell:50`** — 83% of it — and then to no order at all, purely because another desk's holdings
+in *other* names grew. So a reduction is sized by the ceilings that name **this** position — your
+single-name caps and the risk arithmetic — and `evaluateCase` records
+`reduction_is_not_sized_by_the_accounts_remaining_room` with `hostTargetWeightIfRoomFolded`, the
+order the remainder would have sent, beside the one that leaves. ⚠️ **The excess stands and is
+still named**: `sector_limit_exceeded` and `gross_limit_exceeded` still fire, you still propose no
+purchase, and if the book is genuinely over its sector ceiling the reduction that fixes it comes
+from a ceiling that names a position — yours or somebody's — on whichever name is actually
+oversized. You do not invent an allocation the Mandate did not state.
 
 ### 7. Submit, then arm the next review
 
