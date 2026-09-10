@@ -47,9 +47,11 @@ import {
   OUTCOMES,
   THRESHOLDS,
   execute,
+  concentration,
   normalizeBars,
   reversionTarget,
   round,
+  sectorConcentration,
   stabilisation,
   technicalState,
 } from '../managers/fundamental-mean-reversion/lib/index.mjs'
@@ -257,7 +259,7 @@ check('a gap-down history sizes smaller than a calm one', () => {
 
 check('concentration counts real holdings and open proposals together', () => {
   const held = sized.get('held-by-another-strategy')
-  assert.equal(held.exposure.existingWeight, 0.085, 'a 6% holding under one strategy and a 2.5% open proposal under another are 8.5% of exposure to one name')
+  assert.equal(held.exposure.existingWeight, 0.085, 'a 6% holding under one strategy, under another strategy\'s open proposal asking for a total of 8.5%, is 8.5% of exposure to one name')
   assert.equal(held.bindingConstraint, 'single-name-headroom')
   assert.equal(held.targetTotalWeight, 0.015, 'so the 10% account ceiling leaves 1.5%')
   assert.ok(held.targetTotalWeight < sized.get('calm-series').targetTotalWeight, 'which is less than the risk budget alone would have taken')
@@ -272,6 +274,110 @@ check('concentration counts real holdings and open proposals together', () => {
   const full = sized.get('no-headroom-left')
   assert.equal(full.status, 'refused')
   assert.equal(full.code, 'risk_limit_exceeded', 'no room is a finding about the book — never `thesis_refuted` and never `data_missing`')
+})
+
+/**
+ * ── #813: the host states a **total**, and three books it is measured on ───
+ *
+ * The scenarios are the A/B/C of `untilled/aumos` PR #815, which drove the real
+ * host — `Kernel.decide`, real `position_assignments`, `discoveryService`'s
+ * `portfolio-get` — and fed its answer to this package's own `lib`. The fund is
+ * ₩100,000,000 on XKRX with a 20% single-name ceiling, and the third column is
+ * what that host actually produces once the orders go out:
+ *
+ *   A  held 0%  · pending total 8%   → 8%   (unchanged by #813)
+ *   B  held 6%  · pending total 12%  → 12%  (this package said 18%; sized 0.02)
+ *   C  held 6%  · pending total 15%  → 15%  (said 21%: refused outright)
+ *
+ * ⚠️ **B and C are the shape of the defect**: a name that is *already held* and
+ * *also* carries a pending total. In A the two readings coincide — nobody holds
+ * the name — which is why #810's measurement, every row of which was an unheld
+ * name, could not tell them apart. ⚠️ And this package named its proposal field
+ * `targetWeight`, the host's own noun, while adding it to the holding: one word
+ * meaning two things on the two sides of one boundary.
+ */
+const HOST_ABC = [
+  { label: 'A — held 0%, pending total 8%', held: 0, pendingTotal: 0.08, exposure: 0.08, naive: 0.08 },
+  { label: 'B — held 6%, pending total 12%', held: 0.06, pendingTotal: 0.12, exposure: 0.12, naive: 0.18 },
+  { label: 'C — held 6%, pending total 15%', held: 0.06, pendingTotal: 0.15, exposure: 0.15, naive: 0.21 },
+]
+
+for (const scenario of HOST_ABC) {
+  check(`#813 ${scenario.label} — the pending total is folded by maximum, and the sizing still runs`, () => {
+    const book = {
+      holdings: scenario.held > 0 ? [{ symbol: 'FMR001', sector: 'technology', weight: scenario.held, strategy: 'catalyst-turnaround' }] : [],
+      openProposals: [{ symbol: 'FMR001', sector: 'technology', targetWeight: scenario.pendingTotal, strategy: 'shareholder-rerating' }],
+    }
+    const folded = concentration(book, 'FMR001')
+    assert.equal(folded.existingWeight, scenario.exposure, `${scenario.label}: the fund's exposure to this name`)
+    if (scenario.naive !== scenario.exposure) {
+      assert.notEqual(folded.existingWeight, scenario.naive, `${scenario.label}: the holding and the pending total were added`)
+    }
+    assert.equal(folded.heldWeight, scenario.held)
+    assert.equal(folded.proposedWeight, round(scenario.exposure - scenario.held), `${scenario.label}: what the pending total still asks for on top of the holding`)
+    assert.equal(folded.ownWeight, 0, 'none of it belongs to this manager')
+    assert.equal(folded.otherWeight, scenario.exposure)
+
+    /**
+     * ⛔ **And it reaches a size.** Under a 20% ceiling every one of the three has
+     * room for the risk budget, so the binding constraint is the budget rather
+     * than the book — which is the sentence #815 could not write before this.
+     */
+    const answer = execute({
+      operation: 'positionSizing',
+      asOf: ASOF,
+      input: { ...structuredClone(sizing.cases.find((row) => row.name === 'calm-series').input), mandate: { singleNameCap: 0.2, grossCap: 0.9 }, book, rows: rowsOf('shock-then-base') },
+    })
+    assert.equal(answer.status, 'ok', `${scenario.label}: a book with room refused to size`)
+    assert.equal(answer.code ?? null, null)
+    assert.equal(answer.exposure.existingWeight, scenario.exposure)
+    assert.equal(answer.bindingConstraint, 'risk-budget', `${scenario.label}: the book bound a position the risk budget should have`)
+    assert.equal(answer.targetTotalWeight, 0.04011194, `${scenario.label}: the target the risk budget alone asks for`)
+  })
+}
+
+check('#813 — a pending trim does not reduce exposure before it fills, and two managers naming one total have agreed on it', () => {
+  const trimming = concentration({
+    holdings: [{ symbol: 'FMR001', weight: 0.14, strategy: 'fundamental-mean-reversion' }],
+    openProposals: [{ symbol: 'FMR001', targetWeight: 0.08, strategy: 'fundamental-mean-reversion' }],
+  }, 'FMR001')
+  assert.equal(trimming.existingWeight, 0.14, 'a pending trim was read as though it had already filled')
+  assert.equal(trimming.proposedWeight, 0, 'a pending total below the holding asked for something on top of it')
+  assert.equal(trimming.ownWeight, 0.14, 'and this manager is responsible for all of it')
+
+  const twoManagers = concentration({
+    holdings: [{ symbol: 'FMR001', weight: 0.06, strategy: 'catalyst-turnaround' }],
+    openProposals: [
+      { symbol: 'FMR001', targetWeight: 0.12, strategy: 'shareholder-rerating' },
+      { symbol: 'FMR001', targetWeight: 0.12, strategy: 'evidence-gated' },
+    ],
+  }, 'FMR001')
+  assert.equal(twoManagers.existingWeight, 0.12, 'two proposals for the same total were read as a request for twice it')
+  assert.equal(twoManagers.otherWeight, 0.12)
+
+  // …and the gross axis folds the same way, or a whole-account ceiling counts one name twice.
+  const gross = concentration({
+    holdings: [
+      { symbol: 'FMR001', weight: 0.06, strategy: 'catalyst-turnaround' },
+      { symbol: 'FMR002', weight: 0.1, strategy: 'catalyst-turnaround' },
+    ],
+    openProposals: [{ symbol: 'FMR001', targetWeight: 0.12, strategy: 'shareholder-rerating' }],
+  }, 'FMR001')
+  assert.equal(gross.grossExisting, 0.22, 'the gross axis added a holding and its own pending total')
+  assert.equal(gross.grossHeld, 0.16)
+  assert.equal(gross.grossProposed, 0.06, 'what the pending totals still require over the whole book')
+})
+
+check('#813 — the sector axis folds the names before it adds them up', () => {
+  const answer = sectorConcentration({
+    holdings: [
+      { symbol: 'FMR001', sector: 'utilities', weight: 0.06, strategy: 'catalyst-turnaround' },
+      { symbol: 'FMR002', sector: 'utilities', weight: 0.1, strategy: 'evidence-gated' },
+    ],
+    openProposals: [{ symbol: 'FMR001', sector: 'utilities', targetWeight: 0.12, strategy: 'shareholder-rerating' }],
+  }, 'utilities', 'FMR001')
+  assert.equal(answer.exposure, 0.22, 'the sector total added a holding and its own pending total')
+  assert.deepEqual(answer.unclassified, [])
 })
 
 check('config may narrow the risk budget and may not widen it', () => {

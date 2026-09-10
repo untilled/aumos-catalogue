@@ -158,6 +158,32 @@ export function bookIsReadable(book) {
  * Exposure to one name across the whole fund — real holdings and open proposals
  * together, with the per-strategy split carried but never used as a limit.
  *
+ * ── An open proposal states a **total**, so the fold is `max` (#813) ────────
+ *
+ * ⛔ **`targetWeight` on an open-proposal row is what that proposal asks the
+ * position to *become*, and this function used to add it to the holding.** The
+ * name was right and the arithmetic was not: it is the host's own field, and
+ * `portfolio_get` publishes «a total weight, not an increment» in its
+ * description. It is also what the host executes — a book holding 6% of a name,
+ * under another manager's proposal for a total of 12%, sends an order for the
+ * *difference* and ends at 12%. Never 18%. So
+ *
+ *     existingWeight = max(heldWeight, the largest total any proposal asks for)
+ *
+ * and `proposedWeight` is what those proposals still require **on top of** the
+ * holding — `existingWeight − heldWeight`, never negative.
+ *
+ * ⚠️ **The overstatement refuses positions.** A 6%-held name under a 15% pending
+ * total was read as 21%, and against a 20% single-name ceiling `positionSizing`
+ * answered `refused / risk_limit_exceeded` on a book with 5% of room. Two
+ * managers naming the same total have agreed on one end state rather than asked
+ * for two, so their totals fold by `max` as well.
+ *
+ * ⚠️ **`max`, and not «the latest total wins».** A pending *trim* does not reduce
+ * exposure before it fills: a 14% holding under a proposal to take it to 8% is
+ * 14% of this book right now, and a ceiling has to hold in both of the states the
+ * account passes through.
+ *
  * ⚠️ Callers must have established `bookIsReadable(book)` first. The defaults
  * below exist so the fold cannot throw, not so an unread book can be sized
  * against.
@@ -165,14 +191,40 @@ export function bookIsReadable(book) {
 export function concentration(book, symbol, strategyId = STRATEGY_ID) {
   const holdings = Array.isArray(book?.holdings) ? book.holdings : []
   const proposals = Array.isArray(book?.openProposals) ? book.openProposals : []
-  const held = holdings.filter((row) => row.symbol === symbol)
-  const proposed = proposals.filter((row) => row.symbol === symbol)
-  const sum = (rows, key) => round(rows.reduce((total, row) => total + (finite(row[key]) ? row[key] : 0), 0))
-  const heldWeight = sum(held, 'weight')
-  const proposedWeight = sum(proposed, 'targetWeight')
+
+  /**
+   * One row per name the fund is exposed to: what is held, and the largest total
+   * any open proposal asks that name to become.
+   */
+  const byName = new Map()
+  const nameOf = (row) => (typeof row?.symbol === 'string' ? row.symbol : 'unnamed')
+  for (const row of holdings) {
+    const entry = byName.get(nameOf(row)) ?? { held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {} }
+    const weight = finite(row?.weight) ? row.weight : 0
+    const owner = row?.strategy ?? 'unattributed'
+    entry.held = round(entry.held + weight)
+    entry.heldByStrategy[owner] = round((entry.heldByStrategy[owner] ?? 0) + weight)
+    byName.set(nameOf(row), entry)
+  }
+  for (const row of proposals) {
+    const entry = byName.get(nameOf(row)) ?? { held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {} }
+    const target = finite(row?.targetWeight) ? row.targetWeight : 0
+    const owner = row?.strategy ?? 'unattributed'
+    entry.pendingPeak = Math.max(entry.pendingPeak, target)
+    entry.pendingPeakByStrategy[owner] = Math.max(entry.pendingPeakByStrategy[owner] ?? 0, target)
+    byName.set(nameOf(row), entry)
+  }
+  const exposureOf = (entry) => round(Math.max(entry?.held ?? 0, entry?.pendingPeak ?? 0))
+
+  const entry = byName.get(symbol) ?? { held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {} }
+  const heldWeight = round(entry.held)
+  const existingWeight = exposureOf(entry)
+  /** What the open proposals still require on top of the holding. Never negative. */
+  const proposedWeight = round(existingWeight - heldWeight)
   const byStrategy = {}
-  for (const row of held) byStrategy[row.strategy ?? 'unattributed'] = round((byStrategy[row.strategy ?? 'unattributed'] ?? 0) + (finite(row.weight) ? row.weight : 0))
-  for (const row of proposed) byStrategy[row.strategy ?? 'unattributed'] = round((byStrategy[row.strategy ?? 'unattributed'] ?? 0) + (finite(row.targetWeight) ? row.targetWeight : 0))
+  for (const owner of new Set([...Object.keys(entry.heldByStrategy), ...Object.keys(entry.pendingPeakByStrategy)])) {
+    byStrategy[owner] = round(Math.min(existingWeight, Math.max(entry.heldByStrategy[owner] ?? 0, entry.pendingPeakByStrategy[owner] ?? 0)))
+  }
   /**
    * ⚠️ **Own exposure is split out, and it is not a second limit.** It is
    * subtracted for one reason only: a cap applies to the *whole* position, so
@@ -182,8 +234,12 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
    * increment, or an increment as a target.
    */
   const ownWeight = round(byStrategy[strategyId] ?? 0)
-  const existingWeight = round(heldWeight + proposedWeight)
-  const grossExisting = round(sum(holdings, 'weight') + sum(proposals, 'targetWeight'))
+  let grossExisting = 0
+  let grossHeld = 0
+  for (const row of byName.values()) {
+    grossExisting = round(grossExisting + exposureOf(row))
+    grossHeld = round(grossHeld + row.held)
+  }
   return {
     symbol,
     strategyId,
@@ -194,10 +250,11 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
     /** The part of it this manager is already responsible for. */
     ownWeight,
     /** The part of it belonging to every other strategy and open proposal. */
-    otherWeight: round(existingWeight - ownWeight),
+    otherWeight: round(Math.max(0, existingWeight - ownWeight)),
     byStrategy,
-    grossHeld: sum(holdings, 'weight'),
-    grossProposed: sum(proposals, 'targetWeight'),
+    grossHeld,
+    /** What every open proposal on the fund still requires on top of what is held. */
+    grossProposed: round(grossExisting - grossHeld),
     grossExisting,
     grossOther: round(grossExisting - ownWeight),
   }
@@ -211,28 +268,51 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
  * is measured against a total, and one unclassified row makes the total short by
  * whatever it is — however well classified the candidate is. So the unformable
  * case is reported from the *book*, not only from the candidate.
+ *
+ * ⚠️ **The names fold before the sector adds them up (#813).** A proposal states
+ * the weight it asks a position to become, so a name held at 6% under a pending
+ * total of 12% is 12% of this sector and not 18% of it. Adding the two here as
+ * well as in `concentration` is the same overstatement twice.
  */
 export function sectorConcentration(book, sector, symbol, strategyId = STRATEGY_ID) {
   const holdings = Array.isArray(book?.holdings) ? book.holdings : []
   const proposals = Array.isArray(book?.openProposals) ? book.openProposals : []
-  const rows = [
-    ...holdings.map((row) => ({ ...row, weight: row.weight })),
-    ...proposals.map((row) => ({ ...row, weight: row.targetWeight })),
-  ]
+  const byName = new Map()
+  const entryFor = (name) => {
+    const entry = byName.get(name) ?? { symbol: name, sector: null, held: 0, pendingPeak: 0, ownHeld: 0, ownPendingPeak: 0 }
+    byName.set(name, entry)
+    return entry
+  }
+  for (const row of holdings) {
+    const entry = entryFor(typeof row?.symbol === 'string' ? row.symbol : 'unnamed')
+    const weight = finite(row?.weight) ? row.weight : 0
+    if (entry.sector === null && typeof row?.sector === 'string' && row.sector.length > 0) entry.sector = row.sector
+    entry.held = round(entry.held + weight)
+    if ((row?.strategy ?? 'unattributed') === strategyId) entry.ownHeld = round(entry.ownHeld + weight)
+  }
+  for (const row of proposals) {
+    const entry = entryFor(typeof row?.symbol === 'string' ? row.symbol : 'unnamed')
+    const target = finite(row?.targetWeight) ? row.targetWeight : 0
+    if (entry.sector === null && typeof row?.sector === 'string' && row.sector.length > 0) entry.sector = row.sector
+    entry.pendingPeak = Math.max(entry.pendingPeak, target)
+    if ((row?.strategy ?? 'unattributed') === strategyId) entry.ownPendingPeak = Math.max(entry.ownPendingPeak, target)
+  }
+
   const unclassified = []
   let exposure = 0
   let own = 0
-  for (const row of rows) {
-    if (!finite(row.weight) || row.weight === 0) continue
-    if (typeof row.sector !== 'string' || row.sector.length === 0) {
-      if (!unclassified.includes(row.symbol ?? 'unnamed')) unclassified.push(row.symbol ?? 'unnamed')
+  for (const entry of byName.values()) {
+    const folded = round(Math.max(entry.held, entry.pendingPeak))
+    if (folded === 0) continue
+    if (entry.sector === null) {
+      if (!unclassified.includes(entry.symbol)) unclassified.push(entry.symbol)
       continue
     }
-    if (row.sector !== sector) continue
-    exposure += row.weight
-    if (row.symbol === symbol && (row.strategy ?? 'unattributed') === strategyId) own += row.weight
+    if (entry.sector !== sector) continue
+    exposure = round(exposure + folded)
+    if (entry.symbol === symbol) own = round(Math.min(folded, Math.max(entry.ownHeld, entry.ownPendingPeak)))
   }
-  return { sector, exposure: round(exposure), ownWeight: round(own), otherWeight: round(exposure - own), unclassified }
+  return { sector, exposure: round(exposure), ownWeight: round(own), otherWeight: round(Math.max(0, exposure - own)), unclassified }
 }
 
 /**
