@@ -839,6 +839,195 @@ check('#823 — the role table covers this package\'s outcome vocabulary exactly
 })
 
 /**
+ * ── #826: a pending total is a ceiling, and it is not a position ───────────
+ *
+ * `#823` closed «the number a judgement carries is the judgement's». This is one
+ * layer under it: the number a *reduction* carries was `min(entry ceiling, own
+ * holding)`, and that entry ceiling folds other desks' **open proposals** in —
+ * `aumos-catalogue#275` put them there, and for the buying question they belong
+ * there, because a limit has to hold in every state the account passes through.
+ *
+ * For a sale they do not. Driven to the exchange against the real host, a 6%
+ * position wholly this desk's left as `sell:23`; with `shareholder-rerating`
+ * holding a **sealed and unapproved** 15% BUY on the same name it left as
+ * `sell:50`, and once the pending total passed the cap it left as the whole
+ * position. Nothing was approved, nothing was filled, and `diagnostics` was
+ * empty — the fifth answer in this series to change a number and say nothing.
+ *
+ * ⛔ **The inputs are built here and no fixture was edited.** `CAP823` caps a
+ * single name at 10%, so a pending total of 15% takes the single-name headroom
+ * to 1% and one of 16% takes it past zero — the two rows the issue measured.
+ */
+const pending826 = (total, strategy = 'inst_shareholder_rerating') => [{ symbol: SYMBOL823, sector: 'technology', targetWeight: total, strategy }]
+const sizeWithPending826 = (holdings, total) =>
+  sizeFor823(holdings, total === null ? {} : { book: { holdings, openProposals: pending826(total) } })
+/** The three review outcomes over a 6% position **wholly this desk's** — where #819's defences do not exist. */
+const reviews826 = (holding, total) =>
+  ['invalidation-triggered', 'deadline-elapsed', 'target-reached-staged-trim'].map((name) => [
+    `${name}@pending=${total}`,
+    classify823(name, sizeWithPending826([held823(holding, STRATEGY_ID)], total)),
+  ])
+
+check('#826 — another desk\'s unfilled proposal does not enlarge this desk\'s sale', () => {
+  /** The order the issue measured with nobody else in the name: `sell:23` out of a 6% holding. */
+  const baseline = new Map(reviews826(0.06, null).map(([name, answer]) => [name.split('@')[0], answer]))
+  for (const [, answer] of baseline) {
+    assert.equal(answer.hostTargetWeight, 0.03623596, 'the baseline reduction is no longer the one the issue drove to the exchange')
+  }
+
+  /**
+   * ⚠️ **Every one of these narrows the *entry* ceiling, and none of them may
+   * move the sale.** 0.15 took it to 1% and 0.16 past zero — where the entry
+   * answer is refused outright — and the run still sold exactly what it sold
+   * with the account to itself.
+   */
+  for (const total of [0.05, 0.11, 0.15, 0.16, 0.3]) {
+    for (const [name, answer] of reviews826(0.06, total)) {
+      const plain = baseline.get(name.split('@')[0])
+      assert.equal(answer.weightRole, 'reduce', `${name}: an outcome that reduces was not typed as one`)
+      assert.equal(answer.ownHeldWeight, 0.06, `${name}: the desk's own holding`)
+      assert.equal(answer.otherHeldWeight, 0, `${name}: nobody else *holds* this name — a proposal is not a holding`)
+      assert.equal(
+        answer.hostTargetWeight,
+        plain.hostTargetWeight,
+        `${name}: an unapproved, unfilled proposal changed the total this desk hands the exchange`,
+      )
+      assert.equal(answer.exposureDirection, 'reduce', `${name}: the order that leaves is no longer a reduction`)
+      assert.ok(answer.hostTargetWeight > 0, `${name}: a pending proposal liquidated a position this desk runs`)
+    }
+  }
+
+  /**
+   * ⛔ **And the entry ceiling really did move, so this is not a test of a
+   * number nobody narrowed.** At 0.15 the single-name headroom binds at 1% and
+   * at 0.16 `positionSizing` refuses outright — that is the state the review
+   * branches are reached in.
+   */
+  const narrowed = sizeWithPending826([held823(0.06, STRATEGY_ID)], 0.15)
+  assert.equal(narrowed.status, 'ok')
+  assert.equal(narrowed.bindingConstraint, 'single-name-headroom', 'the pending total no longer narrows the entry ceiling — #813 was reverted')
+  assert.equal(narrowed.targetTotalWeight, 0.01, 'the entry share is not the 1% the issue measured')
+  assert.equal(narrowed.heldOnlyBindingConstraint, 'risk-budget', 'the held-only fold read a proposal')
+  assert.equal(narrowed.heldOnlyTargetTotalWeight, 0.03623596, 'the held-only fold is not this desk\'s share measured against holdings')
+  const past = sizeWithPending826([held823(0.06, STRATEGY_ID)], 0.16)
+  assert.equal(past.status, 'refused', 'a pending total past the cap no longer refuses the entry')
+  assert.equal(past.targetTotalWeight, 0, 'and the entry share it refuses with is not zero')
+  assert.equal(past.heldOnlyTargetTotalWeight, 0.03623596, 'a refused *entry* took the reduction ceiling down with it')
+})
+
+/**
+ * ⚠️ **Said out loud, because four answers before this one were not.** The
+ * counterfactual travels with it: an observation that cannot be measured against
+ * what it withheld is a restatement.
+ */
+check('#826 — the answer says that a pending total was not folded into its sale', () => {
+  for (const [name, answer] of reviews826(0.06, 0.15)) {
+    const row = answer.diagnostics.find((diag) => diag.code === 'reduction_target_ignores_others_pending')
+    assert.ok(row, `${name}: the sale was measured against a different ceiling and nothing said so`)
+    assert.equal(row.severity, 'info')
+    assert.equal(row.details.entryTargetTotalWeight, 0.01, `${name}: the entry share the diagnostic names`)
+    assert.equal(row.details.heldOnlyTargetTotalWeight, 0.03623596, `${name}: the share this sale was measured against`)
+    assert.equal(row.details.hostTargetWeight, answer.hostTargetWeight, `${name}: the diagnostic names a total the answer did not send`)
+    assert.equal(row.details.hostTargetWeightIfPendingFolded, 0.01, `${name}: the order that would have gone out is not carried, so nobody can measure what was withheld`)
+  }
+
+  /** ⛔ And it is silent where the two folds agree — a line on every answer is a line nobody reads. */
+  for (const [name, answer] of reviews826(0.06, null)) {
+    assert.ok(
+      !answer.diagnostics.some((diag) => diag.code === 'reduction_target_ignores_others_pending'),
+      `${name}: reported a divergence on an account with no open proposal in the name`,
+    )
+  }
+})
+
+/**
+ * ⛔ **The three regressions this fix must not kill.** `#813`/`#275` folds
+ * pending into the *entry* ceiling, `#817`/`#277` adds what others hold to the
+ * buy total, and `#823`/`#280` clamps a reduction to this desk's own holding.
+ */
+check('#826 — the buy path still folds the pending total, and adds what others hold', () => {
+  /** `#817`: an unattributed 6%, sized here at 3.75%, leaves as `0.09623596` and buys. */
+  const unattributed = sizeFor823([held823(0.06)])
+  const buy = classify823('temporary-shock-plus-stabilisation', unattributed, {
+    position: { held: false },
+    review: { invalidationTriggered: false, deadlineElapsed: false },
+  })
+  assert.equal(buy.weightRole, 'increase', 'the entry outcome is no longer typed as one')
+  assert.equal(buy.hostTargetWeight, round(0.06 + unattributed.targetTotalWeight), '#817\'s addition on the buy path moved')
+  assert.equal(buy.hostTargetWeight, 0.09623596, 'the buy total is not the one #277 measured')
+
+  /**
+   * `#813`: the entry ceiling still narrows under somebody's pending total, and
+   * the buy total still comes off `targetTotalWeight` and never off the
+   * held-only fold — a buy that ignored the pending would overstate the account.
+   */
+  const crowded = sizeWithPending826([held823(0.06)], 0.15)
+  assert.ok(crowded.targetTotalWeight < crowded.heldOnlyTargetTotalWeight, 'the pending total stopped narrowing the entry ceiling')
+  const crowdedBuy = classify823('temporary-shock-plus-stabilisation', crowded, {
+    position: { held: false },
+    review: { invalidationTriggered: false, deadlineElapsed: false },
+  })
+  if (crowdedBuy.weightRole === 'increase' && crowdedBuy.hostTargetWeight !== null) {
+    assert.equal(
+      crowdedBuy.hostTargetWeight,
+      round(0.06 + crowded.targetTotalWeight),
+      'the buy path read the held-only fold and bought room another desk had already asked for',
+    )
+  }
+})
+
+/**
+ * ⚠️ **The two folds are the same fold on an account with no open proposals**,
+ * which is the common case and the reason this change is invisible almost
+ * everywhere. Measured over every sizing fixture rather than asserted.
+ */
+check('#826 — with no open proposal in the book the two folds are one number', () => {
+  let measured = 0
+  for (const row of sizing.cases) {
+    const answer = sized.get(row.name)
+    if (typeof answer?.targetTotalWeight !== 'number') continue
+    const proposals = Array.isArray(row.input?.book?.openProposals) ? row.input.book.openProposals : []
+    if (proposals.length > 0) continue
+    measured += 1
+    assert.equal(answer.heldOnlyTargetTotalWeight, answer.targetTotalWeight, `${row.name}: a book with no open proposal folded to two different shares`)
+    assert.equal(answer.heldOnlyBindingConstraint, answer.bindingConstraint, `${row.name}: and to two different binding constraints`)
+  }
+  assert.ok(measured >= 5, 'too few sizing fixtures reached the identity to be measuring it')
+})
+
+/**
+ * ⛔ **Both book folds have a holdings-only twin, and each is measured
+ * separately.** The single-name axis is what the issue drove to the exchange;
+ * the gross and sector axes are the same arithmetic and would have carried the
+ * same defect the first time either of them bound.
+ */
+check('#826 — every axis that reads the book has a holdings-only term', () => {
+  const book = {
+    holdings: [
+      { symbol: SYMBOL823, sector: 'technology', weight: 0.06, strategy: STRATEGY_ID },
+      { symbol: 'OTHER', sector: 'technology', weight: 0.1, strategy: 'inst_catalyst_turnaround' },
+    ],
+    openProposals: [
+      { symbol: SYMBOL823, sector: 'technology', targetWeight: 0.15, strategy: 'inst_shareholder_rerating' },
+      { symbol: 'OTHER', sector: 'technology', targetWeight: 0.3, strategy: 'inst_shareholder_rerating' },
+    ],
+  }
+  const name = concentration(book, SYMBOL823, STRATEGY_ID)
+  assert.equal(name.otherWeight, 0.09, 'the ceiling term folds the pending total, as #813 requires')
+  assert.equal(name.otherHeldWeight, 0, 'holdings only: nobody else holds this name')
+  assert.equal(name.grossOther, round(0.15 + 0.3 - 0.06), 'the gross ceiling term folds every open proposal on the fund')
+  assert.equal(name.grossOtherHeld, 0.1, 'the gross term has no holdings-only twin, so a fund-wide proposal enlarges this desk\'s sale')
+
+  const sector = sectorConcentration(book, 'technology', SYMBOL823, STRATEGY_ID)
+  assert.equal(sector.exposure, round(0.15 + 0.3), 'the sector ceiling term folds the pending totals')
+  assert.equal(sector.heldExposure, round(0.06 + 0.1), 'the sector term has no holdings-only twin')
+  assert.equal(sector.ownWeight, 0.06, 'this desk\'s own sector share — it wrote none of these proposals')
+  assert.equal(sector.otherWeight, round(0.45 - 0.06), 'the sector ceiling term is measured against the folded exposure')
+  assert.equal(sector.ownHeldWeight, 0.06, 'and its holdings-only share is what it holds')
+  assert.equal(sector.otherHeldWeight, 0.1, 'somebody else\'s pending proposal counted as a sector position')
+})
+
+/**
  * ⚠️ **The same family, two outcomes over.** `aumos-catalogue#278` attached the
  * sizing to three review outcomes; two more answers carry it — the completed
  * position (`WAIT`) and a sizing carrying an unevaluated reading (`WATCH`) — and

@@ -381,7 +381,7 @@ with it:
 ```
 hostTargetWeightFloor = otherHeldWeight          ← no target you send may be below this
 a close-out of this thesis = the floor, exactly  ← and it is `exit` only when the floor is 0
-hostTargetWeight      = otherHeldWeight + min(targetTotalWeight, ownHeldWeight)
+hostTargetWeight      = otherHeldWeight + min(heldOnlyTargetTotalWeight, ownHeldWeight)
                                                 ← the reduction's own total, bounded above by
                                                   what this desk holds and below by the floor
 ```
@@ -397,8 +397,21 @@ only where somebody else holds part of the name. So the total `classifyCase` ans
 reduction is
 
 ```
-hostTargetWeight = otherHeldWeight + min(targetTotalWeight, ownHeldWeight)
+hostTargetWeight = otherHeldWeight + min(heldOnlyTargetTotalWeight, ownHeldWeight)
 ```
+
+⛔ **and the share it is clamped against is measured against *positions*, not against open
+proposals (#826).** `targetTotalWeight` — the entry share — comes off ceilings that fold other
+desks' unfilled proposals in, because a limit has to hold in every state the account passes
+through. A **sale** may not follow from one. Measured to the exchange, a 6% position wholly this
+desk's left as `sell:23`; with another manager holding a sealed and **unapproved** 15% BUY on the
+same name it left as `sell:50`, and once that pending total passed the single-name cap it
+liquidated the position — nothing approved, nothing filled, `diagnostics` empty.
+`positionSizing` answers the second fold as `heldOnlyTargetTotalWeight` (with
+`heldOnlyBindingConstraint` beside it), `classifyCase` clamps against that one, and where the two
+disagree the answer carries `reduction_target_ignores_others_pending` with the total that would
+otherwise have gone out. ⚠️ **The buy path is unchanged and still reads `targetTotalWeight`** — a
+pending proposal is exposure for a ceiling and is not a position for an order.
 
 ⚠️ **and the `min` is a ceiling, never a floor** — where you hold more than the sizing target,
 which is what makes a reduction a reduction, it changes nothing and the trim, the resize and the

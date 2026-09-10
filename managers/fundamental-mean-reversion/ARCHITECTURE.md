@@ -306,7 +306,7 @@ total after the outcome is known:
 | role | `hostTargetWeight` | outcomes |
 |---|---|---|
 | `increase` | `otherHeld + targetTotalWeight` — ⛔ `#817` unchanged | `mean-reversion-candidate` |
-| `reduce` | `otherHeld + min(targetTotalWeight, ownHeldWeight)` | the three review outcomes |
+| `reduce` | `otherHeld + min(heldOnlyTargetTotalWeight, ownHeldWeight)` — ⚠️ `#826` moved this term | the three review outcomes |
 | `standstill` | `otherHeld + ownHeld` — what the account holds today | the other ten |
 
 ⛔ **An outcome with no role throws.** «Whatever the sizing answered» is the default this section
@@ -344,6 +344,61 @@ rather than trusted, and a verdict may not leave with a direction that contradic
 (`untilled/aumos#781`), execution does not read attribution (`untilled/aumos#232`), `#786`'s gate
 was not widened (`untilled/aumos#782`), and execution does not refuse an order by reading the
 judgement's word (`untilled/aumos#822`).
+
+## A pending total is a ceiling, and it is not a position (`untilled/aumos#826`)
+
+One layer under `#823`. That fix bounded a reduction by `min(entry ceiling, own holding)`; this
+one is about the entry ceiling. The three book-derived ceilings — single-name, gross, sector —
+are measured against `exposure.otherWeight`, the `max` of what other desks *hold* and what their
+open proposals *ask for* (`aumos-catalogue#275`, `untilled/aumos#813`). That fold is right for
+the buying question: a limit has to hold in every state the account passes through, so an
+unfilled buy counts before it fills.
+
+It is wrong for a sale. Driven through the real host — `shareholder-rerating` sealing a total
+`0.15` BUY that nobody approved and nothing filled, that fund's `portfolio_get` adapted into this
+package's `lib`, and the number it answered run back out to the exchange:
+
+| another desk's **pending** | `targetTotalWeight` | `bindingConstraint` | exchange | `diagnostics` |
+|---|---|---|---|---|
+| none / 0.05 … 0.12 | `0.03623596` | `risk-budget` | `sell:23` | (none) |
+| **0.15** | **`0.01`** | `single-name-headroom` | ⚠️ **`sell:50`** | ⚠️ (none) |
+| **0.30** | **`0`** | `single-name-headroom` | ⚠️ **whole position** | ⚠️ (none) |
+
+⛔ **A proposal that was never approved and never filled trebled a sale out of a position wholly
+this desk's, and then liquidated it.** `#823` is what made the direction visible: before it that
+number sat *above* the holding and left as a purchase; after the `min` clamp it can only go the
+other way, and the clamp is right — the ceiling under it was not.
+
+⚠️ **`shareholder-rerating` already carried this sentence** — *«a pending total is exposure for a
+ceiling and is not a position for an order, so somebody else's unfilled proposal neither creates
+a reduction nor raises the floor»* — and `catalyst-turnaround` does not read the axis at all. Three
+packages, three answers on one axis.
+
+**The fix is a second fold of one list.** `positionSizing` builds its ceilings through
+`ceilingsAgainst(otherName, otherGross, otherSector)` and folds it twice: once against the
+`#813` terms (`targetTotalWeight`, `bindingConstraint`, `ceilings` — ⛔ byte-for-byte unmoved)
+and once against holdings only (`heldOnlyTargetTotalWeight`, `heldOnlyBindingConstraint`,
+`heldOnlyCeilings`). `concentration` gained `grossOtherHeld` and `sectorConcentration` gained
+`heldExposure` / `ownHeldWeight` / `otherHeldWeight`, so **every** axis that reads the book has a
+holdings-only twin rather than only the one the issue happened to drive.
+
+⚠️ **`risk-budget` and `liquidity` read no book, so on an account with no open proposal the two
+folds are the same number** — which is why this change is invisible almost everywhere, and it is
+measured over every sizing fixture rather than asserted.
+
+⚠️ **Said out loud, because the four answers before it were not.**
+`reduction_target_ignores_others_pending` fires whenever the two folds disagree on an outcome
+that reduces, and carries `hostTargetWeightIfPendingFolded` — the order that would otherwise have
+left — beside the one that did. `increasesExposure` (`#821`), `atOrAboveTarget` (`#823`) and
+`exposureDirection` (`#825`) were each quiet at the moment they mattered; an observation nobody
+can measure against what it withheld is a restatement.
+
+⛔ **What is unchanged.** `#813`'s `max` fold still narrows the entry ceiling and
+`bindingConstraint` still reports it — *«how much may this desk add»* is a real question and a
+crowded name is a real answer to it. `#817`'s buy total is still `otherHeld +
+targetTotalWeight`. `#823`'s role table and `min` clamp are untouched. `#819`'s floor and
+withdrawn `SELL` are untouched. And the host does not fold, execution does not read attribution,
+`#786`'s gate was not widened, and no order is refused by reading a judgement's word.
 
 ⬜ `cash-weight` names no asset and so has no position for a role to attach to; this package's
 `PROMPT.md` never asks for one.

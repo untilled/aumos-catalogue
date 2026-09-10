@@ -157,6 +157,24 @@ export function classifyCase(input = {}) {
    * judgement does with it, and no branch reads it directly.
    */
   const entryTargetTotalWeight = finite(sizing?.targetTotalWeight) ? sizing.targetTotalWeight : null
+  /**
+   * ── The same share of this position, measured against positions only (#826) ──
+   *
+   * ⛔ **A pending total is exposure for a ceiling and is not a position for an
+   * order**, so somebody else's unfilled proposal neither creates a reduction
+   * nor enlarges one. `entryTargetTotalWeight`'s book-derived ceilings fold the
+   * `max` of what others hold and what their open proposals ask for
+   * (`aumos-catalogue#275`) — right for the buying question, and until #826 the
+   * clamp below read it for the selling one. Measured to the exchange, a 6%
+   * position wholly this desk's went `sell:23` → `sell:50` → whole position as
+   * another manager's **unapproved** BUY grew, with nothing in the answer
+   * saying so.
+   *
+   * ⚠️ **`null` where the sizing did not answer it**, and never a silent fall
+   * back to the entry total: that fall back *is* the defect, and it would be
+   * reinstated by exactly the sizing answers this build no longer produces.
+   */
+  const heldOnlyTargetTotalWeight = finite(sizing?.heldOnlyTargetTotalWeight) ? sizing.heldOnlyTargetTotalWeight : null
 
   /**
    * ── The one total this answer may hand the host, by what the outcome does (#823) ──
@@ -173,10 +191,11 @@ export function classifyCase(input = {}) {
   const hostTargetWeightFor = (role) => {
     if (ownHeldWeight === null || otherHeldWeight === null) return null
     if (role === 'standstill') return positionWeight
-    if (entryTargetTotalWeight === null) return null
-    if (role === 'increase') return round(otherHeldWeight + entryTargetTotalWeight)
+    /** ⛔ `#817`, unmoved: the entry total is the entry judgement's and no other reads it. */
+    if (role === 'increase') return entryTargetTotalWeight === null ? null : round(otherHeldWeight + entryTargetTotalWeight)
+    if (heldOnlyTargetTotalWeight === null) return null
     /** ⛔ A ceiling and never a floor: `min` cannot raise this desk's share, so a real reduction is untouched. */
-    return round(otherHeldWeight + Math.min(entryTargetTotalWeight, ownHeldWeight))
+    return round(otherHeldWeight + Math.min(heldOnlyTargetTotalWeight, ownHeldWeight))
   }
 
   /**
@@ -232,13 +251,41 @@ export function classifyCase(input = {}) {
     const carriedSizing = extra.sizing && typeof extra.sizing === 'object'
       ? { ...extra.sizing, hostTargetWeight, hostTargetWeightRole: weightRole }
       : extra.sizing
-    if (carriedSizing && weightRole === 'reduce' && entryTargetTotalWeight !== null && ownHeldWeight !== null && entryTargetTotalWeight > ownHeldWeight) {
+    /**
+     * ⚠️ **The clamp reports the number it actually clamps (#826).** Until this
+     * fix that was the entry total; a reduction is now bounded by the held-only
+     * share, and a diagnostic naming the other one would describe an arithmetic
+     * this answer did not do.
+     */
+    if (carriedSizing && weightRole === 'reduce' && heldOnlyTargetTotalWeight !== null && ownHeldWeight !== null && heldOnlyTargetTotalWeight > ownHeldWeight) {
       diagnostics.push(diagnostic(
         'reduction_target_clamped_to_own_holding',
         'info',
-        `This outcome reduces, and the entry arithmetic sized this thesis's share at ${entryTargetTotalWeight} against the ${ownHeldWeight} it holds. Sent as the position's total that is a purchase out of a judgement to reduce, so the total handed to the host is bounded by what this desk holds: ${hostTargetWeight}`,
-        'sizing.targetTotalWeight',
-        { outcome, weightRole, entryTargetTotalWeight, ownHeldWeight, otherHeldWeight, hostTargetWeight },
+        `This outcome reduces, and the arithmetic sized this thesis's share at ${heldOnlyTargetTotalWeight} against the ${ownHeldWeight} it holds. Sent as the position's total that is a purchase out of a judgement to reduce, so the total handed to the host is bounded by what this desk holds: ${hostTargetWeight}`,
+        'sizing.heldOnlyTargetTotalWeight',
+        { outcome, weightRole, heldOnlyTargetTotalWeight, entryTargetTotalWeight, ownHeldWeight, otherHeldWeight, hostTargetWeight },
+      ))
+    }
+    /**
+     * ── The fifth answer in this series that changed a number and said nothing (#826) ──
+     *
+     * ⛔ **`increasesExposure` (#821), `atOrAboveTarget` (#823) and
+     * `exposureDirection` (#825) were all quiet at the moment they mattered**,
+     * and this one was quieter still: an empty `diagnostics` on an answer whose
+     * sale had trebled because a manager on the other side of the fund had
+     * written a proposal nobody approved. So the divergence is said out loud
+     * whenever the two folds disagree on an outcome that reduces, and the total
+     * that *would* have gone to the exchange is carried beside it — an
+     * observation is not one unless a reader can measure what it withheld.
+     */
+    if (carriedSizing && weightRole === 'reduce' && heldOnlyTargetTotalWeight !== null && entryTargetTotalWeight !== null && heldOnlyTargetTotalWeight !== entryTargetTotalWeight) {
+      const foldedPending = round(otherHeldWeight + Math.min(entryTargetTotalWeight, ownHeldWeight))
+      diagnostics.push(diagnostic(
+        'reduction_target_ignores_others_pending',
+        'info',
+        `The ceilings that read the account fold other desks' open proposals in, which sizes this thesis's entry share at ${entryTargetTotalWeight}; measured against holdings alone it is ${heldOnlyTargetTotalWeight}. A pending total is exposure for a ceiling and is not a position for an order, so this reduction is measured against the second: the host is handed ${hostTargetWeight} and not ${foldedPending}${foldedPending === hostTargetWeight ? ', which the holding happens to clamp to the same number here' : ''}`,
+        'sizing.heldOnlyTargetTotalWeight',
+        { outcome, weightRole, entryTargetTotalWeight, heldOnlyTargetTotalWeight, ownHeldWeight, otherHeldWeight, hostTargetWeight, hostTargetWeightIfPendingFolded: foldedPending },
       ))
     }
     if (carriedSizing && weightRole === 'standstill' && hostTargetWeight !== null && entryTargetTotalWeight !== null && hostTargetWeight !== round(otherHeldWeight + entryTargetTotalWeight)) {
