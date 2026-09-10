@@ -292,6 +292,14 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
     grossProposed: round(grossExisting - grossHeld),
     grossExisting,
     grossOther: round(grossExisting - ownWeight),
+    /**
+     * ⚠️ **The gross term's holdings-only twin (#826).** `grossOther` folds
+     * every open proposal on the fund in, which is right for a ceiling on a new
+     * position and wrong for a judgement that reduces one: nobody else's
+     * unfilled proposal may decide how much of its own position this desk sells.
+     * Same split as `otherHeldWeight`, one axis wider.
+     */
+    grossOtherHeld: round(Math.max(0, grossHeld - ownHeldWeight)),
   }
 }
 
@@ -336,6 +344,8 @@ export function sectorConcentration(book, sector, symbol, strategyId = STRATEGY_
   const unclassified = []
   let exposure = 0
   let own = 0
+  let heldExposure = 0
+  let ownHeld = 0
   for (const entry of byName.values()) {
     const folded = round(Math.max(entry.held, entry.pendingPeak))
     if (folded === 0) continue
@@ -345,9 +355,28 @@ export function sectorConcentration(book, sector, symbol, strategyId = STRATEGY_
     }
     if (entry.sector !== sector) continue
     exposure = round(exposure + folded)
-    if (entry.symbol === symbol) own = round(Math.min(folded, Math.max(entry.ownHeld, entry.ownPendingPeak)))
+    heldExposure = round(heldExposure + entry.held)
+    if (entry.symbol === symbol) {
+      own = round(Math.min(folded, Math.max(entry.ownHeld, entry.ownPendingPeak)))
+      ownHeld = round(Math.min(entry.held, entry.ownHeld))
+    }
   }
-  return { sector, exposure: round(exposure), ownWeight: round(own), otherWeight: round(Math.max(0, exposure - own)), unclassified }
+  return {
+    sector,
+    exposure: round(exposure),
+    ownWeight: round(own),
+    otherWeight: round(Math.max(0, exposure - own)),
+    /**
+     * ⚠️ **The same sector, over positions only (#826).** A pending proposal is
+     * sector exposure the moment it is written — a ceiling has to hold in every
+     * state the account passes through — and it is not a position, so it may not
+     * enlarge the sale this desk makes out of its own holding.
+     */
+    heldExposure: round(heldExposure),
+    ownHeldWeight: round(ownHeld),
+    otherHeldWeight: round(Math.max(0, heldExposure - ownHeld)),
+    unclassified,
+  }
 }
 
 /**
@@ -501,7 +530,6 @@ export function positionSizing(input = {}) {
   const sectorCap = finite(mandate.sectorCap) ? mandate.sectorCap : null
   const candidateSector = typeof input.sector === 'string' && input.sector.length > 0 ? input.sector : null
   let sectorExposure = null
-  let headroomSector = null
   if (sectorCap !== null) {
     sectorExposure = sectorConcentration(book, candidateSector, symbol, strategyId)
     if (candidateSector === null || sectorExposure.unclassified.length > 0) {
@@ -517,7 +545,6 @@ export function positionSizing(input = {}) {
       ))
       return { status: 'refused', code: 'data_missing', haircut, exposure, sectorExposure, diagnostics }
     }
-    headroomSector = round(sectorCap - sectorExposure.otherWeight)
   } else {
     diagnostics.push(diagnostic(
       'sector_cap_not_applicable',
@@ -551,22 +578,57 @@ export function positionSizing(input = {}) {
    * as well as at `incrementalWeight` below would charge it twice and shrink a
    * position every time the manager re-ran on it.
    */
-  const headroomSingleName = round(singleNameCap - exposure.otherWeight)
-  const headroomStrategy = strategyCap === null ? null : round(strategyCap - exposure.otherWeight)
-  const headroomGross = round(grossCap - exposure.grossOther)
-
-  const ceilings = [
+  /**
+   * ── One list of ceilings, folded twice, and a pending proposal is what separates them (#826) ──
+   *
+   * ⛔ **A pending total is exposure for a ceiling and is not a position for an
+   * order.** The three book-derived ceilings above are measured against
+   * `otherWeight` — the `max` of what others hold and what their open proposals
+   * ask for (`aumos-catalogue#275`) — and that is right for *«how much may this
+   * desk buy»*: a limit has to hold in every state the account passes through,
+   * so somebody's unfilled buy counts before it fills.
+   *
+   * It is the wrong number for *«how much should this desk sell»*. Until #826
+   * there was one fold and `classifyCase`'s `reduce` role clamped this desk's
+   * share against it, so an entry ceiling narrowed by a proposal nobody had
+   * approved became a **larger sale**: measured to the exchange, a 6% position
+   * wholly this desk's went from `sell:23` to `sell:50` when another manager
+   * sealed an unapproved 15% BUY on the same name, and to the whole position
+   * when the pending total passed the cap. `shareholder-rerating` already
+   * carried the sentence this closes; this package did not.
+   *
+   * ⚠️ **So the two ceilings that read no book fold identically and the three
+   * that do are re-measured against holdings.** `risk-budget` and `liquidity`
+   * are properties of the thesis and the tape, so the held-only fold is
+   * frequently the entry fold — which is exactly why an empty book, the common
+   * case, is a byte-for-byte identity.
+   */
+  const ceilingsAgainst = (otherName, otherGross, otherSector) => [
     { name: 'risk-budget', value: riskWeight },
     { name: 'liquidity', value: liquidityCap },
-    { name: 'single-name-headroom', value: headroomSingleName },
-    { name: 'strategy-headroom', value: headroomStrategy },
-    { name: 'gross-headroom', value: headroomGross },
-    { name: 'sector-headroom', value: headroomSector },
+    { name: 'single-name-headroom', value: round(singleNameCap - otherName) },
+    { name: 'strategy-headroom', value: strategyCap === null ? null : round(strategyCap - otherName) },
+    { name: 'gross-headroom', value: round(grossCap - otherGross) },
+    { name: 'sector-headroom', value: otherSector === null ? null : round(sectorCap - otherSector) },
   ].filter((row) => finite(row.value))
+  const foldCeilings = (rows) => {
+    const lowest = rows.reduce((best, row) => (best === null || row.value < best.value ? row : best), null)
+    return { binding: lowest, total: lowest ? round(Math.max(lowest.value, 0)) : 0 }
+  }
 
-  const binding = ceilings.reduce((lowest, row) => (lowest === null || row.value < lowest.value ? row : lowest), null)
-  /** *«The whole position should be this.»* */
-  const targetTotalWeight = binding ? round(Math.max(binding.value, 0)) : 0
+  const ceilings = ceilingsAgainst(
+    exposure.otherWeight,
+    exposure.grossOther,
+    sectorCap === null || sectorExposure === null ? null : sectorExposure.otherWeight,
+  )
+  const heldOnlyCeilings = ceilingsAgainst(
+    exposure.otherHeldWeight,
+    exposure.grossOtherHeld,
+    sectorCap === null || sectorExposure === null ? null : sectorExposure.otherHeldWeight,
+  )
+
+  const { binding, total: targetTotalWeight } = foldCeilings(ceilings)
+  const { binding: heldOnlyBinding, total: heldOnlyTargetTotalWeight } = foldCeilings(heldOnlyCeilings)
   /** *«Buy this much more today.»* Never negative: a reduction is an exit decision. */
   const incrementalWeight = round(Math.max(targetTotalWeight - exposure.ownWeight, 0))
   const atOrAboveTarget = targetTotalWeight > 0 && incrementalWeight === 0
@@ -587,6 +649,28 @@ export function positionSizing(input = {}) {
     sectorExposure,
     ceilings,
     bindingConstraint: binding?.name ?? null,
+    /**
+     * ── The same fold with nobody's unfilled proposal in it (#826) ──────────
+     *
+     * ⛔ **`classifyCase`'s `reduce` role is the only consumer, and the entry
+     * path does not read this.** `#813` folds pending totals into every
+     * book-derived ceiling and that judgement stands for the buying question;
+     * what may not follow from it is a sale. A judgement to reduce is bounded
+     * by what this desk *holds* — `hostTargetWeight = otherHeld +
+     * min(heldOnlyTargetTotalWeight, ownHeldWeight)` — so a proposal that was
+     * never approved and never filled neither creates a reduction nor enlarges
+     * one.
+     *
+     * ⚠️ **Published rather than folded in here, because the two answer
+     * different questions and both are true.** A caller that wants to know why
+     * this desk may buy so little reads `bindingConstraint`; one that wants to
+     * know what a reduction is measured against reads
+     * `heldOnlyBindingConstraint`. Collapsing them would be the single number
+     * without a judgement that `#823` is about, one axis over.
+     */
+    heldOnlyCeilings,
+    heldOnlyBindingConstraint: heldOnlyBinding?.name ?? null,
+    heldOnlyTargetTotalWeight,
     /**
      * ⚠️ **Two weights and two meanings, always both present.** One field doing
      * both jobs is a proposal the host executes wrongly in one of its two

@@ -129,6 +129,7 @@ the current price — that is a finding about the target, not a reason to widen 
 | `targetTotalWeight` | the whole position should be this |
 | `incrementalWeight` | buy this much more today |
 | `atOrAboveTarget` | the second is zero because the position is already complete |
+| `heldOnlyTargetTotalWeight` | the same share with the book-derived ceilings measured against **holdings** only — no open proposal of another desk in it. ⛔ What a reduction is clamped against (#826); `heldOnlyBindingConstraint` says which ceiling bound it |
 | `hostTargetWeight` | ⛔ **the entry total only** — `otherHeldWeight + targetTotalWeight`, «what the position becomes if this desk buys up to its share». `hostTargetWeightRole` on the same answer says `increase`, because this operation is reached before any judgement is known |
 
 ⛔ **Take the total from `classifyCase`, never from here, whenever an outcome has been
@@ -206,10 +207,16 @@ four diagnosis codes or `null`.
 | `exposureDirection` | that total against `positionWeight`: `increase`, `reduce`, `unchanged` |
 
 ⛔ **A reduction is bounded by what this desk holds (#823).** On the `reduce` role the total is
-`otherHeldWeight + min(targetTotalWeight, ownHeldWeight)`, so a review reached while the
+`otherHeldWeight + min(heldOnlyTargetTotalWeight, ownHeldWeight)`, so a review reached while the
 position is still being staged in asks for the holding rather than for the entry target — which
 over a 2% holding was a `buy:16` out of a `TRIM`. The clamp is a ceiling and never a floor: a
-holding above the target reduces exactly as it always did. On `standstill` the total is what the
+holding above the target reduces exactly as it always did.
+
+⛔ **And the share it clamps against ignores other desks' open proposals (#826).** A pending
+total is exposure for a ceiling and is not a position for an order, so somebody's unfilled buy
+narrows what you may *add* and never enlarges what you *sell*: on a 6% position wholly this
+desk's, another manager's unapproved 15% BUY on the same name took the order from `sell:23` to
+`sell:50`, and past the cap to the whole position. On `standstill` the total is what the
 account holds today, because an outcome that changes nothing proposes no change. `null`
 throughout means the account was not folded — hand the `sizing` answer in, or propose no weight.
 
