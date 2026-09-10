@@ -33,7 +33,7 @@
  * policy). `structural-earnings-damage` is reached **only** with evidence ids
  * behind it; the same claim with nothing behind it is `research-incomplete`.
  */
-import { DIAGNOSIS_CODES, OUTCOMES, VERDICT_ACTIONS, diagnostic, finite } from './core.mjs'
+import { DIAGNOSIS_CODES, OUTCOMES, OUTCOME_WEIGHT_ROLES, VERDICT_ACTIONS, diagnostic, finite, round } from './core.mjs'
 import { adjustmentBasis, discoveryState, normalizeBars, technicalState } from './prices.mjs'
 import { stabilisation as stabilisationTest } from './stabilisation.mjs'
 
@@ -141,6 +141,43 @@ export function classifyCase(input = {}) {
   const hostTargetWeightFloor = otherHeldWeight
   /** Held, and none of it this desk's: there is nothing here for this run to reduce. */
   const positionIsWhollyAnothers = ownHeldWeight === 0 && otherHeldWeight !== null && otherHeldWeight > 0
+  /**
+   * ⚠️ **What the account holds in this name, whoever runs it** — the quantity
+   * the host's `position-weight` target is executed against
+   * (`untilled/aumos#815`). `ownHeldWeight` is this desk's share of it and the
+   * two must not be read for each other: on an unattributed 6% the first is 0
+   * and the second is 0.06.
+   */
+  const positionWeight = ownHeldWeight === null || otherHeldWeight === null ? null : round(ownHeldWeight + otherHeldWeight)
+  /**
+   * ⛔ **The entry arithmetic, under a name that says so (#823).** Every ceiling
+   * that produced it is «the cap less what other strategies hold», so it is what
+   * this desk may *hold* — an answer to the buying question, computed before any
+   * judgement was reached. `hostTargetWeightFor` below decides what each
+   * judgement does with it, and no branch reads it directly.
+   */
+  const entryTargetTotalWeight = finite(sizing?.targetTotalWeight) ? sizing.targetTotalWeight : null
+
+  /**
+   * ── The one total this answer may hand the host, by what the outcome does (#823) ──
+   *
+   * `OUTCOME_WEIGHT_ROLES` is the table and `lib/core.mjs` carries the argument
+   * for it. What matters here is that the number is chosen **after** the outcome
+   * is known and never before, because the defect this closes was one number
+   * computed without a judgement and then attached to any of them.
+   *
+   * ⚠️ **`null` is «the account was not folded», exactly as it is for the floor.**
+   * A review reached with no sizing answer knows no attribution, and inventing a
+   * `0` there would read as «nobody else holds this».
+   */
+  const hostTargetWeightFor = (role) => {
+    if (ownHeldWeight === null || otherHeldWeight === null) return null
+    if (role === 'standstill') return positionWeight
+    if (entryTargetTotalWeight === null) return null
+    if (role === 'increase') return round(otherHeldWeight + entryTargetTotalWeight)
+    /** ⛔ A ceiling and never a floor: `min` cannot raise this desk's share, so a real reduction is untouched. */
+    return round(otherHeldWeight + Math.min(entryTargetTotalWeight, ownHeldWeight))
+  }
 
   /**
    * ⛔ **An `exit` is a real `0` and bypasses every weight computed above.** So
@@ -166,6 +203,53 @@ export function classifyCase(input = {}) {
   const answer = (outcome, verdict, code, extra = {}) => {
     if (!OUTCOMES.includes(outcome)) throw new Error(`unknown outcome ${outcome}`)
     if (code !== null && !DIAGNOSIS_CODES.includes(code)) throw new Error(`unknown diagnosis code ${code}`)
+    /**
+     * ⛔ **An outcome with no role throws.** A default would be a fourteenth
+     * branch nobody wrote down, and «whatever the sizing answered» is the
+     * default that #823 is about.
+     */
+    const weightRole = OUTCOME_WEIGHT_ROLES[outcome]
+    if (weightRole === undefined) throw new Error(`no weight role for outcome ${outcome}`)
+    const hostTargetWeight = hostTargetWeightFor(weightRole)
+    /**
+     * ⚠️ **Measured, not restated.** `catalyst-turnaround` carried an
+     * `increasesExposure` that was the intent said a second time, and it read
+     * `false` on an answer that bought. This is the comparison of the two
+     * numbers this answer actually carries and nothing else, so a total that
+     * disagrees with the judgement is visible in the answer itself.
+     */
+    const exposureDirection = hostTargetWeight === null || positionWeight === null
+      ? null
+      : hostTargetWeight > positionWeight ? 'increase' : hostTargetWeight < positionWeight ? 'reduce' : 'unchanged'
+    /**
+     * ⛔ **One field named `hostTargetWeight` in the whole answer, and it is the
+     * role's.** The review branch carries the `sizing` answer (#819) and that
+     * answer carries `positionSizing`'s entry-direction total under the same
+     * name; two numbers with one name is how a reduction sent a purchase. The
+     * entry arithmetic is not hidden — it stays on `targetTotalWeight`, under
+     * the name that says whose share it is.
+     */
+    const carriedSizing = extra.sizing && typeof extra.sizing === 'object'
+      ? { ...extra.sizing, hostTargetWeight, hostTargetWeightRole: weightRole }
+      : extra.sizing
+    if (carriedSizing && weightRole === 'reduce' && entryTargetTotalWeight !== null && ownHeldWeight !== null && entryTargetTotalWeight > ownHeldWeight) {
+      diagnostics.push(diagnostic(
+        'reduction_target_clamped_to_own_holding',
+        'info',
+        `This outcome reduces, and the entry arithmetic sized this thesis's share at ${entryTargetTotalWeight} against the ${ownHeldWeight} it holds. Sent as the position's total that is a purchase out of a judgement to reduce, so the total handed to the host is bounded by what this desk holds: ${hostTargetWeight}`,
+        'sizing.targetTotalWeight',
+        { outcome, weightRole, entryTargetTotalWeight, ownHeldWeight, otherHeldWeight, hostTargetWeight },
+      ))
+    }
+    if (carriedSizing && weightRole === 'standstill' && hostTargetWeight !== null && entryTargetTotalWeight !== null && hostTargetWeight !== round(otherHeldWeight + entryTargetTotalWeight)) {
+      diagnostics.push(diagnostic(
+        'standstill_total_is_the_position_as_held',
+        'info',
+        `This outcome changes no position, so the total it hands the host is what the account holds in this name today (${hostTargetWeight}) and not the entry arithmetic's ${round(otherHeldWeight + entryTargetTotalWeight)}. A weight that moves the position is not a by-product of an answer that decided not to move it`,
+        'sizing.hostTargetWeight',
+        { outcome, weightRole, entryTargetTotalWeight, positionWeight, hostTargetWeight },
+      ))
+    }
     return {
       outcome,
       verdict,
@@ -179,6 +263,18 @@ export function classifyCase(input = {}) {
       ownHeldWeight,
       /** Holdings of this name that are **not** this manager's — another's, and every unattributed one. */
       otherHeldWeight,
+      /** What the account holds in this name whoever runs it — the quantity the host's target is executed against. */
+      positionWeight,
+      /** What this outcome asks the position to do: `increase`, `reduce` or `standstill` (#823). */
+      weightRole,
+      /**
+       * ⛔ **The `position-weight` total this answer may hand the host**, chosen
+       * by `weightRole` and never by the sizing alone. `null` where the account
+       * was not folded.
+       */
+      hostTargetWeight,
+      /** `hostTargetWeight` against `positionWeight`, recomputed rather than restated. */
+      exposureDirection,
       /**
        * ⛔ **No `position-weight` total this run hands the host may be below
        * this (#819).** A close-out of this thesis *is* this number; `0` — the
@@ -200,6 +296,8 @@ export function classifyCase(input = {}) {
       requiredOutputs: requiredOutputs(input, { technical: state, stabilisation: extra.stabilisation ?? null }),
       diagnostics,
       ...extra,
+      /** ⛔ After `extra`, because the sizing that leaves here is the role's and never the raw one (#823). */
+      ...(extra.sizing === undefined ? {} : { sizing: carriedSizing }),
     }
   }
 

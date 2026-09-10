@@ -623,8 +623,20 @@ export function positionSizing(input = {}) {
      * `otherHeldWeight` is 0, this number *is* `targetTotalWeight`, and a target
      * below the holding sends the trim it always sent. What it can no longer do
      * is trim somebody else's.
+     *
+     * ⛔ **And it is the total of one judgement only: «add up to this desk's
+     * share» (#823).** Every ceiling above is an entry ceiling, so this sum
+     * answers the buying question and nothing else — this function is reached
+     * before any outcome is known and cannot know which judgement will carry it.
+     * `classifyCase` decides that (`OUTCOME_WEIGHT_ROLES`) and replaces this
+     * field on the answer it publishes; a caller reading this one on a reduction
+     * is reading an entry target, which over a holding smaller than the share is
+     * a **purchase**. `hostTargetWeightRole` says which judgement this number is
+     * for, so the two can never be taken for each other on the wire.
      */
     hostTargetWeight: round(exposure.otherHeldWeight + targetTotalWeight),
+    /** ⛔ The judgement the total above is for. This function only ever answers the entry one. */
+    hostTargetWeightRole: 'increase',
     /** The cumulative staged target: the whole position, not the rung. Same number as `targetTotalWeight`, under the name the staged plan uses. */
     plannedTotalWeight: targetTotalWeight,
     /** What the book loses if the whole position is held and reaches invalidation. */

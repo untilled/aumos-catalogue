@@ -129,6 +129,13 @@ the current price — that is a finding about the target, not a reason to widen 
 | `targetTotalWeight` | the whole position should be this |
 | `incrementalWeight` | buy this much more today |
 | `atOrAboveTarget` | the second is zero because the position is already complete |
+| `hostTargetWeight` | ⛔ **the entry total only** — `otherHeldWeight + targetTotalWeight`, «what the position becomes if this desk buys up to its share». `hostTargetWeightRole` on the same answer says `increase`, because this operation is reached before any judgement is known |
+
+⛔ **Take the total from `classifyCase`, never from here, whenever an outcome has been
+reached.** `positionSizing` cannot know which judgement will carry its number; on a reduction
+over a holding smaller than the share the entry total is a **purchase** (#823). `classifyCase`
+answers `hostTargetWeight`, `weightRole` and `exposureDirection`, and replaces the field on the
+`sizing` it carries so that one answer never holds two totals under one name.
 
 ⛔ Never carry one of them into a proposal as though it were the other. With nothing held they
 are equal, which is exactly why one field looked sufficient — and why the run that already held
@@ -185,6 +192,26 @@ four diagnosis codes or `null`.
   "sizing": { }
 } }
 ```
+
+**The answer's weights, and which of them a proposal carries:**
+
+| field | means |
+|---|---|
+| `ownHeldWeight` | what is **held** in this name and assigned to this manager |
+| `otherHeldWeight` | what is held and is not — another manager's, and every unattributed row |
+| `positionWeight` | what the account holds in the name, whoever runs it |
+| `hostTargetWeightFloor` | `otherHeldWeight`: no total you send may be below it (#819) |
+| `weightRole` | what this outcome asks the position to do — `increase`, `reduce`, `standstill` |
+| `hostTargetWeight` | ⛔ **the one total this answer may hand the host**, chosen by the role |
+| `exposureDirection` | that total against `positionWeight`: `increase`, `reduce`, `unchanged` |
+
+⛔ **A reduction is bounded by what this desk holds (#823).** On the `reduce` role the total is
+`otherHeldWeight + min(targetTotalWeight, ownHeldWeight)`, so a review reached while the
+position is still being staged in asks for the holding rather than for the entry target — which
+over a 2% holding was a `buy:16` out of a `TRIM`. The clamp is a ceiling and never a floor: a
+holding above the target reduces exactly as it always did. On `standstill` the total is what the
+account holds today, because an outcome that changes nothing proposes no change. `null`
+throughout means the account was not folded — hand the `sizing` answer in, or propose no weight.
 
 `requiredOutputs` in the answer is the checklist of what a finished run owes. A `false` there
 is a paragraph you have not written; a `null` is a step you have not reached yet.
