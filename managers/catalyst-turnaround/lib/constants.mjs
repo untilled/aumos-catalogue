@@ -191,6 +191,15 @@ export const CASE_CLASSES = Object.freeze([
  *   `reduce-on-invalidation` a declared business invalidation condition fired
  *   `resize-to-risk-limit`   the thesis stands; the balance sheet no longer funds it
  *   `exit-review`            the deadline arrived — adjudicate against the benchmark
+ *
+ * ⚠️ **`reduction-not-this-desks` is the thirteenth, and it is a reduction that
+ * did not happen (`untilled/aumos#821`).** A rung reached one of the four above
+ * over a position **none of which is this desk's** — every share of it another
+ * manager's, or assigned to nobody at all. The review still stands and is still
+ * armed; what is withdrawn is the word that moves money, because there is
+ * nothing here for this desk to reduce. It is the sibling of
+ * `fundamental-mean-reversion`'s `["WATCH"]` and `shareholder-rerating`'s
+ * `WAIT` (`aumos-catalogue#278`), said in this package's vocabulary.
  */
 export const INTENTS = Object.freeze([
   'enter-staged',
@@ -202,7 +211,52 @@ export const INTENTS = Object.freeze([
   'resize-to-risk-limit',
   'exit-review',
   'close-out',
+  'reduction-not-this-desks',
   'research-watch',
   'blocked-by-account-limit',
   'wait-for-data',
 ])
+
+/**
+ * ── What each intent asks the **position** to become (`untilled/aumos#821`) ──
+ *
+ * ⛔ **This table is the one that decides `hostTargetWeight`, and before #821
+ * there was no table.** Every intent but `close-out` handed the host
+ * `otherHeldWeight + cumulativeTargetWeight` — the weight a *purchase* would
+ * target — whatever the judgement above it had decided. Over a 6% holding
+ * assigned to nobody that turned `trim-into-realisation` into `buy:16`,
+ * `reduce-on-invalidation` into `buy:39` and `resize-to-risk-limit` into
+ * `buy:60`; `hold-through-delay` bought on a wholly-own position, and
+ * `exit-review` — a rung whose entire content is «adjudicate before deciding
+ * anything else» — handed over a `0` and liquidated the name.
+ *
+ * | role | `hostTargetWeight` is | why |
+ * |---|---|---|
+ * | `increase` | `otherHeldWeight + cumulativeTargetWeight` | #817's addition, unchanged |
+ * | `reduce` | `otherHeldWeight + min(cumulativeTargetWeight, ownHeldWeight)` | a reduction happens **inside this desk's own share**. It may take that share down; it may never take it up, and it may never touch anybody else's |
+ * | `close` | `otherHeldWeight` | this desk's share to zero and no further (#817) |
+ * | `standstill` | `otherHeldWeight + ownHeldWeight` — what the account holds now | the rung's own prose is «nothing is added and nothing is closed». The number now says the same thing |
+ *
+ * ⚠️ **`standstill` is not «no answer».** The weight is stated rather than left
+ * `null`, because `null` already means «the book was not read» and one word may
+ * not carry two states. A target equal to the holding is what «unchanged» is in
+ * the only language the host speaks.
+ */
+export const INTENT_WEIGHT_ROLES = Object.freeze({
+  'enter-staged': 'increase',
+  'add-next-stage': 'increase',
+  hold: 'standstill',
+  'hold-through-delay': 'standstill',
+  'trim-into-realisation': 'reduce',
+  'reduce-on-invalidation': 'reduce',
+  'resize-to-risk-limit': 'reduce',
+  'exit-review': 'standstill',
+  'close-out': 'close',
+  'reduction-not-this-desks': 'standstill',
+  'research-watch': 'standstill',
+  'blocked-by-account-limit': 'standstill',
+  'wait-for-data': 'standstill',
+})
+
+/** The roles above, as a closed set — a fourteenth intent with no role is a defect a check catches. */
+export const INTENT_WEIGHT_ROLE_NAMES = Object.freeze(['increase', 'reduce', 'close', 'standstill'])

@@ -49,6 +49,8 @@ import {
   CAUSE_CODES,
   CATALYST_TRANSITIONS,
   INTENTS,
+  INTENT_WEIGHT_ROLES,
+  INTENT_WEIGHT_ROLE_NAMES,
   METHODOLOGY,
   TERMINAL_STATES,
   accountConcentration,
@@ -791,7 +793,7 @@ check('the cumulative target and the increment are two different numbers', () =>
   const entry = runVerdict(positive.input)
   assert.equal(entry.data.intent, 'enter-staged')
   assert.equal(entry.data.cumulativeTargetWeight, 0.12, 'the cumulative target is what the sizing produced')
-  assert.equal(entry.data.currentWeight, 0, 'the book holds none of it')
+  assert.equal(entry.data.ownHeldWeight, 0, 'the book holds none of it')
   assert.equal(entry.data.incrementThisRun, 0.12, 'with no staged plan the increment is the whole gap')
   assert.equal(entry.data.weightMeanings.cumulativeTargetWeight, 'this-strategys-share-of-the-position')
   assert.equal(entry.data.weightMeanings.incrementThisRun, 'weight-added-this-run')
@@ -839,7 +841,7 @@ check('#817 — the weight handed to the host carries the part of the position t
     [{ symbol: 'A00007', weight: undefined, targetWeight: 0.12, strategy: 'inst_shareholder_rerating' }],
   ))
   assert.equal(unattributed.intent, 'enter-staged', 'the run reaching the wire is a purchase')
-  assert.equal(unattributed.currentWeight, 0, 'a holding assigned to nobody was read as this desk\'s')
+  assert.equal(unattributed.ownHeldWeight, 0, 'a holding assigned to nobody was read as this desk\'s')
   assert.equal(unattributed.otherHeldWeight, 0.06, 'a holding assigned to nobody was not carried as somebody else\'s')
   assert.equal(unattributed.concentration.rows[0].total, 0.12, 'the ceiling axis still folds the pending total in')
   assert.equal(unattributed.hostTargetWeight, round(0.06 + unattributed.cumulativeTargetWeight), 'the weight handed to the host sold a holding nobody asked to sell')
@@ -911,6 +913,265 @@ check('the modules themselves distinguish read-and-empty from unread', () => {
   const capUnread = accountConcentration({ positions: [], proposals: [], caps: {}, strategy: 'catalyst-turnaround' })
   assert.equal(capUnread.data.readable, false, 'an unread account cap fell back to this package’s own ceiling')
   assert.ok(has(capUnread.causes, 'data_missing'))
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7b. #821 — the reduction direction, and the field that made it quiet.
+//
+// `#817` put the addition on the **buying** side and `aumos-catalogue#278` put
+// it on the selling side of the other two packages. It read `close-out` here,
+// found it safe, and left this package alone — but `close-out` is safe **by
+// accident**: its own share is `0`, so `otherHeld + 0` happens to equal what the
+// account holds. The three reduction intents whose share is not zero handed the
+// host `otherHeld + (the weight a purchase would target)`, which over a 6%
+// holding assigned to nobody is `buy:16`, `buy:39` and `buy:60`.
+//
+// ⚠️ **And the answer said the opposite in the same object.**
+// `increasesExposure` was `intent === 'enter-staged' || 'add-next-stage'` — the
+// intent restated, never the weight measured — so it answered `false` beside a
+// `hostTargetWeight` 1.7pp above the holding. That is why 111 checks were green
+// over a defect that doubles a position.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CAPS = { accountSingleName: 0.2 }
+const bookOf = (symbol, assignee) => ({
+  positions: assignee === 'none'
+    ? [{ symbol, weight: 0.06 }]
+    : [{ symbol, weight: 0.06, ...(assignee === 'unassigned-row' ? {} : { strategy: assignee }) }],
+  proposals: [],
+  caps: CAPS,
+})
+
+/** The same run, re-booked: 6% of the name held by this desk, by nobody, or by another manager. */
+const ASSIGNEES = [
+  { name: 'mine', strategy: 'catalyst-turnaround' },
+  { name: 'unattributed', strategy: 'none' },
+  { name: 'theirs', strategy: 'inst_shareholder_rerating' },
+]
+
+const REDUCTIONS = [
+  { case: 'catalyst-realised-and-priced-in', intent: 'trim-into-realisation' },
+  { case: 'receivable-re-growth-fires-a-declared-invalidation', intent: 'reduce-on-invalidation' },
+  { case: 'refinancing-deterioration', intent: 'resize-to-risk-limit' },
+  { case: 'catalyst-cancelled', intent: 'close-out' },
+]
+
+const rebooked = (name, assignee) => {
+  const input = structuredClone(cases.cases.find((item) => item.name === name).input)
+  input.book = bookOf(input.symbol, assignee)
+  return runVerdict(input)
+}
+
+/**
+ * ⑴ The measurement the issue made, one row at a time. **The number that leaves
+ * may never buy what this desk did not ask to buy**, and over a position none of
+ * which is this desk's the reduction is withdrawn rather than repriced.
+ */
+check('#821 — a reduction over a position this desk does not run buys nothing and says so', () => {
+  for (const reduction of REDUCTIONS) {
+    for (const assignee of ASSIGNEES) {
+      const result = rebooked(reduction.case, assignee.strategy)
+      const data = result.data
+      const where = `#821 → ${reduction.intent} → ${assignee.name}`
+
+      assert.equal(data.positionWeight, 0.06, `${where}: the account holds 6% of the name whoever runs it`)
+      assert.ok(
+        data.hostTargetWeight <= data.positionWeight + 1e-9,
+        `${where}: a reduction handed the host ${data.hostTargetWeight} against a holding of ${data.positionWeight} — the intent says sell and the order buys`,
+      )
+      assert.notEqual(data.exposureDirection, 'increase', `${where}: exposureDirection`)
+      assert.equal(data.increasesExposure, false, `${where}: increasesExposure`)
+
+      if (assignee.name === 'mine') {
+        // ⛔ #782: the desk that runs the position still reduces it. Nothing here may turn that into a no-op.
+        assert.equal(data.intent, reduction.intent, `${where}: this desk's own reduction was withdrawn`)
+        assert.equal(data.ownHeldWeight, 0.06)
+        assert.equal(data.otherHeldWeight, 0)
+        assert.equal(data.exposureDirection, reduction.intent === 'resize-to-risk-limit' ? 'unchanged' : 'reduce', `${where}: exposureDirection`)
+        assert.ok(!has(result.diagnostics, 'held_position_is_not_this_desks'), `${where}: this desk's own position was reported as somebody else's`)
+        continue
+      }
+
+      assert.equal(data.ownHeldWeight, 0, `${where}: ownHeldWeight`)
+      assert.equal(data.otherHeldWeight, 0.06, `${where}: otherHeldWeight`)
+      assert.equal(data.intent, 'reduction-not-this-desks', `${where}: the reduction stood over a position none of which is this desk's`)
+      assert.equal(data.hostTargetWeight, 0.06, `${where}: the weight that leaves moves a position this desk does not run`)
+      assert.equal(data.exposureDirection, 'unchanged', `${where}: exposureDirection`)
+      assert.ok(has(result.diagnostics, 'held_position_is_not_this_desks'), `${where}: nothing said why the reduction did not go out`)
+
+      /**
+       * ⛔ **The withdrawal is not an absence** (`aumos-catalogue#278`,
+       * `untilled/aumos#782`). The book was read and it said something
+       * definite; calling it `data_missing` would make every holding bought by
+       * hand in a broker app un-reviewable.
+       */
+      assert.ok(!has(result.causes, 'data_missing'), `${where}: a position that was read was reported as unread`)
+      const withdrawn = result.diagnostics.find((entry) => entry.code === 'held_position_is_not_this_desks')
+      assert.equal(withdrawn.severity, 'note', `${where}: the withdrawal was reported as a defect in an input`)
+      assert.equal(withdrawn.details.intentBeforeWithdrawal, reduction.intent, `${where}: the answer does not say which judgement was withdrawn`)
+
+      /** ⚠️ The review is the judgement, and the judgement still stands. */
+      const own = rebooked(reduction.case, 'catalyst-turnaround').data
+      assert.equal(data.review.name, own.review.name, `${where}: the review was withdrawn along with the order`)
+      assert.equal(data.review.atEpochMs, own.review.atEpochMs, `${where}: the review is no longer armed`)
+      assert.equal(data.review.benchmarkComparisonRequired, own.review.benchmarkComparisonRequired, `${where}: the benchmark comparison was dropped`)
+    }
+  }
+})
+
+/**
+ * ⑵ **The rule the four rows above are four instances of.** Every answer this
+ * package can produce, over every attribution, is asked one question: does the
+ * weight that leaves do what the word says?
+ *
+ * ⛔ This is the check that would have caught the defect. It reads only the two
+ * published numbers, so a future rung, a future intent or a future edit to the
+ * arithmetic fails here rather than at an exchange.
+ */
+check('#821 — the word and the number agree, on every case and every attribution', () => {
+  const books = [
+    ['mine', (symbol) => bookOf(symbol, 'catalyst-turnaround')],
+    ['unattributed', (symbol) => bookOf(symbol, 'none')],
+    ['theirs', (symbol) => bookOf(symbol, 'inst_shareholder_rerating')],
+    ['empty', () => ({ positions: [], proposals: [], caps: CAPS })],
+    ['unread', () => ({ proposals: [], caps: CAPS })],
+  ]
+  for (const item of cases.cases) {
+    for (const [label, make] of books) {
+      const input = structuredClone(item.input)
+      input.book = make(input.symbol)
+      const data = runVerdict(input).data
+      const where = `#821 → ${item.name} → ${label}`
+
+      const role = INTENT_WEIGHT_ROLES[data.intent]
+      assert.ok(role !== undefined, `${where}: ${data.intent} has no weight role`)
+
+      /** ⚠️ `increasesExposure` is the two numbers compared, and this recomputes it from them. */
+      const measured = typeof data.hostTargetWeight === 'number' && typeof data.positionWeight === 'number'
+        ? (data.hostTargetWeight > data.positionWeight + 1e-9 ? 'increase' : data.hostTargetWeight < data.positionWeight - 1e-9 ? 'reduce' : 'unchanged')
+        : null
+      assert.equal(data.exposureDirection, measured, `${where}: exposureDirection was restated rather than measured`)
+      assert.equal(data.increasesExposure, measured === 'increase', `${where}: increasesExposure disagrees with the weight that leaves`)
+
+      if (data.hostTargetWeight === null) continue
+      if (role === 'reduce' || role === 'close') {
+        assert.ok(data.hostTargetWeight <= data.positionWeight + 1e-9, `${where}: ${data.intent} handed the host ${data.hostTargetWeight} over a holding of ${data.positionWeight}`)
+        assert.ok(data.hostTargetWeight >= data.otherHeldWeight - 1e-9, `${where}: ${data.intent} reduced past this desk's own share and into somebody else's`)
+      }
+      if (role === 'standstill') {
+        assert.equal(data.hostTargetWeight, data.positionWeight, `${where}: ${data.intent} changes nothing and asked the host for ${data.hostTargetWeight} against a holding of ${data.positionWeight}`)
+      }
+      if (role === 'increase') {
+        assert.equal(data.hostTargetWeight, round(data.otherHeldWeight + data.cumulativeTargetWeight), `${where}: #817's addition no longer holds on the buying side`)
+      }
+    }
+  }
+})
+
+/**
+ * ⑶ **`increasesExposure` is measured, not restated**, and here is an input
+ * where the two answers differ: a due stage on a plan whose cumulative target
+ * sits **below** what the book already holds. The intent is a purchase — the
+ * stage fires and this desk adds 4pp of its own — and the weight that leaves is
+ * a reduction of the position.
+ *
+ * ⛔ Restating the intent answers `true` here. Measuring the weight answers
+ * `false`, and `false` is what the host will do.
+ */
+check('#821 — increasesExposure measures the weight that leaves rather than restating the intent', () => {
+  const input = structuredClone(positive.input)
+  input.held = true
+  input.plan = structuredClone(staging.plan)
+  input.book = { positions: [{ symbol: input.symbol, strategy: 'catalyst-turnaround', weight: 0.15 }], proposals: [], caps: CAPS }
+  const data = runVerdict(input).data
+
+  assert.equal(data.intent, 'add-next-stage', 'the fixture no longer reaches the staged-add rung')
+  assert.equal(data.incrementThisRun, 0.04, 'the stage that came due')
+  assert.equal(data.addsToThisDesksShare, true, 'this run does add to this desk’s share, and the old field name was true of that')
+  assert.equal(data.positionWeight, 0.15)
+  assert.equal(data.hostTargetWeight, 0.12, 'the weight that leaves is the plan’s cumulative target')
+  assert.equal(data.exposureDirection, 'reduce')
+  assert.equal(data.increasesExposure, false, 'the intent was restated instead of the weight being measured — the answer says buy and the host reduces')
+})
+
+/**
+ * ⑷ **A share of the name, not all of it.** The clamp is a ceiling on the
+ * reduction target and never a floor: a desk holding part of a position reduces
+ * **its** part, down to what the arithmetic asks for and no further into
+ * anybody else's.
+ */
+check('#821 — a desk reduces its own share of a shared position and no more', () => {
+  const shared = structuredClone(cases.cases.find((item) => item.name === 'catalyst-realised-and-priced-in').input)
+  shared.book = {
+    positions: [
+      { symbol: shared.symbol, strategy: 'catalyst-turnaround', weight: 0.05 },
+      { symbol: shared.symbol, strategy: 'inst_fundamental_mean_reversion', weight: 0.04 },
+    ],
+    proposals: [],
+    caps: CAPS,
+  }
+  const data = runVerdict(shared).data
+  assert.equal(data.intent, 'trim-into-realisation', 'a desk that runs part of the name still trims it')
+  assert.equal(data.ownHeldWeight, 0.05)
+  assert.equal(data.otherHeldWeight, 0.04)
+  assert.equal(data.positionWeight, 0.09)
+  assert.equal(data.hostTargetWeight, round(0.04 + data.cumulativeTargetWeight), 'the trim left this desk’s share and reached into the other manager’s')
+  assert.equal(data.exposureDirection, 'reduce', 'a real trim stopped leaving')
+
+  /** …and where the sizing asks for **more** than this desk holds, a trim does not become a purchase. */
+  const overSized = structuredClone(shared)
+  overSized.book.positions[0].weight = 0.005
+  const capped = runVerdict(overSized).data
+  assert.equal(capped.intent, 'trim-into-realisation')
+  assert.ok(capped.cumulativeTargetWeight > capped.ownHeldWeight, 'the fixture no longer sizes above what this desk holds, and this assertion no longer measures the clamp')
+  assert.equal(capped.hostTargetWeight, 0.045, 'a trim was re-sized upward out of the entry arithmetic and bought the difference')
+  assert.equal(capped.exposureDirection, 'unchanged')
+})
+
+/**
+ * ⑸ **A standstill states the holding.** `hold`, `hold-through-delay`,
+ * `exit-review`, the research watches and every WAIT are rungs whose own prose
+ * is «nothing is added and nothing is closed» — and each of them handed the host
+ * the weight a *purchase* would target. A `hold-through-delay` bought 2.3pp of a
+ * position it wholly ran; `exit-review`, whose entire content is «adjudicate
+ * before deciding anything else», handed over a `0` and liquidated the name.
+ */
+check('#821 — a judgement that changes nothing asks the host to change nothing', () => {
+  const standstills = [
+    { case: 'one-delay-with-new-evidence', intent: 'hold-through-delay' },
+    { case: 'repeated-delay-exhausts-the-budget', intent: 'exit-review' },
+  ]
+  for (const item of standstills) {
+    for (const assignee of ASSIGNEES) {
+      const data = rebooked(item.case, assignee.strategy).data
+      const where = `#821 → ${item.intent} → ${assignee.name}`
+      assert.equal(data.intent, item.intent, `${where}: the rung moved`)
+      assert.equal(data.hostTargetWeight, 0.06, `${where}: a rung that adds nothing and closes nothing sent ${data.hostTargetWeight} over a holding of 0.06`)
+      assert.equal(data.incrementThisRun, 0, `${where}: incrementThisRun`)
+      assert.equal(data.exposureDirection, 'unchanged', `${where}: exposureDirection`)
+    }
+  }
+
+  /** The entry-side watches, on a name this desk does not hold: nothing to change, and 0 is not an order. */
+  const watch = runVerdict(structuredClone(cases.cases.find((item) => item.name === 'policy-announced-with-no-traced-path').input)).data
+  assert.equal(watch.intent, 'research-watch')
+  assert.equal(watch.positionWeight, 0)
+  assert.equal(watch.hostTargetWeight, 0, 'a research watch on an unheld name asked the host for a position')
+
+  /** …and the same watch over a holding assigned to nobody leaves that holding alone. */
+  const overHolding = rebooked('policy-announced-with-no-traced-path', 'none').data
+  assert.equal(overHolding.intent, 'research-watch')
+  assert.equal(overHolding.hostTargetWeight, 0.06, 'a research watch reached for a holding it never judged')
+})
+
+/** ⑹ The role table is total over the intent vocabulary — a fourteenth intent with no role is caught here. */
+check('#821 — every registered intent says what it asks the position to do', () => {
+  for (const intent of INTENTS) {
+    assert.ok(INTENT_WEIGHT_ROLE_NAMES.includes(INTENT_WEIGHT_ROLES[intent]), `${intent} has no weight role, and a weight nobody assigned a role to is this defect`)
+  }
+  assert.deepEqual(Object.keys(INTENT_WEIGHT_ROLES).sort(), [...INTENTS].sort(), 'the role table and the intent vocabulary drifted apart')
+  assert.equal(INTENT_WEIGHT_ROLES['close-out'], 'close')
+  assert.equal(INTENT_WEIGHT_ROLES['reduction-not-this-desks'], 'standstill')
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

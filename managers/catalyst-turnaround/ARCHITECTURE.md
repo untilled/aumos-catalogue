@@ -182,6 +182,90 @@ coming back.
 `meaning` were `cumulative-position-weight`, which is the confusion itself written down: it is not
 the position's weight. Both now read `this-strategys-share-of-the-position`.
 
+## The addition was right and the number it added was not (#821)
+
+`#817` above answered «what do we add?» — somebody else's holding. It did not answer «**add it to
+what?**», and the answer it left standing was `cumulativeTargetWeight` on every intent but
+`close-out`. That number is the weight a **purchase** targets. `aumos-catalogue#278` closed the same
+seam in the other two packages, read `close-out` here, found it safe and left this package alone —
+but `close-out` is safe **by accident**: its own share is `0`, so `otherHeld + 0` happens to equal
+what the account holds. The three reduction intents whose share is not zero were not safe.
+
+Measured on the real host over a 6% holding assigned to nobody, `₩100,000,000`, 20% single-name
+ceiling:
+
+| intent | `hostTargetWeight` before | what left | after |
+|---|---|---|---|
+| `close-out` | `0.06` | ✅ nothing | `0.06`, unchanged |
+| `trim-into-realisation` | `0.07666668` | ⚠️ **`buy:16`** | `0.06` — and the intent is withdrawn |
+| `reduce-on-invalidation` | `0.09988096` | ⚠️ **`buy:39`** — `thesis_refuted` buying 3.99pp more | `0.06`, withdrawn |
+| `resize-to-risk-limit` | `0.12` | ⚠️ **`buy:60`** — the position **doubled** | `0.06`, withdrawn |
+
+⛔ **And the same object said it was not happening.** `increasesExposure` was
+`intent === 'enter-staged' || intent === 'add-next-stage'` — the intent restated, never the weight
+measured — so it answered `false` beside a target 1.7pp above the holding. That is why 111 checks
+were green over a defect that doubles a position, and it is why the field is now
+`hostTargetWeight` against `positionWeight`, with `addsToThisDesksShare` carrying the sentence the
+old derivation was true of.
+
+### What each intent asks the position to do
+
+`lib/constants.mjs` carries the table, and `runVerdict` reads it rather than naming intents inline:
+
+| role | `hostTargetWeight` | intents |
+|---|---|---|
+| `increase` | `otherHeldWeight + cumulativeTargetWeight` | `enter-staged` · `add-next-stage` |
+| `reduce` | `otherHeldWeight + min(cumulativeTargetWeight, ownHeldWeight)` | `trim-into-realisation` · `reduce-on-invalidation` · `resize-to-risk-limit` |
+| `close` | `otherHeldWeight` | `close-out` |
+| `standstill` | `otherHeldWeight + ownHeldWeight` | `hold` · `hold-through-delay` · `exit-review` · `research-watch` · `blocked-by-account-limit` · `wait-for-data` · `reduction-not-this-desks` |
+
+⚠️ **The clamp is a ceiling and never a floor.** A reduction is a decision about **this desk's own
+share**; `min` takes that share down and can never take it up, and it is the identity wherever the
+sizing asks for less than is held — which is what a reduction *is*. A desk that runs the whole
+position trims exactly as it did before (`untilled/aumos#782`), and a desk that runs part of one
+reduces its part and stops at `otherHeldWeight`.
+
+⚠️ **The standstill row was the same defect in seven more places.** A `hold-through-delay` whose own
+prose is «nothing is added» handed over the entry weight and bought 2.3pp of a position it wholly
+ran; `exit-review`, whose entire content is «adjudicate against the benchmark **before** deciding
+anything else», handed over a `0` and liquidated the name. A judgement that changes nothing now says
+so with the weight the account already holds — stated rather than `null`, because `null` already
+means «the book was not read» and one word may not carry two states.
+
+### The word, where none of the position is this desk's
+
+`reduction-not-this-desks` is the thirteenth intent, and it is
+`fundamental-mean-reversion`'s `["WATCH"]` and `shareholder-rerating`'s `WAIT`
+(`aumos-catalogue#278`) said in this package's vocabulary. The rung judged the thesis; this asks
+whose position it is. **The review is not withdrawn** — it stands, armed, with its benchmark
+comparison — and a `held_position_is_not_this_desks` note says which judgement did not go out.
+
+⛔ **It is a `note` and not `data_missing`.** The book was read and said something definite. Calling
+it an absence makes every holding bought by hand in a broker app un-reviewable, which is
+`untilled/aumos#782`'s «safely do nothing» coming back. The review runs; only the sale does not.
+
+⛔ **What was not done**, for the fourth time and the same four reasons: the host does not fold or
+add (`untilled/aumos#781`), execution does not read attribution (`#232`), `#786`'s gate was not
+widened to unattributed positions (`#782`), and the host does not read a judgement's *words* to
+refuse a weight — `REBALANCE` alone would walk past such a check.
+
+### Per assignee
+
+| the position's assignee | before | after |
+|---|---|---|
+| **this manager** | `sell:43` · `sell:20` · no order — ⛔ **not a defect**, and unchanged here | unchanged, plus a `resize-to-risk-limit` that no longer buys 2pp when the sizing asks for more than is held |
+| another manager | `buy:16` · `buy:39` · `buy:60`, but `#786` refuses the judgement first (`submitted: 0`) | `reduction-not-this-desks`, target = the holding |
+| **unattributed** | the same three buys and **nothing stops them** — this is the issue | `reduction-not-this-desks`, target = the holding, review armed |
+
+⚠️ **And the buys still leave.** `enter-staged` over the same 6% unattributed holding still answers
+`otherHeld + share` and still goes out as a purchase (`#817`). What splits the two is **whether the
+intent is a reduction**, never whether somebody else holds the name.
+
+⚠️ **`currentWeight` was renamed to `ownHeldWeight`, and `positionWeight` is new.** The old field
+never meant «what this position weighs» — it has always been *this strategy's share of it* — and
+over a 6% unattributed holding it answered `0` beside an account plainly holding 6%. Both numbers
+now exist under names that say which is which, with `weightMeanings` entries for each.
+
 ## The sector axis: the judgement #269 asked for, and what came of it
 
 **The question.** #269 required each of the three #256 packages to be *read* and judged under a

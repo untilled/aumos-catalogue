@@ -1,4 +1,4 @@
-import { INTENTS, METHODOLOGY } from './constants.mjs'
+import { INTENTS, INTENT_WEIGHT_ROLES, METHODOLOGY } from './constants.mjs'
 import { DAY_MS, blocked, cause, diagnostic, finite, instantOf, round } from './diagnostics.mjs'
 import { catalystLedger } from './ledger.mjs'
 import { caseClassification } from './classify.mjs'
@@ -118,16 +118,23 @@ export function runVerdict(input = {}) {
   const windowEnd = Number.isFinite(nextWindowEnd) ? nextWindowEnd : null
 
   /**
-   * ── Two weights with two meanings, and they were one field next door ──────
+   * ── What is held, split three ways, and the names say whose ──────────────
    *
-   * `cumulativeTargetWeight` is «the whole position should be this».
-   * `incrementThisRun` is «buy this much more, now». A host reading either for
-   * the other is wrong, and on a staged entry they are never equal. The current
-   * weight is what separates them, so it is read from the book rather than
-   * assumed to be zero on the entry path.
+   * `cumulativeTargetWeight` is «this desk's share should be this».
+   * `incrementThisRun` is «buy this much more, now». What separates them is what
+   * is held *already*, so it is read from the book rather than assumed to be zero
+   * on the entry path.
+   *
+   * ⚠️ **This field was called `currentWeight` until `untilled/aumos#821`**, and
+   * it never meant «what this position currently weighs» — it has always been
+   * *this strategy's share of it*. Over a 6% holding assigned to nobody it
+   * answered `0` while the account plainly held 6%, which is a true sentence
+   * under one reading and a false one under the reading its name invited. The
+   * whole-position number now exists beside it under its own name, and neither
+   * has to be inferred from the other.
    */
-  const currentWeight = concentration.data.readable === true
-    ? round((input.book.positions ?? []).filter((row) => row?.symbol === input.symbol && (row?.strategy ?? 'unattributed') === strategy).reduce((total, row) => total + (finite(row?.weight) ? row.weight : 0), 0))
+  const ownHeldWeight = concentration.data.readable === true
+    ? (concentration.data.ownHeld?.[input.symbol] ?? 0)
     : null
 
   /**
@@ -138,6 +145,17 @@ export function runVerdict(input = {}) {
    */
   const otherHeldWeight = concentration.data.readable === true
     ? (concentration.data.otherHeld?.[input.symbol] ?? 0)
+    : null
+
+  /**
+   * ⚠️ **What the account holds in this name, whoever runs it
+   * (`untilled/aumos#821`).** `ownHeldWeight + otherHeldWeight`, and the number
+   * the host's `targetWeight` is differenced against when an order is formed —
+   * so it is what «does this judgement increase the exposure?» has to be asked
+   * of. `null` where the book was not read.
+   */
+  const positionWeight = concentration.data.readable === true
+    ? (concentration.data.positionHeld?.[input.symbol] ?? 0)
     : null
 
   /**
@@ -160,7 +178,9 @@ export function runVerdict(input = {}) {
     survivable: survivability.data.survivable,
     catalyst: summary,
     priceProgress: progress,
-    currentWeight,
+    ownHeldWeight,
+    otherHeldWeight,
+    positionWeight,
     cumulativeTargetWeight: sizing.data.targetWeight ?? null,
     accountHeadroom: headroom ?? null,
     bookReadable: concentration.data.readable === true,
@@ -368,10 +388,10 @@ export function runVerdict(input = {}) {
      * what this run would target. The increment is zero and the honest answer is
      * that there is nothing to do — not a purchase of the full target again.
      */
-    if (finite(currentWeight) && currentWeight >= sizing.data.targetWeight - 1e-9) {
+    if (finite(ownHeldWeight) && ownHeldWeight >= sizing.data.targetWeight - 1e-9) {
       return {
         intent: 'hold',
-        review: review('already-at-target', { at: windowEnd, kind: 'catalyst-window', reason: `The book already holds ${currentWeight} against a cumulative target of ${sizing.data.targetWeight}. The increment is zero` }),
+        review: review('already-at-target', { at: windowEnd, kind: 'catalyst-window', reason: `The book already holds ${ownHeldWeight} of this desk's own against a cumulative target of ${sizing.data.targetWeight}. The increment is zero` }),
       }
     }
     return {
@@ -381,7 +401,47 @@ export function runVerdict(input = {}) {
   }
 
   const outcome = decide()
+
+  /**
+   * ── A reduction of a position none of which is this desk's (#821) ─────────
+   *
+   * ⛔ **The rung above judged the *thesis*; this line asks whose *position* it
+   * is.** They are two different questions and this package only ever asked the
+   * first. A cancelled catalyst is still a cancelled catalyst over a holding
+   * assigned to nobody — the review is right and stays armed — but «reduce it»
+   * is not this desk's sentence to say about a position it does not run.
+   *
+   * ⚠️ **The word is withdrawn and the judgement is not.** `#278` settled this
+   * next door in as many words: *the review runs; only the sale does not go
+   * out.* Reporting it as `data_missing` instead would make every holding
+   * bought by hand in a broker app un-reviewable, which is
+   * `untilled/aumos#782`'s «safely do nothing» coming straight back. The book
+   * was read and it said something definite.
+   *
+   * ⛔ **Only on an exactly-zero own share, and only with the book read.** A
+   * desk holding *part* of the name still reduces its part — the clamp below is
+   * what keeps that inside its own share — and an unread book cannot claim
+   * anything about whose the position is.
+   */
+  if (held && concentration.data.readable === true && ownHeldWeight === 0) {
+    const withdrawn = INTENT_WEIGHT_ROLES[outcome.intent] === 'reduce' || INTENT_WEIGHT_ROLES[outcome.intent] === 'close'
+    diagnostics.push(
+      diagnostic(
+        'held_position_is_not_this_desks',
+        'note',
+        withdrawn
+          ? `This run reached ${outcome.intent} over a position none of which is this desk's: ${otherHeldWeight} of the book is another manager's or assigned to nobody and none of it is this strategy's. The review stands and is armed; the reduction is not this desk's to make, so the intent is withdrawn to reduction-not-this-desks`
+          : `This run judged a position none of which is this desk's: ${otherHeldWeight} of the book is another manager's or assigned to nobody. The judgement stands; nothing about this name moves on this desk's account`,
+        'book.positions',
+        { intentBeforeWithdrawal: outcome.intent, ownHeldWeight, otherHeldWeight, withdrawn },
+      ),
+    )
+    if (withdrawn) outcome.intent = 'reduction-not-this-desks'
+  }
+
   if (!INTENTS.includes(outcome.intent)) throw new Error(`${outcome.intent} is not a registered intent`)
+  const weightRole = INTENT_WEIGHT_ROLES[outcome.intent]
+  if (weightRole === undefined) throw new Error(`${outcome.intent} has no weight role, and a weight nobody assigned a role to is the defect #821 is`)
 
   /**
    * ── The two weights, resolved once, at the end ───────────────────────────
@@ -399,13 +459,13 @@ export function runVerdict(input = {}) {
    * host reduces to, because «sell this much» and «hold this much afterwards»
    * are the same conflation one sign over.
    */
-  const increases = outcome.intent === 'enter-staged' || outcome.intent === 'add-next-stage'
+  const increases = weightRole === 'increase'
   const cumulative = outcome.intent === 'add-next-stage' ? plan?.data.cumulativeTargetWeight ?? null : sizing.data.targetWeight ?? null
   let increment = 0
   if (outcome.intent === 'add-next-stage') increment = plan.data.addedThisRun
   else if (outcome.intent === 'enter-staged') {
     const firstStage = plan?.data.addedThisRun
-    increment = finite(firstStage) && firstStage > 0 ? firstStage : round(Math.max(0, (cumulative ?? 0) - (currentWeight ?? 0)))
+    increment = finite(firstStage) && firstStage > 0 ? firstStage : round(Math.max(0, (cumulative ?? 0) - (ownHeldWeight ?? 0)))
   }
   if (increment > 0 && !mayIncrease) throw new Error('an increment survived an unread input, which is the whole defect this gate exists for')
 
@@ -437,12 +497,74 @@ export function runVerdict(input = {}) {
    * somebody does, an `exit` would liquidate their position too, so the exit is
    * expressed as this weight instead.
    *
+   * ── What this desk's share is *for this intent* (`untilled/aumos#821`) ─────
+   *
+   * ⛔ **`cumulative` is the weight a purchase would target, and #817 handed it
+   * over on every intent that was not `close-out`.** On a purchase that is
+   * right. On a **reduction** it is the wrong number in the wrong direction: a
+   * trim, a reduction on an invalidation and a resize to a risk limit are
+   * decisions about **this desk's own share**, and re-sizing that share from
+   * the entry arithmetic can put it *above* what this desk holds — which,
+   * added to somebody else's holding, leaves as a **purchase of their
+   * position**. Over 6% assigned to nobody, that was `buy:16`, `buy:39` and
+   * `buy:60`, the last of them doubling a position on a run whose stated cause
+   * was `risk_limit_exceeded`.
+   *
+   * So the reduction target is clamped into this desk's own share:
+   *
+   *     reduce → min(cumulative, ownHeldWeight)
+   *
+   * ⚠️ **The clamp is a ceiling and never a floor.** A desk that runs the whole
+   * position reduces exactly as it always did — `min` is the identity there
+   * whenever the sizing asks for less than is held, which is what a reduction
+   * *is*. Nothing here can turn a real reduction into a no-op, and
+   * `untilled/aumos#782` is the reason that has to stay true.
+   *
+   * ⚠️ **And a standstill states the holding.** `hold`, `hold-through-delay`,
+   * `exit-review`, the research watches and every WAIT asked the host for the
+   * *entry* weight too — a `hold-through-delay` whose own prose is «nothing is
+   * added» bought 2.3pp of a position it wholly ran, and `exit-review`, whose
+   * entire content is «adjudicate before deciding anything else», handed over a
+   * `0` and liquidated the name. A judgement that changes nothing says so with
+   * the weight the account already holds.
+   *
    * `null` where the book was not read or nothing was sized — an unread account
    * has no target, and a `0` here would be an order.
    */
-  const ownTarget = outcome.intent === 'close-out' ? 0 : cumulative
+  const ownTarget = weightRole === 'increase'
+    ? cumulative
+    : weightRole === 'close'
+      ? 0
+      : weightRole === 'reduce' && finite(cumulative) && finite(ownHeldWeight)
+        ? round(Math.min(cumulative, ownHeldWeight))
+        : ownHeldWeight
   const hostTargetWeight = finite(otherHeldWeight) && finite(ownTarget)
     ? round(otherHeldWeight + ownTarget)
+    : null
+
+  /**
+   * ── The field that made all of this quiet (`untilled/aumos#821`) ──────────
+   *
+   * ⛔ **`increasesExposure` was `intent === 'enter-staged' || 'add-next-stage'`
+   * — a restatement of the intent, not a measurement of it.** So a
+   * `trim-into-realisation` that handed the host a weight 1.7pp above what the
+   * account held answered `increasesExposure: false` in the same object, and
+   * every reader — this package's own 111 checks included — was told the
+   * opposite of what would leave for the exchange.
+   *
+   * Exposure is the account's exposure to the name, the host executes
+   * `hostTargetWeight` against the whole position, so the only honest reading is
+   * that number against what the position weighs now. The old sentence is still
+   * worth saying and is now said under a name that is true of it:
+   * `addsToThisDesksShare`.
+   *
+   * ⚠️ **`false` where nothing can be handed over.** A `null`
+   * `hostTargetWeight` is «no target leaves this run», and no order can be
+   * formed from it — so no exposure increases. That is a statement about this
+   * run's output and not a guess about the account.
+   */
+  const exposureDirection = finite(hostTargetWeight) && finite(positionWeight)
+    ? (hostTargetWeight > positionWeight + 1e-9 ? 'increase' : hostTargetWeight < positionWeight - 1e-9 ? 'reduce' : 'unchanged')
     : null
 
   return {
@@ -456,15 +578,27 @@ export function runVerdict(input = {}) {
       cumulativeTargetWeight: cumulative,
       /** «Buy this much more, now.» Zero on every intent that is not a purchase. */
       incrementThisRun: increment,
-      currentWeight,
+      /** Holdings of this name that **are** this desk's. ⚠️ Called `currentWeight` until #821, which is not what it means. */
+      ownHeldWeight,
       /** Holdings of this name that are not this desk's — another manager's, and every unattributed one. */
       otherHeldWeight,
+      /** What the account holds in this name, whoever runs it (#821). What `hostTargetWeight` is differenced against. */
+      positionWeight,
       /** ⛔ «The whole position should be this.» The **only** number that may be handed to the host (#817). */
       hostTargetWeight,
-      increasesExposure: increases,
+      /** What this intent asks the **position** to do: `increase` · `reduce` · `close` · `standstill` (#821). */
+      intentWeightRole: weightRole,
+      /** ⚠️ **Measured, not restated** (#821): `hostTargetWeight` against `positionWeight`. `null` only where neither is known. */
+      exposureDirection,
+      /** Does what leaves this run make the account hold **more** of this name? Measured the same way. */
+      increasesExposure: exposureDirection === 'increase',
+      /** The old `increasesExposure`, under a name that is true of it: this run buys more for **this desk**. */
+      addsToThisDesksShare: increases && increment > 0,
       weightMeanings: {
         cumulativeTargetWeight: 'this-strategys-share-of-the-position',
         incrementThisRun: 'weight-added-this-run',
+        ownHeldWeight: 'this-strategys-held-share-of-the-position',
+        positionWeight: 'whole-position-weight-as-held-now',
         hostTargetWeight: 'whole-position-weight-for-the-host',
       },
       context,

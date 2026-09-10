@@ -510,6 +510,20 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
        * `readable` above is the only statement about.
        */
       otherHeld: Object.fromEntries(rows.map((row) => [row.symbol, row.otherHeld])),
+      /**
+       * ⚠️ **The other two of the same triple, per name (`untilled/aumos#821`).**
+       * `ownHeld` is what is held **and assigned to this strategy**; `positionHeld`
+       * is what the account holds in the name whoever runs it, which is the number
+       * the host's own `targetWeight` is compared against when an order is formed.
+       *
+       * ⛔ **One definition, two callers.** `runVerdict` used to recompute this
+       * desk's share by filtering `book.positions` itself — a second reading of
+       * the same rows that could drift from `heldByStrategy` above without
+       * anything failing. A reduction is now decided against **this** number, so
+       * the two readings are one.
+       */
+      ownHeld: Object.fromEntries(rows.map((row) => [row.symbol, row.ownHeld])),
+      positionHeld: Object.fromEntries(rows.map((row) => [row.symbol, row.held])),
       breaches: rows.filter((row) => row.breach).map((row) => row.symbol),
       /** The book and the limit were both read. Nothing downstream may size without it. */
       readable: true,
