@@ -242,6 +242,40 @@ so what you propose is the difference between that and what is already held plus
 discount and the remaining risk budget. Do not copy a 40/35/25 ladder or any price-and-time
 fallback from anywhere — this plan's stages are this thesis's catalysts.
 
+### 5b. A reduction is about **your** holding, and an exit is about everyone's
+
+`evaluateCase` reaches `RESIZE` on two routes — `trim-or-exit-review` (the thesis worked, or the
+programme retreated) and `reject` — and until `#819` it reached it whenever the **account** held
+the name, whoever it belonged to. A 6% holding bought by hand in a broker app came back from this
+package as a reduction and the host sold it: unattributed is not a rare state, and nothing above
+the package stops that order (`untilled/aumos#786` refuses a judgement on **another manager's**
+position, and an unattributed one has no manager to be somebody else's).
+
+So those routes now answer the pair, and the test is `ownHeldWeight`:
+
+```
+ownHeldWeight  = 0  →  there is nothing here for you to reduce. WAIT, and the finding stands
+hostTargetWeightFloor = otherHeldWeight   ← no total you send may be below this
+a close-out of your position = the floor, exactly — and `exit` only when the floor is 0
+```
+
+⛔ **An `exit` is a real `0` and bypasses every weight this package computes.** Sent on a name
+another manager or nobody holds part of, it liquidates their position with yours. What you send
+instead is a `position-weight` total equal to what is *theirs* — which sells nothing of theirs and
+all of yours. `evaluateCase` answers that number as `hostTargetWeightFloor`; do not assemble it
+yourself, and never send a reduction target below it.
+
+⚠️ **The finding about the company is unchanged.** A re-rated name is still `rerated` and a
+dividend trap is still refused: what does not follow is the **order**, because the shares are
+somebody else's. ⛔ And this is not «nobody may touch an unattributed position»
+(`untilled/aumos#782`) — you may still buy into one, and the moment the investor assigns it on the
+approval screen `otherHeldWeight` is 0, the floor is 0, and every reduction works exactly as it
+did.
+
+⚠️ **Name yourself.** `strategy` is what a holding's own `strategy` is compared against; a run
+that passes none can attribute nothing, every row lands in `otherHeldWeight`, and no reduction can
+leave. That is reported as `run_did_not_name_its_strategy` rather than resolved by a guess.
+
 ### 6. Concentration, over the whole account
 
 `concentration` folds real holdings and open proposals together — per name, per sector and over
@@ -275,7 +309,8 @@ the pending judgements, and the assignment below, come back from `portfolio_get`
 no target for, a `WAIT` states none at all, and a cash target names no asset. Read one of those as
 `0` and you read another manager's open buy as no exposure — the understatement no ceiling here can
 see. Build no `openProposals` row for it, record `data_missing`, and name the decision whose size
-you could not read. An `exit` target **is** a real `0` and is carried as one. And a
+you could not read. An `exit` target **is** a real `0` and is carried as one — which is exactly
+why you do not *send* one on a name another manager or nobody holds part of. And a
 `position-weight` target is executed against the **whole** position rather than against its
 author's share of it, which is why exposure folds over the name and never over the pair (strategy,
 name).

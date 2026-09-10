@@ -3,7 +3,7 @@
   "id": "shareholder-rerating",
   "publisher": "aumos",
   "name": "Shareholder Rerating",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Korea-listed single equities whose earnings and capital headroom support a shareholder return programme that is actually being executed, held for the discount that closing it should close. Separates re-rating from dividends in every number, and never counts a company's buyback as the investor's income.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",

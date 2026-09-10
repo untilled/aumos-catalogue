@@ -290,6 +290,68 @@ holding with no `strategy`, written before `assignment` reached the wire (`until
 unchanged — it is the same case, restated under the contract it is read against, which is exactly
 the move `aumos-catalogue#275` made for the pending rows.
 
+## The routes that reduce ask whose position it is (#819)
+
+`#817` reached one branch — `position_above_target`, **inside** the buy path. Every other route
+out of `evaluateCase` returns before the concentration fold ever runs, so `actionFor` judged on
+`heldWeight`, the whole position, and reached `RESIZE` the moment the account held anything of the
+name. Driven against the real host over a 6% holding assigned to nobody:
+
+| case | this manager | unattributed | another manager |
+|---|---|---|---|
+| `rerated-reaches-trim-review` | `RESIZE` | `RESIZE` | `RESIZE` |
+| `policy-retreat-reaches-trim-review` | `RESIZE` | `RESIZE` | `RESIZE` |
+| `dividend-trap-is-refused` (`reject`) | `RESIZE` | `RESIZE` | `RESIZE` |
+
+— all three with `hostTargetWeight: null` and `otherHeldWeight: null`, because this path never
+called `concentration()` at all.
+
+**What changed.** `heldAttribution` in `concentration.mjs` answers `held`/`ownHeld`/`otherHeld`
+from the holdings alone, and the non-buy path calls it:
+
+```
+proposedAction        = ownHeld > 0 ? RESIZE : WAIT      ← the whole change, in one comparison
+hostTargetWeightFloor = otherHeld                        ← no total sent may be below this
+```
+
+⛔ **Why a second function rather than the fold.** The attribution is a question about the *book*
+— whose shares are these — and the fold is a question about the *Mandate*. Calling the whole fold
+here would return `emptyAnswer()` under a Mandate that states no single-name cap, so a run with no
+declared ceiling would not know whose position it is, and a run that does not know that is the run
+that sells somebody else's. One definition, two callers: `concentration` reads it too, so the two
+cannot drift.
+
+**The `exit` judgement, which is the same in all three packages.** An `exit` target is a real `0`
+(`untilled/aumos#154`) and bypasses every weight computed anywhere. So *«close this out»* is a
+`position-weight` total equal to `otherHeld` — which sells all of this desk's and none of theirs —
+and it is an `exit` only when `otherHeld` is 0. `catalyst-turnaround` already answers that number
+on its `close-out`; this package publishes it as `hostTargetWeightFloor` on every route, and
+`fundamental-mean-reversion` publishes the same floor and stops offering `SELL` above it.
+
+| the position's assignee | before #819 | after |
+|---|---|---|
+| another manager | `RESIZE` — but `untilled/aumos#786` refuses the judgement first, `submitted: 0` | `WAIT`, and `reduction_is_not_this_managers_to_make` |
+| **this manager** | `RESIZE`, and ⛔ **not a defect** — reducing its own position is what the route is for | **unchanged**: `ownHeld` is the holding, `otherHeld` is 0, the floor is 0 |
+| **unattributed** | `RESIZE`, and **nothing stops it** — this is the issue | `WAIT`; the finding about the company stands, the order does not follow |
+
+⚠️ **The classification never moved.** A re-rated name is `rerated` whoever holds it: this is the
+same separation the file already made for an unreadable book — the finding is about the company
+and the action is about the account.
+
+⛔ **This is not «nobody may touch an unattributed position»** (`untilled/aumos#782`). A buy into
+one still leaves as a buy, and once the investor assigns the position on the approval screen
+(`untilled/aumos#785`) every reduction works exactly as it did.
+
+⚠️ **A run that names no `strategy` can attribute nothing**, so every row lands in `otherHeld` and
+no reduction leaves. That is reported as `run_did_not_name_its_strategy` (`unevaluated`) rather
+than resolved by a guess — `aumos-catalogue#268` §1 forbids inferring ownership from cost and
+quantity. Two `cases.json` inputs gained a top-level `strategy` for that reason; their `expect`
+blocks are unchanged, and the rows themselves already named this manager.
+
+⛔ **What was not done**: the host does not fold or add (`untilled/aumos#781`), execution does not
+read attribution (`untilled/aumos#232`), and `#786`'s gate was not widened to unattributed
+positions (`untilled/aumos#782`).
+
 ## The fixed thresholds
 
 Stated in full, with formula and rationale, in `lib/thresholds.mjs`. In summary:

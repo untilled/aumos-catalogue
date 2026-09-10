@@ -77,6 +77,49 @@ import { diagnostic, finite, round } from './numbers.mjs'
 import { THRESHOLDS } from './thresholds.mjs'
 
 /**
+ * ── Whose holding it is, on its own, because a reduction has to ask (#819) ──
+ *
+ * `concentration` answers `ownHeld` and `otherHeld` — but it is the **buy**
+ * path that calls it, and the buy path is the only place `untilled/aumos#817`
+ * reached. Every other route out of `evaluateCase` (`trim-or-exit-review`,
+ * `reject`, `watch`) returns before the fold ever runs, so the question «is any
+ * of this position mine?» had no answer on exactly the routes that propose a
+ * **sale**.
+ *
+ * ⛔ **The attribution is not asked as a favour to the caps, so it must not
+ * depend on them.** Calling the whole fold from the review path would refuse
+ * this pair whenever a Mandate states no single-name cap — the answer would be
+ * `emptyAnswer()`, `ownHeld: null` — and a run that cannot tell whose position
+ * it is is the run that sells somebody else's. Whether a *cap* was stated is a
+ * question about the Mandate; whose the shares are is a question about the
+ * book, and only the second one is asked here.
+ *
+ * `held` is folded the way `concentration` folds it — one quantity per name,
+ * the larger row when a book carries two — so the two cannot drift.
+ *
+ * @param {object} input
+ * @param {Array} input.holdings   the account's real positions, or anything else for `readable: false`
+ * @param {string} input.symbol    the name being asked about
+ * @param {string} [input.strategy] this package's instance id. ⚠️ **Absent means nothing is this desk's** —
+ *   a row with no `strategy`, and a caller that named none, both land in `otherHeld` (`aumos-catalogue#268` §1)
+ * @returns {{readable:boolean, held:number|null, ownHeld:number|null, otherHeld:number|null}}
+ */
+export function heldAttribution(input = {}) {
+  const { holdings, symbol, strategy } = input
+  if (!Array.isArray(holdings) || typeof symbol !== 'string' || symbol.length === 0) {
+    return { readable: false, held: null, ownHeld: null, otherHeld: null }
+  }
+  let row = null
+  for (const candidate of holdings) {
+    if (candidate?.symbol !== symbol || !finite(candidate?.weight)) continue
+    if (row === null || candidate.weight > row.weight) row = candidate
+  }
+  const held = row === null ? 0 : round(row.weight)
+  const ownHeld = strategy !== undefined && row !== null && row.strategy === strategy ? held : 0
+  return { readable: true, held, ownHeld, otherHeld: round(Math.max(0, held - ownHeld)) }
+}
+
+/**
  * @param {object} input
  * @param {{symbol:string, sector?:string, weight:number}} input.proposed  weight is the **increment** being added;
  *   `sector` is the **fund risk-management sector** the host classifies the account by, not this package's issuer kind
@@ -232,10 +275,14 @@ export function concentration(input = {}) {
    * and quantity. So does a run that did not pass `strategy` at all: with
    * nothing to compare against, nothing is this desk's.
    */
-  const heldRow = heldBySymbol.get(symbol)
-  const ownHeld =
-    input.strategy !== undefined && heldRow !== undefined && heldRow.strategy === input.strategy ? heldRow.weight : 0
-  const otherHeld = Math.max(0, held - ownHeld)
+  /**
+   * ⚠️ **One definition, called from two places (#819).** The review routes need
+   * this pair without needing the caps, so the split lives in `heldAttribution`
+   * above and this fold reads it rather than repeating it.
+   */
+  const attribution = heldAttribution({ holdings: [...heldBySymbol.values()], symbol, strategy: input.strategy })
+  const ownHeld = attribution.ownHeld
+  const otherHeld = attribution.otherHeld
   const existingExposure = exposureBySymbol.get(symbol)?.exposure ?? 0
   /** What the open proposals still require on top of the holding. Never negative. */
   const openSame = existingExposure - held

@@ -207,6 +207,63 @@ position ends at the reconciler `untilled/aumos#232` rejected. And `#786`'s gate
 to unattributed positions — making a hand-bought holding permanently untouchable is the «safely do
 nothing» state `untilled/aumos#782` undid.
 
+## The same conversion on the branch that sells, and the `exit` judgement (#819)
+
+`#817` closed the **buy** direction. The review branch of `classifyCase` — an invalidation that
+fired, an elapsed deadline, a target reached — never saw it, and driven against the real host the
+three outcomes came back **identical** on this desk's position, on another manager's and on one
+assigned to nobody:
+
+| case | this manager | unattributed | another manager |
+|---|---|---|---|
+| `invalidation-triggered` | `invalidated-re-adjudicate` / `["RESIZE","SELL"]` | same | same |
+| `deadline-elapsed` | `deadline-elapsed-re-adjudicate` / `["RESIZE","SELL"]` | same | same |
+| `target-reached-staged-trim` | `target-reached-trim` / `["RESIZE","SELL"]` | same | same |
+
+No `sizing` on the answer, so neither `hostTargetWeight` nor `otherHeldWeight` crossed at all —
+the model was told to sell and handed no number. And at the host, an `exit` over a 6%
+unattributed holding was **`sell:60`**: the whole position, all of it somebody else's.
+
+**Three things changed, and none of them is a new arithmetic.**
+
+⑴ Every answer carries `ownHeldWeight`, `otherHeldWeight` and `hostTargetWeightFloor`, and the
+three review answers carry the whole `sizing` answer with them. The numbers come from the same
+`exposure` the buy path adds — holdings only, never `otherWeight`.
+
+⑵ `hostTargetWeightFloor = otherHeldWeight` is the weight **no** target handed to the host may go
+below. This branch sizes nothing, so it cannot answer a `hostTargetWeight` the way
+`catalyst-turnaround`'s `runVerdict` does; a floor is the same statement in the form this branch
+can make it, and a close-out of this thesis *is* the floor exactly.
+
+⑶ ⛔ **`exit` is withdrawn where somebody else holds part of the name.** This is the judgement the
+issue left open, and it is the same one in all three packages: *an `exit` is correct only when
+`otherHeldWeight` is 0.* An `exit` target is a real `0` (`untilled/aumos#154`) and bypasses every
+weight computed anywhere, so no arithmetic can protect it — the only protection is not to offer
+it. `catalyst-turnaround` said it as a number (`hostTargetWeight = otherHeld` on a `close-out`);
+here it is said by narrowing the actions the outcome leaves open:
+
+| the position | actions left open | floor |
+|---|---|---|
+| wholly this desk's | `["RESIZE","SELL"]` — **unchanged**, exit included | 0 |
+| part somebody else's | `["RESIZE"]` — the reduction is a total at or above the floor | `otherHeldWeight` |
+| none of it this desk's | `["WATCH"]` — the review is still written down; it ends in no order | `otherHeldWeight` |
+| the book was not folded | `["RESIZE","SELL"]` + `review_exposure_unread` | `null` |
+
+**The door that locked one way.** `classify.mjs` already refused *«the book attributes exposure
+here and the run did not report holding it»* as `data_missing`. The reverse — the run holds it and
+the book attributes **none** of it here — is deliberately **not** `data_missing`: the book is
+explicit, and what it says is that the position is somebody else's or nobody's. Calling that
+missing data would make a hand-bought holding a position no manager may ever review, which is the
+«safely do nothing» state `untilled/aumos#782` undid. The review runs; the sale does not.
+
+⛔ **What was not done** is what `#817` did not do, for the same three reasons: the host does not
+fold or add (`untilled/aumos#781`), execution does not read attribution
+(`untilled/aumos#232`), and `#786`'s gate was not widened to unattributed positions
+(`untilled/aumos#782`).
+
+⬜ `cash-weight` targets name no asset, so there is no position for a floor to attach to. This
+package's `PROMPT.md` never asks for one.
+
 ## The sector axis: the judgement #269 asked for, and what came of it
 
 **The question.** #269 required each of the three #256 packages to be *read* and judged under a

@@ -105,14 +105,86 @@ export function classifyCase(input = {}) {
   const state = technicalState(normalised.bars)
   const discovery = discoveryState(state)
 
+  /**
+   * ── Whose position is being reviewed, and what that costs a sale (#819) ───
+   *
+   * `untilled/aumos#817` put the write-direction conversion on the **buy** path
+   * — `hostTargetWeight = otherHeldWeight + targetTotalWeight` — and the review
+   * branch below never saw it. Measured against the real host, the three review
+   * outcomes came back **identical** on a position this desk runs, on one
+   * another manager runs, and on one assigned to nobody: no `sizing` on the
+   * answer, so neither number crossed, and an `exit` over a 6% unattributed
+   * holding was `sell:60` — the whole position, most of it somebody else's.
+   *
+   * The two numbers come from the same place the buy path takes them from,
+   * `positionSizing`'s `exposure` — holdings only, never `otherWeight`, because
+   * an unfilled proposal is not a position and the host executes positions.
+   *
+   * ⚠️ **`null` is «the account was not folded», and it is not zero.** A review
+   * reached without a sizing answer has no attribution at all, and a `0` here
+   * would read as «nobody else holds this», which is the permissive reading.
+   */
+  const heldExposure = sizing?.exposure ?? null
+  const ownHeldWeight = finite(heldExposure?.ownHeldWeight) ? heldExposure.ownHeldWeight : null
+  const otherHeldWeight = finite(heldExposure?.otherHeldWeight) ? heldExposure.otherHeldWeight : null
+  /**
+   * ⛔ **The weight no target handed to the host may go below.** The host
+   * executes a `position-weight` total against the **whole** position and reads
+   * no attribution while doing it (`untilled/aumos#815`), so a target below
+   * `otherHeldWeight` sells a holding this desk does not run. Closing this
+   * thesis out is this number exactly — and it is `0`, the host's `exit`, only
+   * when nobody else holds the name. That is `catalyst-turnaround`'s rule
+   * (`hostTargetWeight = otherHeld` on a `close-out`) said in the one form this
+   * branch can say it: a floor rather than a target, because a re-adjudication
+   * is not sized here.
+   */
+  const hostTargetWeightFloor = otherHeldWeight
+  /** Held, and none of it this desk's: there is nothing here for this run to reduce. */
+  const positionIsWhollyAnothers = ownHeldWeight === 0 && otherHeldWeight !== null && otherHeldWeight > 0
+
+  /**
+   * ⛔ **An `exit` is a real `0` and bypasses every weight computed above.** So
+   * where somebody else holds part of the name it is not offered: `SELL` leaves
+   * the list and the reduction has to be expressed as a `RESIZE` to a total at
+   * or above the floor. Where **none** of the position is this desk's, neither
+   * is offered — the review still happens and is still written down, and what
+   * it leaves open is a `WATCH`.
+   *
+   * ⚠️ **This is not «nobody may touch an unattributed position»**
+   * (`untilled/aumos#782`). The buy path adds to `otherHeldWeight` rather than
+   * replacing it and still leaves as a buy; and where the position is this
+   * desk's, `otherHeldWeight` is 0, nothing below fires, and every trim, resize
+   * and exit this methodology ever made still leaves.
+   */
+  const actionsFor = (verdict) => {
+    const published = VERDICT_ACTIONS[verdict]
+    if (verdict !== 'TRIM' && verdict !== 'RE_ADJUDICATE') return published
+    if (otherHeldWeight === null || otherHeldWeight <= 0) return published
+    return Object.freeze(positionIsWhollyAnothers ? ['WATCH'] : published.filter((action) => action !== 'SELL'))
+  }
+
   const answer = (outcome, verdict, code, extra = {}) => {
     if (!OUTCOMES.includes(outcome)) throw new Error(`unknown outcome ${outcome}`)
     if (code !== null && !DIAGNOSIS_CODES.includes(code)) throw new Error(`unknown diagnosis code ${code}`)
     return {
       outcome,
       verdict,
-      /** The AMP actions this outcome leaves open. `RE_ADJUDICATE` leaves neither WAIT nor WATCH. */
-      ampActions: VERDICT_ACTIONS[verdict],
+      /**
+       * The AMP actions this outcome leaves open. `RE_ADJUDICATE` leaves neither
+       * WAIT nor WATCH — and where part of the position is not this desk's, it
+       * no longer leaves `SELL` either (#819).
+       */
+      ampActions: actionsFor(verdict),
+      /** Holdings of this name assigned to this manager. `null` where no sizing folded the book. */
+      ownHeldWeight,
+      /** Holdings of this name that are **not** this manager's — another's, and every unattributed one. */
+      otherHeldWeight,
+      /**
+       * ⛔ **No `position-weight` total this run hands the host may be below
+       * this (#819).** A close-out of this thesis *is* this number; `0` — the
+       * host's `exit` — only when it is `0`.
+       */
+      hostTargetWeightFloor,
       /** One of #256's four, or `null` when the run reached a judgement of its own. */
       code,
       /**
@@ -166,6 +238,47 @@ export function classifyCase(input = {}) {
   // ⑵ ── this fund already holds it: the review branch.
   if (position.held === true) {
     /**
+     * ⛔ **The door above locks one way, and this is the other (#819).** The
+     * check before this branch catches «the book says this strategy holds it and
+     * the run did not» and calls it missing data. The reverse — the run holds
+     * it and the book attributes **none** of it here — is not missing data at
+     * all: the book is explicit, and it says the position belongs to somebody
+     * else or to nobody. Refusing it as `data_missing` would be this package
+     * declining to review a thesis because of an assignment it does not own,
+     * and a position bought by hand in a broker app would become one no manager
+     * may ever look at — the state `untilled/aumos#782` undid.
+     *
+     * So the review runs and is written down. What changes is what leaves:
+     * `SELL` is withdrawn, the floor carries the part of the position this run
+     * is not entitled to move, and the reader is told which of the three states
+     * the book put it in.
+     */
+    if (positionIsWhollyAnothers) {
+      diagnostics.push(diagnostic(
+        'reviewed_position_is_not_this_desks',
+        'info',
+        `The run reports holding this name and the book attributes none of the ${otherHeldWeight} it carries to this strategy — another manager's, or nobody's. The review still stands: it is a judgement about the thesis, and the book is what says whose position it is. What it may not do is end in a sale, because the only shares there are somebody else's`,
+        'sizing.exposure',
+        { ownHeldWeight, otherHeldWeight },
+      ))
+    } else if (otherHeldWeight !== null && otherHeldWeight > 0) {
+      diagnostics.push(diagnostic(
+        'reduction_is_bounded_by_anothers_holding',
+        'info',
+        `${otherHeldWeight} of this position is not this strategy's. A reduction is proposed as a total weight at or above that floor and never as an exit: an exit target is a real 0 and would liquidate their holding with this one`,
+        'sizing.exposure',
+        { ownHeldWeight, otherHeldWeight, hostTargetWeightFloor },
+      ))
+    } else if (otherHeldWeight === null) {
+      diagnostics.push(diagnostic(
+        'review_exposure_unread',
+        'info',
+        'This review was reached without a sizing answer, so the account was never folded and this run does not know which part of the position is its own. A reduction sent from here is sent against the whole position: hand `positionSizing`\'s answer in, or propose no weight',
+        'sizing',
+        { ownHeldWeight, otherHeldWeight },
+      ))
+    }
+    /**
      * ⛔ **A held position with nothing said about its review is unadjudicated,
      * not clean.** Each flag was read as `=== true`, so an absent `review`
      * object meant «no invalidation, no target, no elapsed deadline» — three
@@ -181,18 +294,24 @@ export function classifyCase(input = {}) {
     if (review.invalidationTriggered === true) {
       return answer('invalidated-re-adjudicate', 'RE_ADJUDICATE', 'thesis_refuted', {
         stabilisation,
+        /** ⚠️ #819: the review branch carries the sizing so the two attribution numbers travel with the answer. */
+        sizing,
         note: 'An invalidation condition the thesis named in advance has been met. The position is resized or closed, or the thesis is re-judged in writing; it is not reclassified as a longer-term holding so that the stop and the deadline stop applying',
       })
     }
     if (review.deadlineElapsed === true) {
       return answer('deadline-elapsed-re-adjudicate', 'RE_ADJUDICATE', null, {
         stabilisation,
+        /** ⚠️ #819: the review branch carries the sizing so the two attribution numbers travel with the answer. */
+        sizing,
         note: 'The maximum wait the thesis set has passed without the recovery. The absence of the move is not a refutation of the business claim, and it is also not a reason to keep waiting silently: the wait is re-judged and either restated with a new deadline or ended',
       })
     }
     if (review.targetReached === true) {
       return answer('target-reached-trim', 'TRIM', null, {
         stabilisation,
+        /** ⚠️ #819: the review branch carries the sizing so the two attribution numbers travel with the answer. */
+        sizing,
         note: 'The recovery target was reached. This methodology stages out rather than exiting on one print',
       })
     }
