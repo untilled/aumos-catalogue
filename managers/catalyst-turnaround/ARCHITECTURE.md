@@ -39,7 +39,7 @@ Where arithmetic came from `managers/evidence-gated/lib/`, it was copied and ada
 | `diagnostics.mjs` | `evidence-gated/lib/diagnostics.mjs` | `round`, `finite`, the `{code, severity, message, path, details}` record | its cause registry, which is keyed to that package's own lanes and gates |
 | `ledger.mjs` | `evidence-gated/lib/catalysts.mjs` | the carried-register shape (`previous` in, `nextRegister` out), instants encoded as epoch milliseconds, the refusal to register a window with no `evidenceIds` | everything else — that module *produces windows to scan*, this one *manages a position's catalyst*. No states, no delays, no adjudication, no staleness there |
 | `sizing.mjs` | `evidence-gated/lib/sizing.mjs` → `targetWeight` | the quarter-Kelly arithmetic and the `min(raw, caps…)` shape | its lanes, maturity attribution, unlock-delta disclosures and grandfathering |
-| `sizing.mjs` | `evidence-gated/lib/sizing.mjs` → `concentration` | the rule that a proposal *restates* its own strategy's holding rather than stacking on it | its sector, theme and factor axes, and its parked-liquidity exemption. This package makes a single-name claim only |
+| `sizing.mjs` | `evidence-gated/lib/sizing.mjs` → `concentration` | the rule that a proposal *restates* the position rather than stacking on it — keyed on the name since #813, not on the pair (strategy, name) | its sector, theme and factor axes, and its parked-liquidity exemption. This package makes a single-name claim only |
 | `staging.mjs` | `evidence-gated/lib/sizing.mjs` → `entryTranchePlan` | the condition kinds, «only the first stage is immediate», the sum check, the lapsed-stage finding | its lens/maturity gating, its lot-size executability arithmetic, its core-DCA lane refusal |
 
 ⚠️ **Nothing was commonised.** The three packages in `untilled/aumos-catalogue#256` are each
@@ -82,6 +82,45 @@ every intent that is not `enter-staged` or `add-next-stage` reports an increment
 including the trims and the exits, which carry a **cumulative** target the host reduces to rather than
 a negative increment. The already-at-or-above-target case is defined: increment zero, intent `hold`,
 review `already-at-target`.
+
+## An open proposal states a total, and the fold is `max` (#813)
+
+The host publishes each unapproved judgement's **total** weight per asset — `portfolio_get` says
+so in its own description — and the host executes it as a total: a book holding 6% of a name,
+under another manager's open proposal for a total of 12%, sends an order for the **difference**
+and ends at 12%. Never 18%. `untilled/aumos` PR #815 measured that through the real execution
+path, and then measured what this package did with the same rows.
+
+So exposure to one name is
+
+```
+exposure = max(held, the largest total any open proposal asks for)
+         = held + max(0, thatTotal − held)
+```
+
+and this package reports the second term — what the pending proposals still require **on top of**
+the holding — as the open-proposal figure, so that `held + open = exposure` stays an identity.
+
+⚠️ **This package added the two until #813**, and the overstatement is not conservative in any
+useful sense — it refuses positions on books with room:
+
+| | held | pending total | the host produces | this package said |
+|---|---|---|---|---|
+| A | 0% | 8% | **8%** | 8% |
+| B | 6% | 12% | **12%** | 18% |
+| C | 6% | 15% | **15%** | 21% |
+
+⚠️ **Two managers naming the same total have agreed on one end state**, not asked for two, so
+their totals fold by `max` as well. That is the host's own reading of the field and the reason it
+publishes no sum — a host-side sum is the aggregate cap `untilled/aumos#781` rejected by name.
+
+⚠️ **`max`, and not «the latest total wins».** A pending *trim* does not reduce exposure before it
+fills: a 14% holding under a proposal to take it to 8% is 14% of this book right now, and a
+ceiling has to hold in both of the states the account passes through.
+
+⛔ **The netting lives here rather than in the caller.** A run that is asked to subtract before it
+calls is a run that can be argued out of subtracting, and every axis — the name, the sector and
+the whole book — has to fold the same way or one name is counted twice on one of them.
 
 ## The sector axis: the judgement #269 asked for, and what came of it
 
@@ -136,7 +175,7 @@ no network, no test framework — there is none in this repository and this pack
 | `cases.json` | one run per rung of the ladder, and — asserted **across** cases — that catalyst realisation, one delay, repeated delay, cancellation, a reversing recovery indicator and a deteriorating refinancing reach six *different* judgements. A change collapsing two of them passes every per-case check and fails this one |
 | `ledger.json` | confirmed vs estimated dates; announcement time vs report date; a prior-year source not opening a window; a price move never confirming success; terminal states not reopening; contrary evidence surviving a restatement; a delay costing three things; a closed window being flagged for adjudication |
 | `staging.json` | the same plan read four times. The second read is the point: the same due stage, and nothing added |
-| `concentration.json` | open proposals counting as exposure; per-strategy caps not summing into a larger account limit; a proposal restating its own strategy's holding; one name under two theses still being one position |
+| `concentration.json` | open proposals counting as exposure; per-strategy caps not summing into a larger account limit; a proposal restating the position rather than stacking on it; one name under two theses still being one position |
 | `scoreboard.json` | a failed catalyst under a positive price return still scoring zero on the catalyst side; an open window staying out of the denominator; a combined return being refused |
 | the absent-input regressions (in `tools/verify-catalyst-turnaround.mjs`, not a fixture file) | one declared input removed from a run that passes, twelve times over, asserting the run refuses rather than proceeds — and that none of them reports a refutation. They are in-memory mutations precisely so the positive fixtures keep passing for the reasons they already passed |
 | `reference-case.json` | the reference case classifying as a policy-and-financial turnaround at three points in its own story, never excluded on a valuation multiple, with the four channels kept apart — **and** a variant with the same classification that does not reach a purchase |

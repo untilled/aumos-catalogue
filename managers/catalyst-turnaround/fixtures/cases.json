@@ -575,7 +575,7 @@
     },
     {
       "name": "account-limit-already-taken-by-another-strategy",
-      "why": "The thesis is complete and another manager on the same book already holds the account's whole allowance for this name. One book, one position.",
+      "why": "The thesis is complete and another manager on the same book already holds the account's whole allowance for this name — 0.14 held and an unapproved proposal asking for a total of 0.2, which is the ceiling. One book, one position.",
       "expect": { "intent": "blocked-by-account-limit", "review": "account-limit-taken", "benchmarkComparisonRequired": false, "causeCodes": ["risk_limit_exceeded"] },
       "input": {
         "asOf": "2026-06-30T07:00:00Z",
@@ -630,7 +630,7 @@
         "sizing": { "expectedActiveReturn": 0.45, "conviction": 0.55, "mandatePositionCap": 0.12 },
         "book": {
           "positions": [{ "symbol": "A00007", "strategy": "shareholder-rerating", "weight": 0.14 }],
-          "proposals": [{ "symbol": "A00007", "strategy": "fundamental-mean-reversion", "weight": 0.06 }],
+          "proposals": [{ "symbol": "A00007", "strategy": "fundamental-mean-reversion", "weight": 0.2 }],
           "caps": { "accountSingleName": 0.2, "perStrategy": { "catalyst-turnaround": 0.12, "shareholder-rerating": 0.14, "fundamental-mean-reversion": 0.1 } }
         }
       }

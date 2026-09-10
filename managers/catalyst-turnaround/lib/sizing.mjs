@@ -177,11 +177,16 @@ export function targetWeight({
  *   strategies each allowed 0.10 of one name is not 0.30 of it, and the way that
  *   mistake reaches a book is that nobody ever adds the three numbers up.
  *
- * ⚠️ **A proposal restates the strategy's own holding; it does not stack on it.**
- * That is `managers/evidence-gated/lib/sizing.mjs`'s `concentration` rule and it
- * is derived from there: proposals are the target state for the names they
- * mention, so summing a 0.25 holding and a 0.15 trim proposal to 0.40 would
- * refuse the trim as if it were a purchase.
+ * ⚠️ **A proposal restates the position; it does not stack on it (#813).** A
+ * proposal row states the weight it asks the name to *become* — the host's
+ * `targetWeight` — so summing a 0.25 holding and a 0.15 trim proposal to 0.40
+ * would refuse the trim as if it were a purchase, and summing a 0.06 holding and
+ * a 0.15 pending total to 0.21 refuses an entry on a book with room. The fold is
+ * `max`, and it is over the whole position rather than over one strategy's share
+ * of it: the shape of that rule came from `managers/evidence-gated/lib/sizing.mjs`'s
+ * `concentration`, and what #813 changed is that it is keyed on the name rather
+ * than on the pair (strategy, name) — which is also the only key available on a
+ * book whose holdings carry no attribution.
  *
  * ── The sector axis this package does not compute, and what that costs (#269) ─
  *
@@ -260,6 +265,62 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
   }
 
   /**
+   * ── An open proposal states a **total**, so the fold is `max` (#813) ───────
+   *
+   * ⛔ **The weight on a proposal row is the weight that proposal asks the
+   * position to *become*, not an amount to add to it.** It is the host's
+   * `targetWeight`, and `portfolio_get` publishes that sentence in its own
+   * description. It is also what the host executes: a book holding 6% of a name,
+   * under another manager's proposal for a total of 12%, sends an order for the
+   * *difference* and ends at 12%. Never 18%. So exposure to one name is
+   *
+   *     total = max(held, the largest total any open proposal asks for)
+   *
+   * and `proposed` on the row below is what the pending proposals still require
+   * on top of the holding — `total − held`, never negative.
+   *
+   * ⚠️ **This package added the two until #813.** A 6%-held name under a 15%
+   * pending total was read as 21%, which against a 20% account ceiling is a
+   * `breach` with `headroomForStrategy: 0` on a book that had 5% of room. Two
+   * managers naming the same total have agreed on one end state rather than asked
+   * for two, so their totals fold by `max` as well.
+   *
+   * ⚠️ **`max`, and not «the latest total wins».** A pending *trim* does not
+   * reduce exposure before it fills: a 14% holding under a proposal to take it to
+   * 8% is 14% of this book right now. That subsumes the strategy-keyed
+   * restatement rule this function used to carry — a proposal restates the whole
+   * position rather than its own strategy's share of it, which is also the only
+   * reading available on a book whose holdings carry no attribution at all.
+   */
+  const bySymbol = new Map()
+  const readRow = (row, source) => {
+    if (typeof row?.symbol !== 'string' || !row.symbol) {
+      diagnostics.push(diagnostic('exposure_row_unnamed', 'blocked', 'Every exposure row names the symbol it is exposure to', source))
+      return
+    }
+    if (!finite(row?.weight) || row.weight < 0) {
+      diagnostics.push(diagnostic('exposure_weight_invalid', 'blocked', 'Weights are non-negative numbers', `${source}[${row.symbol}]`))
+      return
+    }
+    const entry = bySymbol.get(row.symbol) ?? { symbol: row.symbol, sector: null, held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {} }
+    if (entry.sector === null && typeof row.sector === 'string' && row.sector.length > 0) entry.sector = row.sector
+    const owner = row.strategy ?? 'unattributed'
+    if (source === 'positions') {
+      entry.held = round(entry.held + row.weight)
+      entry.heldByStrategy[owner] = round((entry.heldByStrategy[owner] ?? 0) + row.weight)
+    } else {
+      entry.pendingPeak = Math.max(entry.pendingPeak, row.weight)
+      entry.pendingPeakByStrategy[owner] = Math.max(entry.pendingPeakByStrategy[owner] ?? 0, row.weight)
+    }
+    bySymbol.set(row.symbol, entry)
+  }
+  for (const row of positions) readRow(row, 'positions')
+  for (const row of proposals) readRow(row, 'proposals')
+
+  /** One name, one quantity: what the account is exposed to once the pending totals are folded in. */
+  const exposureOf = (entry) => round(Math.max(entry.held, entry.pendingPeak))
+
+  /**
    * ── the sector axis, read or reported as unreadable ────────────────────────
    */
   const sectorCapReading = readDeclared(caps.accountSector)
@@ -268,10 +329,10 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
   if (sectorCapReading.state === 'value') {
     const candidateSector = typeof candidate?.sector === 'string' && candidate.sector.length > 0 ? candidate.sector : null
     const unclassified = []
-    for (const row of [...positions, ...proposals]) {
-      if (typeof row?.sector === 'string' && row.sector.length > 0) continue
-      if (!finite(row?.weight) || row.weight === 0) continue
-      if (!unclassified.includes(row?.symbol ?? 'unnamed')) unclassified.push(row?.symbol ?? 'unnamed')
+    for (const entry of bySymbol.values()) {
+      if (entry.sector !== null) continue
+      if (exposureOf(entry) === 0) continue
+      if (!unclassified.includes(entry.symbol)) unclassified.push(entry.symbol)
     }
     if (candidateSector === null || unclassified.length > 0) {
       sectorState = 'unevaluated'
@@ -297,9 +358,9 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
     } else {
       sectorState = 'evaluated'
       const bySector = new Map()
-      for (const row of [...positions, ...proposals]) {
-        if (!finite(row?.weight)) continue
-        bySector.set(row.sector, round((bySector.get(row.sector) ?? 0) + row.weight))
+      for (const entry of bySymbol.values()) {
+        if (entry.sector === null) continue
+        bySector.set(entry.sector, round((bySector.get(entry.sector) ?? 0) + exposureOf(entry)))
       }
       sectorRows = Object.fromEntries(bySector)
       const candidateExposure = bySector.get(candidateSector) ?? 0
@@ -324,36 +385,22 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
     )
   }
 
-  const key = (row) => `${row?.strategy ?? 'unattributed'}::${row?.symbol}`
-  const restated = new Set(proposals.map(key))
-
-  const bySymbol = new Map()
-  const add = (row, source) => {
-    if (typeof row?.symbol !== 'string' || !row.symbol) {
-      diagnostics.push(diagnostic('exposure_row_unnamed', 'blocked', 'Every exposure row names the symbol it is exposure to', source))
-      return
-    }
-    if (!finite(row?.weight) || row.weight < 0) {
-      diagnostics.push(diagnostic('exposure_weight_invalid', 'blocked', 'Weights are non-negative numbers', `${source}[${row.symbol}]`))
-      return
-    }
-    const entry = bySymbol.get(row.symbol) ?? { symbol: row.symbol, held: 0, proposed: 0, byStrategy: {}, otherStrategies: 0 }
-    entry[source === 'positions' ? 'held' : 'proposed'] += row.weight
-    entry.byStrategy[row.strategy ?? 'unattributed'] = round((entry.byStrategy[row.strategy ?? 'unattributed'] ?? 0) + row.weight)
-    if ((row.strategy ?? 'unattributed') !== strategy) entry.otherStrategies = round(entry.otherStrategies + row.weight)
-    bySymbol.set(row.symbol, entry)
-  }
-
-  for (const row of positions) {
-    if (restated.has(key(row))) continue
-    add(row, 'positions')
-  }
-  for (const row of proposals) add(row, 'proposals')
-
   const rows = []
   for (const entry of bySymbol.values()) {
-    const total = round(entry.held + entry.proposed)
+    const total = exposureOf(entry)
+    const held = round(entry.held)
     const strategyCap = finite(strategyCaps[strategy]) ? strategyCaps[strategy] : accountCap
+    /**
+     * ⚠️ **A strategy's share of the name folds the same way**, and it is capped
+     * by the name's own total: what everybody else has is what is left over, so
+     * `headroomForStrategy` below cannot be widened by an attribution that
+     * disagrees with the position.
+     */
+    const byStrategy = {}
+    for (const owner of new Set([...Object.keys(entry.heldByStrategy), ...Object.keys(entry.pendingPeakByStrategy)])) {
+      byStrategy[owner] = round(Math.min(total, Math.max(entry.heldByStrategy[owner] ?? 0, entry.pendingPeakByStrategy[owner] ?? 0)))
+    }
+    const otherStrategies = round(Math.max(0, total - (byStrategy[strategy] ?? 0)))
     /**
      * What is left for *this* strategy in *this* name. The binding limit is the
      * smaller of the account's and this strategy's, minus whatever every other
@@ -362,13 +409,14 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
      */
     const row = {
       symbol: entry.symbol,
-      held: round(entry.held),
-      proposed: round(entry.proposed),
+      held,
+      /** What the open proposals still require **on top of** the holding. Never negative. */
+      proposed: round(total - held),
       total,
-      byStrategy: entry.byStrategy,
+      byStrategy,
       accountCap,
       breach: total > accountCap,
-      headroomForStrategy: round(Math.max(0, Math.min(accountCap, strategyCap) - entry.otherStrategies)),
+      headroomForStrategy: round(Math.max(0, Math.min(accountCap, strategyCap) - otherStrategies)),
     }
     if (row.breach) {
       causes.push(

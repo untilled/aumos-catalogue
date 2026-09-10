@@ -278,6 +278,87 @@ for (const scenario of concentration.scenarios) {
 }
 
 /**
+ * ── #813: the host states a **total**, and three books it is measured on ───
+ *
+ * The scenarios are the A/B/C of `untilled/aumos` PR #815, which drove the real
+ * host — `Kernel.decide`, real `position_assignments`, `discoveryService`'s
+ * `portfolio-get` — and fed its answer to this package's own `lib`. The fund is
+ * ₩100,000,000 on XKRX with a 20% account single-name ceiling, and the third
+ * column is what that host actually produces once the orders go out:
+ *
+ *   A  held 0%  · pending total 8%   → 8%   (unchanged by #813)
+ *   B  held 6%  · pending total 12%  → 12%  (this package said 18%)
+ *   C  held 6%  · pending total 15%  → 15%  (said 21%: breach, headroom 0)
+ *
+ * ⚠️ **B and C are the shape of the defect**: a name that is *already held* and
+ * *also* carries a pending total. In A the two readings coincide — nobody holds
+ * the name — which is why #810's measurement, every row of which was an unheld
+ * name, could not tell them apart.
+ */
+for (const scenario of [
+  { label: 'A — held 0%, pending total 8%', held: 0, pendingTotal: 0.08, total: 0.08, proposed: 0.08, naive: 0.08, headroom: 0.12 },
+  { label: 'B — held 6%, pending total 12%', held: 0.06, pendingTotal: 0.12, total: 0.12, proposed: 0.06, naive: 0.18, headroom: 0.08 },
+  { label: 'C — held 6%, pending total 15%', held: 0.06, pendingTotal: 0.15, total: 0.15, proposed: 0.09, naive: 0.21, headroom: 0.05 },
+]) {
+  check(`#813 ${scenario.label} — the pending total is folded by maximum and the ceiling still has room`, () => {
+    const answer = accountConcentration({
+      positions: scenario.held > 0 ? [{ symbol: 'A00007', weight: scenario.held, strategy: 'shareholder-rerating' }] : [],
+      proposals: [{ symbol: 'A00007', weight: scenario.pendingTotal, strategy: 'fundamental-mean-reversion' }],
+      caps: { accountSingleName: 0.2 },
+      strategy: 'catalyst-turnaround',
+    })
+    const row = answer.data.rows.find((entry) => entry.symbol === 'A00007')
+    assert.equal(row.total, scenario.total, `${scenario.label}: the account's exposure to this name`)
+    if (scenario.naive !== scenario.total) assert.notEqual(row.total, scenario.naive, `${scenario.label}: the holding and the pending total were added`)
+    assert.equal(row.held, scenario.held)
+    assert.equal(row.proposed, scenario.proposed, `${scenario.label}: what the pending total still asks for on top of the holding`)
+    assert.equal(row.breach, false, `${scenario.label}: a book with room reported a breach`)
+    assert.equal(row.headroomForStrategy, scenario.headroom, `${scenario.label}: what is left of the 20% ceiling`)
+    assert.ok(!has(answer.causes, 'risk_limit_exceeded'), `${scenario.label}: a book with room refused`)
+  })
+}
+
+check('#813 — a pending trim does not reduce exposure before it fills, and two managers naming one total have agreed on it', () => {
+  const trimming = accountConcentration({
+    positions: [{ symbol: 'A00011', weight: 0.14, strategy: 'catalyst-turnaround' }],
+    proposals: [{ symbol: 'A00011', weight: 0.08, strategy: 'catalyst-turnaround' }],
+    caps: { accountSingleName: 0.2 },
+    strategy: 'catalyst-turnaround',
+  })
+  assert.equal(trimming.data.rows[0].total, 0.14, 'a pending trim was read as though it had already filled')
+  assert.equal(trimming.data.rows[0].proposed, 0, 'a pending total below the holding asked for something on top of it')
+
+  const twoManagers = accountConcentration({
+    positions: [{ symbol: 'A00007', weight: 0.06, strategy: 'shareholder-rerating' }],
+    proposals: [
+      { symbol: 'A00007', weight: 0.12, strategy: 'fundamental-mean-reversion' },
+      { symbol: 'A00007', weight: 0.12, strategy: 'evidence-gated' },
+    ],
+    caps: { accountSingleName: 0.2 },
+    strategy: 'catalyst-turnaround',
+  })
+  assert.equal(twoManagers.data.rows[0].total, 0.12, 'two proposals for the same total were read as a request for twice it')
+  assert.equal(twoManagers.data.rows[0].breach, false)
+  assert.equal(twoManagers.data.rows[0].headroomForStrategy, 0.08, 'the other strategies were charged twice for one end state')
+})
+
+check('#813 — the sector axis folds the same way, or a ceiling counts one name twice', () => {
+  const answer = accountConcentration({
+    positions: [
+      { symbol: 'A00007', sector: 'utilities', weight: 0.06, strategy: 'shareholder-rerating' },
+      { symbol: 'A00008', sector: 'utilities', weight: 0.1, strategy: 'evidence-gated' },
+    ],
+    proposals: [{ symbol: 'A00007', sector: 'utilities', weight: 0.12, strategy: 'fundamental-mean-reversion' }],
+    caps: { accountSingleName: 0.2, accountSector: 0.3 },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A00007', sector: 'utilities' },
+  })
+  assert.equal(answer.data.sectorState, 'evaluated')
+  assert.equal(answer.data.sectorExposure.utilities, 0.22, 'the sector total added a holding and its own pending total')
+  assert.ok(!has(answer.causes, 'risk_limit_exceeded'), 'a sector with room was reported as past its ceiling')
+})
+
+/**
  * ── #269: the sector axis this package does not compute ───────────────────
  *
  * ⛔ **«No sector concept, therefore no conflict» was a claim about the code and
