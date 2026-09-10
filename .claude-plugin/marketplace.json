@@ -318,6 +318,53 @@
       }
     },
     {
+      "name": "shareholder-rerating",
+      "source": "./managers/shareholder-rerating",
+      "description": "Korea-listed single equities whose earnings and capital headroom support a shareholder return programme that is actually being executed, held for the discount that closing it should close. Separates re-rating from dividends in every number, and never counts a company's buyback as the investor's income.",
+      "version": "0.1.0",
+      "metadata": {
+        "name": "Shareholder Rerating",
+        "publisher": "aumos",
+        "methodology": "Judges whether a Korea-listed company's profit and capital support a shareholder return programme it is actually executing, and whether executing it closes the discount the shares trade at. Financials are read on capital above their own policy CET1 target, non-financials on cash after required investment. Announced and executed programmes are different facts; a company's buyback is never added to the investor's cash dividend.",
+        "assetClasses": [
+          "equity"
+        ],
+        "markets": [
+          "XKRX"
+        ],
+        "tasks": [
+          "PORTFOLIO_REVIEW",
+          "ASSET_REVIEW",
+          "THESIS_REVIEW",
+          "EVENT_REVIEW"
+        ],
+        "capabilities": [
+          "portfolio:read",
+          "thesis:read",
+          "evidence:read",
+          "source:passthrough",
+          "connection:passthrough",
+          "observation:file",
+          "manager-memory:read",
+          "manager-memory:write"
+        ],
+        "requiresSkills": [
+          "source_request",
+          "connection_request"
+        ],
+        "enginesAumos": ">=0.4.0",
+        "provenance": {
+          "sourceRepo": "https://github.com/morethanmin/trading-harness",
+          "commit": "1fa18c595baa742f7323366a3c220fec5c6535a7",
+          "license": "MIT",
+          "licenseHolder": "Lee Sang Min"
+        },
+        "homepage": null,
+        "publishedAt": "2026-09-10T00:00:00.000Z",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJTaGFyZWhvbGRlciBSZXJhdGluZyI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxRjNBNUYiLz4KICA8cGF0aCBkPSJNMTQgNDRoMzYiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9Ii41Ii8+CiAgPHJlY3QgeD0iMTciIHk9IjMwIiB3aWR0aD0iOCIgaGVpZ2h0PSIxNCIgcng9IjIiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9Ii44NSIvPgogIDxyZWN0IHg9IjMwIiB5PSIyNCIgd2lkdGg9IjgiIGhlaWdodD0iMjAiIHJ4PSIyIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIuODUiLz4KICA8cmVjdCB4PSI0MyIgeT0iMTYiIHdpZHRoPSI4IiBoZWlnaHQ9IjI4IiByeD0iMiIgZmlsbD0iIzdGRDFBOCIvPgogIDxjaXJjbGUgY3g9IjQ3IiBjeT0iMTIiIHI9IjQiIGZpbGw9IiNFN0I4NEIiLz4KPC9zdmc+Cg=="
+      }
+    },
+    {
       "name": "undervalued-now",
       "source": "./managers/undervalued-now",
       "description": "One paragraph, no capabilities, and its own web and shell. A benchmark of the model rather than of a methodology — the prompt is the question, and the forward return is the answer.",

@@ -1,0 +1,176 @@
+{
+  "note": "One staged plan, evaluated under the states a real run finds it in. The stages carry cumulative weights, so what a run proposes is always a difference — which is what makes the re-run cases below cost nothing.",
+  "plan": {
+    "planId": "plan_000000_1",
+    "decisionId": "dec_000000_1",
+    "symbol": "000000",
+    "cumulativeTargetWeight": 0.06,
+    "stages": [
+      {
+        "stageId": "stage-1",
+        "toWeight": 0.02,
+        "expiresAt": "2026-12-31T00:00:00Z",
+        "conditions": [
+          { "kind": "thesis-intact" },
+          { "kind": "discount-headroom" },
+          { "kind": "risk-budget" }
+        ]
+      },
+      {
+        "stageId": "stage-2",
+        "toWeight": 0.04,
+        "expiresAt": "2026-12-31T00:00:00Z",
+        "conditions": [
+          { "kind": "execution-evidence", "of": "quarterly treasury acquisition report" },
+          { "kind": "thesis-intact" },
+          { "kind": "risk-budget" }
+        ]
+      },
+      {
+        "stageId": "stage-3",
+        "toWeight": 0.06,
+        "expiresAt": "2026-06-30T00:00:00Z",
+        "conditions": [{ "kind": "thesis-intact" }, { "kind": "discount-headroom" }]
+      },
+      {
+        "stageId": "stage-price-only",
+        "toWeight": 0.05,
+        "expiresAt": "2026-12-31T00:00:00Z",
+        "conditions": [{ "kind": "price-below", "price": 14000 }]
+      },
+      {
+        "stageId": "stage-above-target",
+        "toWeight": 0.08,
+        "expiresAt": "2026-12-31T00:00:00Z",
+        "conditions": [{ "kind": "thesis-intact" }, { "kind": "discount-headroom" }]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "first-stage-proposes-its-difference",
+      "input": {
+        "stageId": "stage-1",
+        "asOf": "2026-09-10T07:00:00Z",
+        "executedStageIds": [],
+        "book": { "heldWeight": 0, "openProposalWeight": 0 },
+        "recheck": { "thesisIntact": true, "discountToBase": 0.31, "riskBudgetRemaining": 0.01, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "propose", "increment": 0.02, "cumulativeAfter": 0.02 }
+    },
+    {
+      "id": "the-same-stage-again-with-the-ledger-intact",
+      "note": "The plan's own ledger says stage-1 happened. Nothing is proposed and nothing is refused: this is the ordinary shape of a re-run.",
+      "input": {
+        "stageId": "stage-1",
+        "asOf": "2026-09-11T07:00:00Z",
+        "executedStageIds": ["stage-1"],
+        "book": { "heldWeight": 0.02, "openProposalWeight": 0 },
+        "recheck": { "thesisIntact": true, "discountToBase": 0.29, "riskBudgetRemaining": 0.008, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "skip", "reason": "stage_already_executed", "increment": 0 }
+    },
+    {
+      "id": "the-same-stage-again-with-the-ledger-lost",
+      "note": "The interesting one. The host repeated the run after a failure and the ledger entry never got written — but the fill did. Because the stage states a cumulative weight and the arithmetic subtracts what the book already holds, the increment is zero anyway. A plan whose stages were increments would double this position here.",
+      "input": {
+        "stageId": "stage-1",
+        "asOf": "2026-09-11T07:00:00Z",
+        "executedStageIds": [],
+        "book": { "heldWeight": 0.02, "openProposalWeight": 0 },
+        "recheck": { "thesisIntact": true, "discountToBase": 0.29, "riskBudgetRemaining": 0.008, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "skip", "reason": "stage_already_filled", "increment": 0 }
+    },
+    {
+      "id": "an-unfilled-proposal-counts-as-exposure",
+      "note": "Stage 2's cumulative 4% is already covered by 2% held plus 2% proposed and not yet approved. Proposing the difference against the held weight alone would put 4% more of the book into an approval queue that already has 2% in it.",
+      "input": {
+        "stageId": "stage-2",
+        "asOf": "2026-09-20T07:00:00Z",
+        "executedStageIds": ["stage-1"],
+        "book": { "heldWeight": 0.02, "openProposalWeight": 0.02 },
+        "recheck": { "thesisIntact": true, "discountToBase": 0.25, "riskBudgetRemaining": 0.008, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "skip", "reason": "stage_already_filled", "increment": 0 }
+    },
+    {
+      "id": "second-stage-proposes-only-what-is-left",
+      "input": {
+        "stageId": "stage-2",
+        "asOf": "2026-09-20T07:00:00Z",
+        "executedStageIds": ["stage-1"],
+        "book": { "heldWeight": 0.02, "openProposalWeight": 0 },
+        "recheck": { "thesisIntact": true, "discountToBase": 0.25, "riskBudgetRemaining": 0.008, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "propose", "increment": 0.02, "cumulativeAfter": 0.04 }
+    },
+    {
+      "id": "a-stage-that-is-only-a-lower-price-is-refused",
+      "input": {
+        "stageId": "stage-price-only",
+        "asOf": "2026-09-20T07:00:00Z",
+        "executedStageIds": ["stage-1"],
+        "book": { "heldWeight": 0.02, "openProposalWeight": 0 },
+        "recheck": { "thesisIntact": true, "discountToBase": 0.4, "riskBudgetRemaining": 0.01, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "blocked", "reason": "price_only_stage_condition", "increment": 0 }
+    },
+    {
+      "id": "a-thesis-not-reaffirmed-stops-the-plan",
+      "input": {
+        "stageId": "stage-2",
+        "asOf": "2026-09-20T07:00:00Z",
+        "executedStageIds": ["stage-1"],
+        "book": { "heldWeight": 0.02, "openProposalWeight": 0 },
+        "recheck": { "thesisIntact": false, "discountToBase": 0.25, "riskBudgetRemaining": 0.008, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "blocked", "reason": "thesis_not_reaffirmed", "increment": 0 }
+    },
+    {
+      "id": "no-discount-left-stops-the-plan",
+      "input": {
+        "stageId": "stage-2",
+        "asOf": "2026-09-20T07:00:00Z",
+        "executedStageIds": ["stage-1"],
+        "book": { "heldWeight": 0.02, "openProposalWeight": 0 },
+        "recheck": { "thesisIntact": true, "discountToBase": -0.02, "riskBudgetRemaining": 0.008, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "blocked", "reason": "no_discount_headroom", "increment": 0 }
+    },
+    {
+      "id": "the-budget-is-what-is-left-not-what-was-planned",
+      "note": "The stage asks for 2% more of the book at a loss-to-invalidation of 18.75%, which is 0.375% of the account at risk, and 0.1% of the budget remains. The stage waits rather than being trimmed to fit: a stage sized to what is left is a size nothing calculated.",
+      "input": {
+        "stageId": "stage-2",
+        "asOf": "2026-09-20T07:00:00Z",
+        "executedStageIds": ["stage-1"],
+        "book": { "heldWeight": 0.02, "openProposalWeight": 0 },
+        "recheck": { "thesisIntact": true, "discountToBase": 0.25, "riskBudgetRemaining": 0.001, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "blocked", "reason": "risk_budget_exhausted", "increment": 0, "outcomeCode": "risk_limit_exceeded" }
+    },
+    {
+      "id": "an-expired-stage-is-not-an-instruction",
+      "input": {
+        "stageId": "stage-3",
+        "asOf": "2026-09-20T07:00:00Z",
+        "executedStageIds": ["stage-1", "stage-2"],
+        "book": { "heldWeight": 0.04, "openProposalWeight": 0 },
+        "recheck": { "thesisIntact": true, "discountToBase": 0.2, "riskBudgetRemaining": 0.01, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "skip", "reason": "stage_expired", "increment": 0 }
+    },
+    {
+      "id": "a-stage-above-the-plans-own-total-is-refused",
+      "input": {
+        "stageId": "stage-above-target",
+        "asOf": "2026-09-20T07:00:00Z",
+        "executedStageIds": ["stage-1", "stage-2"],
+        "book": { "heldWeight": 0.04, "openProposalWeight": 0 },
+        "recheck": { "thesisIntact": true, "discountToBase": 0.2, "riskBudgetRemaining": 0.01, "lossFraction": 0.1875 }
+      },
+      "expect": { "action": "blocked", "reason": "stage_above_cumulative_target", "increment": 0 }
+    }
+  ]
+}

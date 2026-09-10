@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shareholder Rerating instance configuration",
+  "description": "Reaches the manager as ManagerInvocation.config. These are operating constants of the instance, not the shape of the method: nothing here can loosen the Mandate, and nothing here is a threshold the case classification turns on. The thresholds that classify — the execution pace floor, the observable-elapsed share, the sector-relative yield multiple and the non-recurring share — are properties of disclosure practice and accounting materiality rather than of an investor's appetite, so they live in lib/thresholds.mjs and are not configurable. Every value here is also written into PROMPT.md, because an invocation may carry no config block at all.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "deepReviewIntervalDays": {
+      "type": "integer",
+      "minimum": 7,
+      "maximum": 120,
+      "default": 30,
+      "description": "How often a held thesis gets a full re-argument rather than a price and risk check. 30 days by default because the disclosures this methodology reads — results, dividend resolutions, treasury acquisition reports — arrive on a monthly-or-slower cadence, and a deep review that runs faster than its evidence arrives is re-reading the same filings."
+    },
+    "maxActiveTheses": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20,
+      "default": 6,
+      "description": "How many completed theses this instance carries at once. It is a limit on breadth in favour of depth: a run that skims a dozen names and completes none has produced nothing this package can act on or measure. Reaching the limit does not refuse a better candidate — it requires the run to say which existing thesis it is displacing and why."
+    },
+    "minimumExecutablePosition": {
+      "type": "number",
+      "minimum": 0,
+      "default": 500000,
+      "description": "In won. The smallest position worth opening in this venue: below it, a KOSPI-listed share priced anywhere in the ordinary 10,000-100,000 won range gives a position of a handful of shares, which cannot be staged into or trimmed without changing the weight materially, and whose result is round-trip cost rather than the idea. A weight below this is refused rather than rounded up to it."
+    },
+    "dividendWithholdingTaxRate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.6,
+      "default": 0.154,
+      "description": "The rate the investor's net dividend leg is computed at when the invocation states none. 0.154 is the standard Korean resident withholding rate on dividends including local income tax; an investor taxed otherwise sets their own, and a run that used the default says so, because a total return quoted gross and one quoted net differ by roughly a sixth of the cash leg."
+    }
+  }
+}

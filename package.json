@@ -23,6 +23,7 @@
     "check:recipes": "node tools/verify-evidence-gated-recipes.mjs",
     "check:evidence-citation": "node tools/verify-evidence-gated-evidence-citation.mjs",
     "check:amp-price-levels": "node tools/verify-amp-price-levels.mjs",
+    "check:shareholder-rerating": "node tools/verify-shareholder-rerating.mjs",
     "check:legacy-parity": "node tools/legacy-parity.mjs"
   },
   "dependencies": {

@@ -1,0 +1,103 @@
+{
+  "note": "The two legs of expected total return, and the additions that are refused. Every figure is invented for the arithmetic it exercises.",
+  "cases": [
+    {
+      "id": "two-legs-and-the-buyback-is-in-neither",
+      "note": "Re-rating plus the investor's net cash dividend is the total return, exactly. The buyback yield is computed, reported, and absent from that sum — which is the whole reason this module is code.",
+      "input": {
+        "price": 16000,
+        "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
+        "fairValueBasis": { "method": "pbr-on-sustainable-roe" },
+        "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
+        "buyback": { "executedAmount": 200000000000, "cancelledAmount": 150000000000, "marketCap": 12000000000000 }
+      },
+      "expect": {
+        "rerating": { "bear": -0.1875, "base": 0.3125, "bull": 0.5625 },
+        "investorCashReturn": 0.06345,
+        "totalReturn": { "bear": -0.12405, "base": 0.37595, "bull": 0.62595 },
+        "buybackYield": 0.01666667,
+        "cancellationYield": 0.0125,
+        "buybackIncludedInInvestorReturn": false,
+        "legsSumToTotal": true
+      }
+    },
+    {
+      "id": "a-buyback-added-to-the-investors-return-is-refused",
+      "note": "The failure this module was written for. A run that adds executedBuyback / marketCap to a dividend yield has counted the same won twice and called the second count income.",
+      "input": {
+        "price": 16000,
+        "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
+        "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
+        "buyback": { "executedAmount": 200000000000, "marketCap": 12000000000000 },
+        "addedReturnItems": [{ "kind": "buyback", "value": 0.01666667 }]
+      },
+      "expect": {
+        "blocked": true,
+        "diagnosticCodes": ["shareholder_return_double_counted"],
+        "totalReturnBaseIsNull": true
+      }
+    },
+    {
+      "id": "a-cancellation-added-on-top-of-a-fair-value-that-already-carries-it",
+      "note": "The subtler half of the same mistake: the fair value was struck on per-share figures that already reflect the cancellation, so quoting the cancellation yield again is the uplift counted twice.",
+      "input": {
+        "price": 16000,
+        "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
+        "fairValueBasis": { "method": "pbr-on-sustainable-roe", "includesCancellationUplift": true },
+        "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
+        "buyback": { "cancelledAmount": 150000000000, "marketCap": 12000000000000 },
+        "addedReturnItems": [{ "kind": "cancellation", "value": 0.0125 }]
+      },
+      "expect": {
+        "blocked": true,
+        "diagnosticCodes": ["shareholder_return_double_counted", "cancellation_inside_fair_value"],
+        "totalReturnBaseIsNull": true
+      }
+    },
+    {
+      "id": "the-same-dividend-twice",
+      "note": "One payment, entered as the dividend leg and again as a return item.",
+      "input": {
+        "price": 16000,
+        "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
+        "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true, "withholdingTaxRate": 0.154 },
+        "addedReturnItems": [{ "kind": "dividend", "value": 0.075 }]
+      },
+      "expect": {
+        "blocked": true,
+        "diagnosticCodes": ["shareholder_return_double_counted"],
+        "totalReturnBaseIsNull": true
+      }
+    },
+    {
+      "id": "a-dividend-the-investor-cannot-be-on-the-register-for",
+      "note": "The ex-date falls outside the holding period. The payment happens and it happens to somebody else, so the cash leg is zero and the total return is the re-rating alone.",
+      "input": {
+        "price": 16000,
+        "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
+        "cashDividend": { "perShare": 1200, "receivableWithinHorizon": false, "withholdingTaxRate": 0.154 }
+      },
+      "expect": {
+        "investorCashReturn": 0,
+        "totalReturn": { "bear": -0.1875, "base": 0.3125, "bull": 0.5625 },
+        "diagnosticCodes": ["dividend_not_receivable"],
+        "legsSumToTotal": true
+      }
+    },
+    {
+      "id": "no-withholding-rate-makes-the-figure-an-upper-bound",
+      "note": "The gross yield is used and the answer says out loud that it is pre-tax, because a total return quoted gross and a total return quoted net differ by roughly a sixth of the cash leg on a Korean dividend.",
+      "input": {
+        "price": 16000,
+        "fairValue": { "bear": 13000, "base": 21000, "bull": 25000 },
+        "cashDividend": { "perShare": 1200, "receivableWithinHorizon": true }
+      },
+      "expect": {
+        "investorCashReturn": 0.075,
+        "withholdingTaxRateUsed": null,
+        "diagnosticCodes": ["dividend_tax_not_stated"],
+        "legsSumToTotal": true
+      }
+    }
+  ]
+}
