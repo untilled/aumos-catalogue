@@ -217,7 +217,8 @@ effectiveLoss      = lossToInvalidation + gapHaircut
 targetTotalWeight  = min( perThesisRiskBudget / effectiveLoss,
                           liquidity ceiling,
                           the Mandate's single-name cap less what *other* strategies hold,
-                          the Mandate's gross cap less what *other* strategies hold )
+                          the Mandate's gross cap less what *other* strategies hold,
+                          the Mandate's sector cap less what *other* strategies hold in it )
 incrementalWeight  = max(0, targetTotalWeight − what this thesis already holds)
 ```
 
@@ -233,6 +234,18 @@ could not measure is not 3%. All of them refuse with `data_missing`, and a sizin
 reading it could not evaluate — an undeclared halt state, say — will not reach BUY. On XKRX
 `execution.dailyPriceLimit` is `true`; declare it, because this package will not fill a venue
 fact in for you.
+
+⛔ **A declared sector ceiling that cannot be checked stops the entry.** This methodology
+classifies no company by industry and never will — but «no sector concept, therefore no
+conflict» is a statement about this package and not about the account. If `mandate.sectorCap`
+is declared, the total it is measured against has to be formable, and that total is every
+holding and every open proposal in that sector: one unclassified row anywhere in the book makes
+it short by whatever it is, however well classified the candidate is. Then `positionSizing`
+refuses with `data_missing`, naming the row, and you open nothing and fire no stage. ⚠️ **The
+review branch is above this** — an invalidation that fired, an elapsed deadline, a target
+reached all reach their answers unchanged, because an unverifiable ceiling withholds an
+addition and nothing else. If no `sectorCap` is declared, the axis is reported as not
+applicable rather than silently skipped.
 
 **A stop price does not guarantee a fill.** On KRX the ±30% daily limit is not protection, it
 is the mechanism: a limit-down session is a session in which your stop is a wish, and a halt is

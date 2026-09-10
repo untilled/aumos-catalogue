@@ -20,6 +20,22 @@
  * ⚠️ **The cap is not the order.** `mandate.singleNameCap` is the ceiling and
  * never the default weight — the weight comes from the risk budget divided by
  * the effective loss, and the cap only ever makes it smaller.
+ *
+ * ⑶ **A declared sector ceiling this run cannot check holds the increase (#269).**
+ * This package had no sector concept at all, and «no concept, therefore no
+ * conflict» was never a proof of anything: the host does not enforce a Mandate's
+ * sector ceiling and this package did not receive it, so under such a Mandate a
+ * correct-looking answer could put the account through a limit its investor had
+ * declared. `mandate.sectorCap` is now read. Declared and formable, it is another
+ * ceiling in the `min`; declared and unformable — the candidate carries no sector,
+ * or a row of the book does — it refuses as `data_missing`, which withholds the
+ * entry and leaves every review, trim and re-adjudication rung above it untouched.
+ * Undeclared, it constrains nothing: a Mandate that states no sector ceiling has
+ * declined to constrain that axis rather than left a gap.
+ *
+ * ⚠️ **That sector is the fund's risk-management classification** — the host's,
+ * applied across the whole account — and not this package's reading of what
+ * business a company is in. This package makes no such reading.
  */
 import { THRESHOLDS, diagnostic, finite, narrowingOnly, round } from './core.mjs'
 
@@ -188,6 +204,38 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
 }
 
 /**
+ * Exposure to one **fund risk-management sector**, over holdings and open
+ * proposals together, and the rows that could not be classified at all.
+ *
+ * ⚠️ **The candidate's own sector is not the whole of the question.** A ceiling
+ * is measured against a total, and one unclassified row makes the total short by
+ * whatever it is — however well classified the candidate is. So the unformable
+ * case is reported from the *book*, not only from the candidate.
+ */
+export function sectorConcentration(book, sector, symbol, strategyId = STRATEGY_ID) {
+  const holdings = Array.isArray(book?.holdings) ? book.holdings : []
+  const proposals = Array.isArray(book?.openProposals) ? book.openProposals : []
+  const rows = [
+    ...holdings.map((row) => ({ ...row, weight: row.weight })),
+    ...proposals.map((row) => ({ ...row, weight: row.targetWeight })),
+  ]
+  const unclassified = []
+  let exposure = 0
+  let own = 0
+  for (const row of rows) {
+    if (!finite(row.weight) || row.weight === 0) continue
+    if (typeof row.sector !== 'string' || row.sector.length === 0) {
+      if (!unclassified.includes(row.symbol ?? 'unnamed')) unclassified.push(row.symbol ?? 'unnamed')
+      continue
+    }
+    if (row.sector !== sector) continue
+    exposure += row.weight
+    if (row.symbol === symbol && (row.strategy ?? 'unattributed') === strategyId) own += row.weight
+  }
+  return { sector, exposure: round(exposure), ownWeight: round(own), otherWeight: round(exposure - own), unclassified }
+}
+
+/**
  * The whole position this thesis may hold, what buying it today would add, and
  * the loss the book takes if the thesis reaches its invalidation.
  *
@@ -319,6 +367,44 @@ export function positionSizing(input = {}) {
     return { status: 'refused', code: 'data_missing', haircut, exposure, diagnostics }
   }
   /**
+   * ── the sector ceiling, which nothing here used to read (#269) ───────────
+   *
+   * ⛔ **Declared and unevaluable refuses; undeclared constrains nothing.** The
+   * two are different facts and only the first withholds anything. The refusal
+   * is `data_missing`, so `classifyCase` reaches it below the held-position
+   * rungs: a trim, a re-adjudication and an exit are never withheld by a limit
+   * that only constrains additions.
+   */
+  const sectorCap = finite(mandate.sectorCap) ? mandate.sectorCap : null
+  const candidateSector = typeof input.sector === 'string' && input.sector.length > 0 ? input.sector : null
+  let sectorExposure = null
+  let headroomSector = null
+  if (sectorCap !== null) {
+    sectorExposure = sectorConcentration(book, candidateSector, symbol, strategyId)
+    if (candidateSector === null || sectorExposure.unclassified.length > 0) {
+      diagnostics.push(diagnostic(
+        'sector_exposure_unevaluable',
+        'blocked',
+        `A sector ceiling of ${sectorCap} is declared and the total it is measured against cannot be formed: ${[
+          candidateSector === null ? 'this candidate does not say which sector it is in' : null,
+          sectorExposure.unclassified.length > 0 ? `${sectorExposure.unclassified.join(', ')} in the book carr${sectorExposure.unclassified.length === 1 ? 'ies' : 'y'} no sector` : null,
+        ].filter(Boolean).join('; ')}. A declared limit this run could not verify is not a limit that passed, and no exposure is increased under one. This is an absence about the account and says nothing about the thesis`,
+        'mandate.sectorCap',
+        { sectorCap, candidateSector, unclassified: sectorExposure.unclassified },
+      ))
+      return { status: 'refused', code: 'data_missing', haircut, exposure, sectorExposure, diagnostics }
+    }
+    headroomSector = round(sectorCap - sectorExposure.otherWeight)
+  } else {
+    diagnostics.push(diagnostic(
+      'sector_cap_not_applicable',
+      'info',
+      'This mandate declares no sector ceiling, so the sector axis is not applicable on this run rather than unchecked. Said out loud, because an axis nobody looked at and an axis nobody declared must not leave the same trace',
+      'mandate.sectorCap',
+    ))
+  }
+
+  /**
    * ⛔ **A per-strategy allowance never raises the account's ceiling.** It is
    * read only to make the smaller of the two bind, and a caller handing in one
    * that is larger is told so rather than obeyed.
@@ -352,6 +438,7 @@ export function positionSizing(input = {}) {
     { name: 'single-name-headroom', value: headroomSingleName },
     { name: 'strategy-headroom', value: headroomStrategy },
     { name: 'gross-headroom', value: headroomGross },
+    { name: 'sector-headroom', value: headroomSector },
   ].filter((row) => finite(row.value))
 
   const binding = ceilings.reduce((lowest, row) => (lowest === null || row.value < lowest.value ? row : lowest), null)
@@ -374,6 +461,7 @@ export function positionSizing(input = {}) {
     liquidityCap,
     averageTradedValue,
     exposure,
+    sectorExposure,
     ceilings,
     bindingConstraint: binding?.name ?? null,
     /**

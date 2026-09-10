@@ -113,6 +113,50 @@ where the increment is zero because the position is complete; `classifyCase` ans
 `target-weight-already-held` and `WAIT`, which is a different sentence from «no room» and would
 otherwise have been the same zero.
 
+## The sector axis: the judgement #269 asked for, and what came of it
+
+**The question.** #269 required each of the three #256 packages to be *read* and judged under a
+Mandate that states a sector ceiling — and said so about this one by name: «`fundamental-mean-reversion`
+은 섹터 개념이 없으므로 충돌하지 않는다»는 결론은 조건부다. 개념이 없다는 것 자체가 준수의 증거가
+아니다.
+
+**The reading.** Before this change, the string `sector` appeared nowhere in `lib/` at all, and once
+in `PROMPT.md` — in the list of things that might have *caused* a fall («a sector de-rating»), which
+is a cause to decompose and not an exposure axis. `positionSizing` read `mandate.singleNameCap`,
+`mandate.grossCap` and `mandate.strategyCap`; `mandate.sectorCap` was read by nothing.
+
+**The verdict: it could increase risk.** #269's conditional needs either the host to enforce the
+ceiling or the package to receive its result. Neither held. So under a Mandate declaring a sector
+ceiling, a `mean-reversion-candidate` BUY could take the account through that ceiling with a
+correct target weight, a correct downside figure and no finding anywhere. Having no concept of a
+sector is what made the breach invisible, not what made it impossible.
+
+**What was changed, and what was not.** `positionSizing` now reads `mandate.sectorCap` and
+`input.sector`, and `sectorConcentration` folds the sector total over holdings and open proposals
+together:
+
+| Mandate | classification | effect |
+|---|---|---|
+| no `sectorCap` | — | `sector_cap_not_applicable` · `info`; no `sector-headroom` ceiling exists |
+| declared | complete | a `sector-headroom` ceiling joins the `min`, measured against what *other* strategies hold in that sector — the same rule as every other headroom here |
+| declared | candidate **or any book row** unclassified | `sector_exposure_unevaluable` · `blocked`, refused as `data_missing` |
+
+⛔ **The refusal is `data_missing` and it lands below the held-position rungs.** `classifyCase`
+reaches the sizing at rung ⑺; the review branch — an invalidation that fired, an elapsed deadline, a
+target reached — is rung ⑵. So a trim, a re-adjudication and an exit are never withheld by a ceiling
+that only constrains additions, and the withheld entry is recorded as an absence about the *account*
+rather than as a finding about the thesis.
+
+⚠️ **This package still classifies nothing.** The sector it reads is the fund's risk-management
+classification, supplied with the book and the candidate; the methodology's own work — the fall's
+causes, the damage test, the stabilisation evidence — is about one company and stays that way.
+
+⚠️ **The candidate's own sector is not the whole of the question.** A ceiling is measured against a
+total, and one unclassified holding or open proposal makes that total unformable however well
+classified the candidate is. The `#269 —` checks in `tools/verify-fundamental-mean-reversion.mjs`
+build that case explicitly, with a positive control that reaches BUY, because a run that looked only
+at the candidate passes every other one.
+
 ## Fixtures
 
 Synthetic bars, generated once and committed. ⛔ **They are shapes, not prices.** No vendor data

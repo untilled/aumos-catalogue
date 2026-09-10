@@ -229,6 +229,18 @@ recomputed for this port — so it is **not** an edge this package has been show
 appears nowhere in it. Aumos shows no returns for this package until it has measured some from
 actual runs.
 
+**Sectors: this package has no concept of one, and that is not the same as being safe under a
+sector limit.** Nothing in this methodology reads what industry a company is in — the fall's causes,
+the damage test and the stabilisation evidence are all about one company — and it does not
+classify one. But "no sector concept, therefore no conflict" is a conclusion about the code and not
+about your account: the host does not enforce a Mandate's sector ceiling and this package was not
+receiving one, so under such a Mandate a correct-looking answer could take the account through a
+limit you had declared. It now reads `sectorCap`. **Declared and checkable, it is one more ceiling
+on the position. Declared and uncheckable — the candidate, or any holding or open proposal in the
+book, carries no sector — no entry is opened and no stage fires**, and the answer names the row it
+could not classify and records it as missing data. Undeclared, the axis simply does not apply.
+Reviewing, trimming, re-adjudicating and exiting a position you already hold are untouched.
+
 **Known limits at first publication.** Duplicate-exposure attribution across several managers
 on one book, the storage of a proposal, the re-arming of a review and the link from a decision
 to a real fill are all the host's, and none of them is exercised by this repository's checks.

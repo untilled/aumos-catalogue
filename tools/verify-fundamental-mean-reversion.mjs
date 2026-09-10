@@ -390,7 +390,23 @@ check('the absence audit has a positive control', () => {
   const control = sizeWith(() => {})
   assert.equal(control.status, 'ok')
   assert.ok(control.targetTotalWeight > 0)
-  assert.deepEqual(control.diagnostics, [], 'and it carries no unevaluated reading, so a BUY over it is authorised by checks that actually ran')
+  /**
+   * ⚠️ Was `deepEqual(diagnostics, [])`. #269 added an `info` note saying the
+   * Mandate declares no sector ceiling — an axis nobody declared and an axis
+   * nobody looked at must not leave the same trace — so the assertion is
+   * restated at the severity it was always about: nothing here is unevaluated
+   * or blocked, which is what authorises a BUY over it.
+   */
+  assert.deepEqual(
+    control.diagnostics.filter((row) => row.severity === 'unevaluated' || row.severity === 'blocked'),
+    [],
+    'and it carries no unevaluated reading, so a BUY over it is authorised by checks that actually ran',
+  )
+  assert.deepEqual(
+    control.diagnostics.map((row) => row.code),
+    ['sector_cap_not_applicable'],
+    'a Mandate declaring no sector ceiling has to say so rather than leave the axis silently skipped (#269)',
+  )
 })
 
 check('an unread book is not an empty book', () => {
@@ -630,6 +646,121 @@ check('the required-output checklist can be false', () => {
   })
   assert.equal(answer.requiredOutputs.technicalState, false, 'a checklist entry hardcoded true checks nothing')
   assert.equal(answer.requiredOutputs.stabilisationObservation, false)
+})
+
+/**
+ * ── #269: a declared sector ceiling this package cannot check ──────────────
+ *
+ * «This package has no sector concept, therefore it cannot break a sector limit»
+ * is a conclusion about the code and not about the account. The host does not
+ * enforce a Mandate's sector ceiling and this package did not receive it, so
+ * under such a Mandate a correct-looking answer could put the account through a
+ * limit its investor had declared. These are the four states of that axis.
+ */
+check('#269 — an undeclared sector ceiling constrains nothing and says so', () => {
+  const answer = sizeWith(() => {})
+  assert.equal(answer.status, 'ok')
+  assert.equal(answer.sectorExposure, null)
+  assert.ok(answer.diagnostics.some((row) => row.code === 'sector_cap_not_applicable' && row.severity === 'info'))
+  assert.ok(!answer.ceilings.some((row) => row.name === 'sector-headroom'))
+})
+
+check('#269 — a declared sector ceiling is folded like every other ceiling', () => {
+  const answer = sizeWith((input) => {
+    input.sector = 'internet'
+    input.mandate.sectorCap = 0.2
+    input.book.holdings = [{ symbol: 'OTHER', sector: 'internet', weight: 0.05, strategy: 'evidence-gated' }]
+  })
+  assert.equal(answer.status, 'ok')
+  assert.equal(answer.sectorExposure.exposure, 0.05)
+  const ceiling = answer.ceilings.find((row) => row.name === 'sector-headroom')
+  assert.ok(ceiling, 'a declared sector ceiling was read and then not applied')
+  assert.equal(ceiling.value, 0.15, 'the sector headroom is the ceiling less what everyone else already has in it')
+
+  const full = sizeWith((input) => {
+    input.sector = 'internet'
+    input.mandate.sectorCap = 0.05
+    input.book.holdings = [{ symbol: 'OTHER', sector: 'internet', weight: 0.05, strategy: 'evidence-gated' }]
+  })
+  assert.equal(full.status, 'refused')
+  assert.equal(full.code, 'risk_limit_exceeded', 'a full sector is a finding about the book, not about the thesis')
+})
+
+check('#269 — a declared ceiling whose total cannot be formed withholds the entry as an absence', () => {
+  const noCandidateSector = sizeWith((input) => {
+    input.mandate.sectorCap = 0.2
+  })
+  assert.equal(noCandidateSector.status, 'refused')
+  assert.equal(noCandidateSector.code, 'data_missing', 'an unformable sector total was recorded as something other than an absence')
+  assert.ok(noCandidateSector.diagnostics.some((row) => row.code === 'sector_exposure_unevaluable'))
+
+  /**
+   * ⛔ **The hole #269 names: the candidate is classified and the book is not.**
+   * A run that looked only at the candidate would size this and buy it.
+   */
+  const unclassifiedHolding = sizeWith((input) => {
+    input.sector = 'internet'
+    input.mandate.sectorCap = 0.2
+    input.book.holdings = [
+      { symbol: 'OTHER', sector: 'internet', weight: 0.05, strategy: 'evidence-gated' },
+      { symbol: 'MYSTERY', weight: 0.06, strategy: 'catalyst-turnaround' },
+    ]
+  })
+  assert.equal(unclassifiedHolding.status, 'refused', 'the candidate named its sector, the book could not form one, and the position sized anyway')
+  assert.equal(unclassifiedHolding.code, 'data_missing')
+  assert.deepEqual(
+    unclassifiedHolding.diagnostics.find((row) => row.code === 'sector_exposure_unevaluable')?.details.unclassified,
+    ['MYSTERY'],
+    'the run has to name the row it could not classify',
+  )
+
+  // …and an unapproved proposal, which is exposure that is about to exist.
+  const unclassifiedProposal = sizeWith((input) => {
+    input.sector = 'internet'
+    input.mandate.sectorCap = 0.2
+    input.book.openProposals = [{ symbol: 'PENDING', targetWeight: 0.04, strategy: 'shareholder-rerating' }]
+  })
+  assert.equal(unclassifiedProposal.status, 'refused')
+  assert.equal(unclassifiedProposal.code, 'data_missing')
+})
+
+check('#269 — the withheld entry is a WATCH about the account, and the held rungs above it still fire', () => {
+  const positive = cases.cases.find((entry) => entry.name === 'temporary-shock-plus-stabilisation')
+  assert.ok(positive, 'the positive classification fixture is still there')
+  const unformableSizing = sizeWith((row) => {
+    row.sector = 'internet'
+    row.mandate.sectorCap = 0.2
+    row.book.holdings = [{ symbol: 'MYSTERY', weight: 0.06, strategy: 'catalyst-turnaround' }]
+  })
+  const withUnformableSector = () => ({
+    ...clone(positive.input),
+    sizing: unformableSizing,
+    series: { adjustment: 'adjusted', corporateActions: [], rows: rowsOf(positive.series) },
+  })
+  // The control: the same fixture with its own sizing reaches a BUY.
+  const control = execute({
+    operation: 'classifyCase',
+    asOf: ASOF,
+    input: { ...clone(positive.input), series: { adjustment: 'adjusted', corporateActions: [], rows: rowsOf(positive.series) } },
+  })
+  assert.equal(control.verdict, 'BUY', 'the positive control no longer buys, so the assertion below is testing nothing')
+  const withheld = execute({ operation: 'classifyCase', asOf: ASOF, input: withUnformableSector() })
+  assert.notEqual(withheld.verdict, 'BUY', 'a declared sector ceiling nobody could check let a purchase through')
+  assert.equal(withheld.code, 'data_missing', 'the withheld entry was filed as something other than an absence')
+  assert.notEqual(withheld.code, 'thesis_refuted')
+
+  /**
+   * ⑸ **A reduction is not withheld.** The held-position rungs sit above the
+   * sizing, so a trim, a re-adjudication and an exit reach their answers whatever
+   * the sector total could not be formed from.
+   */
+  const held = withUnformableSector()
+  held.position = { ...(held.position ?? {}), held: true }
+  held.review = { ...(held.review ?? {}), invalidationTriggered: true }
+  const reduction = execute({ operation: 'classifyCase', asOf: ASOF, input: held })
+  assert.notEqual(reduction.verdict, 'BUY')
+  assert.equal(reduction.outcome, 'invalidated-re-adjudicate', `a held position with a fired invalidation reached ${reduction.outcome}`)
+  assert.equal(reduction.verdict, 'RE_ADJUDICATE', 'a risk-reducing rung was replaced by the account absence below it')
 })
 
 // ── ⑬ asOf is not optional ────────────────────────────────────────────────
