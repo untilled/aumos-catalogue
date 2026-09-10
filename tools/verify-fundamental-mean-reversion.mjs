@@ -507,6 +507,123 @@ check('#817 — a BUY over an unattributed holding leaves as a buy, and the adde
   assert.equal(fresh.hostTargetWeight, fresh.targetTotalWeight, 'and this is why an unheld-name measurement could not see any of it')
 })
 
+/**
+ * ── #819: the same conversion, on the branch that **sells** ────────────────
+ *
+ * `untilled/aumos#817` closed the buy direction and the review branch never saw
+ * it. Driven against the real host, `invalidation-triggered`,
+ * `deadline-elapsed` and `target-reached-staged-trim` came back **identical**
+ * on a position this desk runs, on another manager's, and on one assigned to
+ * nobody — no `sizing` on the answer, so neither attribution number crossed,
+ * and an `exit` over a 6% unattributed holding was `sell:60`: the whole
+ * position, all of it somebody else's.
+ *
+ * ⛔ **And an `exit` bypasses every weight this package computes.** Its target
+ * is a real `0` (`untilled/aumos#154`), so no arithmetic protects it — the only
+ * protection is to stop offering it. `catalyst-turnaround` reached the same
+ * conclusion in the form its branch could take (`close-out` comes back as
+ * `hostTargetWeight = otherHeld`); this branch sizes nothing, so it says the
+ * same thing as a **floor** and by withdrawing `SELL`.
+ *
+ * ⚠️ **A reduction of this desk's own position still leaves**, which is the
+ * whole point of `TRIM` and `RE_ADJUDICATE` and is the thing this fix must not
+ * kill.
+ */
+check('#819 — a review of a position this desk does not run may not leave as a sale', () => {
+  const CAP = { singleNameCap: 0.2, grossCap: 0.9 }
+  const sizingBase = structuredClone(sizing.cases.find((row) => row.name === 'calm-series').input)
+  const sizeAgainst = (holdings) =>
+    execute({
+      operation: 'positionSizing',
+      asOf: ASOF,
+      input: { ...structuredClone(sizingBase), mandate: CAP, book: { holdings, openProposals: [] }, rows: rowsOf('shock-then-base') },
+    })
+  const SYMBOL = sizingBase.symbol
+  const held = (weight, strategy) => [{ symbol: SYMBOL, sector: 'technology', weight, ...(strategy === undefined ? {} : { strategy }) }]
+
+  const reviewOf = (name) => {
+    const row = cases.cases.find((fixture) => fixture.name === name)
+    assert.ok(row, `fixtures/cases.json carries ${name}, which this regression is about`)
+    return row
+  }
+  const classify = (name, sizingAnswer) => {
+    const row = reviewOf(name)
+    return execute({
+      operation: 'classifyCase',
+      asOf: ASOF,
+      input: {
+        ...structuredClone(row.input),
+        series: { adjustment: row.declared ?? undefined, corporateActions: row.corporateActions ?? [], rows: rowsOf(row.series) },
+        sizing: sizingAnswer,
+      },
+    })
+  }
+  const codesOf = (answer) => answer.diagnostics.map((diag) => diag.code)
+
+  /**
+   * ⛔ **The issue's book.** 6% held and assigned to nobody — every share bought
+   * by hand in a broker app is in this state. The review still happens; what it
+   * may no longer do is end in a sale of somebody else's position.
+   */
+  for (const [label, holdings] of [
+    ['unattributed', held(0.06)],
+    ['another manager', held(0.06, 'inst_catalyst_turnaround')],
+  ]) {
+    const answer = classify('invalidation-triggered', sizeAgainst(holdings))
+    assert.equal(answer.outcome, 'invalidated-re-adjudicate', `${label}: the finding about the thesis is unchanged — this is not a refusal to review`)
+    assert.equal(answer.verdict, 'RE_ADJUDICATE', `${label}: the re-judgement still has to be written down`)
+    assert.equal(answer.ownHeldWeight, 0, `${label}: a holding this desk was never assigned was read as its own`)
+    assert.equal(answer.otherHeldWeight, 0.06, `${label}: the review answer carries no attribution at all`)
+    assert.equal(answer.hostTargetWeightFloor, 0.06, `${label}: the review answer named no floor, so any target it produced sold the whole position`)
+    assert.deepEqual([...answer.ampActions], ['WATCH'], `${label}: a re-adjudication of a position this desk does not run still offers to sell it`)
+    assert.ok(!answer.ampActions.includes('SELL'), `${label}: an exit is a real 0 and would liquidate their holding`)
+    assert.ok(codesOf(answer).includes('reviewed_position_is_not_this_desks'), `${label}: nothing said whose position it is`)
+    /** ⚠️ The review branch answered no `sizing` at all, so neither weight reached the model. */
+    assert.ok(answer.sizing?.exposure, `${label}: the review answer carries no sizing, so the run reading it has no numbers to reduce against`)
+    assert.equal(answer.sizing.hostTargetWeight, round(0.06 + answer.sizing.targetTotalWeight), `${label}: the buy-direction total is still assembled the way #817 assembles it`)
+    assert.ok(!codesOf(answer).includes('data_missing'), `${label}: an explicit book was reported as missing data, which is the state untilled/aumos#782 undid`)
+  }
+
+  /** The same on the other two review branches: one fix, three doors. */
+  for (const name of ['deadline-elapsed', 'target-reached-staged-trim']) {
+    const answer = classify(name, sizeAgainst(held(0.06)))
+    assert.deepEqual([...answer.ampActions], ['WATCH'], `${name}: this branch was left offering a sale of somebody else's position`)
+    assert.equal(answer.hostTargetWeightFloor, 0.06, `${name}: no floor left with the answer`)
+  }
+
+  /**
+   * ⛔ **A reduction of this desk's own position still leaves, unchanged.** #819
+   * must not turn every review into a no-op: that is the «safely do nothing»
+   * state `untilled/aumos#782` undid.
+   */
+  const mine = classify('invalidation-triggered', sizeAgainst(held(0.12, STRATEGY_ID)))
+  assert.equal(mine.ownHeldWeight, 0.12)
+  assert.equal(mine.otherHeldWeight, 0)
+  assert.equal(mine.hostTargetWeightFloor, 0, 'with nothing of anybody else\'s in the name the floor is 0, which is the host\'s exit')
+  assert.deepEqual([...mine.ampActions], ['RESIZE', 'SELL'], 'a review of this desk\'s own position stopped being able to close it')
+  assert.ok(!codesOf(mine).includes('reviewed_position_is_not_this_desks'))
+
+  /**
+   * ⚠️ **A shared position keeps the resize and loses the exit.** There is
+   * something here to reduce, and the reduction is a total at or above the
+   * floor rather than a `0`.
+   */
+  const shared = classify('invalidation-triggered', sizeAgainst([...held(0.04, STRATEGY_ID), ...held(0.06, 'inst_shareholder_rerating')]))
+  assert.equal(shared.ownHeldWeight, 0.04)
+  assert.equal(shared.otherHeldWeight, 0.06)
+  assert.equal(shared.hostTargetWeightFloor, 0.06)
+  assert.deepEqual([...shared.ampActions], ['RESIZE'], 'a shared position could still be exited, and an exit takes their half with it')
+  assert.ok(codesOf(shared).includes('reduction_is_bounded_by_anothers_holding'))
+
+  /** An account nobody folded is not an account with nobody in it. */
+  const unread = classify('invalidation-triggered', null)
+  assert.equal(unread.ownHeldWeight, null, 'an unread book answered 0, which is the reading that says nobody else holds this')
+  assert.equal(unread.otherHeldWeight, null)
+  assert.equal(unread.hostTargetWeightFloor, null)
+  assert.deepEqual([...unread.ampActions], ['RESIZE', 'SELL'], 'the published actions moved on an answer that measured nothing')
+  assert.ok(codesOf(unread).includes('review_exposure_unread'), 'the run was not told that its reduction has no floor')
+})
+
 check('config may narrow the risk budget and may not widen it', () => {
   const widened = sized.get('config-may-not-widen-the-risk-budget')
   assert.equal(widened.riskBudget, THRESHOLDS.sizing.perThesisRiskBudget)

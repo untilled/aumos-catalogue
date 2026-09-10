@@ -97,7 +97,8 @@ no target for, a `WAIT` states none at all, and a cash target names no asset. Re
 `0` and another manager's open buy becomes no exposure — and this package refuses to let a book it
 could not read look like a book with room, so it will not let a judgement it could not size look
 like one either. Build no `openProposals` row for it and refuse with `data_missing`, naming the
-decision whose size you could not read. An `exit` target **is** a real `0` and is carried as one.
+decision whose size you could not read. An `exit` target **is** a real `0` and is carried as one
+— which is exactly why you do not *send* one on a name another manager or nobody holds part of.
 And a `position-weight` target is executed against the **whole** position rather than against its
 author's share of it, which is why the fold is over the name and never over the pair (strategy,
 name).
@@ -363,6 +364,35 @@ outcome leaves open; you choose among those and you write the sentences.
 broken invalidation, an elapsed deadline — the actions left open are `RESIZE` and `SELL`.
 `WAIT` and `WATCH` are not among them, deliberately: that is what *"do not quietly keep
 holding"* looks like when it is enforced rather than requested.
+
+⛔ **And the reduction is about *your* position, which the review branch did not used to ask.**
+The formula in Stage 5 converts on the way **in**; a review converts on the way **out**, and it
+is the same conversion. `classifyCase` answers `ownHeldWeight`, `otherHeldWeight` and
+`hostTargetWeightFloor` on every answer, and the review branch carries the whole `sizing` answer
+with it:
+
+```
+hostTargetWeightFloor = otherHeldWeight          ← no target you send may be below this
+a close-out of this thesis = the floor, exactly  ← and it is `exit` only when the floor is 0
+```
+
+⛔ **An `exit` bypasses every weight above it.** Its target is a real `0`, so no arithmetic
+protects it: sent on a name somebody else holds part of, it liquidates their position with
+yours. Measured against the host, an `exit` over a 6% holding assigned to nobody was `sell:60`
+— the **whole** position, none of it this desk's. So where `otherHeldWeight` is above zero
+`SELL` is **not among the actions left open**, and the reduction is a `RESIZE` to a
+`position-weight` total at or above the floor. Where none of the position is yours at all,
+neither `RESIZE` nor `SELL` is offered and what is left is a `WATCH`: the re-judgement is still
+written down, and it does not end in an order against shares that are not this desk's.
+
+⚠️ **`null` is «the account was not folded», and it is not zero.** A review reached without a
+`positionSizing` answer knows nothing about attribution — hand the sizing in, or propose no
+weight at all.
+
+⛔ **This is not «nobody may touch an unattributed position».** You may still buy into one —
+`hostTargetWeight` *adds to* what is there — and where the position is yours, `otherHeldWeight`
+is 0, the floor is 0, and every trim, resize and exit this methodology ever made still leaves,
+`exit` included. What ended is trimming somebody else's.
 
 Your `rationale` is what a person reads. It carries, and a proposal missing any of these is not
 finished:
