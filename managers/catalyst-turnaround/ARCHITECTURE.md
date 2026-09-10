@@ -83,6 +83,49 @@ including the trims and the exits, which carry a **cumulative** target the host 
 a negative increment. The already-at-or-above-target case is defined: increment zero, intent `hold`,
 review `already-at-target`.
 
+## The sector axis: the judgement #269 asked for, and what came of it
+
+**The question.** #269 required each of the three #256 packages to be *read* and judged under a
+Mandate that states a sector ceiling, rather than assumed safe. «`catalyst-turnaround` only touches
+sector in `lib/sizing.mjs`» was the starting observation and it was not an answer.
+
+**The reading.** Before this change, `lib/sizing.mjs` mentioned a sector once — in the ⚠️ note on
+`accountConcentration` saying that `evidence-gated` folds sector, theme and factor axes and *this
+package makes a single-name claim only*. `caps` carried `accountSingleName` and `perStrategy` and
+nothing else; `runVerdict` passed `input.book?.caps` straight through. So a Mandate's
+`accountSector` reached no arithmetic anywhere in the package.
+
+**The verdict: it could increase risk.** #269's own conditional is that either the host enforces
+the ceiling or the package receives its result, and neither was true. So under a Mandate declaring
+a sector ceiling, `enter-staged` and `add-next-stage` could open or extend a position that took the
+account through that ceiling, with a correct `intent`, a correct `cumulativeTargetWeight` and no
+finding anywhere. The absence of a concept was the mechanism, not the defence.
+
+**What was changed, and what was not.** `accountConcentration` now takes a `candidate`
+(`{ symbol, sector }`, passed by `runVerdict` from `input.sector`) and reads `caps.accountSector`:
+
+| Mandate | classification | `data.sectorState` | effect |
+|---|---|---|---|
+| no `accountSector` | — | `not-applicable` | `sector_cap_not_applicable` · `note`; nothing constrained |
+| declared | complete | `evaluated` | the sector total is folded; past the ceiling is `risk_limit_exceeded` |
+| declared | candidate **or any book row** unclassified | `unevaluated` | `data_missing` cause |
+
+⛔ **The withheld case reaches `mayIncrease`, which already existed.** `runVerdict` computes
+`mayIncrease = causes.filter(code === 'data_missing').length === 0`, and the invariant at the end of
+the file throws if an increment survives it. So a `data_missing` here is the whole of the wiring: the
+entry waits, the staged addition does not fire, and `close-out`, `reduce-on-invalidation`,
+`resize-to-risk-limit`, `trim-into-realisation` and `hold-through-delay` are all above the gate and
+untouched. A limit that could not be verified withholds an increase and nothing else.
+
+⚠️ **The sector here is the fund's risk-management classification** — the host's, applied across
+the whole account. This package still forms no view of what business a company is in, and #269 did
+not ask it to: its case work is about an event and a balance sheet.
+
+⚠️ **The candidate's own sector is not the whole of the question.** A ceiling is measured against a
+total, and one unclassified holding or open proposal makes that total short by whatever it is. The
+`#269 —` checks in `tools/verify-catalyst-turnaround.mjs` build that case explicitly, because a run
+that looked only at the candidate passes every other one.
+
 ## Which fixture stands behind which rule
 
 `tools/verify-catalyst-turnaround.mjs` runs all of them on plain Node over committed JSON. No install,

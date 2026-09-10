@@ -277,6 +277,129 @@ for (const scenario of concentration.scenarios) {
   })
 }
 
+/**
+ * ── #269: the sector axis this package does not compute ───────────────────
+ *
+ * ⛔ **«No sector concept, therefore no conflict» was a claim about the code and
+ * not about the account.** The host does not enforce a Mandate's sector ceiling
+ * and this package did not receive one, so under such a Mandate a run could open
+ * a position that put the account through a limit its investor had declared —
+ * and every number in the answer would be right. The arithmetic is still not
+ * this package's methodology; the *contract* is.
+ */
+check('#269 — an undeclared sector ceiling is not applicable and constrains nothing', () => {
+  const answer = accountConcentration({
+    positions: [{ symbol: 'A', weight: 0.04, strategy: 'catalyst-turnaround' }],
+    proposals: [],
+    caps: { accountSingleName: 0.2 },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A', sector: null },
+  })
+  assert.equal(answer.data.sectorState, 'not-applicable')
+  assert.ok(has(answer.diagnostics, 'sector_cap_not_applicable'), 'an axis nobody declared and an axis nobody looked at left the same trace')
+  assert.ok(!has(answer.causes, 'data_missing'), 'an undeclared sector ceiling withheld an increase it never constrained')
+})
+
+check('#269 — a declared sector ceiling is evaluated when every row carries a sector', () => {
+  const within = accountConcentration({
+    positions: [{ symbol: 'B', sector: 'utilities', weight: 0.06, strategy: 'evidence-gated' }],
+    proposals: [],
+    caps: { accountSingleName: 0.2, accountSector: 0.3 },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A', sector: 'utilities' },
+  })
+  assert.equal(within.data.sectorState, 'evaluated')
+  assert.equal(within.data.sectorExposure.utilities, 0.06)
+  assert.ok(!has(within.causes, 'data_missing'))
+  assert.ok(!has(within.causes, 'risk_limit_exceeded'))
+
+  const over = accountConcentration({
+    positions: [{ symbol: 'B', sector: 'utilities', weight: 0.34, strategy: 'evidence-gated' }],
+    proposals: [],
+    caps: { accountSingleName: 0.4, accountSector: 0.3 },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A', sector: 'utilities' },
+  })
+  assert.ok(has(over.causes, 'risk_limit_exceeded'), 'a sector already past its declared ceiling was not a limit finding')
+})
+
+check('#269 — a declared ceiling whose total cannot be formed is an absence, from the candidate or from the book', () => {
+  const noCandidateSector = accountConcentration({
+    positions: [{ symbol: 'B', sector: 'utilities', weight: 0.06, strategy: 'evidence-gated' }],
+    proposals: [],
+    caps: { accountSingleName: 0.2, accountSector: 0.3 },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A', sector: null },
+  })
+  assert.equal(noCandidateSector.data.sectorState, 'unevaluated')
+  assert.ok(has(noCandidateSector.causes, 'data_missing'))
+  assert.ok(!has(noCandidateSector.causes, 'thesis_refuted'), 'an unformable sector total was recorded against the thesis')
+
+  /**
+   * ⛔ **The hole #269 names: the candidate is classified and a *book row* is not.**
+   * A ceiling is measured against a total, and one unclassified row makes the
+   * total short by whatever it is. A run that checked only the candidate passes
+   * this one.
+   */
+  const unclassifiedRow = accountConcentration({
+    positions: [
+      { symbol: 'B', sector: 'utilities', weight: 0.06, strategy: 'evidence-gated' },
+      { symbol: 'C', weight: 0.05, strategy: 'shareholder-rerating' },
+    ],
+    proposals: [],
+    caps: { accountSingleName: 0.2, accountSector: 0.3 },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A', sector: 'utilities' },
+  })
+  assert.equal(unclassifiedRow.data.sectorState, 'unevaluated', 'the candidate named its sector and the book could not form one, and it passed')
+  assert.deepEqual(
+    unclassifiedRow.causes.find((row) => row.code === 'data_missing')?.details.unclassified,
+    ['C'],
+    'the run has to name the row it could not classify',
+  )
+
+  const unclassifiedProposal = accountConcentration({
+    positions: [],
+    proposals: [{ symbol: 'D', weight: 0.04, strategy: 'shareholder-rerating' }],
+    caps: { accountSingleName: 0.2, accountSector: 0.3 },
+    strategy: 'catalyst-turnaround',
+    candidate: { symbol: 'A', sector: 'utilities' },
+  })
+  assert.equal(unclassifiedProposal.data.sectorState, 'unevaluated', 'an unclassified open proposal was left out of the sector total')
+})
+
+check('#269 end to end — the entry waits and the exits stay open', () => {
+  const positive = cases.cases.find((item) => item.name === 'completed-positive-thesis-reaches-the-buy-path')
+  assert.ok(positive, 'cases.json no longer carries the buy-path case, so this regression is testing nothing')
+  const withSectorCap = (name) => {
+    const item = structuredClone(cases.cases.find((row) => row.name === name).input)
+    item.book.caps = { ...(item.book.caps ?? {}), accountSector: 0.3 }
+    item.book.positions = [...(item.book.positions ?? []), { symbol: 'MYSTERY', weight: 0.05, strategy: 'shareholder-rerating' }]
+    return item
+  }
+
+  const withheld = runVerdict(withSectorCap('completed-positive-thesis-reaches-the-buy-path'))
+  assert.equal(withheld.data.intent, 'wait-for-data', `a declared sector ceiling nobody could check reached ${withheld.data.intent}`)
+  assert.equal(withheld.data.incrementThisRun ?? 0, 0, 'exposure was increased under a limit this run could not verify')
+  assert.ok(has(withheld.causes, 'data_missing'))
+  assert.ok(!has(withheld.causes, 'thesis_refuted'), 'an absence about the account was filed against the thesis')
+
+  /**
+   * ⑤ **A risk-reducing exit is not withheld.** Those rungs sit above the
+   * structural gate, so a cancellation still closes out and a fired invalidation
+   * still reduces, whatever the sector total could not be formed from.
+   */
+  for (const [name, intent] of [
+    ['catalyst-cancelled', 'close-out'],
+    ['receivable-re-growth-fires-a-declared-invalidation', 'reduce-on-invalidation'],
+    ['refinancing-deterioration', 'resize-to-risk-limit'],
+    ['one-delay-with-new-evidence', 'hold-through-delay'],
+  ]) {
+    const answer = runVerdict(withSectorCap(name))
+    assert.equal(answer.data.intent, intent, `${name} reached ${answer.data.intent} once a sector ceiling could not be checked — a limit that only constrains increases withheld a reduction`)
+  }
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. Two ledgers that never become one.
 // ─────────────────────────────────────────────────────────────────────────────

@@ -181,11 +181,35 @@ export function targetWeight({
  * That is `managers/evidence-gated/lib/sizing.mjs`'s `concentration` rule and it
  * is derived from there: proposals are the target state for the names they
  * mention, so summing a 0.25 holding and a 0.15 trim proposal to 0.40 would
- * refuse the trim as if it were a purchase. What is *not* derived is the axis
- * set — evidence-gated folds sector, theme and factor as well, and this package
- * makes a single-name claim only.
+ * refuse the trim as if it were a purchase.
+ *
+ * ── The sector axis this package does not compute, and what that costs (#269) ─
+ *
+ * ⛔ **«This package has no sector concept, so it cannot break a sector limit» is
+ * not true and was never checked.** The axis set here was the single name and
+ * nothing else, so a Mandate stating a sector ceiling had that ceiling read by
+ * nobody: the host does not enforce it, and this package did not receive it. A
+ * run under such a Mandate could open a position that put the account through a
+ * limit its investor had declared, and every number in the answer would be
+ * correct.
+ *
+ * What #269 fixes is the **contract**, not the arithmetic. A stated sector
+ * ceiling that this run cannot evaluate is `data_missing`, which is the one
+ * thing `runVerdict`'s `mayIncrease` gate already knows how to hold; a stated
+ * ceiling it *can* evaluate is folded here like any other. An **unstated** one
+ * is `not_applicable` and constrains nothing, because a Mandate that declares no
+ * sector ceiling has declined to constrain that axis rather than left a gap.
+ *
+ * ⚠️ **The candidate's own sector is not the whole of the question.** The total a
+ * sector ceiling is measured against is every position and every open proposal in
+ * that sector, so one unclassified row makes the total unformable however well
+ * classified the candidate is.
+ *
+ * ⚠️ **The sector here is the fund's risk-management classification** — the
+ * host's, applied consistently across the whole account. It is not this
+ * package's own reading of what business a company is in.
  */
-export function accountConcentration({ positions, proposals, caps = {}, strategy = null } = {}) {
+export function accountConcentration({ positions, proposals, caps = {}, strategy = null, candidate = null } = {}) {
   const diagnostics = []
   const causes = []
 
@@ -232,6 +256,71 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
         accountCap,
         perStrategy: strategyCaps,
       }),
+    )
+  }
+
+  /**
+   * ── the sector axis, read or reported as unreadable ────────────────────────
+   */
+  const sectorCapReading = readDeclared(caps.accountSector)
+  let sectorState = 'not-applicable'
+  let sectorRows = null
+  if (sectorCapReading.state === 'value') {
+    const candidateSector = typeof candidate?.sector === 'string' && candidate.sector.length > 0 ? candidate.sector : null
+    const unclassified = []
+    for (const row of [...positions, ...proposals]) {
+      if (typeof row?.sector === 'string' && row.sector.length > 0) continue
+      if (!finite(row?.weight) || row.weight === 0) continue
+      if (!unclassified.includes(row?.symbol ?? 'unnamed')) unclassified.push(row?.symbol ?? 'unnamed')
+    }
+    if (candidateSector === null || unclassified.length > 0) {
+      sectorState = 'unevaluated'
+      /**
+       * ⛔ `data_missing`, which is what `runVerdict`'s `mayIncrease` gate reads.
+       * It withholds an opening and a staged addition and touches nothing else:
+       * a hold, a trim, a close-out and every verdict about the *company* stand,
+       * because a classification nobody supplied refutes nothing.
+       */
+      causes.push(
+        cause(
+          'data_missing',
+          `A sector ceiling of ${sectorCapReading.value} is declared and this run cannot form the total it is measured against: ${
+            [
+              candidateSector === null ? 'the candidate does not say which sector it is in' : null,
+              unclassified.length > 0 ? `${unclassified.join(', ')} carr${unclassified.length === 1 ? 'ies' : 'y'} no sector` : null,
+            ].filter(Boolean).join('; ')
+          }. No exposure is increased under a declared limit this run could not check`,
+          'caps.accountSector',
+          { accountSectorCap: sectorCapReading.value, candidateSector, unclassified },
+        ),
+      )
+    } else {
+      sectorState = 'evaluated'
+      const bySector = new Map()
+      for (const row of [...positions, ...proposals]) {
+        if (!finite(row?.weight)) continue
+        bySector.set(row.sector, round((bySector.get(row.sector) ?? 0) + row.weight))
+      }
+      sectorRows = Object.fromEntries(bySector)
+      const candidateExposure = bySector.get(candidateSector) ?? 0
+      if (candidateExposure > sectorCapReading.value) {
+        causes.push(
+          cause('risk_limit_exceeded', `${candidateSector} reaches ${round(candidateExposure)} of the book across holdings and open proposals, past the declared sector ceiling of ${sectorCapReading.value}`, 'caps.accountSector', {
+            sector: candidateSector,
+            exposure: round(candidateExposure),
+            accountSectorCap: sectorCapReading.value,
+          }),
+        )
+      }
+    }
+  } else {
+    diagnostics.push(
+      diagnostic(
+        'sector_cap_not_applicable',
+        'note',
+        'This Mandate declares no sector ceiling, so the sector axis is not applicable on this run rather than unchecked. Recorded, because a declared absence and an axis nobody looked at must not leave the same trace',
+        'caps.accountSector',
+      ),
     )
   }
 
@@ -311,6 +400,10 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
       /** The book and the limit were both read. Nothing downstream may size without it. */
       readable: true,
       accountCapState: accountReading.state,
+      /** `not-applicable` (no ceiling declared), `evaluated`, or `unevaluated` (declared and unformable). */
+      sectorState,
+      accountSectorCap: sectorCapReading.state === 'value' ? sectorCapReading.value : null,
+      sectorExposure: sectorRows,
       units: { held: 'portfolio-weight', proposed: 'portfolio-weight', total: 'portfolio-weight' },
     },
     diagnostics,

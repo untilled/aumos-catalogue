@@ -208,6 +208,19 @@ unattractive valuation multiple. There is no rule anywhere in this package that 
 company, and the fixtures deliberately include a variant of the same case that does **not** reach a
 purchase.
 
+**Sectors: which one this package computes, and which one it only receives.** This manager makes no
+judgement about what business a company is in — its case work is about an *event* and a balance
+sheet, not an industry — so it has no view of its own to offer on sector classification. What it
+does now do is read a sector ceiling if your Mandate states one. It used to read only the
+single-name limit, and "this package has no sector concept, therefore it cannot break a sector
+limit" was never a proof of anything: the host does not enforce that ceiling and this package was
+not receiving it, so under such a Mandate a correct-looking answer could take the account through a
+limit you had declared. **If a sector ceiling is stated and the account's sector classification is
+incomplete — the candidate, or any position or open proposal in the book — this manager opens
+nothing and adds no stage.** It waits, names the row it could not classify, and records it as
+missing data. Closing out, reducing on an invalidation, resizing to a risk limit and holding through
+a delay are untouched: what an unverifiable ceiling withholds is the increase.
+
 **Running it beside other managers.** Exposure is measured across the whole account — real holdings
 and open proposals together — and per-strategy limits do not add up into a larger account limit. If
 you run this alongside another Korea manager, the single-name ceiling you set on the account is the

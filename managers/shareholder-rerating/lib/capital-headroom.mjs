@@ -21,45 +21,134 @@
  * one is `unevaluated`. That is what keeps the check from ageing: Basel's buffers and
  * an issuer's stated CET1 target both move, and a package carrying last year's copy
  * would refuse a company that had cleared the bar it was actually held to.
+ *
+ * ── «Financial» is four balance sheets and it was one word (#269) ──────────
+ *
+ * ⛔ **The refusal above ran across the financial/non-financial line and not inside
+ * it.** A CET1 ratio handed in for a shipbuilder was refused; a CET1 ratio handed in
+ * for a *life insurer* was accepted and divided into risk-weighted assets, because
+ * both are `financial` and nothing here asked which kind. An insurer's solvency is
+ * K-ICS, a broker's is the NCR, and a financial holding company is a consolidation of
+ * whichever of those it owns. Being financial is not a reason to enter a bank's
+ * arithmetic; being a **bank** is.
+ *
+ * So the issuer kind is five things and no longer two:
+ *
+ *   `bank`            a bank or a bank-led financial holding company — CET1 headroom
+ *   `non-financial`   an operating company — free cash after required investment
+ *   `insurance`       ⛔ **not supported.** K-ICS, and it is not a CET1 in other units
+ *   `securities`      ⛔ **not supported.** the NCR, and neither is that
+ *   `unclassified`    복합·기타·분류 미확인 — a conglomerate, or nobody has said yet
+ *
+ * ⛔ **The three unsupported kinds return `unevaluated` and never a number.** #269 is
+ * explicit that the honest answer is to say so: a solvency ratio's meaning and the
+ * arithmetic that turns it into distributable capital both have to be designed, and
+ * putting K-ICS or the NCR into the `cet1` slot because both are «capital ratios» is
+ * the same defect as the one this file already refuses, wearing a different label. An
+ * explicit non-evaluation is a wait; a silent pass is a position.
+ *
+ * ⚠️ **The legacy word `financial` is now one of the unclassified.** It named the set
+ * that contains all three of the supported and unsupported financial kinds, so it
+ * cannot select one of them, and a caller still saying it is told which word to say.
+ *
+ * ⚠️ **The classification carries its own receipts.** `classification.basis` is the
+ * filing or business report the kind was read off, and `classification.consolidationBasis`
+ * says whether the capital ratio describes the consolidated group or the bank alone —
+ * a holding company's consolidated CET1 and its banking subsidiary's are different
+ * numbers about different entities, and a headroom quoted without saying which is a
+ * number a reader cannot check. Both are reported when absent and both travel in the
+ * answer when present.
  */
 
 import { absentFields, diagnostic, finite, isBlocked, round } from './numbers.mjs'
 
-const FINANCIAL_ONLY = ['cet1', 'policyTargetCet1', 'regulatoryMinimumCet1', 'riskWeightedAssets']
+const BANK_ONLY = ['cet1', 'policyTargetCet1', 'regulatoryMinimumCet1', 'riskWeightedAssets']
 const NON_FINANCIAL_ONLY = ['netDebt', 'ebitda', 'netDebtToEbitdaCeiling']
 
 /**
+ * The five issuer kinds, and what this package can do with each. `supported` is the
+ * whole of the difference: two of them have an arithmetic here and three of them are
+ * an explicit non-evaluation.
+ */
+export const ISSUER_KINDS = Object.freeze({
+  bank: Object.freeze({ supported: true, basis: 'cet1-headroom-over-policy-target', label: '은행·은행계 금융지주' }),
+  'non-financial': Object.freeze({ supported: true, basis: 'free-cash-after-required-investment', label: '일반 비금융' }),
+  insurance: Object.freeze({ supported: false, ratio: 'K-ICS', label: '보험' }),
+  securities: Object.freeze({ supported: false, ratio: 'NCR', label: '증권' }),
+  unclassified: Object.freeze({ supported: false, ratio: null, label: '복합·기타·분류 미확인' }),
+})
+
+/** Words a caller may still be saying, and the word to say instead. */
+const RETIRED_KINDS = Object.freeze({
+  financial: 'bank, insurance, securities or unclassified',
+})
+
+const CONSOLIDATION_BASES = Object.freeze(['consolidated', 'standalone'])
+
+/**
  * @param {object} input
- * @param {'financial'|'non-financial'} input.sector
+ * @param {'bank'|'insurance'|'securities'|'non-financial'|'unclassified'} input.issuerKind
+ *   the **issuer kind** — 기업 분석용 업종, which decides *which arithmetic* answers the
+ *   question. It is not the fund's risk-management sector; that one belongs to the
+ *   host and is folded by `concentration.mjs` under a Mandate ceiling.
+ * @param {object} [input.classification] `{ basis, consolidationBasis }` — the filing the kind
+ *   was read off, and whether the capital figures are consolidated or standalone
  * @param {object} [input.financial]      `{ cet1, policyTargetCet1, regulatoryMinimumCet1, riskWeightedAssets, marketCap, roe, creditCostRatio, creditCostGuidance, projectFinanceExposureRatio }`
  * @param {object} [input.nonFinancial]   `{ operatingCashFlow, maintenanceCapex, requiredInvestment, netDebt, ebitda, netDebtToEbitdaCeiling, marketCap, plannedReturnCash }`
  */
 export function capitalHeadroom(input = {}) {
   const diagnostics = []
-  const sector = input.sector
+  const issuerKind = input.issuerKind
+  const classification = readClassification(input.classification, diagnostics)
 
-  if (sector !== 'financial' && sector !== 'non-financial') {
+  if (typeof issuerKind === 'string' && issuerKind in RETIRED_KINDS) {
+    /**
+     * ⛔ The word that used to select the bank arithmetic. It names the *set* that
+     * contains banks, insurers and brokers, so it cannot select any one of them, and
+     * a caller who says it has not classified the issuer — they have said it is
+     * financial, which is the question rather than the answer.
+     */
     diagnostics.push(
       diagnostic(
-        'sector_not_stated',
+        'issuer_kind_not_specific',
         'unevaluated',
-        'Which arithmetic answers this question is a property of the sector, and no sector was stated. Nothing is judged rather than a bank ratio being tried on whatever this is.',
-        'sector',
+        `"${issuerKind}" names a set of balance sheets rather than one of them: a bank's solvency is CET1, an insurer's is K-ICS and a broker's is the NCR, and being in the set is not a reason to be read as the first. State ${RETIRED_KINDS[issuerKind]}.`,
+        'issuerKind',
+        { issuerKind, say: RETIRED_KINDS[issuerKind] },
       ),
     )
-    return { data: emptyAnswer(null), diagnostics }
+    return { data: emptyAnswer(null, classification), diagnostics }
+  }
+  if (!(typeof issuerKind === 'string' && issuerKind in ISSUER_KINDS)) {
+    diagnostics.push(
+      diagnostic(
+        'issuer_kind_not_stated',
+        'unevaluated',
+        `Which arithmetic answers this question is a property of the issuer kind, and no recognised one was stated. One of ${Object.keys(ISSUER_KINDS).join(', ')}. Nothing is judged rather than a bank ratio being tried on whatever this is.`,
+        'issuerKind',
+        { issuerKind: issuerKind ?? null, recognised: Object.keys(ISSUER_KINDS) },
+      ),
+    )
+    return { data: emptyAnswer(null, classification), diagnostics }
   }
 
-  // ── the cross-sector refusal, before any arithmetic ──────────────────────
-  const strayFinancial = sector === 'non-financial' ? FINANCIAL_ONLY.filter((key) => finite(input.financial?.[key])) : []
-  const strayNonFinancial = sector === 'financial' ? NON_FINANCIAL_ONLY.filter((key) => finite(input.nonFinancial?.[key])) : []
-  for (const key of strayFinancial) {
+  /**
+   * ── the cross-kind refusal, before any arithmetic ────────────────────────
+   *
+   * ⛔ **This runs for every kind that is not `bank`, which is the hole #269 names.**
+   * It used to run only for `non-financial`, so an insurer or a broker carrying a
+   * `cet1` was inside `financial` and inside the bank arithmetic with it.
+   */
+  const strayBank = issuerKind === 'bank' ? [] : BANK_ONLY.filter((key) => finite(input.financial?.[key]))
+  const strayNonFinancial = issuerKind === 'non-financial' ? [] : NON_FINANCIAL_ONLY.filter((key) => finite(input.nonFinancial?.[key]))
+  for (const key of strayBank) {
     diagnostics.push(
       diagnostic(
         'bank_metric_out_of_sector',
         'blocked',
-        `${key} is a bank capital figure and this issuer is not a bank. A capital-adequacy verdict reached through it would be a number about nothing, so it is refused rather than read.`,
+        `${key} is a bank capital figure and this issuer is ${ISSUER_KINDS[issuerKind].label} (${issuerKind}), not a bank. A capital-adequacy verdict reached through it would be a number about nothing, so it is refused rather than read.`,
         `financial.${key}`,
+        { issuerKind, key },
       ),
     )
   }
@@ -68,14 +157,76 @@ export function capitalHeadroom(input = {}) {
       diagnostic(
         'industrial_metric_out_of_sector',
         'blocked',
-        `${key} judges an industrial balance sheet, and a bank's return capacity is a capital ratio rather than a leverage multiple. Refused rather than read.`,
+        `${key} judges an industrial balance sheet, and a financial issuer's return capacity is a solvency ratio rather than a leverage multiple. Refused rather than read.`,
         `nonFinancial.${key}`,
+        { issuerKind, key },
       ),
     )
   }
-  if (isBlocked(diagnostics)) return { data: emptyAnswer(sector), diagnostics }
+  if (isBlocked(diagnostics)) return { data: emptyAnswer(issuerKind, classification), diagnostics }
 
-  return sector === 'financial' ? financialHeadroom(input.financial ?? {}, diagnostics) : industrialHeadroom(input.nonFinancial ?? {}, diagnostics)
+  /**
+   * ⛔ **The explicit non-evaluation.** #269's scope keeps the bank and the operating
+   * company arithmetic and stops there. An insurer, a broker and an unclassified
+   * conglomerate leave here as `unevaluated` with the ratio that *would* answer them
+   * named, so the gap is a thing somebody can pick up rather than a silence.
+   */
+  if (!ISSUER_KINDS[issuerKind].supported) {
+    const ratio = ISSUER_KINDS[issuerKind].ratio
+    diagnostics.push(
+      diagnostic(
+        issuerKind === 'unclassified' ? 'issuer_kind_unclassified' : 'capital_headroom_method_unsupported',
+        'unevaluated',
+        issuerKind === 'unclassified'
+          ? 'This issuer is a conglomerate, something else, or nothing anybody has classified yet, so there is no single arithmetic that answers where its return would be paid from. It is left unevaluated rather than read as an operating company because a group with a financial subsidiary is not one.'
+          : `${ISSUER_KINDS[issuerKind].label} (${issuerKind}) solvency is measured by ${ratio}, and this package implements the bank and the operating-company arithmetic only. ${ratio} is not a CET1 in other units: what counts as distributable capital under it, and what the ratio means, both have to be designed before a number here would mean anything. Unsupported is stated rather than approximated.`,
+        'issuerKind',
+        { issuerKind, ratio },
+      ),
+    )
+    return { data: emptyAnswer(issuerKind, classification), diagnostics }
+  }
+
+  return issuerKind === 'bank'
+    ? financialHeadroom(input.financial ?? {}, diagnostics, classification)
+    : industrialHeadroom(input.nonFinancial ?? {}, diagnostics, classification)
+}
+
+/**
+ * The receipts on the classification: which document it was read off, and whether the
+ * capital figures describe the consolidated group or the entity alone.
+ *
+ * ⚠️ **Both are `warn` and neither refuses**, on `regulatory_minimum_not_stated`'s
+ * argument: the ratio is the number it is whichever entity it describes, and what an
+ * absent basis costs is the ability to *say* which — so it is reported wherever the
+ * capital position is quoted rather than turned into a refusal of the company.
+ */
+function readClassification(classification, diagnostics) {
+  const basis = typeof classification?.basis === 'string' && classification.basis.length > 0 ? classification.basis : null
+  const raw = classification?.consolidationBasis
+  const consolidationBasis = CONSOLIDATION_BASES.includes(raw) ? raw : null
+  if (basis === null) {
+    diagnostics.push(
+      diagnostic(
+        'issuer_classification_basis_not_stated',
+        'warn',
+        'No filing or business report was named as the reason this issuer is the kind it is said to be. The kind decides which arithmetic runs, so the document it was read off belongs beside it — say the disclosure, not the impression.',
+        'classification.basis',
+      ),
+    )
+  }
+  if (consolidationBasis === null) {
+    diagnostics.push(
+      diagnostic(
+        'capital_basis_not_stated',
+        'warn',
+        `Neither ${CONSOLIDATION_BASES.join(' nor ')} was stated, so this answer cannot say which entity its figures describe. A financial holding company's consolidated CET1 and its banking subsidiary's standalone ratio are two different numbers, and a headroom quoted without saying which is one a reader cannot check.`,
+        'classification.consolidationBasis',
+        { stated: raw ?? null, recognised: CONSOLIDATION_BASES },
+      ),
+    )
+  }
+  return { basis, consolidationBasis }
 }
 
 /**
@@ -92,7 +243,7 @@ export function capitalHeadroom(input = {}) {
  * and a package sizing a programme out of the gap between 13% and the regulatory
  * minimum would be spending capital the issuer has already promised not to spend.
  */
-function financialHeadroom(financial, diagnostics) {
+function financialHeadroom(financial, diagnostics, classification) {
   const missing = absentFields(financial, ['cet1', 'policyTargetCet1', 'riskWeightedAssets', 'marketCap'])
   if (missing.length > 0) {
     diagnostics.push(
@@ -104,7 +255,7 @@ function financialHeadroom(financial, diagnostics) {
         { missing },
       ),
     )
-    return { data: emptyAnswer('financial'), diagnostics }
+    return { data: emptyAnswer('bank', classification), diagnostics }
   }
 
   const headroomRatio = financial.cet1 - financial.policyTargetCet1
@@ -185,7 +336,8 @@ function financialHeadroom(financial, diagnostics) {
 
   return {
     data: {
-      sector: 'financial',
+      issuerKind: 'bank',
+      classification,
       basis: 'cet1-headroom-over-policy-target',
       headroomRatio: round(headroomRatio),
       distributableCapital: round(distributableCapital, 2),
@@ -216,7 +368,7 @@ function financialHeadroom(financial, diagnostics) {
  * that kills an industrial's dividend is not the lathe it replaces every year, it is
  * the plant it has already committed to build.
  */
-function industrialHeadroom(nonFinancial, diagnostics) {
+function industrialHeadroom(nonFinancial, diagnostics, classification) {
   const missing = absentFields(nonFinancial, ['operatingCashFlow', 'maintenanceCapex', 'plannedReturnCash', 'marketCap'])
   if (missing.length > 0) {
     diagnostics.push(
@@ -228,7 +380,7 @@ function industrialHeadroom(nonFinancial, diagnostics) {
         { missing },
       ),
     )
-    return { data: emptyAnswer('non-financial'), diagnostics }
+    return { data: emptyAnswer('non-financial', classification), diagnostics }
   }
 
   /**
@@ -248,7 +400,7 @@ function industrialHeadroom(nonFinancial, diagnostics) {
         'nonFinancial.requiredInvestment',
       ),
     )
-    return { data: emptyAnswer('non-financial'), diagnostics }
+    return { data: emptyAnswer('non-financial', classification), diagnostics }
   }
   const requiredInvestment = nonFinancial.requiredInvestment
   const freeCash = nonFinancial.operatingCashFlow - nonFinancial.maintenanceCapex - requiredInvestment
@@ -290,7 +442,8 @@ function industrialHeadroom(nonFinancial, diagnostics) {
 
   return {
     data: {
-      sector: 'non-financial',
+      issuerKind: 'non-financial',
+      classification,
       basis: 'free-cash-after-required-investment',
       freeCashAfterInvestment: round(freeCash, 2),
       returnCoverage: finite(coverage) ? round(coverage) : null,
@@ -308,11 +461,13 @@ function industrialHeadroom(nonFinancial, diagnostics) {
   }
 }
 
-function emptyAnswer(sector) {
+function emptyAnswer(issuerKind, classification = { basis: null, consolidationBasis: null }) {
   return {
-    sector,
+    issuerKind,
+    classification,
     basis: null,
     returnHeadroomYield: null,
+    /** ⛔ `null` and never `false`: nothing here measured the capital and found it short. */
     adequate: null,
     units: { returnHeadroomYield: 'share-of-market-cap' },
   }
