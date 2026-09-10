@@ -392,6 +392,51 @@ word.** `stage_target_ignores_others_pending` names the divergence wherever it d
 carries `hostTargetWeightIfPendingFolded` — the order that did not go out, because an observation is
 not one unless a reader can measure what it withheld.
 
+## `untilled/aumos#831` — and the same gate one rung over, on the ladder with no plan
+
+**What `#828` did not touch.** It fixed the rung a `plan` reaches. `add-next-stage` and the **entry**
+ladder arrive at the same state — *«this desk holds at or above what this run would target»* — through
+two different sizings, and the entry rung was still reading `sizing.data.targetWeight` there: the fold
+with every other desk's **open proposals** in it. Same book, same desk, same pending total, one
+difference:
+
+| other desks' pending | with a `plan` | with none |
+|---|---|---|
+| `0` | `add-next-stage`, `buy:60` | `enter-staged`, `buy:60` |
+| `0.15` | `add-next-stage`, `buy:60`, a note | `enter-staged`, `buy:50`, silence |
+| `0.20` | `add-next-stage`, `buy:60`, a note | ⚠️ **`hold`**, no order, silence |
+| `0.25` | `add-next-stage`, `buy:60`, a note | `hold`, no order, silence |
+
+⛔ **And the answer disagreed with itself.** `heldOnlyTargetWeight` sat in the same object saying
+`0.12` while `review.reason` read *«already holds 0.06 … against a cumulative target of 0.06»* —
+`#828`'s tautology verbatim, one rung over. At pending `0.25` the reason named `0.01` and the host was
+handed `0.06`: two numbers for one state inside one object.
+
+**The rungs are two here as well.** A desk that reached what it would size **against the positions**
+is `hold` / `already-at-target` and names *that* target; a desk the account limit left with nothing
+above its holding is `blocked-by-account-limit` / `account-limit-taken` and names the two rooms and
+the cap. Both are `standstill`, so ⛔ **no weight moved with the word** — `increase`'s floor (#825) is
+what makes that safe, and every row of a two-axis sweep asserts no rung that cannot buy ever sold.
+
+**And the silence, which was the other half.** ⛔ `stage_target_ignores_others_pending` was **not**
+widened to reach here. Its name is a claim — *the target ignores the pending total* — true on the
+staged rung and **false** on this one, where the target folds it in deliberately (`#813`, and `#828`'s
+own regression). A reader who greps one code and is handed two opposite facts cannot tell which run
+they are reading. The entry ladder gets `entry_target_folds_others_pending`, gated on the same
+question (*did the fold decide anything*) and carrying `hostTargetWeightIfHoldingsOnly` — the order
+that did not go out.
+
+⛔ **The entry ceiling is unmoved.** `enter-staged` still sizes through the fold that counts open
+proposals, and an opening beside a full single-name limit is still refused. What split off was the
+**word**, not the number.
+
+**The third rung that reads the folded target keeps its word by construction.**
+`odds-not-worth-taking` says the *odds* sized this at zero and sits below a rung that refuses a
+headroom of zero, so the sweep asked whether a pending total could slip between them and blame the
+arithmetic for what the limit did. It cannot: `headroomForStrategy` and `targetWeight` round on the
+same eight-place grain, so a room the fold does not take to zero is at least `1e-8` and sizes to at
+least `1e-8`. That claim is an assertion in the checker rather than a sentence here.
+
 ## The sector axis: the judgement #269 asked for, and what came of it
 
 **The question.** #269 required each of the three #256 packages to be *read* and judged under a

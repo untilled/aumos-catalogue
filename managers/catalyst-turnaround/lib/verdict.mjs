@@ -256,6 +256,17 @@ export function runVerdict(input = {}) {
     stabilisationWindowDays: config.stabilisationWindowDays,
   }
 
+  /**
+   * ⚠️ **Which ladder produced the answer, recorded rather than inferred
+   * (`untilled/aumos#831`).** The entry rungs size through `sizing.data`, which
+   * is folded twice; the staged rung sizes through the plan and its own fold.
+   * They share an `intent` and a review name (`blocked-by-account-limit` /
+   * `account-limit-taken`), so an observation about *the entry fold* cannot be
+   * gated on the outcome afterwards without claiming the fold decided something
+   * on a run where it decided nothing.
+   */
+  let sizedEntry = false
+
   const decide = () => {
     // ── rung 0: the run cannot judge at all ────────────────────────────────
     if (blocked(diagnostics)) {
@@ -472,6 +483,13 @@ export function runVerdict(input = {}) {
         review: review('inputs-unread', { at: asOfInstant + DAY_MS, kind: 'post-close-risk', reason: `No position may be opened while ${unread.map((entry) => entry.path ?? 'an input').join(', ')} is unread. An unread limit is not an absent one` }),
       }
     }
+    /**
+     * ⚠️ **Everything from here down is decided against the sizing**, and the
+     * sizing is folded twice (#828). The marker is set once, here, rather than
+     * asked of the outcome afterwards: `account-limit-taken` is reached from the
+     * staged rung too, and there the pending fold decides nothing.
+     */
+    sizedEntry = true
     if (finite(headroom) && headroom <= 0) {
       return { intent: 'blocked-by-account-limit', review: review('account-limit-taken', { kind: 'post-close-risk', reason: 'Holdings and open proposals elsewhere already fill this name’s account limit' }) }
     }
@@ -482,14 +500,46 @@ export function runVerdict(input = {}) {
       }
     }
     /**
+     * ── The target this desk reached, and the room it was left (`untilled/aumos#831`) ─
+     *
      * The case that had no defined behaviour: the book already holds at or above
      * what this run would target. The increment is zero and the honest answer is
      * that there is nothing to do — not a purchase of the full target again.
+     *
+     * ⚠️ **Which target, is the whole of #831.** `sizing.data.targetWeight` folds
+     * every other desk's **open proposals** into the ceiling (#813) and is right
+     * to — a limit has to hold in every state the account passes through. It is
+     * the wrong number to ask *«has this desk arrived?»* of: read against it, a
+     * manager on the other side of the fund sealing a BUY nobody approved, nobody
+     * funded and nobody filled turned this desk's entry into «already at target»,
+     * and the sentence underneath restated the folded number against itself —
+     * *«already holds 0.06 … against a cumulative target of 0.06»* — which is true
+     * of every folded answer and says nothing about any of them. At a larger
+     * pending total the same answer named `0.01` in its reason and handed the host
+     * `0.06`: two numbers for one state, inside one object.
+     *
+     * ⛔ **This is `untilled/aumos#828` one rung over, and #828 fixed only the rung
+     * a `plan` reaches.** `add-next-stage` and this arrive at the same state
+     * through two different sizings; the gate was the same sentence in both.
+     *
+     * ⚠️ **So the rungs are two, exactly as they are on the staged side.** A desk
+     * that reached what it would size against the **positions** holds and names
+     * that target; a desk the account limit left with nothing above its holding
+     * says `blocked-by-account-limit` / `account-limit-taken` — the word this
+     * package has carried since #265, which the rung above already reaches for a
+     * limit that is *full*. Both are `standstill`, so ⛔ **not one weight moves
+     * with the word.**
      */
-    if (finite(ownHeldWeight) && ownHeldWeight >= sizing.data.targetWeight - 1e-9) {
+    if (finite(ownHeldWeight) && finite(sizing.data.heldOnlyTargetWeight) && ownHeldWeight >= sizing.data.heldOnlyTargetWeight - 1e-9) {
       return {
         intent: 'hold',
-        review: review('already-at-target', { at: windowEnd, kind: 'catalyst-window', reason: `The book already holds ${ownHeldWeight} of this desk's own against a cumulative target of ${sizing.data.targetWeight}. The increment is zero` }),
+        review: review('already-at-target', { at: windowEnd, kind: 'catalyst-window', reason: `The book already holds ${ownHeldWeight} of this desk's own against a cumulative target of ${sizing.data.heldOnlyTargetWeight}. The increment is zero` }),
+      }
+    }
+    if (finite(ownHeldWeight) && ownHeldWeight >= sizing.data.targetWeight - 1e-9) {
+      return {
+        intent: 'blocked-by-account-limit',
+        review: review('account-limit-taken', { at: windowEnd, kind: 'catalyst-window', reason: `Measured against the positions on this book this desk would hold ${sizing.data.heldOnlyTargetWeight} of this name. The ${concentration.data.accountCap} account limit leaves it ${headroom} once every other desk's holdings and open proposals are out, against ${heldOnlyHeadroom} once only their holdings are, and the book already holds ${ownHeldWeight} of this desk's own — so there is nothing this entry may add` }),
       }
     }
     return {
@@ -727,6 +777,56 @@ export function runVerdict(input = {}) {
         ),
       )
     }
+  }
+
+  /**
+   * ── The same divergence on the entry ladder, and it is the mirror image ────
+   *
+   * ⚠️ **`untilled/aumos#831` is #828 one rung over, and the silence was the
+   * other half of it.** The entry rungs size through `sizing.data`, whose two
+   * folds differ in exactly one term, and until now nothing said a word when the
+   * pending fold decided the answer: an entry sized down, or refused outright, by
+   * a proposal nobody approved, nobody funded and nobody filled left with an
+   * empty `diagnostics` beside it. That is the sixth quiet answer in this series
+   * (`increasesExposure` #821 · `atOrAboveTarget` #823 · `exposureDirection`
+   * #825 · `aumos-catalogue#281`'s divergence · #828's stage fold).
+   *
+   * ⛔ **A separate code, and `stage_target_ignores_others_pending` was not
+   * widened to reach here.** That name is a claim — *the target ignores the
+   * pending total* — and it is true on the staged rung, where the weight that
+   * leaves is folded into holdings alone. On this ladder the target folds the
+   * pending total **in**, deliberately (#813, and #828's own ⑸ regression), so
+   * the claim is false here. A reader who greps one code and is handed two
+   * opposite facts cannot tell which run they are reading, and one word meaning
+   * two things is the defect one level down from the one being fixed.
+   *
+   * ⚠️ **The gate is «did it decide anything», the same gate #828 wrote.** Two
+   * folds that disagree over a target this desk has *already reached* changed no
+   * number — the answer is `hold` under either — so the note is withheld there.
+   *
+   * ⛔ **And the number that did not go out is carried with it**, because an
+   * observation is not one unless a reader can measure what it withheld.
+   */
+  if (sizedEntry && finite(sizing.data.targetWeight) && finite(sizing.data.heldOnlyTargetWeight) && sizing.data.targetWeight < sizing.data.heldOnlyTargetWeight && !(finite(ownHeldWeight) && ownHeldWeight >= sizing.data.heldOnlyTargetWeight - 1e-9)) {
+    const holdingsOnlyHost = finite(otherHeldWeight) && finite(ownHeldWeight)
+      ? round(otherHeldWeight + Math.max(sizing.data.heldOnlyTargetWeight, ownHeldWeight))
+      : null
+    diagnostics.push(
+      diagnostic(
+        'entry_target_folds_others_pending',
+        'note',
+        `The ceiling that decides how much this desk may buy folds other desks' open proposals in, which sizes this entry at ${sizing.data.targetWeight} of the book; measured against their holdings alone it is ${sizing.data.heldOnlyTargetWeight}. The ceiling is what a limit is for and it stands, so the host is handed ${hostTargetWeight} and not ${holdingsOnlyHost}${holdingsOnlyHost === hostTargetWeight ? ', which the holding happens to clamp to the same number here' : ''}`,
+        'book.proposals',
+        {
+          targetWeight: sizing.data.targetWeight,
+          heldOnlyTargetWeight: sizing.data.heldOnlyTargetWeight,
+          accountHeadroom: headroom ?? null,
+          heldOnlyAccountHeadroom: heldOnlyHeadroom ?? null,
+          hostTargetWeight,
+          hostTargetWeightIfHoldingsOnly: holdingsOnlyHost,
+        },
+      ),
+    )
   }
 
   /**

@@ -406,6 +406,17 @@ which of the two stopped you**: a stage the account limit will not let you reach
 `hold` / `already-at-target` is for a plan you have genuinely reached, against the plan's own target.
 The two used to share one word, and the shared sentence restated the folded number against itself.
 
+⚠️ **All of the paragraph above is true of an entry with no plan at all, and it says so now.** The
+entry rungs ask the same question — *«have I already reached what I would size?»* — and they ask it
+against what other desks **hold**. Where somebody's unapproved proposal is what leaves you nothing to
+add, the answer is **`blocked-by-account-limit` / `account-limit-taken`**, naming the room the limit
+leaves once their proposals are counted and the room it leaves once only their holdings are;
+`hold` / `already-at-target` is for a target you genuinely reached, and it names *your* target.
+Where the fold decided something, `entry_target_folds_others_pending` carries both numbers and the
+order that did not go out. ⛔ **It is a different code from the staged one and that is deliberate**:
+on a stage the target ignores the pending total, on an entry it folds it in, and one word must not
+mean both.
+
 ⚠️ **Read `increasesExposure` as what it now is: a measurement.** It is `hostTargetWeight` against
 `positionWeight` — what the account holds in the name, whoever runs it — and not a restatement of
 your intent. `addsToThisDesksShare` is the other sentence, measured the same way: it is true only
