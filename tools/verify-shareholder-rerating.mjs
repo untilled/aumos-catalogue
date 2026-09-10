@@ -366,6 +366,50 @@ for (const scenario of HOST_ABC) {
   assert.equal(gross.data.grossExposure, 0.22, 'the gross axis added a holding and its own pending total')
   ok('#813 — a pending trim, two managers agreeing on one total, and the gross axis that folds the same way')
 }
+/**
+ * ── #814/#816: a holding row that names its assignee changes nothing here ──
+ *
+ * `untilled/aumos#816` puts an `assignment` — `assigned` · `none` · `released` ·
+ * `departed`, plus the assignee's **instance** id — on every holding row
+ * `portfolio_get` answers, and the adapter into this package's `holdings` is one
+ * expression: `assigned` and mine → this instance's strategy id, `assigned` and
+ * somebody else's → that instance, the other three words → `unattributed`.
+ *
+ * ⛔ **This package's exposure arithmetic does not read it, and that is correct
+ * rather than an oversight.** `held` is counted over the whole account whoever it
+ * belongs to, because a cap is a cap on the *position*; `strategy` is read in one
+ * place only, the `overlapping_open_proposal` diagnostic about somebody else's
+ * pending row. #813's fold is keyed on the name for the same reason — a
+ * `position-weight` target is executed against the whole position — so an
+ * assignment arriving cannot move a number below.
+ */
+{
+  const MINE = 'inst_shareholder_rerating'
+  const strategyOf = (row) =>
+    row.state === 'assigned' ? (row.managerInstanceId === MINE ? 'shareholder-rerating' : row.managerInstanceId) : 'unattributed'
+  const views = [
+    { state: 'assigned', managerInstanceId: MINE },
+    { state: 'assigned', managerInstanceId: 'inst_catalyst_turnaround' },
+    { state: 'none', managerInstanceId: null },
+    { state: 'released', managerInstanceId: null },
+    { state: 'departed', managerInstanceId: null },
+  ]
+  for (const [label, held, pendingTotal, exposure] of [['A', 0, 0.08, 0.08], ['B', 0.06, 0.12, 0.12], ['C', 0.06, 0.15, 0.15]]) {
+    for (const view of views) {
+      const answer = concentration({
+        proposed: { symbol: '005930', sector: 'technology', weight: 0 },
+        holdings: held > 0 ? [{ symbol: '005930', sector: 'technology', weight: held, strategy: strategyOf(view) }] : [],
+        openProposals: [{ symbol: '005930', sector: 'technology', targetWeight: pendingTotal, strategy: 'fundamental-mean-reversion' }],
+        caps: { accountPositionCap: 0.2 },
+        strategy: 'shareholder-rerating',
+      })
+      assert.equal(answer.data.existingExposure, exposure, `${label}/${view.state}: the fold read the assignment`)
+      assert.equal(answer.data.held, held, `${label}/${view.state}: the holding moved with the assignment`)
+      assert.equal(answer.data.withinLimits, true)
+    }
+  }
+  ok('#814 — a holding that names its assignee moves no number in this package, and the fold stays keyed on the name')
+}
 
 /**
  * ── ⑹ #269: a stated ceiling that could not be checked, and «financial» as four

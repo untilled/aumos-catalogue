@@ -45,6 +45,7 @@ import { fileURLToPath } from 'node:url'
 import {
   DIAGNOSIS_CODES,
   OUTCOMES,
+  STRATEGY_ID,
   THRESHOLDS,
   execute,
   concentration,
@@ -378,6 +379,54 @@ check('#813 — the sector axis folds the names before it adds them up', () => {
   }, 'utilities', 'FMR001')
   assert.equal(answer.exposure, 0.22, 'the sector total added a holding and its own pending total')
   assert.deepEqual(answer.unclassified, [])
+})
+/**
+ * ── #814/#816: the holding row names its assignee, and the fold does not move ─
+ *
+ * `untilled/aumos#816` puts an `assignment` — `assigned` · `none` · `released` ·
+ * `departed`, plus the assignee's **instance** id — on every holding row
+ * `portfolio_get` answers, and the adapter into this package's `book` is the one
+ * expression that PR's own measurement used:
+ *
+ *   `assignment.state === 'assigned' ? (mine ? STRATEGY_ID : that instance) : 'unattributed'`
+ *
+ * ⛔ **Two axes, and only one of them moves.** `existingWeight` answers *«what will
+ * this name be»* and is keyed on the name; `ownWeight`/`otherWeight` answer *«how
+ * much of it is mine»*. #813's fold lives on the first axis and #814's assignment
+ * on the second, so an assignment arriving changes what is left for this thesis
+ * and never what the name totals.
+ */
+check('#814 — the assignee moves own/other and never the name total', () => {
+  const MINE = 'inst_fundamental_mean_reversion'
+  const strategyOf = (row) =>
+    row.state === 'assigned' ? (row.managerInstanceId === MINE ? STRATEGY_ID : row.managerInstanceId) : 'unattributed'
+  const assignment = (state, managerInstanceId = null) => ({ state, managerInstanceId })
+
+  /** PR untilled/aumos#816's own table, reproduced against this branch: no pending, 6% held. */
+  const mine = concentration({ holdings: [{ symbol: 'FMR001', weight: 0.06, strategy: strategyOf(assignment('assigned', MINE)) }], openProposals: [] }, 'FMR001')
+  assert.equal(mine.existingWeight, 0.06)
+  assert.equal(mine.ownWeight, 0.06, 'a position this manager is the assignee of read as somebody else\'s')
+  assert.equal(mine.otherWeight, 0)
+  for (const view of [assignment('assigned', 'inst_catalyst_turnaround'), assignment('none'), assignment('released'), assignment('departed')]) {
+    const answer = concentration({ holdings: [{ symbol: 'FMR001', weight: 0.06, strategy: strategyOf(view) }], openProposals: [] }, 'FMR001')
+    assert.equal(answer.existingWeight, 0.06, `${view.state}: the assignee changed what the name totals`)
+    assert.equal(answer.ownWeight, 0, `${view.state}: a holding this manager was not assigned was read as its own`)
+    assert.equal(answer.otherWeight, 0.06)
+  }
+
+  // ── A/B/C again, with the holding assigned three different ways ──────────
+  for (const [label, held, pendingTotal, exposure] of [['A', 0, 0.08, 0.08], ['B', 0.06, 0.12, 0.12], ['C', 0.06, 0.15, 0.15]]) {
+    for (const view of [assignment('assigned', MINE), assignment('assigned', 'inst_catalyst_turnaround'), assignment('none')]) {
+      const answer = concentration({
+        holdings: held > 0 ? [{ symbol: 'FMR001', weight: held, strategy: strategyOf(view) }] : [],
+        openProposals: [{ symbol: 'FMR001', targetWeight: pendingTotal, strategy: 'inst_shareholder_rerating' }],
+      }, 'FMR001')
+      assert.equal(answer.existingWeight, exposure, `${label}/${view.state}: the fold read the assignment`)
+      assert.equal(answer.heldWeight, held)
+      assert.equal(answer.ownWeight, view.managerInstanceId === MINE ? held : 0, `${label}/${view.state}: own exposure`)
+      assert.equal(answer.otherWeight, round(exposure - (view.managerInstanceId === MINE ? held : 0)))
+    }
+  }
 })
 
 check('config may narrow the risk budget and may not widen it', () => {

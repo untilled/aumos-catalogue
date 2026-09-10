@@ -357,6 +357,74 @@ check('#813 — the sector axis folds the same way, or a ceiling counts one name
   assert.equal(answer.data.sectorExposure.utilities, 0.22, 'the sector total added a holding and its own pending total')
   assert.ok(!has(answer.causes, 'risk_limit_exceeded'), 'a sector with room was reported as past its ceiling')
 })
+/**
+ * ── #814/#816: the holding row names its assignee, and the fold does not move ─
+ *
+ * `untilled/aumos#816` puts an `assignment` — `assigned` · `none` · `released` ·
+ * `departed`, plus the assignee's **instance** id — on every holding row that
+ * `portfolio_get` answers. The adapter that turns one into this package's input is
+ * one expression, and it is the one that PR's own measurement used:
+ *
+ *   `assignment.state === 'assigned' ? (mine ? my strategy id : that instance) : 'unattributed'`
+ *
+ * ⛔ **Two axes, and only one of them moves.** The fold answers *«what will this
+ * name be»* and is keyed on the name, because a `position-weight` target is
+ * executed against the whole position — `rebalanceShadowBook` reads the position's
+ * total weight and never its attribution (`untilled/aumos#815`). Attribution
+ * answers *«how much of it is mine»*, which is `byStrategy` and
+ * `headroomForStrategy`. So an assignment that arrives, changes or is withdrawn
+ * moves the second and leaves the first exactly where it was, and the two cases
+ * below are that sentence made checkable.
+ */
+check('#814 — the assignee moves the strategy headroom and never the name total', () => {
+  const assignment = (state, managerInstanceId = null) => ({ state, managerInstanceId })
+  const MINE = 'inst_catalyst_turnaround'
+  const strategyOf = (row) =>
+    row.state === 'assigned' ? (row.managerInstanceId === MINE ? 'catalyst-turnaround' : row.managerInstanceId) : 'unattributed'
+
+  /** PR untilled/aumos#816's own table, reproduced against this branch: no pending, 6% held, 20% ceiling. */
+  for (const [expected, view] of [
+    [0.2, assignment('assigned', MINE)],
+    [0.14, assignment('assigned', 'inst_shareholder_rerating')],
+    [0.14, assignment('none')],
+    [0.14, assignment('released')],
+    [0.14, assignment('departed')],
+  ]) {
+    const answer = accountConcentration({
+      positions: [{ symbol: 'A00007', weight: 0.06, strategy: strategyOf(view) }],
+      proposals: [],
+      caps: { accountSingleName: 0.2 },
+      strategy: 'catalyst-turnaround',
+    })
+    const row = answer.data.rows[0]
+    assert.equal(row.total, 0.06, `${view.state}: the assignee changed what the name totals`)
+    assert.equal(row.headroomForStrategy, expected, `${view.state}: headroom for this strategy`)
+  }
+
+  /**
+   * ⚠️ **And the three unattributed words stay conservative.** `none`, `released`
+   * and `departed` each leave the holding as somebody else's, because a holding
+   * nobody assigned is not a holding this manager may assume (aumos-catalogue#268 §1).
+   */
+  for (const [label, held, pendingTotal, total] of [['A', 0, 0.08, 0.08], ['B', 0.06, 0.12, 0.12], ['C', 0.06, 0.15, 0.15]]) {
+    const answers = [assignment('assigned', MINE), assignment('assigned', 'inst_shareholder_rerating'), assignment('none')].map((view) =>
+      accountConcentration({
+        positions: held > 0 ? [{ symbol: 'A00007', weight: held, strategy: strategyOf(view) }] : [],
+        proposals: [{ symbol: 'A00007', targetWeight: pendingTotal, strategy: 'inst_fundamental_mean_reversion' }],
+        caps: { accountSingleName: 0.2 },
+        strategy: 'catalyst-turnaround',
+      }).data.rows[0],
+    )
+    for (const row of answers) {
+      assert.equal(row.total, total, `${label}: the fold read the assignment`)
+      assert.equal(row.held, held, `${label}: the holding moved with the assignment`)
+      assert.equal(row.breach, false)
+    }
+    // …and the split does move, which is the axis the assignment is for.
+    assert.equal(answers[0].headroomForStrategy > answers[1].headroomForStrategy || held === 0, true, `${label}: being the assignee opened no headroom`)
+    assert.equal(answers[1].headroomForStrategy, answers[2].headroomForStrategy, `${label}: an unattributed holding was read as this manager's`)
+  }
+})
 
 /**
  * ── #269: the sector axis this package does not compute ───────────────────

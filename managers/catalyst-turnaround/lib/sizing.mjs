@@ -287,10 +287,26 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
    *
    * ⚠️ **`max`, and not «the latest total wins».** A pending *trim* does not
    * reduce exposure before it fills: a 14% holding under a proposal to take it to
-   * 8% is 14% of this book right now. That subsumes the strategy-keyed
-   * restatement rule this function used to carry — a proposal restates the whole
-   * position rather than its own strategy's share of it, which is also the only
-   * reading available on a book whose holdings carry no attribution at all.
+   * 8% is 14% of this book right now.
+   *
+   * ⛔ **The fold is keyed on the name, and that is a fact about execution rather
+   * than about what the book happens to tell us.** This function used to drop a
+   * position when a proposal from the *same strategy* named it — keyed on the
+   * pair (strategy, name) — and the new fold replaces that rule rather than
+   * approximating it. The reason is that a `position-weight` target is executed
+   * against the **whole position**: the host's `rebalanceShadowBook` reads the
+   * position's total weight and never its attribution, which `untilled/aumos#815`
+   * measured through the exchange. So attribution cannot key this axis, and a
+   * strategy-keyed rule is wrong in both directions — it sums a 6% holding and
+   * another manager's 12% total to 18%, and it reads a 14% position under its own
+   * trim to 8% as 8% of a book that still holds 14%.
+   *
+   * ⚠️ **Attribution answers the *other* question, and it does answer it.**
+   * `untilled/aumos#814` puts an `assignment` on every holding row, so
+   * `byStrategy` and `headroomForStrategy` below stop reading every holding as
+   * somebody else's — the axis where «how much of this is mine» belongs. That
+   * changes what is left for this strategy; it does not change what the name
+   * totals.
    */
   const bySymbol = new Map()
   const readRow = (row, source) => {
