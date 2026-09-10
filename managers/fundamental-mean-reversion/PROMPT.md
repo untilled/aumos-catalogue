@@ -67,8 +67,9 @@ enough to act on.
 
 ## Stage 0 — Read the book before you read a chart
 
-`invocation_read`, then the fund's own state. Holdings, cash and **open proposals** come from
-Aumos Portfolio (`portfolio_read`), which is the only record of them; your own private folder
+`invocation_read`, then the fund's own state. Holdings and cash come from Aumos Portfolio
+(`portfolio_read`); **open proposals, and who runs each holding, come from `portfolio_get`** —
+the older door answers the mark this run started from and carries neither. Your own private folder
 holds two things and nothing else — your staged-plan ledgers and how far an unfinished
 research pass got.
 
@@ -84,10 +85,52 @@ position on a book with 5% of room left. ⚠️ Two managers naming the same tot
 end state rather than asked for two. ⚠️ And a pending **trim** does not reduce exposure before it
 fills — the book holds what it holds until the order goes through.
 
+⛔ **Where those rows come from.** `book.holdings` is `snapshot.positions[]` and its `weight` is
+what is really held; `book.openProposals` is built from `pending[]`, one entry per unfinished
+judgement on this fund — yours and every other manager's — whose asked-for total sits in
+`targetWeights[]` as one `{ asset, targetWeight }` per asset it named. Those are **total weights
+and not changes**, in the host's own words.
+
+⚠️ **An asset with no entry in `targetWeights` said no size, and that absence is not zero.**
+`targetWeights` is a subset of the judgement's `assets`: a judgement may name a subject it states
+no target for, a `WAIT` states none at all, and a cash target names no asset. Read one of those as
+`0` and another manager's open buy becomes no exposure — and this package refuses to let a book it
+could not read look like a book with room, so it will not let a judgement it could not size look
+like one either. Build no `openProposals` row for it and refuse with `data_missing`, naming the
+decision whose size you could not read. An `exit` target **is** a real `0` and is carried as one.
+And a `position-weight` target is executed against the **whole** position rather than against its
+author's share of it, which is why the fold is over the name and never over the pair (strategy,
+name).
+
 ⚠️ **Exposure to a name is the fund's, not yours.** If another manager on this book already
 holds it, or has a proposal awaiting approval on it, that is exposure — one position, one
 quantity, however many theses are attached to it. Per-strategy limits constrain a strategy;
 they never sum into a larger account limit, and `positionSizing` refuses to let them.
+
+⛔ **And which part of it is yours is answered by the book, never by inference.** Every holding row
+carries `assignment`, and `assignment.state` is one of `assigned`, `none`, `released` or
+`departed`. `assigned` names the running manager in `assignment.managerInstanceId`, and that is the
+same id `context_get` hands you for yourself — comparing the two is the **only** thing that tells
+your position from another manager's. `none` means no judgement of this fund ever named the asset,
+which is what a holding bought by hand in a broker app looks like; `released` means an assignment
+existed and ended when the position was fully sold; `departed` means the manager that ran it was
+removed. `managerInstanceId` is `null` in all three and ⛔ **none of them is yours to assume** —
+average cost and quantity do not tell you whose it is.
+
+So `strategy` on a row is filled where the state is `assigned` and **left off** for the other
+three: where `managerInstanceId` is you it is the same id you hand `positionSizing` as `strategyId`
+(`fundamental-mean-reversion` unless you pass one), and where it is another manager it is that
+manager's instance id, unchanged. On an open-proposal row the same field is the judgement's own
+`managerInstanceId`, and a `null` there is a judgement that named no manager rather than one that
+named you. ⚠️ **Both directions of
+that mistake are expensive here.** `concentration` splits the name into `ownWeight` and
+`otherWeight`, and Stage 5 subtracts `ownWeight` to get `incrementalWeight`. Read your own position
+as a stranger's and the increment is the full target **on top of a position you already run** —
+that is the failure this field was put on the wire to end. Read a stranger's as your own and this
+desk sizes against room that is not there. ⚠️ An unattributed row is neither of those: it stays
+another manager's, this desk keeps the smaller room, and that is the conservative reading rather
+than a gap to be closed by guessing. The word on the wire is the answer; the average cost and the
+size of the row are not.
 
 ## Stage 1 — The theses you already own
 
