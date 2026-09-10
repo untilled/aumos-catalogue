@@ -207,6 +207,7 @@
       "id": "rerated-reaches-trim-review",
       "note": "The thesis worked: the price is above the base-case fair value and the discount this desk was paid for closing is closed. A held position reaches a staged reduction review, not a new entry.",
       "input": {
+        "strategy": "shareholder-rerating",
         "symbol": "000001",
         "sector": "financials",
         "sectorKind": "bank",
@@ -282,6 +283,7 @@
       "id": "policy-retreat-reaches-trim-review",
       "note": "The issuer cut its own stated return ratio. The thesis rested on the policy, so a smaller policy is a changed thesis — a held position goes to a reduction review rather than being averaged down into.",
       "input": {
+        "strategy": "shareholder-rerating",
         "symbol": "000002",
         "sector": "financials",
         "sectorKind": "bank",

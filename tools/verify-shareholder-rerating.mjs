@@ -516,6 +516,105 @@ for (const scenario of HOST_ABC) {
 }
 
 /**
+ * ── #819: the routes that propose a sale, and whose position they are about ──
+ *
+ * `untilled/aumos#817` reached the buy path and stopped there. Everything else
+ * — `trim-or-exit-review`, `reject`, `watch` — returns before the concentration
+ * fold ever runs, so `actionFor` judged on `heldWeight`, the **whole** position,
+ * and reached `RESIZE` the moment the account held anything of the name. Driven
+ * against the real host over a 6% holding assigned to nobody, all three routes
+ * answered identically on this desk's position, on another manager's and on an
+ * unattributed one, with `hostTargetWeight: null` and `otherHeldWeight: null`.
+ *
+ * ⛔ **The attribution may not be bought at the price of the caps.** These
+ * routes ask a question about the book — *whose shares are these?* — and not
+ * about the Mandate, so `heldAttribution` answers it without a cap in sight. A
+ * run under a Mandate that states no single-name ceiling still knows whose
+ * position it is, which is what stops it from selling somebody else's.
+ *
+ * ⚠️ **And this desk's own reduction still leaves**, which is the behaviour
+ * `#816` and `boundaries.json` have asserted since finding ③.
+ */
+{
+  const MINE = 'shareholder-rerating'
+  const fixtureOf = (id) => {
+    const row = cases.cases.find((fixture) => fixture.id === id)
+    assert.ok(row, `cases.json no longer carries ${id}, so this regression is testing nothing`)
+    return row.input
+  }
+  const runWith = (id, holdings, overrides = {}) =>
+    evaluateCase({ ...structuredClone(fixtureOf(id)), strategy: MINE, ...overrides, book: { holdings, openProposals: [] } })
+  const symbolOf = (id) => fixtureOf(id).symbol
+  const row = (id, weight, strategy) => [{ symbol: symbolOf(id), sector: 'financials', weight, ...(strategy === undefined ? {} : { strategy }) }]
+
+  for (const id of ['rerated-reaches-trim-review', 'policy-retreat-reaches-trim-review', 'dividend-trap-is-refused']) {
+    /** ⛔ The issue's book: 6% held and assigned to nobody, on a route that proposes a reduction. */
+    for (const [label, holdings] of [['unattributed', row(id, 0.06)], ['another manager', row(id, 0.06, 'catalyst-turnaround')]]) {
+      const answer = runWith(id, holdings)
+      assert.equal(answer.data.case, evaluateCase({ ...structuredClone(fixtureOf(id)), strategy: MINE, book: { holdings: [], openProposals: [] } }).data.case, `${id}/${label}: the finding about the company moved with the book, and it is a finding about the company`)
+      assert.equal(answer.data.heldWeight, 0.06, `${id}/${label}: the account really does hold it`)
+      assert.equal(answer.data.ownHeldWeight, 0, `${id}/${label}: a holding this manager was never assigned was read as its own`)
+      assert.equal(answer.data.otherHeldWeight, 0.06, `${id}/${label}: this route carried no attribution at all`)
+      assert.equal(answer.data.hostTargetWeightFloor, 0.06, `${id}/${label}: no floor left with the answer, so a target below it sold their holding`)
+      assert.equal(answer.data.proposedAction, 'WAIT', `${id}/${label}: this run proposed a reduction of a position it does not run`)
+      assert.equal(answer.data.hostTargetWeight, null, `${id}/${label}: and it handed the host a weight anyway`)
+      assert.ok(
+        codesOf(answer.diagnostics).includes('reduction_is_not_this_managers_to_make'),
+        `${id}/${label}: nothing said why the reduction was left alone`,
+      )
+    }
+
+    /** ⛔ **This desk's own position is still reduced.** #819 must not make every review a no-op. */
+    const mine = runWith(id, row(id, 0.06, MINE))
+    assert.equal(mine.data.ownHeldWeight, 0.06)
+    assert.equal(mine.data.otherHeldWeight, 0)
+    assert.equal(mine.data.hostTargetWeightFloor, 0, `${id}: with nothing of anybody else's in the name the floor is 0`)
+    assert.equal(mine.data.proposedAction, 'RESIZE', `${id}: this manager could no longer reduce its own position`)
+
+    /** A name nobody holds is still a `WAIT`, and always was. */
+    assert.equal(runWith(id, []).data.proposedAction, 'WAIT')
+    assert.equal(runWith(id, []).data.hostTargetWeightFloor, 0)
+  }
+
+  /**
+   * ⚠️ **A run that did not name itself cannot attribute anything**, and that is
+   * a defect in the call rather than a finding about the book. It is reported as
+   * one instead of being resolved in the permissive direction.
+   */
+  const anonymous = evaluateCase({
+    ...structuredClone(fixtureOf('rerated-reaches-trim-review')),
+    strategy: undefined,
+    book: { holdings: row('rerated-reaches-trim-review', 0.06, MINE), openProposals: [] },
+  })
+  assert.equal(anonymous.data.proposedAction, 'WAIT')
+  assert.ok(codesOf(anonymous.diagnostics).includes('run_did_not_name_its_strategy'), 'a run that named no strategy was allowed to trim on a guess')
+
+  /** An account nobody read is not an account with nobody in it — unchanged, and still stated. */
+  const unread = evaluateCase({ ...structuredClone(fixtureOf('rerated-reaches-trim-review')), strategy: MINE, book: undefined })
+  assert.equal(unread.data.proposedAction, 'WAIT')
+  assert.equal(unread.data.outcomeCode, 'data_missing')
+  assert.equal(unread.data.ownHeldWeight, null, 'an unread book answered a number')
+  assert.equal(unread.data.hostTargetWeightFloor, null)
+
+  /**
+   * ⚠️ **Holdings, never exposure — on this side too.** A pending total is
+   * exposure for a ceiling and is not a position for an order, so somebody
+   * else's unfilled proposal neither creates a reduction nor raises the floor.
+   */
+  const pending = evaluateCase({
+    ...structuredClone(fixtureOf('rerated-reaches-trim-review')),
+    strategy: MINE,
+    book: { holdings: [], openProposals: [{ symbol: symbolOf('rerated-reaches-trim-review'), sector: 'financials', targetWeight: 0.12, strategy: 'fundamental-mean-reversion' }] },
+  })
+  assert.equal(pending.data.ownHeldWeight, 0)
+  assert.equal(pending.data.otherHeldWeight, 0, 'an unfilled proposal was carried as a position')
+  assert.equal(pending.data.hostTargetWeightFloor, 0, 'the floor was raised by a proposal nobody has approved')
+  assert.equal(pending.data.proposedAction, 'WAIT')
+
+  ok('#819 — the routes that reduce ask whose position it is, and a floor leaves with every one of them')
+}
+
+/**
  * ── ⑹ #269: a stated ceiling that could not be checked, and «financial» as four
  *      balance sheets ────────────────────────────────────────────────────────
  *

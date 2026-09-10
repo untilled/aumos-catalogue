@@ -48,7 +48,7 @@ export { capitalHeadroom, ISSUER_KINDS } from './capital-headroom.mjs'
 export { classifyCase, REQUIRED_OUTPUTS, ROUTES } from './classify.mjs'
 export { lossToInvalidation, targetWeight } from './sizing.mjs'
 export { stagedIncrement } from './staged-plan.mjs'
-export { concentration } from './concentration.mjs'
+export { concentration, heldAttribution } from './concentration.mjs'
 
 import { diagnostic, finite, round } from './numbers.mjs'
 import { THRESHOLDS } from './thresholds.mjs'
@@ -56,7 +56,7 @@ import { returnComposition } from './return-composition.mjs'
 import { capitalHeadroom } from './capital-headroom.mjs'
 import { classifyCase } from './classify.mjs'
 import { lossToInvalidation, targetWeight } from './sizing.mjs'
-import { concentration } from './concentration.mjs'
+import { concentration, heldAttribution } from './concentration.mjs'
 
 /**
  * @param {object} input  one candidate, as the run has assembled it
@@ -114,8 +114,18 @@ export function evaluateCase(input = {}) {
      */
     hostTargetWeight: null,
     heldWeight: null,
+    /** Holdings of this name assigned to this manager. ⚠️ The number every reduction here is measured against (#819). */
+    ownHeldWeight: null,
     /** Holdings of this name that are not this manager's — another manager's, and every unattributed one. */
     otherHeldWeight: null,
+    /**
+     * ⛔ **The weight no `position-weight` total handed to the host may go below
+     * (#819).** The host executes against the whole position and reads no
+     * attribution while doing it, so a target under this number sells a holding
+     * this run does not run. Closing this desk's position out **is** this number;
+     * an `exit` — a real `0` — is right only when it is `0`.
+     */
+    hostTargetWeightFloor: null,
     existingExposure: null,
     projectedExposure: null,
     projectedGrossExposure: null,
@@ -152,12 +162,81 @@ export function evaluateCase(input = {}) {
 
   if (classified.data.route !== 'buy-path') {
     /**
-     * ⚠️ The **classification** is about the company and stands whether or not the book
-     * was read; the **action** is about the account and does not. A `rerated` name with
-     * an unreadable book is still `rerated`, and this run still proposes nothing.
+     * ── The routes that propose a **sale**, and whose position they are about (#819) ──
+     *
+     * ⛔ **`heldWeight` is the whole position and this branch used to judge on
+     * it.** `trim-or-exit-review` and `reject` reached `RESIZE` the moment the
+     * account held **anything** of the name, whoever it belonged to — so a 6%
+     * holding bought by hand in a broker app, or one whose approval never named
+     * a manager, came back from this package as a reduction and the host sold
+     * it. Measured against the real host, all three of these routes answered
+     * identically on this desk's position, on another manager's and on an
+     * unattributed one.
+     *
+     * ⚠️ **`untilled/aumos#817` fixed the same sentence one branch over.**
+     * `position_above_target`, inside the buy path, already tests `ownHeld` and
+     * records `excess_is_not_this_managers_to_reduce`. These routes return
+     * before that branch is ever reached, so the sentence had to be said again
+     * here.
+     *
+     * ⚠️ **The classification is about the company and stands whether or not the
+     * book was read; the action is about the account and does not.** A `rerated`
+     * name with an unreadable book is still `rerated`, and this run still
+     * proposes nothing.
+     *
+     * ⛔ **This is not «nobody may touch an unattributed position»**
+     * (`untilled/aumos#782`). A buy into one still leaves here as a buy, and the
+     * moment the investor assigns the position on the approval screen
+     * (`untilled/aumos#785`) `otherHeld` is 0 and every reduction works exactly
+     * as it did.
      */
-    base.proposedAction = bookReadable ? actionFor(classified.data.route, heldWeight) : 'WAIT'
+    const attribution = heldAttribution({
+      holdings: bookReadable ? input.book.holdings : null,
+      symbol: input.symbol,
+      strategy: input.strategy,
+    })
+    base.ownHeldWeight = attribution.ownHeld
+    base.otherHeldWeight = attribution.otherHeld
+    base.hostTargetWeightFloor = attribution.otherHeld
+    base.proposedAction = bookReadable ? actionFor(classified.data.route, attribution.ownHeld) : 'WAIT'
     if (!bookReadable) base.outcomeCode = 'data_missing'
+    /**
+     * ⚠️ **A run that did not name itself is not a run that owns nothing — but it
+     * is a run that cannot prove it owns anything.** `strategy` is what the
+     * holding's own `strategy` is compared against, so without it every row
+     * lands in `otherHeld` and no reduction can leave. That is a defect in the
+     * call rather than a finding about the book, and it is reported as one.
+     */
+    if (bookReadable && attribution.held > 0 && input.strategy === undefined) {
+      diagnostics.push(
+        diagnostic(
+          'run_did_not_name_its_strategy',
+          'unevaluated',
+          'This account holds the name and this run did not say which manager instance it is, so no holding here can be matched to it and no reduction can be attributed. Pass `strategy`: guessing from cost and quantity is what `aumos-catalogue#268` §1 forbids, and assuming the position is this desk\'s is the assumption that sells somebody else\'s.',
+          'strategy',
+          { held: attribution.held },
+        ),
+      )
+    }
+    if (bookReadable && attribution.otherHeld > 0) {
+      diagnostics.push(
+        attribution.ownHeld > 0
+          ? diagnostic(
+              'reduction_is_bounded_by_anothers_holding',
+              'info',
+              `${attribution.otherHeld} of this ${attribution.held} position is another manager's or nobody's. The reduction this run proposes is against its own ${attribution.ownHeld} and no further, expressed as a total weight at or above ${attribution.otherHeld} — never as an exit, which is a real 0 and would liquidate their holding with this desk's.`,
+              'book.holdings',
+              { held: attribution.held, ownHeld: attribution.ownHeld, otherHeld: attribution.otherHeld, hostTargetWeightFloor: attribution.otherHeld },
+            )
+          : diagnostic(
+              'reduction_is_not_this_managers_to_make',
+              'info',
+              `This name is ${attribution.held} of the account and none of it is assigned to this manager, so there is nothing here for this run to reduce. The finding about the company stands; the order does not follow from it, because the shares are somebody else's or nobody's and this package is not what makes that decision.`,
+              'book.holdings',
+              { held: attribution.held, ownHeld: attribution.ownHeld, otherHeld: attribution.otherHeld },
+            ),
+      )
+    }
     return { data: base, diagnostics }
   }
   if (!bookReadable) return wait(base, diagnostics, 'data_missing')
@@ -184,7 +263,10 @@ export function evaluateCase(input = {}) {
   const exposure = concentration({ proposed: { symbol: input.symbol, sector: input.sector, weight: 0 }, ...account })
   diagnostics.push(...exposure.diagnostics)
   base.existingExposure = exposure.data.existingExposure
+  base.ownHeldWeight = exposure.data.ownHeld
   base.otherHeldWeight = exposure.data.otherHeld
+  /** ⚠️ #819: the same floor the review routes publish, on the path that sizes as well. */
+  base.hostTargetWeightFloor = exposure.data.otherHeld
   base.projectedExposure = exposure.data.projectedExposure
   base.projectedGrossExposure = exposure.data.projectedGrossExposure
   base.maxTotalWeightBinding = exposure.data.maxTotalWeightBinding
@@ -358,11 +440,18 @@ function wait(base, diagnostics, outcomeCode) {
 }
 
 /**
- * Which action a route reaches, and it depends on whether the book already holds it.
+ * Which action a route reaches, and it depends on whether **this manager** already
+ * holds it.
  *
  * ⚠️ **A refuted thesis on a name nobody owns is a `WAIT`, not a `SELL`.** There is
  * nothing to sell, and a package that returned `SELL` on every rejection would fill an
  * investor's approval queue with orders against positions that do not exist.
+ *
+ * ⛔ **And «nobody owns» means «this desk does not own», not «the account holds
+ * none» (#819).** The parameter was the whole position, so a holding assigned to
+ * another manager — or to nobody at all, which is every share bought by hand in a
+ * broker app — reached `RESIZE` here and the host sold it. It is `ownHeld` now, and
+ * `hostTargetWeightFloor` carries what is left alone.
  *
  * ⛔ **`RESIZE` and not `EXIT`, and the difference is deliberate.** A re-rated name and
  * a retreating policy are reasons to stage a position down against a fair value, which
@@ -370,8 +459,8 @@ function wait(base, diagnostics, outcomeCode) {
  * counts as one, and on what evidence — is prose in `PROMPT.md` rather than a branch
  * here, because the arithmetic cannot tell a breach from a bad week.
  */
-function actionFor(route, heldWeight = 0) {
+function actionFor(route, ownHeldWeight = 0) {
   if (route === 'watch') return 'WATCH'
-  if (route === 'trim-or-exit-review' || route === 'reject') return heldWeight > 0 ? 'RESIZE' : 'WAIT'
+  if (route === 'trim-or-exit-review' || route === 'reject') return ownHeldWeight > 0 ? 'RESIZE' : 'WAIT'
   return 'WAIT'
 }
