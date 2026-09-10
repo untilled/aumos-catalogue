@@ -1526,6 +1526,262 @@ check('#828 — the entry ceiling still folds open proposals in, and still stops
   )
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// `untilled/aumos#831` — the same gate, one rung over, on the ladder with no plan.
+//
+// ⚠️ **`#828` was closed on the rung a `plan` reaches and the twin was not
+// touched.** `add-next-stage` and the entry ladder arrive at the same state —
+// «this desk holds at or above what this run would target» — through two
+// different sizings, and until now the entry side read `sizing.data.targetWeight`
+// there: the number with every other desk's **open proposals** folded into it
+// (#813). Measured on the same book, the same desk and the same pending total,
+// with a `plan` and without:
+//
+//   pending 0.20 · plan → `add-next-stage`, `buy:60`, a note
+//   pending 0.20 · none → `hold`, no order, and nothing said why
+//
+// ⛔ **And the answer disagreed with itself.** `heldOnlyTargetWeight` sat in the
+// same object saying `0.12` while `review.reason` read *«already holds 0.06 …
+// against a cumulative target of 0.06»* — #828's tautology, verbatim, one rung
+// over. At pending 0.25 the two numbers in one answer were `0.01` and `0.06`.
+//
+// ⛔ **No weight moves here.** `increase`'s floor is what makes that true and
+// #825 established it; what changes is the **word** and the **silence**.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The entry ladder, re-booked: this desk's own holding, and somebody else's unapproved proposal on top. */
+const enteringWith = (pendingTotal, ownWeight) => {
+  const input = structuredClone(positive.input)
+  input.book = {
+    positions: ownWeight === null ? [] : [{ symbol: input.symbol, strategy: 'catalyst-turnaround', weight: ownWeight }],
+    proposals: pendingTotal === null ? [] : [{ symbol: input.symbol, strategy: 'inst_shareholder_rerating', targetWeight: pendingTotal }],
+    caps: CAPS,
+  }
+  return runVerdict(input)
+}
+
+/**
+ * ⑴ **The word, where the account limit is what stopped the entry.** This desk
+ * holds 6% and would size 12% against the positions on this book; what leaves it
+ * with nothing to add is another desk's **unapproved proposal** eating the
+ * single-name limit. `blocked-by-account-limit` / `account-limit-taken` is the
+ * word this package has carried since #265 and the entry ladder was already
+ * reaching it one rung above — for a full limit, and not for a limit that merely
+ * took the room above the holding.
+ *
+ * ⛔ **The three weights are asserted unchanged**, because this is the word being
+ * wrong beside numbers that were right.
+ */
+check('#831 — an entry the account limit stops says the account limit stopped it, and not that it arrived', () => {
+  const concentrationCap = CAPS.accountSingleName
+  for (const pending of [0.2, 0.25]) {
+    const answer = enteringWith(pending, 0.06)
+    const data = answer.data
+    const where = `#831 → pending ${pending}`
+    assert.equal(data.intent, 'blocked-by-account-limit', `${where}: an entry the limit stopped answered in the vocabulary of a target this desk had reached`)
+    assert.equal(data.review.name, 'account-limit-taken', `${where}: review`)
+    assert.equal(INTENT_WEIGHT_ROLES[data.intent], 'standstill', `${where}: the word changed and the money must not`)
+    assert.equal(data.hostTargetWeight, 0.06, `${where}: the weight that leaves moved with the word`)
+    assert.equal(data.incrementThisRun ?? 0, 0, `${where}`)
+    assert.equal(data.exposureDirection, 'unchanged', `${where}`)
+    assert.equal(data.addsToThisDesksShare, false, `${where}`)
+    assert.ok(data.review.reason.includes('0.12'), `${where}: the reason does not name what this desk would hold measured against the positions: ${data.review.reason}`)
+    assert.ok(
+      data.review.reason.includes(String(data.sizing.caps.accountHeadroom)) && data.review.reason.includes(String(data.sizing.caps.heldOnlyAccountHeadroom)),
+      `${where}: the reason names one of the two rooms and not the other, so a reader cannot see which fold stopped this: ${data.review.reason}`,
+    )
+    assert.ok(data.review.reason.includes(String(concentrationCap)), `${where}: the reason does not name the limit that took the room: ${data.review.reason}`)
+  }
+
+  /**
+   * ⛔ And the tautology it replaces — the folded number restated against
+   * itself, true of every folded answer and informative about none of them.
+   */
+  const tautology = enteringWith(0.2, 0.06).data.review.reason
+  assert.ok(
+    !/against a cumulative target of 0\.06/.test(tautology),
+    `the reason is built out of the folded number rather than out of the reason it was folded: ${tautology}`,
+  )
+})
+
+/**
+ * ⑵ **And the rung above it still exists, naming this desk's own target.** A
+ * desk that has actually reached what it would size holds — the state #265
+ * defined and #825 carried to the plan side. The number it names is now the one
+ * measured against the positions, so an unapproved proposal on the other side of
+ * the fund cannot rewrite the sentence.
+ */
+check('#831 — a desk that reached its own target says so, and names the target it reached', () => {
+  for (const pending of [null, 0.2, 0.25]) {
+    const data = enteringWith(pending, 0.12).data
+    const where = `#831 → at target, pending ${pending}`
+    assert.equal(data.intent, 'hold', `${where}`)
+    assert.equal(data.review.name, 'already-at-target', `${where}`)
+    assert.equal(data.hostTargetWeight, 0.12, `${where}`)
+    assert.ok(
+      /against a cumulative target of 0\.12\b/.test(data.review.reason),
+      `${where}: the reason names a target this desk never sized against its own positions: ${data.review.reason}`,
+    )
+  }
+})
+
+/**
+ * ⑶ **The silence, which is the other half of this defect.** `#828` gave the
+ * staged rung `stage_target_ignores_others_pending` — true there, because the
+ * stage's target *does* ignore the pending total. On the entry ladder the target
+ * folds it **in**, on purpose (#813, and `#828`'s own ⑸), so the true observation
+ * is the mirror image and it needs its own word: a code whose name is a claim
+ * cannot be widened to a path where the claim is false.
+ *
+ * ⚠️ **The gate is «did it decide anything».** Two folds that disagree over a
+ * target this desk has already reached changed no number, and a note beside every
+ * such run is noise a reader stops reading.
+ */
+check('#831 — where the entry fold binds the answer names both numbers, and the order that was not sent', () => {
+  for (const [pending, holdingsOnly] of [[0.15, 0.12], [0.2, 0.12], [0.25, 0.12], [0.3, 0.12]]) {
+    const answer = enteringWith(pending, 0.06)
+    const where = `#831 → pending ${pending}`
+    assert.ok(
+      has(answer.diagnostics, 'entry_target_folds_others_pending'),
+      `${where}: another desk's unapproved proposal decided this answer and nothing said so: ${codes(answer.diagnostics).join(', ') || '(none)'}`,
+    )
+    const row = answer.diagnostics.find((entry) => entry.code === 'entry_target_folds_others_pending')
+    assert.equal(row.severity, 'note', `${where}: an observation is not a refusal`)
+    assert.equal(row.details.heldOnlyTargetWeight, holdingsOnly, `${where}`)
+    assert.equal(row.details.hostTargetWeight, answer.data.hostTargetWeight, `${where}`)
+    assert.equal(
+      row.details.hostTargetWeightIfHoldingsOnly,
+      0.12,
+      `${where}: the order that did not go out is not measurable from the observation that withheld it`,
+    )
+  }
+
+  /** ⛔ Two folds that agree, and two that disagree over a target already reached. */
+  assert.ok(!has(enteringWith(null, 0.06).diagnostics, 'entry_target_folds_others_pending'), 'a book with no open proposal was reported as if one had narrowed it')
+  assert.ok(!has(enteringWith(0.25, 0.12).diagnostics, 'entry_target_folds_others_pending'), 'a fold that decided nothing over a target this desk had reached was reported')
+
+  /**
+   * ⛔ **And not on the staged rung, which is the whole point of two codes.**
+   * There the target ignores the pending total on purpose (#828), so the entry
+   * observation would be a false sentence about a run it does not describe —
+   * and the staged rung keeps its own.
+   */
+  const staged = structuredClone(positive.input)
+  staged.held = true
+  staged.plan = structuredClone(staging.plan)
+  staged.book = {
+    positions: [{ symbol: staged.symbol, strategy: 'catalyst-turnaround', weight: 0.06 }],
+    proposals: [{ symbol: staged.symbol, strategy: 'inst_shareholder_rerating', targetWeight: 0.25 }],
+    caps: CAPS,
+  }
+  const stagedAnswer = runVerdict(staged)
+  assert.equal(stagedAnswer.data.intent, 'add-next-stage', 'the staged fixture no longer reaches the rung this exclusion is about')
+  assert.ok(!has(stagedAnswer.diagnostics, 'entry_target_folds_others_pending'), 'the entry observation was said of a stage whose target ignores the pending total')
+  assert.ok(has(stagedAnswer.diagnostics, 'stage_target_ignores_others_pending'), 'the staged rung lost the observation #828 gave it')
+})
+
+/**
+ * ⑷ **The sweep with the axis this defect lived in: `plan` present and absent.**
+ * `#828`'s sweep had a `pending` axis and every row carried a plan, so no row
+ * ever reached the entry rungs — which is exactly how one gate got fixed and its
+ * twin did not. The claim is one sentence and it holds on both axes: a standstill
+ * over a target this desk has **not** reached is the account limit, and one over a
+ * target it **has** reached is not.
+ */
+check('#831 — on both ladders the word follows the holdings-only target, never the folded one', () => {
+  for (const withPlan of [false, true]) {
+    for (const own of [null, 0.06, 0.12, 0.15]) {
+      for (const pending of [null, 0.08, 0.15, 0.2, 0.25, 0.3]) {
+        const input = structuredClone(positive.input)
+        if (withPlan) {
+          input.held = true
+          input.plan = structuredClone(staging.plan)
+        }
+        input.book = {
+          positions: own === null ? [] : [{ symbol: input.symbol, strategy: 'catalyst-turnaround', weight: own }],
+          proposals: pending === null ? [] : [{ symbol: input.symbol, strategy: 'inst_shareholder_rerating', targetWeight: pending }],
+          caps: CAPS,
+        }
+        const data = runVerdict(input).data
+        const where = `#831 → plan ${withPlan} · own ${own} · pending ${pending}`
+
+        /** ⛔ #825's floor, on every row of both axes: a purchase that cannot be made is never a sale. */
+        assert.notEqual(data.exposureDirection, 'reduce', `${where}: [${data.intent}] a rung that cannot buy sold instead`)
+
+        if (data.review.name !== 'already-at-target' && data.intent !== 'blocked-by-account-limit') continue
+        const reached = data.sizing?.heldOnlyTargetWeight
+        if (!Number.isFinite(reached) || !Number.isFinite(data.ownHeldWeight)) continue
+        const atOwnTarget = data.ownHeldWeight >= reached - 1e-9
+        assert.equal(
+          data.review.name === 'already-at-target',
+          atOwnTarget,
+          `${where}: [${data.intent}/${data.review.name}] «this desk arrived» was said of a desk holding ${data.ownHeldWeight} against its own target of ${reached}`,
+        )
+      }
+    }
+  }
+})
+
+/**
+ * ⑸ **⛔ And the ceiling is still the ceiling.** `#813` folds pending totals into
+ * every book-derived ceiling and `#828` ⑸ kept that for the buying question; this
+ * commit split the **word** off it and not the number. These are the rows that say
+ * so, and the structural pair the split rests on.
+ */
+check('#831 — the entry ceiling still folds open proposals in, and the two folds stay ordered', () => {
+  for (const [pending, cumulative] of [[null, 0.12], [0.15, 0.05], [0.2, 0], [0.3, 0]]) {
+    const data = enteringWith(pending, null).data
+    assert.equal(data.cumulativeTargetWeight, cumulative, `#831 → opening beside pending ${pending}: the entry ceiling stopped folding open proposals in`)
+  }
+
+  /** #813's own fold — other desks' **holdings** — measured where it lands exactly on the cap. */
+  for (const [otherHeld, host] of [[0.06, 0.18], [0.1, 0.2], [0.15, 0.2], [0.19, 0.2]]) {
+    const input = structuredClone(positive.input)
+    input.book = { positions: [{ symbol: input.symbol, strategy: 'inst_shareholder_rerating', weight: otherHeld }], proposals: [], caps: CAPS }
+    assert.equal(runVerdict(input).data.hostTargetWeight, host, `#831 → other desks hold ${otherHeld}: #813's fold moved`)
+  }
+
+  /**
+   * ⚠️ **The two folds differ in exactly one term, so one is never below the
+   * other and neither is ever read without the other.** The split rungs are
+   * written against that pair; a book that produced one number and not the other
+   * would send the entry ladder down a rung nobody measured.
+   */
+  for (const own of [null, 0.06, 0.12]) {
+    for (const pending of [null, 0.15, 0.25]) {
+      const sizing = enteringWith(pending, own).data.sizing
+      const where = `#831 → own ${own} · pending ${pending}`
+      assert.equal(Number.isFinite(sizing.targetWeight), Number.isFinite(sizing.heldOnlyTargetWeight), `${where}: one fold answered and the other did not`)
+      if (!Number.isFinite(sizing.targetWeight)) continue
+      assert.ok(sizing.heldOnlyTargetWeight >= sizing.targetWeight - 1e-12, `${where}: the holdings-only fold came out below the one that also folds proposals in`)
+      if (pending === null) assert.equal(sizing.heldOnlyTargetWeight, sizing.targetWeight, `${where}: the two folds diverged on a book with no open proposal`)
+    }
+  }
+
+  /**
+   * ⚠️ **And the third rung that reads the folded target keeps its word by
+   * construction.** `odds-not-worth-taking` says the *odds* sized this at zero,
+   * and it sits below a rung that refuses a headroom of zero — so the sweep of
+   * this file asked whether a pending total could ever slip between them and
+   * make that sentence blame the arithmetic for what the account limit did. It
+   * cannot: `headroomForStrategy` and `targetWeight` are rounded on the same
+   * eight-place grain, so a room the fold does not take to zero is at least
+   * `1e-8` and sizes to at least `1e-8`. This is that claim, executable rather
+   * than asserted in a comment.
+   */
+  for (const pending of [0.199999999, 0.1999999999, 0.19999999, 0.2]) {
+    const data = enteringWith(pending, null).data
+    const where = `#831 → opening beside pending ${pending}`
+    if (data.review.name === 'odds-not-worth-taking') {
+      assert.fail(`${where}: the account limit sized this entry at zero and the answer blamed the expected return`)
+    }
+    assert.ok(
+      data.sizing.caps.accountHeadroom <= 0 || data.sizing.targetWeight > 0,
+      `${where}: a positive room sized to zero, which is the gap between the two rungs this assertion says cannot exist`,
+    )
+  }
+})
+
 
 /**
  * ⑷ **A share of the name, not all of it.** The clamp is a ceiling on the
