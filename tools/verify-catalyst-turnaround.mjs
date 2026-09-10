@@ -1036,62 +1036,245 @@ check('#821 — the word and the number agree, on every case and every attributi
     ['empty', () => ({ positions: [], proposals: [], caps: CAPS })],
     ['unread', () => ({ proposals: [], caps: CAPS })],
   ]
+  /**
+   * ⚠️ **And the same sweep with a staged plan on top (`untilled/aumos#825`).**
+   * Without it no row here ever reaches `add-next-stage` — the rung needs a due
+   * stage — so the whole staged-add side of the ladder sat outside the check
+   * that exists to catch exactly this, and #825's `sell:30` walked past it.
+   * `over-target` is the book that makes the stage due into a holding already
+   * above what the plan builds toward.
+   */
   for (const item of cases.cases) {
-    for (const [label, make] of books) {
-      const input = structuredClone(item.input)
-      input.book = make(input.symbol)
-      const data = runVerdict(input).data
-      const where = `#821 → ${item.name} → ${label}`
+    for (const [label, make] of [...books, ['over-target', (symbol) => ({ positions: [{ symbol, strategy: 'catalyst-turnaround', weight: 0.15 }], proposals: [], caps: CAPS })]]) {
+      for (const planned of [false, true]) {
+        const input = structuredClone(item.input)
+        input.book = make(input.symbol)
+        if (planned) {
+          input.held = true
+          input.plan = structuredClone(staging.plan)
+        }
+        const data = runVerdict(input).data
+        const where = `#821 → ${item.name} → ${label}${planned ? ' + plan' : ''}`
 
-      const role = INTENT_WEIGHT_ROLES[data.intent]
-      assert.ok(role !== undefined, `${where}: ${data.intent} has no weight role`)
+        const role = INTENT_WEIGHT_ROLES[data.intent]
+        assert.ok(role !== undefined, `${where}: ${data.intent} has no weight role`)
 
-      /** ⚠️ `increasesExposure` is the two numbers compared, and this recomputes it from them. */
-      const measured = typeof data.hostTargetWeight === 'number' && typeof data.positionWeight === 'number'
-        ? (data.hostTargetWeight > data.positionWeight + 1e-9 ? 'increase' : data.hostTargetWeight < data.positionWeight - 1e-9 ? 'reduce' : 'unchanged')
-        : null
-      assert.equal(data.exposureDirection, measured, `${where}: exposureDirection was restated rather than measured`)
-      assert.equal(data.increasesExposure, measured === 'increase', `${where}: increasesExposure disagrees with the weight that leaves`)
+        /** ⚠️ `increasesExposure` is the two numbers compared, and this recomputes it from them. */
+        const measured = typeof data.hostTargetWeight === 'number' && typeof data.positionWeight === 'number'
+          ? (data.hostTargetWeight > data.positionWeight + 1e-9 ? 'increase' : data.hostTargetWeight < data.positionWeight - 1e-9 ? 'reduce' : 'unchanged')
+          : null
+        assert.equal(data.exposureDirection, measured, `${where}: exposureDirection was restated rather than measured`)
+        assert.equal(data.increasesExposure, measured === 'increase', `${where}: increasesExposure disagrees with the weight that leaves`)
 
-      if (data.hostTargetWeight === null) continue
-      if (role === 'reduce' || role === 'close') {
-        assert.ok(data.hostTargetWeight <= data.positionWeight + 1e-9, `${where}: ${data.intent} handed the host ${data.hostTargetWeight} over a holding of ${data.positionWeight}`)
-        assert.ok(data.hostTargetWeight >= data.otherHeldWeight - 1e-9, `${where}: ${data.intent} reduced past this desk's own share and into somebody else's`)
-      }
-      if (role === 'standstill') {
-        assert.equal(data.hostTargetWeight, data.positionWeight, `${where}: ${data.intent} changes nothing and asked the host for ${data.hostTargetWeight} against a holding of ${data.positionWeight}`)
-      }
-      if (role === 'increase') {
-        assert.equal(data.hostTargetWeight, round(data.otherHeldWeight + data.cumulativeTargetWeight), `${where}: #817's addition no longer holds on the buying side`)
+        if (data.hostTargetWeight === null) continue
+        if (role === 'reduce' || role === 'close') {
+          assert.ok(data.hostTargetWeight <= data.positionWeight + 1e-9, `${where}: ${data.intent} handed the host ${data.hostTargetWeight} over a holding of ${data.positionWeight}`)
+          assert.ok(data.hostTargetWeight >= data.otherHeldWeight - 1e-9, `${where}: ${data.intent} reduced past this desk's own share and into somebody else's`)
+        }
+        if (role === 'standstill') {
+          assert.equal(data.hostTargetWeight, data.positionWeight, `${where}: ${data.intent} changes nothing and asked the host for ${data.hostTargetWeight} against a holding of ${data.positionWeight}`)
+        }
+        if (role === 'increase') {
+          /**
+           * ⛔ **The assertion the `reduce` branch had and this one did not
+           * (`untilled/aumos#825`).** Three lines up a reduction may not raise the
+           * position; here a *purchase* may not lower it — and for eight months
+           * nothing said so, because this branch checked the **formula** and never
+           * the **direction**. A due stage over a holding above the plan's
+           * cumulative target handed the host `0.12` against `0.15` and sold 30
+           * shares on a run whose own word is «add».
+           */
+          assert.ok(
+            data.hostTargetWeight >= data.positionWeight - 1e-9,
+            `${where}: ${data.intent} handed the host ${data.hostTargetWeight} over a holding of ${data.positionWeight} — a purchase that reduces the position`,
+          )
+          if (typeof data.cumulativeTargetWeight === 'number' && typeof data.ownHeldWeight === 'number') {
+            assert.equal(
+              data.hostTargetWeight,
+              round(data.otherHeldWeight + Math.max(data.cumulativeTargetWeight, data.ownHeldWeight)),
+              `${where}: #817's addition no longer holds on the buying side, under #825's floor`,
+            )
+          }
+        }
+
+        /**
+         * ⚠️ **And the sentence beside the number is measured too.** `#821`
+         * renamed the restated `increasesExposure` to `addsToThisDesksShare` and
+         * left it restated: `increase && increment > 0`. Over a holding at or
+         * above the plan's cumulative target that answered `true` while this
+         * desk's share did not move at all.
+         */
+        if (data.addsToThisDesksShare === true && typeof data.ownHeldWeight === 'number' && typeof data.otherHeldWeight === 'number') {
+          assert.ok(
+            data.hostTargetWeight - data.otherHeldWeight > data.ownHeldWeight + 1e-9,
+            `${where}: addsToThisDesksShare was restated rather than measured — this desk's share goes from ${data.ownHeldWeight} to ${round(data.hostTargetWeight - data.otherHeldWeight)}`,
+          )
+        }
       }
     }
   }
 })
 
 /**
- * ⑶ **`increasesExposure` is measured, not restated**, and here is an input
- * where the two answers differ: a due stage on a plan whose cumulative target
- * sits **below** what the book already holds. The intent is a purchase — the
- * stage fires and this desk adds 4pp of its own — and the weight that leaves is
- * a reduction of the position.
+ * ⑶ **The input `#821` measured and left alone (`untilled/aumos#825`).** A due
+ * stage on a plan whose cumulative target sits **below** what this desk already
+ * holds. `#821` asserted `exposureDirection: 'reduce'` here and wrote *"the
+ * answer says buy and the host reduces"* into its own message — it read the
+ * defect, named it, and pinned it green, because measuring a number is not the
+ * same as refusing it.
  *
- * ⛔ Restating the intent answers `true` here. Measuring the weight answers
- * `false`, and `false` is what the host will do.
+ * ⛔ There is nothing to add and the run now says that in both languages: the
+ * word is `hold` on the review this package already had for it one branch over,
+ * and the weight is the holding.
  */
-check('#821 — increasesExposure measures the weight that leaves rather than restating the intent', () => {
+check('#825 — a due stage whose cumulative target is already held adds nothing and says so', () => {
+  const at = (ownWeight) => {
+    const input = structuredClone(positive.input)
+    input.held = true
+    input.plan = structuredClone(staging.plan)
+    input.book = { positions: [{ symbol: input.symbol, strategy: 'catalyst-turnaround', weight: ownWeight }], proposals: [], caps: CAPS }
+    return runVerdict(input).data
+  }
+
+  /** The row the issue measured: 0.15 held against a cumulative 0.12, and `sell:30` left for the exchange. */
+  const over = at(0.15)
+  assert.equal(over.intent, 'hold', 'a stage fired over a holding already above its own cumulative target')
+  assert.equal(over.review.name, 'already-at-target', 'the review does not say why the stage added nothing')
+  assert.equal(over.incrementThisRun, 0, 'a stage that adds nothing reported an increment')
+  assert.equal(over.cumulativeTargetWeight, 0.12, 'the plan’s own target is still reported')
+  assert.equal(over.positionWeight, 0.15)
+  assert.equal(over.hostTargetWeight, 0.15, 'the weight that leaves sold this desk’s own position')
+  assert.equal(over.exposureDirection, 'unchanged')
+  assert.equal(over.increasesExposure, false)
+  assert.equal(over.addsToThisDesksShare, false, 'this run adds nothing to this desk’s share and said it did')
+
+  /** The boundary: exactly at the target is «already at it», the same as the entry side reads it. */
+  const equal = at(0.12)
+  assert.equal(equal.intent, 'hold')
+  assert.equal(equal.hostTargetWeight, 0.12)
+  assert.equal(equal.exposureDirection, 'unchanged')
+  assert.equal(equal.addsToThisDesksShare, false)
+
+  /** ⛔ And the stage that has somewhere to go still goes there — `buy:60`, unchanged. */
+  const under = at(0.06)
+  assert.equal(under.intent, 'add-next-stage', 'a real stage stopped firing')
+  assert.equal(under.review.name, 'stage-filled')
+  assert.equal(under.incrementThisRun, 0.04)
+  assert.equal(under.hostTargetWeight, 0.12, 'the stage no longer reaches the plan’s cumulative target')
+  assert.equal(under.exposureDirection, 'increase')
+  assert.equal(under.addsToThisDesksShare, true)
+})
+
+/**
+ * ⑶′ **The row where the two clamps meet, and the statement that the floor has
+ * no producer.** A position 10% of which is this desk's and 15% somebody
+ * else's, under a 20% cap: the fold below takes the plan's target down to the
+ * 5% that is left, which is *under* what this desk holds. Folding a target down
+ * is the same arithmetic that turns a purchase into a sale, and this is the row
+ * where it would — `sell:5pp` on a run whose word is «add».
+ *
+ * ⚠️ **What actually answers here is the rung, not the floor.** Every path to
+ * an `increase` role now passes a rung that reads «already at the target» — the
+ * staged-add rung above, and the entry side's since #265 — so
+ * `max(cumulative, ownHeldWeight)` in `verdict.mjs` is a **backstop with no
+ * producer in this build**, and the sweep below is the assertion of exactly
+ * that. ⛔ It stays because the role table is what decides the weight and #821
+ * is the record of what an unclamped role does while 111 checks stay green; a
+ * future rung reaching `increase` past those two guards lands on the floor
+ * rather than on an exchange. **Green here is the evidence of the absence.**
+ */
+check('#825 — a purchase never reaches a target below what this desk holds, and never lowers the position', () => {
   const input = structuredClone(positive.input)
   input.held = true
   input.plan = structuredClone(staging.plan)
-  input.book = { positions: [{ symbol: input.symbol, strategy: 'catalyst-turnaround', weight: 0.15 }], proposals: [], caps: CAPS }
+  input.book = {
+    positions: [
+      { symbol: input.symbol, strategy: 'catalyst-turnaround', weight: 0.1 },
+      { symbol: input.symbol, strategy: 'inst_shareholder_rerating', weight: 0.15 },
+    ],
+    proposals: [],
+    caps: CAPS,
+  }
   const data = runVerdict(input).data
 
-  assert.equal(data.intent, 'add-next-stage', 'the fixture no longer reaches the staged-add rung')
-  assert.equal(data.incrementThisRun, 0.04, 'the stage that came due')
-  assert.equal(data.addsToThisDesksShare, true, 'this run does add to this desk’s share, and the old field name was true of that')
-  assert.equal(data.positionWeight, 0.15)
-  assert.equal(data.hostTargetWeight, 0.12, 'the weight that leaves is the plan’s cumulative target')
-  assert.equal(data.exposureDirection, 'reduce')
-  assert.equal(data.increasesExposure, false, 'the intent was restated instead of the weight being measured — the answer says buy and the host reduces')
+  assert.equal(data.ownHeldWeight, 0.1)
+  assert.equal(data.otherHeldWeight, 0.15)
+  assert.equal(data.positionWeight, 0.25)
+  assert.ok(data.cumulativeTargetWeight < data.ownHeldWeight, 'the room left for this desk is no longer below what it holds, and this row no longer stands where the two clamps meet')
+  assert.equal(data.intent, 'hold', 'a stage fired into a target below what this desk already holds')
+  assert.equal(data.hostTargetWeight, 0.25, 'the weight that leaves sold 5pp of a position on a run whose word is «add»')
+  assert.equal(data.exposureDirection, 'unchanged')
+  assert.equal(data.addsToThisDesksShare, false)
+
+  /**
+   * ⛔ The absence itself, swept: over every case, every attribution and the
+   * staged plan on top, no answer carrying an `increase` role holds more than
+   * it targets. The day one does, this line goes red beside the floor that
+   * caught it — which is the only order those two events may happen in.
+   */
+  for (const item of cases.cases) {
+    for (const [label, make] of [
+      ['mine', (symbol) => bookOf(symbol, 'catalyst-turnaround')],
+      ['unattributed', (symbol) => bookOf(symbol, 'none')],
+      ['theirs', (symbol) => bookOf(symbol, 'inst_shareholder_rerating')],
+      ['over-target', (symbol) => ({ positions: [{ symbol, strategy: 'catalyst-turnaround', weight: 0.15 }], proposals: [], caps: CAPS })],
+    ]) {
+      for (const planned of [false, true]) {
+        const probe = structuredClone(item.input)
+        probe.book = make(probe.symbol)
+        if (planned) {
+          probe.held = true
+          probe.plan = structuredClone(staging.plan)
+        }
+        const answer = runVerdict(probe).data
+        if (INTENT_WEIGHT_ROLES[answer.intent] !== 'increase') continue
+        if (typeof answer.cumulativeTargetWeight !== 'number' || typeof answer.ownHeldWeight !== 'number') continue
+        assert.ok(
+          answer.cumulativeTargetWeight > answer.ownHeldWeight - 1e-9,
+          `#825 → ${item.name} → ${label}${planned ? ' + plan' : ''}: ${answer.intent} reached a target of ${answer.cumulativeTargetWeight} over a held ${answer.ownHeldWeight}, and only verdict.mjs's floor stood between that and a sale`,
+        )
+      }
+    }
+  }
+})
+
+/**
+ * ⑶″ **The stage that quietly disappeared (`untilled/aumos#825`).** A plan's
+ * cumulative target is frozen at the run that wrote it; the room left for this
+ * desk is not. `enter-staged` is sized through `accountHeadroom` every run and
+ * lands exactly on the cap — `add-next-stage` read the same cap into its own
+ * answer and ignored it, so over 15% of the name held elsewhere it asked for a
+ * position of 27% under a 20% limit and the host downgraded the **whole
+ * judgement** to WAIT.
+ *
+ * ⚠️ Weaker than the row above — no money moves wrongly, a stage merely stops
+ * arriving and nothing says why. So the fold is reported rather than silent.
+ */
+check('#825 — a due stage is folded into the room this name still has, and says when it was', () => {
+  const staged = (otherWeight) => {
+    const input = structuredClone(positive.input)
+    input.held = true
+    input.plan = structuredClone(staging.plan)
+    input.book = { positions: [{ symbol: input.symbol, strategy: 'inst_shareholder_rerating', weight: otherWeight }], proposals: [], caps: CAPS }
+    return runVerdict(input)
+  }
+
+  const tight = staged(0.15)
+  assert.equal(tight.data.intent, 'add-next-stage', 'the stage stopped firing rather than fitting')
+  assert.equal(tight.data.cumulativeTargetWeight, 0.05, 'the plan’s frozen target was handed over unfolded')
+  assert.equal(tight.data.hostTargetWeight, 0.2, `a stage asked for ${tight.data.hostTargetWeight} of a name the account caps at 0.2`)
+  assert.ok(tight.data.hostTargetWeight <= tight.data.concentration.accountCap + 1e-9, 'the answer read the cap and asked past it')
+  assert.ok(
+    has(tight.diagnostics, 'stage_target_folded_into_headroom'),
+    `the fold happened without saying so: ${codes(tight.diagnostics).join(', ') || '(none)'}`,
+  )
+
+  /** ⛔ And where the room is there, the plan's own number is what leaves — the fold is a ceiling and nothing else. */
+  const roomy = staged(0.06)
+  assert.equal(roomy.data.intent, 'add-next-stage')
+  assert.equal(roomy.data.cumulativeTargetWeight, 0.12, 'a plan with room to run was folded anyway')
+  assert.equal(roomy.data.hostTargetWeight, 0.18)
+  assert.ok(!has(roomy.diagnostics, 'stage_target_folded_into_headroom'), 'a fold that did not bind was reported')
 })
 
 /**

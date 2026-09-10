@@ -169,6 +169,45 @@ export function runVerdict(input = {}) {
   const unread = causes.filter((entry) => entry.code === 'data_missing')
   const mayIncrease = unread.length === 0
 
+  /**
+   * ── The plan's target, against the room this name still has (#825) ────────
+   *
+   * ⛔ **A plan's cumulative target is frozen at the run that wrote it; the room
+   * left for this desk is not.** `enter-staged` is sized through
+   * `accountHeadroom` on every run and lands exactly on the cap.
+   * `add-next-stage` read the same `accountCap` into its own answer and then
+   * ignored it, so over 15% of the name held by somebody else it asked for a
+   * position of 27% under a 20% limit — and the host does not trim that back,
+   * it downgrades the **whole judgement** to WAIT. Nothing moved wrongly; a
+   * stage merely stopped arriving and no line said why.
+   *
+   * ⚠️ **A ceiling and reported when it binds.** Where the room is there the
+   * plan's own number is what leaves, untouched. Where it is not, the stage
+   * fits into what is left rather than vanishing, and a note names both numbers
+   * — a fold nobody can see is the silence this fixes, one level down.
+   *
+   * ⚠️ **The floor below is what makes this safe.** Folding a target *down* is
+   * the same arithmetic that turns a purchase into a sale, and on a partly
+   * shared position it would: 10% of this desk's own under a 5% remaining room
+   * is `sell:5pp` on a run whose word is «add». `ownTarget` never goes below
+   * what this desk holds, so this fold can stop a stage and can never sell one.
+   */
+  const plannedCumulative = plan?.data.cumulativeTargetWeight ?? null
+  const stageHeadroom = finite(headroom) ? headroom : null
+  const stageFolded = finite(plannedCumulative) && finite(stageHeadroom) && stageHeadroom < plannedCumulative
+  const stageCumulative = stageFolded ? round(stageHeadroom) : plannedCumulative
+  if (stageFolded) {
+    diagnostics.push(
+      diagnostic(
+        'stage_target_folded_into_headroom',
+        'note',
+        `The plan builds toward ${plannedCumulative} of the book and ${stageHeadroom} is what this name has left for this desk once every other strategy's exposure is out of the account limit. The stage is folded into the room that is there; the plan's own target is unchanged and is reported beside it`,
+        'plan.cumulativeTargetWeight',
+        { plannedCumulativeTargetWeight: plannedCumulative, accountHeadroom: stageHeadroom, foldedTo: stageCumulative },
+      ),
+    )
+  }
+
   const context = {
     classification: classification.data.classification,
     qualifiesAsPosition: classification.data.qualifiesAsPosition,
@@ -296,9 +335,30 @@ export function runVerdict(input = {}) {
       // ⚠️ `mayIncrease` is the structural gate: a stage may not fire while any
       // declared input is unread, whichever rung failed to read it.
       if (mayIncrease && finite(plan?.data.addedThisRun) && plan.data.addedThisRun > 0) {
+        /**
+         * ⛔ **The stage came due and this desk is already there (#825).** The
+         * entry side has read this one branch over since #265 — «the book
+         * already holds at or above what this run would target, the increment
+         * is zero and the honest answer is that there is nothing to do» — and
+         * the staged-add rung, which reaches the same state through a plan
+         * rather than through the sizing, never asked. So a stage fired over a
+         * holding above its own cumulative target, and the weight that left was
+         * that target: `sell:30` on a run whose word is «add 4pp».
+         *
+         * ⚠️ **A purchase that cannot be made is not a sale.** The plan did not
+         * say «reduce to 12%» — reducing is a different judgement with its own
+         * rungs and its own causes. What is true here is only that there is
+         * nothing to add, which is what `hold` says.
+         */
+        if (finite(ownHeldWeight) && finite(stageCumulative) && ownHeldWeight >= stageCumulative - 1e-9) {
+          return {
+            intent: 'hold',
+            review: review('already-at-target', { at: windowEnd, kind: 'catalyst-window', reason: `A stage came due and the book already holds ${ownHeldWeight} of this desk's own against a cumulative target of ${stageCumulative}. The increment is zero, and reducing to the plan's target is a judgement this run did not make` }),
+          }
+        }
         return {
           intent: 'add-next-stage',
-          review: review('stage-filled', { at: windowEnd, kind: 'catalyst-window', reason: `Stage conditions met; ${plan.data.addedThisRun} added against a cumulative target of ${plan.data.cumulativeTargetWeight}` }),
+          review: review('stage-filled', { at: windowEnd, kind: 'catalyst-window', reason: `Stage conditions met; ${plan.data.addedThisRun} added against a cumulative target of ${stageCumulative}` }),
         }
       }
       return {
@@ -460,7 +520,7 @@ export function runVerdict(input = {}) {
    * are the same conflation one sign over.
    */
   const increases = weightRole === 'increase'
-  const cumulative = outcome.intent === 'add-next-stage' ? plan?.data.cumulativeTargetWeight ?? null : sizing.data.targetWeight ?? null
+  const cumulative = outcome.intent === 'add-next-stage' ? stageCumulative : sizing.data.targetWeight ?? null
   let increment = 0
   if (outcome.intent === 'add-next-stage') increment = plan.data.addedThisRun
   else if (outcome.intent === 'enter-staged') {
@@ -520,6 +580,30 @@ export function runVerdict(input = {}) {
    * *is*. Nothing here can turn a real reduction into a no-op, and
    * `untilled/aumos#782` is the reason that has to stay true.
    *
+   * ── …and the mirror of that clamp, on the buying side (#825) ─────────────
+   *
+   * ⛔ **`reduce` got a ceiling and `increase` never got the floor.** The two
+   * are one sentence in two signs — *a judgement moves this desk's own share in
+   * the direction it says and no further* — and #821 wrote only half of it. A
+   * due stage on a plan whose cumulative target sits **below** what this desk
+   * already holds handed the host that target: over 15% wholly this desk's,
+   * against a plan building toward 12%, `sell:30` left for the exchange on a
+   * run whose own `incrementThisRun` was «add 4pp».
+   *
+   *     increase → max(cumulative, ownHeldWeight)
+   *
+   * ⚠️ **A floor is never a ceiling.** Where the sizing asks for more than is
+   * held — which is what a purchase *is* — `max` is the identity and every real
+   * buy is untouched. Nothing here can turn a purchase into a larger one.
+   *
+   * ⚠️ **The rung above reaches this state first, and that is the point.** A
+   * stage due over a holding already at its target now answers `hold`, so the
+   * word is right and not merely the number. This stays because the table is
+   * the thing that decides the weight: a future rung landing on `increase`, or
+   * a fold that takes a target down under a partly shared position, reaches
+   * here without passing that rung — and #821 is the record of what an
+   * unclamped role does while 111 checks stay green.
+   *
    * ⚠️ **And a standstill states the holding.** `hold`, `hold-through-delay`,
    * `exit-review`, the research watches and every WAIT asked the host for the
    * *entry* weight too — a `hold-through-delay` whose own prose is «nothing is
@@ -531,9 +615,11 @@ export function runVerdict(input = {}) {
    * `null` where the book was not read or nothing was sized — an unread account
    * has no target, and a `0` here would be an order.
    */
-  const ownTarget = weightRole === 'increase'
-    ? cumulative
-    : weightRole === 'close'
+  const ownTarget = weightRole === 'increase' && finite(cumulative) && finite(ownHeldWeight)
+    ? round(Math.max(cumulative, ownHeldWeight))
+    : weightRole === 'increase'
+      ? cumulative
+      : weightRole === 'close'
       ? 0
       : weightRole === 'reduce' && finite(cumulative) && finite(ownHeldWeight)
         ? round(Math.min(cumulative, ownHeldWeight))
@@ -592,8 +678,13 @@ export function runVerdict(input = {}) {
       exposureDirection,
       /** Does what leaves this run make the account hold **more** of this name? Measured the same way. */
       increasesExposure: exposureDirection === 'increase',
-      /** The old `increasesExposure`, under a name that is true of it: this run buys more for **this desk**. */
-      addsToThisDesksShare: increases && increment > 0,
+      /**
+       * The old `increasesExposure`, under a name that is true of it: this run buys more for **this desk**.
+       * ⚠️ **Measured against the resolved target, not restated (#825).** `increase && increment > 0` answered
+       * `true` beside a share that did not move — the same defect one field over, and the reason #821's own
+       * ⑶ read `add-next-stage` with `addsToThisDesksShare: true` over a holding the run was about to sell.
+       */
+      addsToThisDesksShare: increases && increment > 0 && (finite(ownTarget) && finite(ownHeldWeight) ? ownTarget > ownHeldWeight + 1e-9 : true),
       weightMeanings: {
         cumulativeTargetWeight: 'this-strategys-share-of-the-position',
         incrementThisRun: 'weight-added-this-run',

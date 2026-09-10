@@ -82,7 +82,8 @@ only one the host may be handed — see «The weight that leaves is a third numb
 every intent that is not `enter-staged` or `add-next-stage` reports an increment of exactly zero —
 including the trims and the exits, which carry a **cumulative** target the host reduces to rather than
 a negative increment. The already-at-or-above-target case is defined: increment zero, intent `hold`,
-review `already-at-target`.
+review `already-at-target` — ⚠️ **on both sides since #825**, the entry rung and the staged-add rung
+that reaches the same state through a plan rather than through the sizing.
 
 ## An open proposal states a total, and the fold is `max` (#813)
 
@@ -214,7 +215,7 @@ old derivation was true of.
 
 | role | `hostTargetWeight` | intents |
 |---|---|---|
-| `increase` | `otherHeldWeight + cumulativeTargetWeight` | `enter-staged` · `add-next-stage` |
+| `increase` | `otherHeldWeight + max(cumulativeTargetWeight, ownHeldWeight)` — the `max` is #825's floor | `enter-staged` · `add-next-stage` |
 | `reduce` | `otherHeldWeight + min(cumulativeTargetWeight, ownHeldWeight)` | `trim-into-realisation` · `reduce-on-invalidation` · `resize-to-risk-limit` |
 | `close` | `otherHeldWeight` | `close-out` |
 | `standstill` | `otherHeldWeight + ownHeldWeight` | `hold` · `hold-through-delay` · `exit-review` · `research-watch` · `blocked-by-account-limit` · `wait-for-data` · `reduction-not-this-desks` |
@@ -265,6 +266,84 @@ intent is a reduction**, never whether somebody else holds the name.
 never meant «what this position weighs» — it has always been *this strategy's share of it* — and
 over a 6% unattributed holding it answered `0` beside an account plainly holding 6%. Both numbers
 now exist under names that say which is which, with `weightMeanings` entries for each.
+
+## The clamp had one sign, and «add the next stage» sold (#825)
+
+`#821` above wrote half a sentence. The half it wrote is *a reduction moves this desk's own share
+down and never up*; the half it did not is the same sentence in the other sign — **a purchase moves
+that share up and never down.** `reduce` got `min(cumulative, ownHeldWeight)`; `increase` got
+`cumulative`, unclamped.
+
+The state that reaches it is ordinary: a **staged plan whose cumulative target sits below what this
+desk already holds** — a plan written when the sizing was larger, or a position topped up outside
+it. The stage comes due, the run's own `incrementThisRun` says «add 4pp», and the weight that leaves
+is the plan's target against a larger holding. Measured on the real host, fund NAV `$100,000`,
+NVDA `$100`, the position **wholly this desk's**:
+
+| held | intent | `incrementThisRun` | `cumulative` | `hostTargetWeight` | what left | after |
+|---|---|---|---|---|---|---|
+| **0.15** | `add-next-stage` | 0.04 | 0.12 | `0.12` | ⚠️ **`sell:30`** | `hold` / `already-at-target`, target `0.15`, no order |
+| 0.12 | `add-next-stage` | 0.04 | 0.12 | `0.12` | nothing, and `addsToThisDesksShare: true` beside it | `hold`, `addsToThisDesksShare: false` |
+| 0.06 | `add-next-stage` | 0.04 | 0.12 | `0.12` | ✅ `buy:60` | unchanged |
+
+⛔ **This one is not reachable through `#786`.** The seven seams before it were unattributed
+positions; this is a position whose assignee **is the author of the judgement**, so no widening of
+the host's handover gate touches it — the same shape `#823` found next door.
+
+### The judgement chooses, and the floor stands behind it
+
+Two changes, at two levels, and the first is the one that fires:
+
+⑴ **The rung.** The entry side has read this state since #265 — *the book already holds at or above
+what this run would target; the increment is zero and there is nothing to do* — and the staged-add
+rung, which arrives at it through `plan.cumulativeTargetWeight` instead of through
+`sizing.targetWeight`, never asked. It asks now, and answers `hold` on the review this package
+already had for it. ⚠️ **A purchase that cannot be made is not a sale**: the plan never said «reduce
+to 12%», and reducing is a different judgement with its own rungs and its own causes.
+
+⑵ **The floor**, `max(cumulative, ownHeldWeight)`, in the role table's `increase` row. ⚠️ **A floor
+is never a ceiling** — wherever the sizing asks for more than is held, which is what a purchase *is*,
+`max` is the identity and every real buy is untouched. ⬜ **It has no producer in this build**: every
+path to an `increase` role now passes one of the two «already at the target» rungs, and
+`verify-catalyst-turnaround.mjs`'s ⑶′ sweeps every case × every attribution × the staged plan to
+assert exactly that absence — **green there is the evidence**. It stays because the table is what
+decides the weight and `#821` is the record of what an unclamped role does while 111 checks stay
+green. `addsToThisDesksShare` is measured against the resolved target for the same reason and with
+the same standing: the sentence beside the number is what kept the last one quiet.
+
+### The check that read the defect and pinned it green
+
+`#821`'s ⑵ — *«the word and the number agree, on every case and every attribution»* — checked, on
+the `increase` role, only the **formula** (`host === otherHeld + cumulative`). The direction
+assertion its `reduce` branch had was never written on this side. Worse, `#821`'s ⑶ ran **this exact
+input**, asserted `exposureDirection: 'reduce'` and wrote *"the answer says buy and the host
+reduces"* into its own failure message. It measured the defect, named it, and passed.
+
+⚠️ **Measuring a number is not refusing it.** ⑶ is now the regression; ⑵ carries the missing
+direction assertion **and** the staged plan, without which no row in that sweep ever reached
+`add-next-stage` at all — the whole staged-add side of the ladder sat outside the check that exists
+to catch this.
+
+### The stage that quietly disappeared
+
+Beside it, smaller and in the same expression: a plan's cumulative target is frozen at the run that
+wrote it, and the room left for this desk is not. `enter-staged` is sized through `accountHeadroom`
+every run and lands exactly on the cap; `add-next-stage` read the same `accountCap` into its own
+answer and ignored it. Over 15% of the name held elsewhere under a 20% ceiling it asked for a
+position of **27%** — and the host does not trim that back, it downgrades the **whole judgement** to
+WAIT (`target weight 0.27 exceeds max position weight 0.2`). Nothing moved wrongly; a stage stopped
+arriving and no line said why.
+
+The target is now folded into the room that is there, and `stage_target_folded_into_headroom` names
+both numbers when it binds. ⚠️ **The floor is what makes that safe**: folding a target *down* is the
+same arithmetic that turns a purchase into a sale, and on a position 10% this desk's under 5% of
+remaining room it would be `sell:5pp` on a run whose word is «add». The two clamps compose — the
+fold can stop a stage and can never sell one.
+
+⛔ **What was not done**, for the fifth time and the same four reasons: the host does not fold or add
+(`untilled/aumos#781`), execution does not read attribution (`#232`), `#786`'s gate was not widened
+to unattributed positions (`#782`), and the host does not read a judgement's *words* to refuse a
+weight — `REBALANCE` alone walks past such a check (`#822`).
 
 ## The sector axis: the judgement #269 asked for, and what came of it
 
