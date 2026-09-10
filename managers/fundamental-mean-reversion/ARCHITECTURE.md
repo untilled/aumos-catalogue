@@ -152,6 +152,61 @@ ceiling has to hold in both of the states the account passes through.
 calls is a run that can be argued out of subtracting, and every axis — the name, the sector and
 the whole book — has to fold the same way or one name is counted twice on one of them.
 
+## The weight that leaves is a third number (#817)
+
+`#813` and `#814` were both the **reading** direction — how the host's answer becomes a row of
+this package's `book`. This is the **writing** direction, and until #817 nothing said anything
+about it.
+
+Two totals, and they are not the same total:
+
+| | what it means | who computes it |
+|---|---|---|
+| `targetTotalWeight` | the cap **less what everyone else has** — this thesis's share of the position | `positionSizing`, out of `exposure.otherWeight` |
+| host `targetWeight` | the **whole position's** weight, executed against the whole position with no attribution read (`untilled/aumos#815`) | the host, on whatever number it is handed |
+
+The conversion is one addition, and it lives in `positionSizing`:
+
+```
+hostTargetWeight = exposure.otherHeldWeight + targetTotalWeight
+```
+
+⛔ **Why the addition is code and not a sentence.** The same argument #813 settled: the model
+assembles the rows, and a run asked to add before it sends is a run that can be argued out of
+adding. The prose in `PROMPT.md` says *what the number means and never to build it by hand*; the
+arithmetic is here, next to the fold it is the mirror of.
+
+⛔ **The addend is `otherHeldWeight` and never `otherWeight`.** The second folds open proposals
+in. That is right for a *ceiling* — a limit has to hold in every state the account passes
+through — and wrong for an *order*: an unfilled proposal is not a position, and adding one would
+have this run buy another manager's unapproved judgement for them. Two fields, because the two
+directions genuinely need two numbers.
+
+**What `#817` measured, and it is a sale.** Fund ₩100,000,000 on XKRX, 20% single-name ceiling, a
+6% holding assigned to **nobody** and 12% pending under another manager. This package reaches BUY
+and sizes `targetTotalWeight = 0.0375`; the real host, driven to the exchange, turns that into
+`sell:22`. `0.06 + 0.0375 = 0.0975` is `buy:37`.
+
+| the position's assignee | before #817 | after |
+|---|---|---|
+| another manager | `sell:22` — but `untilled/aumos#786` refuses the judgement first, `submitted: 0` | `hostTargetWeight = 0.06 + share`, a buy |
+| **this manager** | `sell:22`, and ⛔ **not a defect** — a desk reducing its own position is what this methodology is for | unchanged: `otherHeldWeight` is 0, the two totals are one number |
+| **unattributed** | `sell:22`, and **nothing stops it** — this is the issue | `hostTargetWeight = 0.06 + share`, a buy |
+
+⚠️ **Unattributed is not a rare state.** It is every holding bought by hand in a broker app and
+every position whose approval did not name a manager to run it (`untilled/aumos#785`).
+
+⚠️ **And #813's overstatement was conservative where this one is not.** #813 stopped this package
+from buying. This one **sells** — a position nobody asked to reduce, out of a judgement that says
+BUY.
+
+⛔ **What was not done, and each has a decision behind it.** The host does not fold or add — a
+second answer to «how much did this judgement ask for» ends at the aggregate cap
+`untilled/aumos#781` rejected by name. Execution does not read attribution — two ledgers for one
+position ends at the reconciler `untilled/aumos#232` rejected. And `#786`'s gate was not widened
+to unattributed positions — making a hand-bought holding permanently untouchable is the «safely do
+nothing» state `untilled/aumos#782` undid.
+
 ## The sector axis: the judgement #269 asked for, and what came of it
 
 **The question.** #269 required each of the three #256 packages to be *read* and judged under a

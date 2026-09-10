@@ -208,9 +208,10 @@ the whole book — has to fold the same way or one name is counted twice on one 
 `targetTotalWeight` is what the name should **be**: the risk budget over the loss to invalidation,
 under the single-name cap and under what the sector and gross ceilings leave once the rest of the
 book is counted. `incrementWeight` is `targetTotalWeight − existingExposure`, which is what a
-proposal carries — and `existingExposure` is the fold above, not the sum of the two rows. At target the run proposes nothing; above target it is a reduction question and
-this manager proposes a reduction only against what is actually held; an increment below the venue
-minimum waits.
+proposal carries — and `existingExposure` is the fold above, not the sum of the two rows. At target the run proposes nothing; above target it is a reduction question **about this desk's own
+holding** and this manager proposes a reduction only against what is actually held **and assigned
+to it** (#817); an increment below the venue minimum waits. ⚠️ Neither of the two weights is what
+the host is handed — see «The weight that leaves is a third number» below.
 
 ⛔ **An absent input is not an input that passed.** `holdings` and `openProposals` are required
 lists — an empty list says *there is nothing* and an absent one says *nobody looked*. A `BUY`
@@ -227,6 +228,67 @@ the checker asserts that no fixture still carries the retired word.
 ⛔ **Every figure in every fixture is invented for the arithmetic it exercises.** None is a price
 record; none is copied from the source repository's private files; none was tuned so that the
 reference case produces a `BUY` or any particular return.
+
+## The weight that leaves is a third number, and «above target» says whose (#817)
+
+`#813` and `#814` were both the **reading** direction — how the host's answer becomes this
+package's `holdings` and `openProposals`. This is the **writing** direction.
+
+`decision_submit` carries a `position-weight` **total for the whole position**, and
+`rebalanceShadowBook` executes it against the whole position without ever reading attribution
+(`untilled/aumos#815`). So the number that crosses the boundary has to carry the part of the
+position this run is not entitled to move:
+
+```
+hostTargetWeight = otherHeld + (ownHeld + incrementWeight)
+                 = held + incrementWeight
+```
+
+`evaluateCase` answers it, and it is `null` on every run that proposes no order — a weight is an
+instruction, and there is none.
+
+⛔ **Why the addition is code and not a sentence.** The argument #813 settled: a run asked to add
+before it sends is a run that can be argued out of adding. `PROMPT.md` says what the number means
+and forbids building it by hand; the arithmetic is here.
+
+⛔ **Holdings are added and `existingExposure` is not.** That number folds every open proposal in,
+which is right for a ceiling — a limit has to hold in every state the account passes through — and
+wrong for an order: buying up to somebody else's pending total would be this run executing their
+unapproved judgement.
+
+**«The account is above it» became «*this desk's* holding is above it».** This package already
+said the right sentence about pending rows — *an excess made of somebody else's unapproved
+proposal is theirs to withdraw* — and #817 says it about holdings too. The test in the
+`position_above_target` branch is `ownHeld`, not the whole position, and a run that leaves an
+excess alone records `excess_is_not_this_managers_to_reduce`.
+
+**What #817 measured.** Fund ₩100,000,000 on XKRX, 20% single-name ceiling, a 6% holding assigned
+to **nobody**. This package sizes the name at `0.05` and called it a reduction; the real host,
+driven to the exchange, turns that into `sell:10` — against a position no judgement on this fund
+ever asked to reduce.
+
+| the position's assignee | before #817 | after |
+|---|---|---|
+| another manager | `RESIZE`, `sell:10` — `untilled/aumos#786` refuses the judgement first, `submitted: 0` | `WAIT`, no weight |
+| **this manager** | `RESIZE`, `sell:10`, and ⛔ **not a defect** — this is the reduction question, named | unchanged: `RESIZE`, `hostTargetWeight = targetTotalWeight` |
+| **unattributed** | `RESIZE`, `sell:10`, and **nothing stops it** — this is the issue | `WAIT`, `excess_is_not_this_managers_to_reduce` |
+
+⚠️ **Unattributed is not a rare state**: every holding bought by hand in a broker app, and every
+position whose approval did not name a manager to run it (`untilled/aumos#785`).
+
+⛔ **This is not «nobody may touch an unattributed position».** A BUY into an unattributed name
+still leaves, and it leaves as a **buy** — `hostTargetWeight` adds to what is there rather than
+replacing it. Once the investor assigns the position on the approval screen, `otherHeld` is 0 and
+every reduction works exactly as it did. Making a hand-bought holding permanently untouchable is
+the «safely do nothing» state `untilled/aumos#782` undid, and `#786`'s gate was deliberately not
+widened to reach it.
+
+⚠️ **One fixture input was restated, and no `expect` block moved.**
+`boundaries.json → seven-percent-held-is-above-target-and-is-a-reduction-question` carried a
+holding with no `strategy`, written before `assignment` reached the wire (`untilled/aumos#814` ·
+`#816`) and silently read as this manager's. The row now says so. Every expected number is
+unchanged — it is the same case, restated under the contract it is read against, which is exactly
+the move `aumos-catalogue#275` made for the pending rows.
 
 ## The fixed thresholds
 
