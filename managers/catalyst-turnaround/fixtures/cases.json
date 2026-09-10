@@ -630,7 +630,7 @@
         "sizing": { "expectedActiveReturn": 0.45, "conviction": 0.55, "mandatePositionCap": 0.12 },
         "book": {
           "positions": [{ "symbol": "A00007", "strategy": "shareholder-rerating", "weight": 0.14 }],
-          "proposals": [{ "symbol": "A00007", "strategy": "fundamental-mean-reversion", "weight": 0.2 }],
+          "proposals": [{ "symbol": "A00007", "strategy": "fundamental-mean-reversion", "targetWeight": 0.2 }],
           "caps": { "accountSingleName": 0.2, "perStrategy": { "catalyst-turnaround": 0.12, "shareholder-rerating": 0.14, "fundamental-mean-reversion": 0.1 } }
         }
       }

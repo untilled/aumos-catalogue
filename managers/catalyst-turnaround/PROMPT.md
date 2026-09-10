@@ -68,9 +68,11 @@ Call `invocation_read` first. Then read, in this order:
    another manager has proposed and not yet filled is exposure this book has already committed to;
 3. **your own register** — the catalyst ledger you wrote last run, through `manager-memory`.
 
-⛔ **An open proposal states a total, and the fold is `max` — never `+`.** The weight on an
-open-proposal row is what that proposal asks the position to **become**, not an amount to add to
-it: the host publishes it as a *total* weight and says so in `portfolio_get`'s own description. It
+⛔ **An open proposal states a total, and the fold is `max` — never `+`.** Each proposal row
+carries `targetWeight`, which is what that proposal asks the position to **become** — the host's
+own field, under the host's own meaning, and `portfolio_get` says so in its description. It is not
+an amount to add to what is held, and a row that carries `weight` instead is refused rather than
+read as an increment. A **holding** row carries `weight`, and that one really is what is held. It
 is also what the host executes. A book holding 6% of a name, under another manager's open proposal
 for a total of 12%, sends an order for the **difference** and ends at 12% — never 18%. So exposure
 to a name is `max(held, the largest total any open proposal asks for)`, and `concentration` folds

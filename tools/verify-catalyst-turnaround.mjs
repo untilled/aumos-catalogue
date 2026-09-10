@@ -303,7 +303,7 @@ for (const scenario of [
   check(`#813 ${scenario.label} — the pending total is folded by maximum and the ceiling still has room`, () => {
     const answer = accountConcentration({
       positions: scenario.held > 0 ? [{ symbol: 'A00007', weight: scenario.held, strategy: 'shareholder-rerating' }] : [],
-      proposals: [{ symbol: 'A00007', weight: scenario.pendingTotal, strategy: 'fundamental-mean-reversion' }],
+      proposals: [{ symbol: 'A00007', targetWeight: scenario.pendingTotal, strategy: 'fundamental-mean-reversion' }],
       caps: { accountSingleName: 0.2 },
       strategy: 'catalyst-turnaround',
     })
@@ -321,7 +321,7 @@ for (const scenario of [
 check('#813 — a pending trim does not reduce exposure before it fills, and two managers naming one total have agreed on it', () => {
   const trimming = accountConcentration({
     positions: [{ symbol: 'A00011', weight: 0.14, strategy: 'catalyst-turnaround' }],
-    proposals: [{ symbol: 'A00011', weight: 0.08, strategy: 'catalyst-turnaround' }],
+    proposals: [{ symbol: 'A00011', targetWeight: 0.08, strategy: 'catalyst-turnaround' }],
     caps: { accountSingleName: 0.2 },
     strategy: 'catalyst-turnaround',
   })
@@ -331,8 +331,8 @@ check('#813 — a pending trim does not reduce exposure before it fills, and two
   const twoManagers = accountConcentration({
     positions: [{ symbol: 'A00007', weight: 0.06, strategy: 'shareholder-rerating' }],
     proposals: [
-      { symbol: 'A00007', weight: 0.12, strategy: 'fundamental-mean-reversion' },
-      { symbol: 'A00007', weight: 0.12, strategy: 'evidence-gated' },
+      { symbol: 'A00007', targetWeight: 0.12, strategy: 'fundamental-mean-reversion' },
+      { symbol: 'A00007', targetWeight: 0.12, strategy: 'evidence-gated' },
     ],
     caps: { accountSingleName: 0.2 },
     strategy: 'catalyst-turnaround',
@@ -348,7 +348,7 @@ check('#813 — the sector axis folds the same way, or a ceiling counts one name
       { symbol: 'A00007', sector: 'utilities', weight: 0.06, strategy: 'shareholder-rerating' },
       { symbol: 'A00008', sector: 'utilities', weight: 0.1, strategy: 'evidence-gated' },
     ],
-    proposals: [{ symbol: 'A00007', sector: 'utilities', weight: 0.12, strategy: 'fundamental-mean-reversion' }],
+    proposals: [{ symbol: 'A00007', sector: 'utilities', targetWeight: 0.12, strategy: 'fundamental-mean-reversion' }],
     caps: { accountSingleName: 0.2, accountSector: 0.3 },
     strategy: 'catalyst-turnaround',
     candidate: { symbol: 'A00007', sector: 'utilities' },
@@ -441,7 +441,7 @@ check('#269 — a declared ceiling whose total cannot be formed is an absence, f
 
   const unclassifiedProposal = accountConcentration({
     positions: [],
-    proposals: [{ symbol: 'D', weight: 0.04, strategy: 'shareholder-rerating' }],
+    proposals: [{ symbol: 'D', targetWeight: 0.04, strategy: 'shareholder-rerating' }],
     caps: { accountSingleName: 0.2, accountSector: 0.3 },
     strategy: 'catalyst-turnaround',
     candidate: { symbol: 'A', sector: 'utilities' },

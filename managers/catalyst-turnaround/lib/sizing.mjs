@@ -267,9 +267,9 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
   /**
    * ── An open proposal states a **total**, so the fold is `max` (#813) ───────
    *
-   * ⛔ **The weight on a proposal row is the weight that proposal asks the
-   * position to *become*, not an amount to add to it.** It is the host's
-   * `targetWeight`, and `portfolio_get` publishes that sentence in its own
+   * ⛔ **`targetWeight` on a proposal row is the weight that proposal asks the
+   * position to *become*, not an amount to add to it.** It is the host's own
+   * field name, and `portfolio_get` publishes that sentence in its own
    * description. It is also what the host executes: a book holding 6% of a name,
    * under another manager's proposal for a total of 12%, sends an order for the
    * *difference* and ends at 12%. Never 18%. So exposure to one name is
@@ -298,19 +298,29 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
       diagnostics.push(diagnostic('exposure_row_unnamed', 'blocked', 'Every exposure row names the symbol it is exposure to', source))
       return
     }
-    if (!finite(row?.weight) || row.weight < 0) {
-      diagnostics.push(diagnostic('exposure_weight_invalid', 'blocked', 'Weights are non-negative numbers', `${source}[${row.symbol}]`))
+    /**
+     * ⚠️ **A holding carries `weight` and a proposal carries `targetWeight`**, and
+     * the two words are different because the two numbers are: one is what is
+     * held, the other is what the position is asked to become. A proposal row
+     * carrying `weight` is a caller written against the contract before #813,
+     * when this field was an increment, and it is refused rather than read as
+     * one — reading a total as an increment understates the account.
+     */
+    const field = source === 'positions' ? 'weight' : 'targetWeight'
+    const value = row?.[field]
+    if (!finite(value) || value < 0) {
+      diagnostics.push(diagnostic('exposure_weight_invalid', 'blocked', `Every ${source === 'positions' ? 'holding states \`weight\`' : 'open proposal states \`targetWeight\`, the total weight it asks the position to become'}, as a non-negative number`, `${source}[${row.symbol}]`))
       return
     }
     const entry = bySymbol.get(row.symbol) ?? { symbol: row.symbol, sector: null, held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {} }
     if (entry.sector === null && typeof row.sector === 'string' && row.sector.length > 0) entry.sector = row.sector
     const owner = row.strategy ?? 'unattributed'
     if (source === 'positions') {
-      entry.held = round(entry.held + row.weight)
-      entry.heldByStrategy[owner] = round((entry.heldByStrategy[owner] ?? 0) + row.weight)
+      entry.held = round(entry.held + value)
+      entry.heldByStrategy[owner] = round((entry.heldByStrategy[owner] ?? 0) + value)
     } else {
-      entry.pendingPeak = Math.max(entry.pendingPeak, row.weight)
-      entry.pendingPeakByStrategy[owner] = Math.max(entry.pendingPeakByStrategy[owner] ?? 0, row.weight)
+      entry.pendingPeak = Math.max(entry.pendingPeak, value)
+      entry.pendingPeakByStrategy[owner] = Math.max(entry.pendingPeakByStrategy[owner] ?? 0, value)
     }
     bySymbol.set(row.symbol, entry)
   }

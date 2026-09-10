@@ -6,7 +6,7 @@
       "why": "Another manager's unfilled proposal is exposure this book has already committed to; counting it only after a fill is how a book ends up at the limit twice in one afternoon. The row states a total of 0.2 — where that manager wants the position to end — so the account's exposure is 0.2 and the ceiling is exactly met.",
       "strategy": "catalyst-turnaround",
       "positions": [{ "symbol": "A00007", "strategy": "shareholder-rerating", "weight": 0.14 }],
-      "proposals": [{ "symbol": "A00007", "strategy": "fundamental-mean-reversion", "weight": 0.2 }],
+      "proposals": [{ "symbol": "A00007", "strategy": "fundamental-mean-reversion", "targetWeight": 0.2 }],
       "caps": { "accountSingleName": 0.2 },
       "expect": { "total": { "A00007": 0.2 }, "headroom": { "A00007": 0 }, "breaches": [], "causeCodes": [] }
     },
@@ -31,7 +31,7 @@
       "why": "A trim from 0.14 to 0.08 is a target state, not a purchase of 0.08 on top: summing the two would refuse the trim as a breach. And the trim does not reduce the exposure before it fills — the book holds 0.14 right now — so the fold is `max` and the answer is 0.14 rather than either 0.22 or 0.08 (#813).",
       "strategy": "catalyst-turnaround",
       "positions": [{ "symbol": "A00011", "strategy": "catalyst-turnaround", "weight": 0.14 }],
-      "proposals": [{ "symbol": "A00011", "strategy": "catalyst-turnaround", "weight": 0.08 }],
+      "proposals": [{ "symbol": "A00011", "strategy": "catalyst-turnaround", "targetWeight": 0.08 }],
       "caps": { "accountSingleName": 0.2 },
       "expect": { "total": { "A00011": 0.14 }, "breaches": [], "causeCodes": [] }
     },

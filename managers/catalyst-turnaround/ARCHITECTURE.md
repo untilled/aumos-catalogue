@@ -101,6 +101,11 @@ exposure = max(held, the largest total any open proposal asks for)
 and this package reports the second term — what the pending proposals still require **on top of**
 the holding — as the open-proposal figure, so that `held + open = exposure` stays an identity.
 
+⚠️ **The row's field is `targetWeight`, which is the host's name for it.** It was `weight` here
+until #813, next to `weight` on a position row, which is one word meaning two things inside one
+input object. A proposal row that still carries `weight` is `exposure_weight_invalid` — refused
+rather than read as an increment, because reading a total as an increment understates the account.
+
 ⚠️ **This package added the two until #813**, and the overstatement is not conservative in any
 useful sense — it refuses positions on books with room:
 
