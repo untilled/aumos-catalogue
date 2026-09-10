@@ -131,6 +131,16 @@ export function runVerdict(input = {}) {
     : null
 
   /**
+   * ⚠️ **What is held here and is not this desk's (#817).** Another manager's
+   * holding of this name plus every unattributed one — holdings only, no open
+   * proposals. `null` where the book was not read, because 0 would be a claim
+   * about an account nobody saw.
+   */
+  const otherHeldWeight = concentration.data.readable === true
+    ? (concentration.data.otherHeld?.[input.symbol] ?? 0)
+    : null
+
+  /**
    * ⛔ **The structural rule, stated once instead of at every rung.** A run
    * holding any `data_missing` may not increase an exposure — not by a staged
    * entry, not by a due stage, not by a resize upward. This is the single line
@@ -399,6 +409,42 @@ export function runVerdict(input = {}) {
   }
   if (increment > 0 && !mayIncrease) throw new Error('an increment survived an unread input, which is the whole defect this gate exists for')
 
+  /**
+   * ── The third weight, and it is the only one the host may be handed (#817) ──
+   *
+   *     hostTargetWeight = otherHeldWeight + (this desk's share of the position)
+   *
+   * ⛔ **`cumulativeTargetWeight` is this strategy's share and the host's
+   * `targetWeight` is the position.** `headroomForStrategy` above is «the
+   * smaller of the two caps, less what every *other* strategy has», so what
+   * comes out of `targetWeight` is what this desk may hold — not what the name
+   * should be. The host's field is the other total: `rebalanceShadowBook` reads
+   * a position's whole weight and never its attribution
+   * (`untilled/aumos#815`), so handing over this desk's share is an instruction
+   * to make the **whole** position that size.
+   *
+   * ⚠️ **The gap between the two is what somebody else holds, and it sells.** A
+   * 6% holding assigned to nobody, sized here at 2%, handed over as `0.02` is a
+   * sale of two thirds of a position no judgement on this fund ever asked to
+   * reduce — from a run whose own intent is `enter-staged`.
+   *
+   * ⚠️ **Holdings are added and open proposals are not.** A pending proposal is
+   * exposure for a *ceiling* and is not a position for an *order*; adding one
+   * would buy another manager's unapproved judgement on their behalf.
+   *
+   * ⛔ **`close-out` reduces this desk's share to zero and no further.** Where
+   * nobody else holds the name this is `0`, which is the host's `exit`. Where
+   * somebody does, an `exit` would liquidate their position too, so the exit is
+   * expressed as this weight instead.
+   *
+   * `null` where the book was not read or nothing was sized — an unread account
+   * has no target, and a `0` here would be an order.
+   */
+  const ownTarget = outcome.intent === 'close-out' ? 0 : cumulative
+  const hostTargetWeight = finite(otherHeldWeight) && finite(ownTarget)
+    ? round(otherHeldWeight + ownTarget)
+    : null
+
   return {
     data: {
       symbol: input.symbol ?? null,
@@ -406,13 +452,21 @@ export function runVerdict(input = {}) {
       held,
       intent: outcome.intent,
       review: outcome.review,
-      /** «The whole position should be this.» Null where this run sizes nothing. */
+      /** «This desk's share of the position should be this.» Null where this run sizes nothing. ⛔ Not the host's `targetWeight` — see `hostTargetWeight` (#817). */
       cumulativeTargetWeight: cumulative,
       /** «Buy this much more, now.» Zero on every intent that is not a purchase. */
       incrementThisRun: increment,
       currentWeight,
+      /** Holdings of this name that are not this desk's — another manager's, and every unattributed one. */
+      otherHeldWeight,
+      /** ⛔ «The whole position should be this.» The **only** number that may be handed to the host (#817). */
+      hostTargetWeight,
       increasesExposure: increases,
-      weightMeanings: { cumulativeTargetWeight: 'cumulative-position-weight', incrementThisRun: 'weight-added-this-run' },
+      weightMeanings: {
+        cumulativeTargetWeight: 'this-strategys-share-of-the-position',
+        incrementThisRun: 'weight-added-this-run',
+        hostTargetWeight: 'whole-position-weight-for-the-host',
+      },
       context,
       ledger: ledger.data,
       recovery: recovery.data,
