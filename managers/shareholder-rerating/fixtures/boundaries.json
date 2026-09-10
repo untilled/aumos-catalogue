@@ -118,7 +118,8 @@
       "finding": 3,
       "kind": "evaluateCase",
       "base": "cases[0]",
-      "mutations": [{ "op": "set", "path": "book.holdings", "value": [{ "symbol": "000000", "sector": "financials", "weight": 0.07 }] }],
+      "note": "The holding says whose it is. It was written before `assignment` reached the wire (untilled/aumos#814 · #816) and the row was silently read as this manager's; #817 makes that explicit, because «the account is above it» is a reduction question about *this desk's* position and an unattributed row is nobody's. The scenario and every expected number are unchanged — this is the same case, restated under the contract the row is read against.",
+      "mutations": [{ "op": "set", "path": "book.holdings", "value": [{ "symbol": "000000", "sector": "financials", "weight": 0.07, "strategy": "shareholder-rerating" }] }],
       "expect": {
         "route": "trim-or-exit-review",
         "outcomeCode": "position_above_target",

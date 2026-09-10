@@ -106,7 +106,16 @@ export function evaluateCase(input = {}) {
     targetTotalWeight: null,
     /** What this run proposes adding. `targetTotalWeight` minus what the account already carries. */
     incrementWeight: null,
+    /**
+     * ⛔ **The one weight the host may be handed (#817).** «The whole position
+     * should be this» — every holding of this name that is *not* this manager's,
+     * plus what this manager means to hold after the run. `null` where this run
+     * proposes no order, because a weight is an instruction and there is none.
+     */
+    hostTargetWeight: null,
     heldWeight: null,
+    /** Holdings of this name that are not this manager's — another manager's, and every unattributed one. */
+    otherHeldWeight: null,
     existingExposure: null,
     projectedExposure: null,
     projectedGrossExposure: null,
@@ -175,6 +184,7 @@ export function evaluateCase(input = {}) {
   const exposure = concentration({ proposed: { symbol: input.symbol, sector: input.sector, weight: 0 }, ...account })
   diagnostics.push(...exposure.diagnostics)
   base.existingExposure = exposure.data.existingExposure
+  base.otherHeldWeight = exposure.data.otherHeld
   base.projectedExposure = exposure.data.projectedExposure
   base.projectedGrossExposure = exposure.data.projectedGrossExposure
   base.maxTotalWeightBinding = exposure.data.maxTotalWeightBinding
@@ -221,7 +231,39 @@ export function evaluateCase(input = {}) {
     base.incrementWeight = 0
     base.route = 'trim-or-exit-review'
     base.outcomeCode = 'position_above_target'
-    base.proposedAction = heldWeight > sized.data.targetTotalWeight + THRESHOLDS.weightTolerance ? 'RESIZE' : 'WAIT'
+    /**
+     * ⛔ **«The account is above it» is a reduction question about *this desk's*
+     * holding, and #817 is where that sentence stops being ambiguous.** The
+     * comment below already said it about pending proposals — an excess made of
+     * somebody else's unapproved proposal is theirs to withdraw. The same
+     * sentence has to hold for a **holding**: a 6% position assigned to nobody,
+     * on a run this package sizes at 5%, used to reach `RESIZE` and hand the
+     * host a target that sold a third of a position no judgement on this fund
+     * ever asked to reduce. So the test is `ownHeld`, not the whole position.
+     *
+     * ⚠️ **This is not «nobody may touch an unattributed position».** That is the
+     * state `untilled/aumos#782` undid and `untilled/aumos#786` was explicitly
+     * kept away from. This desk may still *buy* into an unattributed name — the
+     * BUY path below adds to `otherHeld` rather than replacing it — and once the
+     * investor assigns the position on the approval screen (`untilled/aumos#785`)
+     * every reduction here works exactly as it did. What it may not do is shrink
+     * a position nobody made it responsible for.
+     */
+    const ownHeld = exposure.data.ownHeld ?? 0
+    base.proposedAction = ownHeld > sized.data.targetTotalWeight + THRESHOLDS.weightTolerance ? 'RESIZE' : 'WAIT'
+    base.hostTargetWeight =
+      base.proposedAction === 'RESIZE' ? round(exposure.data.otherHeld + sized.data.targetTotalWeight) : null
+    if (ownHeld < heldWeight - THRESHOLDS.weightTolerance) {
+      diagnostics.push(
+        diagnostic(
+          'excess_is_not_this_managers_to_reduce',
+          'info',
+          `${round(exposure.data.otherHeld)} of this name is held by another manager or by nobody at all, and this run is not responsible for it. The reduction this package proposes is against its own ${round(ownHeld)} and no further: a target weight covering the whole position would sell somebody else's holding, and the host executes it against the whole position.`,
+          'book.holdings',
+          { held: round(heldWeight), ownHeld: round(ownHeld), otherHeld: round(exposure.data.otherHeld), targetTotalWeight: sized.data.targetTotalWeight },
+        ),
+      )
+    }
     diagnostics.push(
       diagnostic(
         'position_above_target_weight',
@@ -276,6 +318,31 @@ export function evaluateCase(input = {}) {
   if (confirm.data.withinLimits !== true) {
     return wait(base, diagnostics, confirm.data.withinLimits === false ? 'risk_limit_exceeded' : 'data_missing')
   }
+
+  /**
+   * ── The weight that leaves this package, and it is not `targetTotalWeight` (#817) ──
+   *
+   *     hostTargetWeight = otherHeld + (ownHeld + incrementWeight)
+   *                      = held + incrementWeight
+   *
+   * ⛔ **`incrementWeight` is what this run adds and the host takes no
+   * increments.** `decision_submit` carries a `position-weight` *total*, and
+   * `rebalanceShadowBook` executes it against the whole position without reading
+   * whose it is (`untilled/aumos#815`). So the total has to be assembled here,
+   * and it is assembled out of the part of the position this run is not
+   * entitled to move plus the part it is.
+   *
+   * ⚠️ **Holdings, never `existingExposure`.** The second folds in every open
+   * proposal, and an open proposal is not a position: buying up to somebody
+   * else's unfilled total would be this run executing their unapproved
+   * judgement. That is the second answer to «how much did this judgement ask
+   * for» that `untilled/aumos#781` refused.
+   *
+   * ⚠️ **Nothing here widens what this package may hold.** The increment already
+   * passed both concentration passes; what is added is what the account already
+   * has and this run is leaving alone.
+   */
+  base.hostTargetWeight = round(exposure.data.otherHeld + (exposure.data.ownHeld ?? 0) + increment)
 
   base.proposedAction = 'BUY'
   return { data: base, diagnostics }
