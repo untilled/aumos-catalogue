@@ -225,7 +225,7 @@ for (const fixture of staged.cases) {
     proposed: { symbol: 'A', sector: 'financials', weight: 0.03 },
     holdings: [{ symbol: 'A', sector: 'financials', weight: 0.06, strategy: 'evidence-gated' }],
     // ⚠️ A total, not an addition: `catalyst-turnaround` is asking for this name to *be* 0.09 of the book (#813).
-    openProposals: [{ symbol: 'A', sector: 'financials', weight: 0.09, strategy: 'catalyst-turnaround', decisionId: 'dec_x' }],
+    openProposals: [{ symbol: 'A', sector: 'financials', targetWeight: 0.09, strategy: 'catalyst-turnaround', decisionId: 'dec_x' }],
     caps: { accountPositionCap: 0.1, strategyPositionCap: 0.08, accountSectorCap: 0.3, accountGrossCap: 0.9 },
     strategy: 'shareholder-rerating',
   })
@@ -251,7 +251,7 @@ for (const fixture of staged.cases) {
   const withOpen = concentration({
     proposed: { symbol: 'A', weight: 0.03 },
     holdings: [{ symbol: 'A', weight: 0.06 }],
-    openProposals: [{ symbol: 'A', weight: 0.09 }],
+    openProposals: [{ symbol: 'A', targetWeight: 0.09 }],
     caps: { accountPositionCap: 0.1 },
   })
   const unreadable = concentration({
@@ -308,7 +308,7 @@ for (const scenario of HOST_ABC) {
   const answer = concentration({
     proposed: { symbol: '005930', sector: 'technology', weight: 0 },
     holdings: scenario.held > 0 ? [{ symbol: '005930', sector: 'technology', weight: scenario.held }] : [],
-    openProposals: [{ symbol: '005930', sector: 'technology', weight: scenario.pendingTotal, strategy: 'fundamental-mean-reversion', decisionId: 'dec_other' }],
+    openProposals: [{ symbol: '005930', sector: 'technology', targetWeight: scenario.pendingTotal, strategy: 'fundamental-mean-reversion', decisionId: 'dec_other' }],
     caps: { accountPositionCap: 0.2 },
     strategy: 'shareholder-rerating',
   })
@@ -330,7 +330,7 @@ for (const scenario of HOST_ABC) {
   const trimming = concentration({
     proposed: { symbol: 'A', weight: 0 },
     holdings: [{ symbol: 'A', weight: 0.14 }],
-    openProposals: [{ symbol: 'A', weight: 0.08, strategy: 'catalyst-turnaround' }],
+    openProposals: [{ symbol: 'A', targetWeight: 0.08, strategy: 'catalyst-turnaround' }],
     caps: { accountPositionCap: 0.2 },
   })
   assert.equal(trimming.data.existingExposure, 0.14, 'a pending trim was read as though it had already filled')
@@ -345,8 +345,8 @@ for (const scenario of HOST_ABC) {
     proposed: { symbol: 'A', weight: 0 },
     holdings: [{ symbol: 'A', weight: 0.06 }],
     openProposals: [
-      { symbol: 'A', weight: 0.12, strategy: 'catalyst-turnaround' },
-      { symbol: 'A', weight: 0.12, strategy: 'fundamental-mean-reversion' },
+      { symbol: 'A', targetWeight: 0.12, strategy: 'catalyst-turnaround' },
+      { symbol: 'A', targetWeight: 0.12, strategy: 'fundamental-mean-reversion' },
     ],
     caps: { accountPositionCap: 0.2 },
   })
@@ -360,7 +360,7 @@ for (const scenario of HOST_ABC) {
       { symbol: 'A', weight: 0.06 },
       { symbol: 'B', weight: 0.1 },
     ],
-    openProposals: [{ symbol: 'A', weight: 0.12, strategy: 'catalyst-turnaround' }],
+    openProposals: [{ symbol: 'A', targetWeight: 0.12, strategy: 'catalyst-turnaround' }],
     caps: { accountPositionCap: 0.2, accountGrossCap: 0.9 },
   })
   assert.equal(gross.data.grossExposure, 0.22, 'the gross axis added a holding and its own pending total')
@@ -465,7 +465,7 @@ const byId = (id) => {
   const otherProposalUnclassified = concentration({
     proposed: { symbol: 'A', sector: 'financials', weight: 0.03 },
     holdings: book.holdings,
-    openProposals: [{ symbol: 'D', weight: 0.04, strategy: 'catalyst-turnaround' }],
+    openProposals: [{ symbol: 'D', targetWeight: 0.04, strategy: 'catalyst-turnaround' }],
     caps: book.caps,
   })
   assert.equal(otherProposalUnclassified.data.withinLimits, null, 'an unclassified open proposal was left out of the sector total')

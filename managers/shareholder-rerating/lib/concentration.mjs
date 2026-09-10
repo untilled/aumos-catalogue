@@ -81,7 +81,9 @@ import { THRESHOLDS } from './thresholds.mjs'
  * @param {{symbol:string, sector?:string, weight:number}} input.proposed  weight is the **increment** being added;
  *   `sector` is the **fund risk-management sector** the host classifies the account by, not this package's issuer kind
  * @param {Array} input.holdings       real positions: `{ symbol, sector, weight, strategy }` — required
- * @param {Array} input.openProposals  unapproved proposals: `{ symbol, sector, weight, strategy, decisionId }` — required
+ * @param {Array} input.openProposals  unapproved proposals: `{ symbol, sector, targetWeight, strategy, decisionId }` — required.
+ *   ⚠️ `targetWeight` is the host's field and the host's meaning: the **total** weight that proposal asks
+ *   this position to become, never an amount to add to what is held (#813)
  * @param {object} [input.caps]        `{ accountPositionCap, strategyPositionCap, accountSectorCap, accountGrossCap }`
  * @param {string} [input.strategy]    this package's instance id, for the overlap message
  */
@@ -145,9 +147,9 @@ export function concentration(input = {}) {
     if (row.weight > existing.weight) heldBySymbol.set(row.symbol, { ...row })
   }
   for (const row of openProposals) {
-    if (typeof row?.symbol !== 'string' || !finite(row?.weight)) {
+    if (typeof row?.symbol !== 'string' || !finite(row?.targetWeight)) {
       diagnostics.push(
-        diagnostic('open_proposal_row_unreadable', 'unevaluated', 'An open proposal row carries no symbol or no weight. It is exposure that is about to exist and it cannot be added, so no total here is complete.', 'openProposals'),
+        diagnostic('open_proposal_row_unreadable', 'unevaluated', 'An open proposal row carries no symbol or no `targetWeight`. `targetWeight` is the total weight that proposal asks the position to become, and without it the account total here is not complete. ⚠️ A row carrying `weight` is a caller written against the contract before #813, when this field was an increment; it is unreadable rather than read as one, because reading an increment as a total understates the exposure.', 'openProposals'),
       )
     }
   }
@@ -158,9 +160,9 @@ export function concentration(input = {}) {
   /**
    * ── An open proposal states a **total**, so the fold is `max` (#813) ──────
    *
-   * ⛔ **The weight on an open-proposal row is what that proposal asks the
-   * position to *become*, not an amount to add to it.** It is the host's
-   * `targetWeight`, and `portfolio_get` says so in its own published description.
+   * ⛔ **`targetWeight` on an open-proposal row is what that proposal asks the
+   * position to *become*, not an amount to add to it.** It is the host's own
+   * field name, and `portfolio_get` says so in its own published description.
    * It is also what the host executes: a book holding 6% of a name, under another
    * manager's open proposal for a total of 12%, sends an order for the
    * *difference* and ends at 12%. Never 18%. So exposure to one name is
@@ -186,7 +188,7 @@ export function concentration(input = {}) {
   const pendingBySymbol = new Map()
   for (const row of openProposals) {
     const entry = pendingBySymbol.get(row.symbol) ?? { peak: 0, sector: null }
-    if (row.weight > entry.peak) entry.peak = row.weight
+    if (row.targetWeight > entry.peak) entry.peak = row.targetWeight
     if (entry.sector === null && typeof row.sector === 'string' && row.sector.length > 0) entry.sector = row.sector
     pendingBySymbol.set(row.symbol, entry)
   }
@@ -217,9 +219,9 @@ export function concentration(input = {}) {
         diagnostic(
           'overlapping_open_proposal',
           'warn',
-          `${row.strategy} already has an unapproved proposal taking ${symbol} to ${round(row.weight)} of the book. That is a total and not an addition: if it is approved the account holds the larger of it and what is already there, so it is folded here by maximum rather than added to the holding.`,
+          `${row.strategy} already has an unapproved proposal taking ${symbol} to ${round(row.targetWeight)} of the book. That is a total and not an addition: if it is approved the account holds the larger of it and what is already there, so it is folded here by maximum rather than added to the holding.`,
           'openProposals',
-          { symbol, strategy: row.strategy, weight: round(row.weight), decisionId: row.decisionId ?? null },
+          { symbol, strategy: row.strategy, targetWeight: round(row.targetWeight), decisionId: row.decisionId ?? null },
         ),
       )
     }

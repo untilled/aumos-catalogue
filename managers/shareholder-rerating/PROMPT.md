@@ -222,9 +222,11 @@ fallback from anywhere — this plan's stages are this thesis's catalysts.
 
 `concentration` folds real holdings and open proposals together — per name, per sector and over
 the whole book — and takes the **minimum** of the caps that apply.
-⛔ **An open proposal states a total, and the fold is `max` — never `+`.** The weight on an
-open-proposal row is what that proposal asks the position to **become**, not an amount to add to
-it: the host publishes it as a *total* weight and says so in `portfolio_get`'s own description. It
+⛔ **An open proposal states a total, and the fold is `max` — never `+`.** Each open-proposal row
+carries `targetWeight`, which is what that proposal asks the position to **become** — the host's
+own field, under the host's own meaning, and `portfolio_get` says so in its description. It is not
+an amount to add to what is held, and a row that carries `weight` instead is unreadable rather
+than read as an increment. It
 is also what the host executes. A book holding 6% of a name, under another manager's open proposal
 for a total of 12%, sends an order for the **difference** and ends at 12% — never 18%. So exposure
 to a name is `max(held, the largest total any open proposal asks for)`, and `concentration` folds

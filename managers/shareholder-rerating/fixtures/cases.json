@@ -883,7 +883,7 @@
             {
               "symbol": "000010",
               "sector": "financials",
-              "weight": 0.09,
+              "targetWeight": 0.09,
               "strategy": "catalyst-turnaround",
               "decisionId": "dec_sibling_1"
             }
@@ -990,7 +990,7 @@
             {
               "symbol": "000011",
               "sector": "financials",
-              "weight": 0.03,
+              "targetWeight": 0.03,
               "strategy": "shareholder-rerating",
               "decisionId": "dec_own_1"
             }
