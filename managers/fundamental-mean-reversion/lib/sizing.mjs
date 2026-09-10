@@ -603,14 +603,55 @@ export function positionSizing(input = {}) {
    * frequently the entry fold — which is exactly why an empty book, the common
    * case, is a byte-for-byte identity.
    */
-  const ceilingsAgainst = (otherName, otherGross, otherSector) => [
+  /**
+   * ── And a second axis under that one: two kinds of ceiling (#835) ─────────
+   *
+   * ⛔ **A ceiling that names *this position* and a ceiling that is the
+   * account's leftover room after *other names* are not the same statement**,
+   * and folding them together produced the number that sized a **sale**.
+   *
+   *   ⚠️ **`nameAxes`** — `risk-budget` and `liquidity` are properties of this
+   *      thesis and this tape; `single-name-headroom` and `strategy-headroom`
+   *      are ceilings on **this name**, less what other desks hold *of it*.
+   *      Every one of them says *«this position may be at most X»*. They need
+   *      no division between names, and a desk over one of them reduces itself.
+   *
+   *   ⚠️ **`residualAxes`** — the gross and sector ceilings *less everything
+   *      else in the bucket* — say *«after the other names, this much is
+   *      left»*. That is the right ceiling for an **addition**, because a limit
+   *      has to hold in every state the account passes through (#813). It is
+   *      **not a size for this position**.
+   *
+   * ⛔ **Because a residual is not an allocation, folding it into a reduction
+   * makes the answer depend on evaluation order.** A sector ceiling states no
+   * division of itself between the names under it, so reading *«the sector has
+   * 0.01 left»* as *«this position must become 0.01»* hands the whole
+   * adjustment to whichever name was evaluated last — including when every
+   * other name in the bucket belongs to a desk this run cannot reduce at all.
+   * Measured through the real host on a 6% position **wholly this desk's**, its
+   * thesis invalidated, under a 0.25 sector ceiling: another name at 0.24 of the
+   * sector turned `sell:23` into `sell:50`, 0.245 into `sell:55`, and 0.3 into
+   * `sell:60` — **the whole position**, which nobody asked to liquidate. The
+   * gross axis is the same arithmetic with a wider bucket, and the owner of that
+   * other name — another desk, this desk, or nobody — made no difference at all.
+   *
+   * ⚠️ **`shareholder-rerating` carried this sentence first** (`#833`,
+   * `aumos-catalogue#286`); this package carried only the axis above it.
+   */
+  const nameAxes = (otherName) => [
     { name: 'risk-budget', value: riskWeight },
     { name: 'liquidity', value: liquidityCap },
     { name: 'single-name-headroom', value: round(singleNameCap - otherName) },
     { name: 'strategy-headroom', value: strategyCap === null ? null : round(strategyCap - otherName) },
+  ]
+  const residualAxes = (otherGross, otherSector) => [
     { name: 'gross-headroom', value: round(grossCap - otherGross) },
     { name: 'sector-headroom', value: otherSector === null ? null : round(sectorCap - otherSector) },
-  ].filter((row) => finite(row.value))
+  ]
+  const ceilingsAgainst = (otherName, otherGross, otherSector) =>
+    [...nameAxes(otherName), ...residualAxes(otherGross, otherSector)].filter((row) => finite(row.value))
+  /** ⛔ The same list with the account's leftover room left out. Nothing else differs. */
+  const nameCeilingsAgainst = (otherName) => nameAxes(otherName).filter((row) => finite(row.value))
   const foldCeilings = (rows) => {
     const lowest = rows.reduce((best, row) => (best === null || row.value < best.value ? row : best), null)
     return { binding: lowest, total: lowest ? round(Math.max(lowest.value, 0)) : 0 }
@@ -627,8 +668,19 @@ export function positionSizing(input = {}) {
     sectorCap === null || sectorExposure === null ? null : sectorExposure.otherHeldWeight,
   )
 
+  /**
+   * ⚠️ **The reduction fold is where the two axes compose (#826, #835).** A sale
+   * is measured against holdings only *and* against the ceilings that name this
+   * position — nobody's unfilled proposal and nobody else's *name* may decide
+   * how much of its own holding this desk sells. With no open proposal and
+   * nothing else in the bucket all three folds are one number, which is why the
+   * ordinary account is a byte-for-byte identity.
+   */
+  const reductionCeilings = nameCeilingsAgainst(exposure.otherHeldWeight)
+
   const { binding, total: targetTotalWeight } = foldCeilings(ceilings)
   const { binding: heldOnlyBinding, total: heldOnlyTargetTotalWeight } = foldCeilings(heldOnlyCeilings)
+  const { binding: reductionBinding, total: reductionTargetTotalWeight } = foldCeilings(reductionCeilings)
   /** *«Buy this much more today.»* Never negative: a reduction is an exit decision. */
   const incrementalWeight = round(Math.max(targetTotalWeight - exposure.ownWeight, 0))
   const atOrAboveTarget = targetTotalWeight > 0 && incrementalWeight === 0
@@ -671,6 +723,32 @@ export function positionSizing(input = {}) {
     heldOnlyCeilings,
     heldOnlyBindingConstraint: heldOnlyBinding?.name ?? null,
     heldOnlyTargetTotalWeight,
+    /**
+     * ── The same fold with the account's leftover room left out (#835) ──────
+     *
+     * ⛔ **`classifyCase`'s `reduce` role is the only consumer, and the entry
+     * path does not read this.** A ceiling constrains additions rather than
+     * reductions, so a sale is sized by what the risk arithmetic says this
+     * position should be and by the ceilings that **name** it — never by what
+     * is left of a sector or of the whole book after somebody else's names.
+     *
+     * ⚠️ **Published rather than folded in, because the two answer different
+     * questions and both are true.** A caller asking why this desk may buy so
+     * little reads `bindingConstraint`; one asking what a sale is measured
+     * against reads `reductionBindingConstraint`.
+     *
+     * ⚠️ **What this gives up, said out loud.** Where a sector really is over
+     * its ceiling and it is *this desk's other holdings* that filled it, this
+     * package no longer trims *this* name on the sector axis. The excess stands
+     * and the axis that names it still says so; the reduction that fixes it
+     * comes from a ceiling that names a position — the single-name cap or the
+     * risk budget of whichever name is actually oversized. Dividing a sector
+     * budget between this desk's names is portfolio construction, and a
+     * name-at-a-time evaluator has no input with which to choose it.
+     */
+    reductionCeilings,
+    reductionBindingConstraint: reductionBinding?.name ?? null,
+    reductionTargetTotalWeight,
     /**
      * ⚠️ **Two weights and two meanings, always both present.** One field doing
      * both jobs is a proposal the host executes wrongly in one of its two

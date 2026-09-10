@@ -397,7 +397,7 @@ only where somebody else holds part of the name. So the total `classifyCase` ans
 reduction is
 
 ```
-hostTargetWeight = otherHeldWeight + min(heldOnlyTargetTotalWeight, ownHeldWeight)
+hostTargetWeight = otherHeldWeight + min(reductionTargetTotalWeight, ownHeldWeight)
 ```
 
 ⛔ **and the share it is clamped against is measured against *positions*, not against open
@@ -407,11 +407,31 @@ through. A **sale** may not follow from one. Measured to the exchange, a 6% posi
 desk's left as `sell:23`; with another manager holding a sealed and **unapproved** 15% BUY on the
 same name it left as `sell:50`, and once that pending total passed the single-name cap it
 liquidated the position — nothing approved, nothing filled, `diagnostics` empty.
-`positionSizing` answers the second fold as `heldOnlyTargetTotalWeight` (with
-`heldOnlyBindingConstraint` beside it), `classifyCase` clamps against that one, and where the two
-disagree the answer carries `reduction_target_ignores_others_pending` with the total that would
-otherwise have gone out. ⚠️ **The buy path is unchanged and still reads `targetTotalWeight`** — a
-pending proposal is exposure for a ceiling and is not a position for an order.
+`positionSizing` answers that fold as `heldOnlyTargetTotalWeight` (with
+`heldOnlyBindingConstraint` beside it), and where it disagrees with the entry share the answer
+carries `reduction_target_ignores_others_pending` with the total that would otherwise have gone
+out. ⚠️ **The buy path is unchanged and still reads `targetTotalWeight`** — a pending proposal is
+exposure for a ceiling and is not a position for an order.
+
+⛔ **and it is measured against the ceilings that *name this position*, never against what a
+sector or the whole book has left after **other names** (#835).** `gross-headroom` and
+`sector-headroom` are `cap − everything else in the bucket`: a residual, and a residual is not an
+allocation. A sector ceiling states no division of itself between the names under it, so reading
+its remainder as this position's target hands the whole adjustment to whichever name was
+evaluated last — and to a desk that may not be able to sell one share of what filled the bucket.
+Measured to the exchange, a 6% position wholly this desk's under a 0.25 sector ceiling left as
+`sell:23`; with another *name* at 0.24 of that sector it left as `sell:50`, at 0.245 as
+`sell:55`, and at 0.30 it **liquidated the position** — and the owner of that other name, another
+desk or this one or nobody, made no difference. `positionSizing` answers the third fold as
+`reductionTargetTotalWeight` (with `reductionBindingConstraint` beside it), `classifyCase` clamps
+against that one, and where it disagrees with the held-only fold the answer carries
+`reduction_is_not_sized_by_the_accounts_remaining_room` with the order that would otherwise have
+gone out. ⚠️ **The buy path is unchanged here too** — an addition really is bounded by what the
+account has room for, and a full sector still refuses an entry outright.
+⚠️ **What that gives up**: where a sector is over its ceiling because of *your own other
+holdings*, this package no longer trims *this* name on the sector axis. The excess stands and
+`sector_limit_exceeded` still names it; say so, and let the reduction come from a ceiling that
+names a position.
 
 ⚠️ **and the `min` is a ceiling, never a floor** — where you hold more than the sizing target,
 which is what makes a reduction a reduction, it changes nothing and the trim, the resize and the

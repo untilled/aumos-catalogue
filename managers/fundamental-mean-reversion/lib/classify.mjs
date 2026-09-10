@@ -175,6 +175,26 @@ export function classifyCase(input = {}) {
    * reinstated by exactly the sizing answers this build no longer produces.
    */
   const heldOnlyTargetTotalWeight = finite(sizing?.heldOnlyTargetTotalWeight) ? sizing.heldOnlyTargetTotalWeight : null
+  /**
+   * ── And the same share again, measured only against ceilings that name it (#835) ──
+   *
+   * ⛔ **The account's leftover room after *other names* is not a size for this
+   * position.** `heldOnlyTargetTotalWeight` took the pending totals out of every
+   * ceiling and left the sector and gross axes in, and those two are
+   * `cap − everything else in the bucket`: a residual, not an allocation. A
+   * sector ceiling states no division of itself between the names under it, so
+   * reading its remainder as this position's target hands the whole adjustment
+   * to whichever name was evaluated last. Measured to the exchange on a 6%
+   * position wholly this desk's, its thesis invalidated: another *name* at 0.24
+   * of a 0.25 sector turned `sell:23` into `sell:50`, and at 0.3 into `sell:60`
+   * — the whole position, liquidated by an arithmetic nobody asked for. The
+   * owner of that other name made no difference: another desk, this desk, and
+   * nobody at all produced the same three numbers.
+   *
+   * ⚠️ **`null` where the sizing did not answer it**, and never a silent fall
+   * back to either wider fold: that fall back *is* the defect.
+   */
+  const reductionTargetTotalWeight = finite(sizing?.reductionTargetTotalWeight) ? sizing.reductionTargetTotalWeight : null
 
   /**
    * ── The one total this answer may hand the host, by what the outcome does (#823) ──
@@ -193,9 +213,9 @@ export function classifyCase(input = {}) {
     if (role === 'standstill') return positionWeight
     /** ⛔ `#817`, unmoved: the entry total is the entry judgement's and no other reads it. */
     if (role === 'increase') return entryTargetTotalWeight === null ? null : round(otherHeldWeight + entryTargetTotalWeight)
-    if (heldOnlyTargetTotalWeight === null) return null
+    if (reductionTargetTotalWeight === null) return null
     /** ⛔ A ceiling and never a floor: `min` cannot raise this desk's share, so a real reduction is untouched. */
-    return round(otherHeldWeight + Math.min(heldOnlyTargetTotalWeight, ownHeldWeight))
+    return round(otherHeldWeight + Math.min(reductionTargetTotalWeight, ownHeldWeight))
   }
 
   /**
@@ -257,13 +277,13 @@ export function classifyCase(input = {}) {
      * share, and a diagnostic naming the other one would describe an arithmetic
      * this answer did not do.
      */
-    if (carriedSizing && weightRole === 'reduce' && heldOnlyTargetTotalWeight !== null && ownHeldWeight !== null && heldOnlyTargetTotalWeight > ownHeldWeight) {
+    if (carriedSizing && weightRole === 'reduce' && reductionTargetTotalWeight !== null && ownHeldWeight !== null && reductionTargetTotalWeight > ownHeldWeight) {
       diagnostics.push(diagnostic(
         'reduction_target_clamped_to_own_holding',
         'info',
-        `This outcome reduces, and the arithmetic sized this thesis's share at ${heldOnlyTargetTotalWeight} against the ${ownHeldWeight} it holds. Sent as the position's total that is a purchase out of a judgement to reduce, so the total handed to the host is bounded by what this desk holds: ${hostTargetWeight}`,
-        'sizing.heldOnlyTargetTotalWeight',
-        { outcome, weightRole, heldOnlyTargetTotalWeight, entryTargetTotalWeight, ownHeldWeight, otherHeldWeight, hostTargetWeight },
+        `This outcome reduces, and the arithmetic sized this thesis's share at ${reductionTargetTotalWeight} against the ${ownHeldWeight} it holds. Sent as the position's total that is a purchase out of a judgement to reduce, so the total handed to the host is bounded by what this desk holds: ${hostTargetWeight}`,
+        'sizing.reductionTargetTotalWeight',
+        { outcome, weightRole, reductionTargetTotalWeight, heldOnlyTargetTotalWeight, entryTargetTotalWeight, ownHeldWeight, otherHeldWeight, hostTargetWeight },
       ))
     }
     /**
@@ -283,9 +303,53 @@ export function classifyCase(input = {}) {
       diagnostics.push(diagnostic(
         'reduction_target_ignores_others_pending',
         'info',
-        `The ceilings that read the account fold other desks' open proposals in, which sizes this thesis's entry share at ${entryTargetTotalWeight}; measured against holdings alone it is ${heldOnlyTargetTotalWeight}. A pending total is exposure for a ceiling and is not a position for an order, so this reduction is measured against the second: the host is handed ${hostTargetWeight} and not ${foldedPending}${foldedPending === hostTargetWeight ? ', which the holding happens to clamp to the same number here' : ''}`,
+        `The ceilings that read the account fold other desks' open proposals in, which sizes this thesis's entry share at ${entryTargetTotalWeight}; measured against holdings alone it is ${heldOnlyTargetTotalWeight}. A pending total is exposure for a ceiling and is not a position for an order, so no pending total is folded into this sale: the host is handed ${hostTargetWeight} and not the ${foldedPending} that fold would have named${foldedPending === hostTargetWeight ? ', which the holding happens to clamp to the same number here' : ''}`,
         'sizing.heldOnlyTargetTotalWeight',
-        { outcome, weightRole, entryTargetTotalWeight, heldOnlyTargetTotalWeight, ownHeldWeight, otherHeldWeight, hostTargetWeight, hostTargetWeightIfPendingFolded: foldedPending },
+        { outcome, weightRole, entryTargetTotalWeight, heldOnlyTargetTotalWeight, reductionTargetTotalWeight, ownHeldWeight, otherHeldWeight, hostTargetWeight, hostTargetWeightIfPendingFolded: foldedPending },
+      ))
+    }
+    /**
+     * ── The sixth answer in this series that changed a number and said nothing (#835) ──
+     *
+     * ⛔ **A control nobody can measure is a restatement.** This build sizes a
+     * sale by the ceilings that name the position and not by what a sector or
+     * the whole book has left after other names, and the order that difference
+     * deletes has to be reported next to the one that goes out —
+     * `untilled/aumos#782`'s sentence about reductions is only checkable when
+     * both numbers are on the page. That is `#826`'s rule, one axis over.
+     *
+     * ⚠️ **Silent where the two folds agree**, which is every account with no
+     * other name in the bucket, and silent on a purchase: an addition *is*
+     * bounded by the account's leftover room — that is `#813` — and the entry
+     * fold reports it as `bindingConstraint` all by itself.
+     */
+    if (
+      carriedSizing &&
+      weightRole === 'reduce' &&
+      reductionTargetTotalWeight !== null &&
+      heldOnlyTargetTotalWeight !== null &&
+      reductionTargetTotalWeight !== heldOnlyTargetTotalWeight
+    ) {
+      const foldedRoom = round(otherHeldWeight + Math.min(heldOnlyTargetTotalWeight, ownHeldWeight))
+      const bucket = sizing?.heldOnlyBindingConstraint ?? null
+      diagnostics.push(diagnostic(
+        'reduction_is_not_sized_by_the_accounts_remaining_room',
+        'info',
+        `Every declared axis folded together leaves this name ${heldOnlyTargetTotalWeight} of the account, because ${bucket ?? 'a bucket-wide ceiling'} measures a bucket most of which is other names. That is the ceiling on what may be **added** here and it is not a size for a position already held: a sector or gross limit states no division of itself between the names under it, so reading its remainder as this position's target hands the whole adjustment to whichever name was evaluated last — including when every other name in the bucket belongs to a desk this run cannot reduce at all. This reduction is measured against ${reductionTargetTotalWeight} — ${sizing?.reductionBindingConstraint ?? 'the ceilings that name this position'} and the risk arithmetic — so the host is handed ${hostTargetWeight} and not ${foldedRoom}${foldedRoom <= otherHeldWeight ? ', which is this desk\'s share of the position reduced to nothing' : ''}. The excess the account really is carrying stands, and the axis that names it says so`,
+        'sizing.reductionTargetTotalWeight',
+        {
+          outcome,
+          weightRole,
+          reductionTargetTotalWeight,
+          heldOnlyTargetTotalWeight,
+          entryTargetTotalWeight,
+          reductionBindingConstraint: sizing?.reductionBindingConstraint ?? null,
+          heldOnlyBindingConstraint: bucket,
+          ownHeldWeight,
+          otherHeldWeight,
+          hostTargetWeight,
+          hostTargetWeightIfRoomFolded: foldedRoom,
+        },
       ))
     }
     if (carriedSizing && weightRole === 'standstill' && hostTargetWeight !== null && entryTargetTotalWeight !== null && hostTargetWeight !== round(otherHeldWeight + entryTargetTotalWeight)) {
