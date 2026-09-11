@@ -1,0 +1,760 @@
+# 실제 런 1회 런북 — `untilled/aumos-catalogue#256`의 마지막 한 칸
+
+> **무엇을 닫는 문서인가.** `aumos-catalogue#256`의 남은 완료 조건 세 개 중 세 번째:
+>
+> > 자격증명이 있는 환경에서 세 패키지 중 하나로 실제 런 한 번: `decision_submit` → 승인 → 체결 → 다음 런의 WATCH 재arm까지. 이 저장소·CI에서는 할 수 없다.
+>
+> 그리고 `untilled/aumos#850`이 열다섯 차수 내내 ⬜로 남긴 한 줄 — *「실제 CLI 런을 한 번도 못 띄웠다(자격증명 없음)」* — 을 지우는 것이 이 런북의 전부다.
+>
+> ⛔ **이 문서의 4단계 이후는 진짜 돈을 쓴다.** 토스증권에는 시뮬레이터가 없다(§3).
+
+---
+
+## 0. 재려는 다섯 체크포인트
+
+| # | 체크포인트 | 확인 지점 |
+|---|---|---|
+| ① | 카탈로그 패키지가 설치된다 | `<AUMOS_HOME>/managers/<agt_…>/aumos.json`, `runnable-managers` |
+| ② | 런이 `decision_submit`을 내고 판단이 봉인된다 | `<AUMOS_HOME>/runs/<run_…>/decision.json` → `decisions` 행 + 승인 대기열 |
+| ③ | 승인(+ 담당 지정 체크) → 주문 → 체결이 기록된다 | `approvals`·`orders`·`position_assignments` 행 |
+| ④ | 다음 런이 그 포지션을 **자기 것**으로 읽고 WATCH/리뷰를 다시 arm한다 | `portfolio_get`의 `assignment.managerInstanceId` == 자기 `context_get` id; `plans` 질의 |
+| ⑤ | Forward Track Record가 그 판단을 건다 | `performance` 질의의 `runs[].decisionId` |
+
+⚠️ **⑤의 뜻을 미리 좁혀 둔다.** 「체결 → Forward Track Record」 연결은 **이 빌드에 없다**(`untilled/aumos#887`). `track-record.ts`의 입력은 runs/decisions/plans/marks뿐이고 fill·order가 없다. 한 번의 런으로 관측 가능한 것은 **인스턴스 행이 서고 그 행의 `runs[]`가 `decisionId`를 든다**까지이며, 다섯 축(reliability/discipline/coherence/acuity/composure)은 전부 `insufficient`로 나온다(최소치: 런 5, 판단 5, 해소된 판단 10). **그것이 정상이고, 그대로 기록하는 것이 이 체크포인트다.**
+
+---
+
+## 1. 패키지 선택 — `shareholder-rerating`
+
+셋 중 **shareholder-rerating (SR, 0.5.7)** 을 쓴다. 근거 넷:
+
+1. **종목이 망가져 있을 것을 요구하지 않는 유일한 패키지다.**
+   - FMR은 Stage 2 발굴 게이트가 **설정 불가로 박혀 있다**: `drawdown = close/max(high, 최근 252봉) − 1 ≤ −0.30` **그리고** (`rsi14 ≤ 35` 또는 `ma200Distance ≤ −0.15`). 건강한 대형주는 `uptrend-pullback-not-this-strategy`로 끝난다.
+   - CT는 *훼손된* 회사 + **날짜가 박힌 촉매 원본**을 요구한다.
+   - SR은 반대를 원한다 — *「환원을 집행하며 주가가 오르는 좋은 회사야말로 찾는 대상」*.
+2. **외부 입력이 가장 적다.** SR의 BUY는 **OpenDART 공시 한 계열 + 가격 한 번**이면 닫힌다(배당 결의, 자기주식 취득/소각 보고, 분기·사업보고서). CT는 관보/규제기관 고시 + **지표 2채널 × 각 2개 기간의 관측** + 실적 발표 일정까지 5~6개. FMR은 **조정기준이 선언된 250봉 이상**을 요구하고, 그 조건이 자기 참고사례(NAVER)조차 `replay 부적합`으로 만들었다.
+3. **시점 게이트가 없다.** FMR은 `stabilisation === "confirmed"`(저점 이후 15봉·+5%·RSI≥35)를, CT는 `catalystHorizonDays 180` 안의 창과 `minImprovingChannels 2`를 추가로 통과해야 한다. SR의 대응물은 `executionPaceFloor 0.5` + `executionObservableElapsed 0.25` 하나뿐이고, **진행 중인 자사주 매입 프로그램이면 이미 만족한다.**
+4. **fixture가 BUY를 4건 든다.** `fixtures/cases.json`의 `financial-positive-reaches-buy`(주석이 *「이 패키지가 존재하는 이유인 케이스」*라 적는다)와 `a-cap-binds-the-total-…`, `fixtures/boundaries.json` 2건. FMR은 2건(같은 합성 시리즈), CT의 양성 케이스는 `intent: "enter-staged"`이고 같은 파일에 *「분류가 곧 BUY가 아니다」*를 고정하는 쌍둥이 케이스가 있다.
+
+**덤:** SR만 스케줄이 둘이라(`30 16 * * 1-5` + `0 8 1 * *`, `Asia/Seoul`) 월간 기회가 더 많다.
+
+**겨눌 대상:** 은행 또는 은행계 금융지주, 혹은 비금융 사업회사. ⛔ **보험사·증권사·복합기업은 피한다** — SR은 이들을 분류한 뒤 판정이 아니라 명시적 **「미평가」**로 되돌린다.
+
+---
+
+## 2. 사전 준비
+
+### 2.1 도구·버전
+
+| | 값 | 확인 |
+|---|---|---|
+| macOS | Apple Silicon/Intel 무관, **로그인 키체인이 열려 있어야** 한다 | — |
+| Node | `>=22` (`package.json` `engines`) | `node -v` |
+| pnpm | `11.0.8` (`packageManager`) | `pnpm -v` |
+| 호스트 버전 | `0.5.0` — 세 패키지 전부 `engines.aumos: ">=0.5.0"` | `packages/manager-runtime/src/install.ts`의 `AUMOS_APP_VERSION` |
+| `claude` CLI | **`>=2.1.221 <3.0.0`** — 강제된다 | `claude --version` |
+| `claude` 로그인 | 구독 로그인이 되어 있어야 한다 | `claude auth status` → `{"loggedIn":true,…}` |
+
+버전 핀은 `packages/cli-driver/src/vendors.ts:618`의 `pin: { min: '2.1.221', belowMajor: 3 }`이고 `detect.ts:73`의 `satisfiesPin`이 실제로 막는다(`unsupported-version`). 호스트에게 직접 묻는 것이 가장 확실하다:
+
+```bash
+echo '{"id":1,"command":{"kind":"vendors","refresh":true}}' | $HOST
+```
+`refresh: true`가 `claude --version`과 `claude auth status`를 다시 돌린다.
+
+CLI 경로가 안 잡히면 (Finder에서 띄운 앱은 `~/.local/bin`이 PATH에 없다):
+```bash
+export AUMOS_CLAUDE_BIN=/Users/<you>/.local/bin/claude     # 이것이 언제나 먼저 이긴다
+# 또는 호스트에게 시킨다 (~/.aumos-256/ui.json의 vendorPaths에 저장된다)
+echo '{"id":1,"command":{"kind":"set-vendor-path","vendor":"claude","path":"/Users/<you>/.local/bin/claude"}}' | $HOST
+```
+
+⚠️ **로그인이 안 되어 있어도 런은 시작된다.** #306 이후 사전 거절이 없어졌다 — 런이 열리고 `claude`의 TUI가 런 터미널 안에 `Not logged in · Run /login`을 그린다. `run-input`으로 그 안에 `/login`을 타이핑할 수 있고, 아무도 안 치면 유휴 감시가 판단 없이 `awaiting-input`으로 끝낸다.
+
+⚠️ **Aumos는 모델 API 키를 갖지 않는다.** 자식에게 넘기는 환경변수는 **허용목록**이다 (`packages/cli-driver/src/isolation.ts`):
+```
+ENV_PASSTHROUGH = ['PATH','USER','LOGNAME','LANG','LC_ALL','TZ','TERM']
++ HOME, TERM, AUMOS_MANAGER_PACKAGE, AUMOS_MANAGER_STORE, AUMOS_AS_OF
+```
+`ANTHROPIC_API_KEY`는 **넘어가지 않는다**(테스트가 단언한다). 인증은 오직 구독 로그인이고, `HOME`·`USER`가 그 유일한 통로다 — `USER`가 없으면 macOS에서 키체인 자격증명에 닿지 못해 모든 런이 「Not logged in」으로 끝난다.
+
+### 2.2 자격증명 — 이름만 적는다. 값은 이 문서에 절대 쓰지 않는다
+
+| 이름 | 어디서 | 어디에 둘 것인가 |
+|---|---|---|
+| `TOSS_CLIENT_ID` | 토스증권 앱 → **설정 → Open API**. 발급 시 **호출 IP를 등록**해야 한다 | ⛔ 키체인에 저장하지 말 것. **이 셸에만 export** |
+| `TOSS_CLIENT_SECRET` | 위와 함께 발급, **한 번만 보여 준다** | 같음 |
+| OpenDART `api-key` | `opendart.fss.or.kr` 등록(무료·자동승인) | `save-source-credential`로 키체인 |
+| `claude` 구독 로그인 | 이미 로그인된 CLI | Aumos는 LLM 키를 갖지 않는다 |
+
+**토스 쌍을 키체인에 넣지 않는 이유** (`services/kernel-host/README.md` §"The live round trip"): 매니저는 셸을 갖고, `security find-generic-password`로 키체인을 읽을 수 있다. export만 하면 그 질문이 아예 안 열린다. SETTINGS는 그 로그인을 `from-environment`로 표시하며 **그것이 정상이다**(#180 설계).
+
+```bash
+# 이 셸에서만. 히스토리에 남기기 싫으면 앞에 공백 하나.
+ export TOSS_CLIENT_ID='…'
+ export TOSS_CLIENT_SECRET='…'
+```
+
+`m8c-live.mjs`를 쓸 거라면 저장소 루트의 `.m8c-credentials.json`(gitignore 되어 있고 **`chmod 600` 필수**):
+```json
+{ "TOSS_CLIENT_ID": "…", "TOSS_CLIENT_SECRET": "…" }
+```
+⚠️ **끝나면 지운다.** 디스크의 평문 비밀이고, 매니저가 읽을 수 있다.
+
+### 2.3 계좌
+
+- **본인 명의 위탁계좌**여야 한다(가족 명의 불가).
+- **국내 주식만 든 계좌**를 쓴다. 한 토스 계좌가 국내·미국 주식을 같이 들면 벤더가 합산해 주지 않고 `brokerBook`이 `position-currency-mismatch`로 **정확히 거절한다**.
+- 잔고: **₩300,000 ~ ₩2,000,000** 권장(§7에서 사이징 계산).
+
+---
+
+## 3. ⛔ 안전 — 먼저 읽는다
+
+1. **토스는 live 하나뿐이다.** `packages/credentials/src/catalog.ts`:
+   ```
+   environments: ['live']
+   ```
+   > *Toss publishes a single server (`openapi.tossinvest.com`) and no sandbox. The 모의투자 in the Toss app is a separate product with no API behind it.*
+
+   `judgeConnection`이 `toss` + `paper`를 **이름으로 거절한다.** 그 거절을 한 번 보는 것은 값어치가 있다.
+   - 페이퍼가 필요하면 Alpaca(`environments: ['paper','live']`)뿐인데 **미국 시장이라 XKRX 패키지 셋 중 어느 것도 쓸 수 없다.** 이 런북에 페이퍼 경로는 없다.
+2. **Aumos는 주문을 취소하지 못한다.** `toss-execution.ts`의 `cancelOrder`는 **던진다**:
+   > *this broker cancels by its own order id, and `${clientOrderId}` is ours — nothing in Aumos cancels an order yet*
+
+   **취소는 토스증권 앱에서 직접 한다.** 이것이 유일한 취소 경로다.
+3. **`timeInForce`는 `day`만 나간다.** 그 외는 `tossTimeInForce`가 거절한다 — *「이 브로커에는 그 주문이 없다」*. 장 마감 뒤 승인하면 주문은 그날 안에 죽는다.
+4. **호가 단위(틱)는 포트를 안 건넌다.** 지정가가 틱에서 어긋나면 **거래소가 올바른 틱을 에러 본문에 실어 거절**하고 `toss-http.ts`가 그것을 그대로 올려 준다. 이것이 설계다.
+5. **수량은 정수로 잘린다.** 토스는 `fractionable: false`이므로 `roundQuantity`가 `Math.trunc`한다 — 목표 비중이 1주에 못 미치면 **0주**가 되고 그 다리는 조용히 빠진다(#849가 여는 결함의 이웃).
+6. **⚠️ `minNotionalMinorUnits`(더스트 하한)는 선언만 있고 배선이 없다.** `planner.ts` 밖 어디에도 생산자가 없다 → §9 ⚠️-2.
+7. **`AUMOS_HOME`을 반드시 명시한다.** 생략하면 이 기기의 진짜 저장소를 겨눈다. `chmod 700` 필수.
+8. **끝나면 되판다**(§8) — 포지션이 연습보다 오래 살지 않게.
+
+---
+
+## 4. 저장소 준비 · 전용 `AUMOS_HOME`
+
+```bash
+cd ~/workspace/personal/aumos
+git pull
+pnpm install
+pnpm build                       # ⚠️ 필수. dist/가 없으면 아래 전부 동작하지 않는다
+
+# 카탈로그 체크아웃도 최신으로(로컬 경로 설치를 쓸 경우)
+cd ~/workspace/personal/aumos-catalogue && git pull && cd -
+```
+
+전용 저장소를 판다. ⛔ 앱이 쓰는 `~/.aumos`도, 벤치의 `~/.aumos-bench`도 아니다.
+
+```bash
+export AUMOS_HOME="$HOME/.aumos-256"
+mkdir -p "$AUMOS_HOME" && chmod 700 "$AUMOS_HOME"
+
+# 셸 편의
+HOST="node $PWD/services/kernel-host/dist/main.js"
+ask() { { echo "$1"; sleep "${2:-10}"; } | node "$PWD/services/kernel-host/dist/main.js"; }
+```
+
+> **커맨드는 비동기로 답한다.** 맨 `echo … |`는 답이 오기 전에 stdin을 닫는다. 위 `ask`처럼 `sleep`을 붙인다. 읽기 질의(`{"query":…}`)는 즉답이라 `echo` 하나로 충분하다.
+
+**⚠️ 시드는 하지 않는다.** 빈 `AUMOS_HOME`에 `apply-setting`을 보내면 워커가 가는 길에 저장소를 만든다. `seed`는 데모용이고 **이 기기의 기본 저장소를 겨누면 `seedRefusal`이 거절한다**.
+
+### 확인
+```bash
+ls -la "$AUMOS_HOME"                      # 아직 비어 있음
+echo '{"id":1,"command":{"kind":"vendors"}}' | $HOST     # claude가 path와 함께 보여야 한다
+```
+`vendors` 답에 `claude`가 경로와 함께 없으면 §2.1의 `set-vendor-path`로 돌아간다.
+
+---
+
+## 5. 토스 로그인 · 펀드 · 계좌 붙이기
+
+두 길이 있다. **A가 짧고 실수가 적다.**
+
+### A. `m8c-live.mjs` (권장)
+
+```bash
+node services/kernel-host/scripts/m8c-live.mjs check
+node services/kernel-host/scripts/m8c-live.mjs connect  "Toss 위탁"
+node services/kernel-host/scripts/m8c-live.mjs accounts        # accountRef를 받아 적는다
+node services/kernel-host/scripts/m8c-live.mjs book "#256" <accountRef>
+node services/kernel-host/scripts/m8c-live.mjs read
+```
+
+- `accountRef`는 **벤더의 `accountSeq`**이지 명세서에 찍힌 계좌번호가 아니다.
+- `read`가 초록이려면 `book.provenance.source === "broker"` **그리고** `snapshotRefreshed === true`여야 한다. 스크립트가 그 둘을 실제로 검사하고, 아니면 이유를 찍고 종료 1로 죽는다.
+- **15분 창**: 엔진은 방금 마크한 장부를 15분 동안 내버려 둔다. 재실행이 *이전* 마크를 보여 주는 것이 정상이다. 급하면 `AUMOS_SNAPSHOT_MAX_AGE_MS=0`(`auto`가 스스로 설정한다).
+
+`auto` 하나로 전부:
+```bash
+node services/kernel-host/scripts/m8c-live.mjs auto "#256"
+```
+⛔ `auto`도 **주문은 절대 내지 않는다.** 마지막 단계는 사람이 타이핑하도록 인쇄만 한다.
+
+### B. 와이어 그대로
+
+```bash
+# 1) 로그인. paper는 이름으로 거절된다 — 한 번 봐 두면 좋다.
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"open-connection","connector":"toss","environment":"live","label":"Toss 위탁"}}}' 15
+
+# 2) 이 로그인이 보는 계좌. 벤더에 닿고 아무것도 쓰지 않는다.
+ask '{"id":1,"command":{"kind":"broker-accounts"}}' 30
+
+# 3) 맨데이트 + 펀드
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"open-mandate","draft":{
+  "label":"#256",
+  "objective":"카탈로그 매니저 실런 1회. 국내 은행계 금융지주 중 주주환원 프로그램 집행이 확인되는 1종목. 소액.",
+  "horizonDays":3650,
+  "constraints":{"baseCurrency":"KRW","allowedAssetClasses":["equity","cash"],
+    "maxPositionWeight":0.2,"cashFloor":0.05,"maxDrawdown":0.5,
+    "allowShorting":false,"allowLeverage":false,"excludedSymbols":[]}}}}}' 20
+# → mandateId
+
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"open-portfolio","label":"#256","mandateId":"mnd_…","baseCurrency":"KRW","cash":{"currency":"KRW","minorUnits":0},"positions":[]}}}' 20
+echo '{"id":1,"query":{"kind":"portfolios"}}' | $HOST     # → portfolioId (pf_…)
+echo '{"id":1,"query":{"kind":"settings"}}'   | $HOST     # → connectionId (conn_…)
+
+# 4) 계좌 붙이기
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"attach-account","portfolioId":"pf_…","connectionId":"conn_…","accountRef":"<accountSeq>","baseCurrency":"KRW"}}}' 20
+
+# 5) 진짜 계좌를 장부로 읽는다
+{ echo '{"id":1,"command":{"kind":"wake-tick"}}'; sleep 8; echo '{"id":1,"command":{"kind":"wake-status"}}'; sleep 5; echo '{"id":1,"query":{"kind":"portfolio"}}'; sleep 5; } | $HOST
+```
+
+> `wake-tick`·`wake-status`·`portfolio`를 **한 stdin에서** 물어야 한다. 실패한 브로커 읽기의 진단(`brokerProblems`)은 엔진 프로세스의 클로저 변수라, 일회성 `echo | node`는 그것을 프로세스와 함께 버린다.
+
+### ✅ 확인
+```
+book.provenance.source == "broker"
+book.totalValue        == 실제 계좌 평가액
+wake-status.brokerProblems == []
+```
+`brokerProblems`에 401이 있으면 **호출 IP가 미등록**인 경우가 대부분이다.
+
+---
+
+## 6. `open-dart` 소스 설치 · 패키지 설치 (체크포인트 ①)
+
+### 6.1 킬 리스트를 한 번 채운다 — 이것을 건너뛰면 설치가 막힌다
+
+```bash
+ask '{"id":1,"command":{"kind":"catalogue"}}' 20
+```
+`catalogue`가 `killList.refresh()`를 돈다. **한 번도 받은 적이 없으면 `previewInstall`이 `never-checked`를 blocking으로 올리고 설치가 거절된다.**
+
+```bash
+ls -l "$AUMOS_HOME/kill-list.json"        # 있어야 한다
+```
+
+### 6.2 OpenDART 소스
+
+```bash
+ask '{"id":1,"command":{"kind":"source-catalogue"}}' 20
+ask '{"id":1,"command":{"kind":"install-source","sourceId":"open-dart","version":"0.1.0","portfolioId":"pf_…"}}' 20
+ask '{"id":1,"command":{"kind":"save-source-credential","sourceId":"open-dart","name":"api-key","value":"<OpenDART 키>"}}' 10
+```
+
+- ⚠️ **`portfolioId`를 빼면 바이트만 내려오고 어떤 펀드도 그것을 부를 수 없다.**
+- 자격증명 이름은 정확히 `api-key`다(`sources/open-dart/source.json`의 `credentials[0].name`). `crtfc_key` 쿼리 파라미터로 주입되며 매니저에게는 절대 보이지 않는다.
+- 되읽는 커맨드는 없다.
+
+```bash
+ls -d "$AUMOS_HOME/sources/open-dart@0.1.0"     # 확인
+```
+
+### 6.3 SR 내려받기 + 설치
+
+```bash
+ask '{"id":1,"command":{"kind":"registry-fetch","packageId":"shareholder-rerating","version":"0.5.7"}}' 30
+ls -d "$AUMOS_HOME/staging/shareholder-rerating@0.5.7"
+```
+
+> ⚠️ `CLAUDE.md`와 `services/kernel-host/README.md`는 아직 `~/.aumos/managers/<id>@<version>/`라 적지만 **코드는 `<AUMOS_HOME>/staging/<id>@<version>/`에 쓴다.** `managers/`는 이제 **인스턴스 id**로 키가 잡힌다.
+> ⚠️ staging은 호스트가 열릴 때 **쓸린다**(1시간 TTL). 받았으면 바로 설치한다.
+
+설치 — 이것이 §37 동의이자 바이트를 인스턴스 밑으로 옮기는 행위다:
+
+```bash
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"install-manager",
+  "packagePath":"'"$AUMOS_HOME"'/staging/shareholder-rerating@0.5.7",
+  "portfolioId":"pf_…",
+  "vendor":"claude",
+  "acknowledged":true,
+  "config":{"minimumExecutableWeight":0.004,"maxActiveTheses":1}}}}' 30
+```
+
+- `acknowledged: true`는 **비차단 경고만** 통과시킨다(`source-not-installed`, `connection-not-linked`, `stale-kill-list`, `warned`). 차단 문제를 뚫는 플래그는 **없다**.
+- `mode`는 기본 **`live`**다 — `setup.ts`가 *"The default is LIVE because an investor installing a manager on their book means this book's manager"*라 적고 대안은 `disabled`다(#479 이후. `services/kernel-host/README.md:1020`의 「SHADOW가 기본」은 **낡았다**).
+  ⚠️ **그래도 눈으로 확인한다** — SHADOW 인스턴스는 제 그림자 장부에서 돌아 승인 대기열에 서지 않고, 그러면 체크포인트 ③이 통째로 실패한다:
+  ```bash
+  echo '{"id":1,"command":{"kind":"runnable-managers"}}' | $HOST     # mode == "live" 확인
+  # 아니면
+  ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"set-instance-mode","instanceId":"agt_…","mode":"live"}}}' 15
+  ```
+- `model`을 생략하면 CLI의 기본 모델이다 — 그것이 세 번째 값이고 기본값이 아니다.
+- `minimumExecutableWeight: 0.004`가 왜 필요한지는 §7.2.
+- **로컬 체크아웃에서 설치하고 싶다면** `packagePath`를 `~/workspace/personal/aumos-catalogue/managers/shareholder-rerating`로 주면 된다(디렉토리는 복사되지, 옮겨지지 않는다). 다만 그것은 *게시된 바이트로 설치했다*는 주장을 약화시키므로 **#256을 닫는 런은 `registry-fetch` 경로를 쓴다.**
+
+### ✅ 체크포인트 ①
+```bash
+echo '{"id":1,"command":{"kind":"runnable-managers"}}' | $HOST     # shareholder-rerating 행 + agt_… 
+ls "$AUMOS_HOME/managers/"                                          # agt_… 디렉토리
+cat "$AUMOS_HOME/managers/agt_…/aumos.json" | head -5                # version 0.5.7
+```
+
+---
+
+## 7. 런 — `decision_submit` (체크포인트 ②)
+
+### 7.1 언제 돌릴 것인가
+
+- SR의 스케줄은 `30 16 * * 1-5`(장 마감 후) + `0 8 1 * *` (Asia/Seoul). 기다릴 필요 없이 **수동으로 띄운다.**
+- 다만 **주문이 당일 체결되려면 KRX 정규장(09:00–15:30 KST) 안에서 승인**해야 한다(`timeInForce: day`). 그래서 **평일 오전에 런을 띄우고 오전 중에 승인**하는 것이 이 연습의 창이다.
+
+### 7.2 사이징 — 왜 `minimumExecutableWeight`를 넣었나
+
+SR의 목표 비중은 `riskBudgetWeight / (무효화 가격까지의 거리)`다. `riskBudgetWeight` 기본 0.01이고 **max도 0.01이라 키울 수 없다**(narrow-only). 무효화 거리 25%면 목표 비중 ≈ 4%.
+
+그런데 기본 `minimumExecutablePosition: 500000` KRW는 **₩2,000,000 장부에서 0.25 비중의 하한**이 된다 — 4% 목표가 그 하한에 걸려 **거절**된다. `minimumExecutableWeight`는 **통화를 안 보고 outright 이긴다**(스키마가 그렇게 적는다). `0.004`는 스키마 자신의 `examples` 값이다.
+
+| 장부 | 목표 4% | 주당 ₩18,000 기준 |
+|---|---|---|
+| ₩500,000 | ₩20,000 | 1주 |
+| ₩1,000,000 | ₩40,000 | 2주 |
+| ₩2,000,000 | ₩80,000 | 4주 |
+
+⚠️ **1주 미만이면 `roundQuantity`가 0으로 자르고 그 다리는 사라진다.** ₩500,000 미만 장부는 권하지 않는다.
+
+### 7.3 띄운다
+
+```bash
+ask '{"id":1,"command":{"kind":"start-run","packageId":"shareholder-rerating","managerInstanceId":"agt_…","live":true}}' 600
+```
+
+> ⛔ **`"live": true`가 없으면 픽스처 세계로 돈다.** `worker.ts:1291`이 `fixtures: request.live !== true`이고, 자격증명은 `live: true`인 런에만 실린다. **이 한 줄이 이 런북 전체의 요점이다.**
+> ⚠️ 수동 `start-run`의 task는 **`PORTFOLIO_REVIEW`**다(#517). `ASSET_REVIEW`로 특정 종목을 지목하는 인자는 `start-run`에 **없다** → §9 ⚠️-3.
+
+⚠️ **`start-run`의 답은 `runId`가 아니라 티켓이다** — `{started:true, ticket:"tkt_…"}`. 그 티켓으로 따라간다(같은 stdin 안에서):
+```bash
+{ echo '{"id":1,"command":{"kind":"start-run","packageId":"shareholder-rerating","managerInstanceId":"agt_…","live":true}}'
+  sleep 5
+  echo '{"id":2,"command":{"kind":"run-terminal","ticket":"tkt_1","since":0}}'
+  sleep 600
+} | $HOST
+```
+그 밖에 `run-progress`, `run-transcript`, `run-input`(터미널에 타이핑 — 로그인이 필요할 때 `/login`을 여기로 보낸다)가 같은 티켓을 받는다.
+
+### 알림 — NDJSON 파이프에 `id` 없는 줄로 온다
+
+`{"notification":{…}}` 형태. 이 런북이 기다리는 것들:
+
+| `kind` | 뜻 |
+|---|---|
+| `run-started` | `Manager started · {manager}` |
+| `run-attention` | `Waiting for you · {manager}` — 세션이 뭔가를 묻고 있다(로그인일 가능성이 높다) |
+| `run-settled` | `Run finished · {manager}` / `{action} — {conclusion}` |
+| **`approval-pending`** | `Waiting for your approval · {book}` — **체크포인트 ②의 신호** (key: `approval:<decisionId>`) |
+| **`order-settled`** | `{state} · {book}` / `{side} {quantity} {symbol} at {price}` — **체크포인트 ③의 신호**. `filled`·`partially-filled`·`cancelled`·`expired`·`rejected`에만 온다 |
+
+⛔ 주문이 `pending`/`accepted`로 접수된 것에는 **알림이 없다**(의도된 침묵).
+
+### stderr 로그 줄 (stdout은 프로토콜 전용이다)
+
+```
+[aumos-kernel-host] reading <path>            # 호스트가 열렸다
+[aumos-kernel-host] PATH += /Users/…/.local/bin
+[aumos-wake] ticking every 60000ms · market source <src>
+[aumos-run-worker] …                          # 워커 stderr 전달
+[aumos-mcp] {"event":"tool_call","tool":"portfolio_read","outcome":"allowed",…}
+[aumos-mcp] {"event":"tool_call","tool":"decision_submit",…}   ← 체크포인트 ②
+```
+
+### 7.4 무엇을 볼 것인가 — 디스크
+
+```bash
+RUN=$(ls -t "$AUMOS_HOME/runs" | head -1); echo "$RUN"
+ls -la "$AUMOS_HOME/runs/$RUN"
+```
+
+| 파일 | 뜻 |
+|---|---|
+| `invocation.json` | 매니저가 받은 것 전부 — `mandate.objective`, `portfolio`, `asOf`, `config` |
+| `decision.json` | **`decision_submit`이 쓴 바로 그 파일.** 있으면 체크포인트 ② 전반부 성립 |
+| `evidence.jsonl` | 게이트웨이가 기록한 근거 |
+| `mcp-audit.jsonl` | 매니저가 부른 툴 전부 — `source_request`(OpenDART), `connection_request`(토스 시세)가 여기 찍힌다 |
+| `served-tools.json` | 게이트웨이가 **실제로 세운** 툴 이름. 없으면 `unobservable`이지 *「빠진 게 없다」*가 아니다 |
+| `source-gaps.json` | 게이트웨이가 **못 세운** 소스 문서. `open-dart`가 여기 있으면 §6.2가 덜 된 것이다 |
+| `status.jsonl` | 훅이 찍는 세션 진행 |
+| `unsealed.json` | **런이 봉인 없이 죽었을 때만** 생긴다(#594) — 있으면 그 자체가 진단이다 |
+
+⚠️ **`claude`의 대화 기록(transcript)은 런 디렉토리에 없다.** `~/.claude/projects/<enc>/<uuid>/`에 남고 이 빌드는 일부러 읽지 않는다. 런 디렉토리가 지워진 뒤에도 `claude --resume <uuid>`로 그 대화를 다시 열 수 있다.
+
+⚠️ **보존**: `sweep.ts`의 `RUN_DIRECTORY_TTL_MS = 14일`, 그리고 **봉인된 런만 쓸린다** — `no-proposal`·`failed`·`timeout`·`rejected` 디렉토리는 무기한 남는다.
+
+```bash
+cat "$AUMOS_HOME/runs/$RUN/source-gaps.json"      # [] 여야 한다
+jq -r '.decision.action' "$AUMOS_HOME/runs/$RUN/decision.json"
+```
+
+### 7.5 무엇을 볼 것인가 — 저장소
+
+```bash
+echo '{"id":1,"query":{"kind":"approvals"}}' | $HOST      # pending[]에 dec_… 이 서야 한다
+echo '{"id":1,"query":{"kind":"today"}}'     | $HOST
+```
+
+### ✅ 체크포인트 ②
+- `runs/<run_…>/decision.json` 존재 **그리고**
+- `approvals` 질의의 `pending[]`에 그 판단이 `decisionId: dec_…`로 서 있다.
+
+판단이 `WAIT`/`WATCH`면 **주문이 안 나가므로 승인 대기열에 서지 않는다** — §8로 간다.
+
+---
+
+## 8. 판단이 WATCH/WAIT로 끝났다면 — 패키지를 고치지 않고 창을 좁히는 법
+
+⛔ **`PROMPT.md`도 `lib/*.mjs`도 `thresholds.mjs`도 건드리지 않는다.** 그러면 재는 대상이 바뀐다. 아래는 전부 **호스트가 제공하는 손잡이**다.
+
+순서대로 시도한다.
+
+**① 맨데이트 `objective`로 겨눈다 (가장 강한 손잡이).**
+`MandateDraft.objective`는 AMP 스냅샷(`packages/amp/src/snapshots.ts`)에 실려 매니저에게 **그대로 도착한다.** SR §0이 맨 먼저 읽는다. 종목명을 직접 쓰는 것은 과하지만, **섹터와 요건을 좁히는 것은 정당하다**:
+```
+"국내 은행계 금융지주 중, 공시된 자기주식 취득 프로그램이 집행 중(취득결과보고서가 이미 제출됨)인 1종목."
+```
+바꾸려면 새 맨데이트를 열고 펀드를 그쪽으로 — 또는 새 `#256-2` 펀드를 파는 편이 깨끗하다.
+
+**② 실패 이유를 먼저 읽는다.** `decision.json`의 `outcomeCode`가 전부를 말한다.
+
+| `outcomeCode` | 뜻 | 손잡이 |
+|---|---|---|
+| `data_missing` | OpenDART/시세가 안 닿았다 | `source-gaps.json`·`mcp-audit.jsonl` 확인 → §6.2 재점검 |
+| `research_incomplete` | 열 개 필수 출력 중 하나가 빔(`contraryEvidence`가 비면 런이 진다; `invalidationPrice ≤ 0`도 여기) | 재실행. 다른 후보로 갈 여지를 `objective`로 연다 |
+| `risk_limit_exceeded` | 맨데이트가 잘랐다 | `maxPositionWeight`를 0.2 → 0.3, `cashFloor`를 0.05로 |
+| 사이즈가 하한에 걸림 | `minimumExecutable*` | `minimumExecutableWeight`를 더 낮춘다(아래) |
+
+**③ 인스턴스 config를 조인다.** 패키지가 아니라 **설치본의 설정**이다:
+```bash
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"set-instance-config","instanceId":"agt_…","config":{"minimumExecutableWeight":0.002,"maxActiveTheses":1,"deepReviewIntervalDays":7}}}}' 15
+```
+⚠️ **문서 전체를 보낸다.** 빈 문서는 「한 번도 설정되지 않음」으로 되돌린다.
+⛔ `riskBudgetWeight`는 **키울 수 없다**(max 0.01, narrow-only). 사이즈를 키우고 싶으면 **장부에 현금을 더 넣는 쪽**이 유일한 길이다.
+
+**④ 장부를 키운다.** 목표 비중이 1주로 반올림되지 않는 것이 흔한 실패다. 계좌에 현금을 더 넣고 `wake-tick`으로 다시 마크한다.
+
+**⑤ 대화를 이어 다시 판단시킨다.** 같은 세션을 잇는 **새 런**이다:
+```bash
+ask '{"id":1,"command":{"kind":"start-run","packageId":"shareholder-rerating","resumeRunId":"run_…","live":true}}' 600
+```
+
+**⑥ 그래도 WATCH면 그것을 기록한다.** SR은 자사주 프로그램 집행이 확인되지 않는 날에는 WATCH가 **옳은 답**이다. #256이 스스로 적은 규율 — *「모든 사례가 대기로 끝나는 구현을 성공으로 처리하지 않는다」* — 의 반대편은 *「BUY가 나오도록 만들지 않는다」*(#298)다. **BUY를 만들어 내는 대신 날을 바꿔 다시 돌린다.** 배당 결의(2~3월)와 자사주 취득결과보고 직후가 확률이 가장 높다.
+
+⚠️ 페이퍼/샌드박스 펀드로 피해 가는 길은 **없다**(§3.1). 브로커가 안 붙은 펀드에서는 `AUMOS_BROKER_CHANNEL`이 안 서서 `market_quote`·`connection_request` 자체가 세워지지 않고, 가격 없이는 SR이 사이징을 못 해 `data_missing`으로 끝난다.
+
+---
+
+## 9-A. 승인 · 담당 지정 · 체결 (체크포인트 ③)
+
+### 9-A.1 미리보기 — 나갈 것 전부를, 나가기 전에
+
+```bash
+ask '{"id":1,"command":{"kind":"approval-preview","decisionId":"dec_…"}}' 20
+```
+가격을 위해 **네트워크에 닿고** 계획을 한 번 더 유도한다. 답에서 볼 것:
+
+| 필드 | 봐야 할 것 |
+|---|---|
+| `plan.orders[]` | `symbol`·`side: "buy"`·`quantity`(정수)·`estimatedPrice` |
+| `accounts[]` | `accountRef` + `environment: "live"` ← **live임을 눈으로 확인** |
+| `blocked` | `null`이어야 한다. 아니면 로그인/키 문제 |
+| `assignments[]` | **여기가 #785다.** 각 행: `assetKey`·`symbol`·`version`·`state`·`holder`·`candidate` |
+
+`assignments[0]`은 보통:
+```json
+{ "assetKey":"equity:XKRX:316140", "symbol":"316140", "version":0,
+  "state":"none", "holder":null, "candidate":{"instanceId":"agt_…","label":"Shareholder Rerating"} }
+```
+`holder: null`은 **「미귀속」**이지 「아직 안 읽었다」가 아니다.
+
+### 9-A.2 앱에서 승인할 때 (권장 — #785의 체크박스를 실제로 누르는 경로)
+
+```bash
+# 창 있는 앱
+cd apps/desktop && pnpm bundle:runtime     # 새 클론이면 한 번만
+AUMOS_HOME="$HOME/.aumos-256" pnpm app:desktop
+# 또는 브라우저로
+AUMOS_HOME="$HOME/.aumos-256" pnpm app
+```
+⚠️ **`pnpm app`/`pnpm app:desktop`은 `AUMOS_HOME`을 `~/.aumos-dev/worktrees/<worktree>`로 덮어쓴다.** 위처럼 **명시적으로 주면 그쪽이 이긴다.**
+
+화면에서:
+1. 사이드바 **「승인」**(`nav.approvals`) → `apps/desktop/src/screens/Approvals.tsx`
+2. 대기 행을 펼치고 **「리스크 점검」**과 주문 목록을 읽는다
+3. **「운용 담당」**(`approvals.assign`) 절의 체크박스를 켠다 —
+   > **「Shareholder Rerating을(를) 이 포지션의 운용 담당으로 지정합니다. 주문만 승인해서는 지정되지 않습니다.」**
+
+   ⛔ **기본값은 꺼짐이다**(`useState(false)`, 설계). **켜지 않으면 담당이 한 글자도 안 움직이고 체크포인트 ④가 실패한다.**
+   그 아래 주석: 「Aumos는 담당을 추정하지 않습니다. 담당 없는 포지션은 당신이 지정할 때까지 그대로이고, 한 포지션의 담당은 한 매니저입니다.」
+4. **「승인하고 전송」**(`approvals.approve-send`) → 확인 문구
+   > **「이 거래를 승인하시겠습니까? Aumos가 {계좌}(으)로 주문 {n}건을 보냅니다.」**
+
+### 9-A.3 CLI로 승인할 때
+
+체크박스에 해당하는 것이 `assignments` 필드다 — **`assetKey` → 화면이 보여 준 `version`**:
+
+```bash
+ask '{"id":1,"command":{"kind":"approve-decision","decisionId":"dec_…","verdict":"approved","assignments":{"equity:XKRX:316140":0}}}' 40
+```
+
+- ⛔ **`assignments` 키가 없는 승인은 담당을 안 움직인다.** 기본값이 부재인 것이 #793 계약 ②의 요구다.
+- `version`은 **미리보기가 보여 준 그 값**을 그대로 돌려준다. 그 사이 다른 승인이 담당을 가져갔으면:
+  > *the manager in charge of … changed while this was on screen — it stands at version N; look again and approve once more*
+- 담당이 **될 매니저는 payload가 못 고른다** — 언제나 봉인된 판단의 저자다.
+- 거부는 절대 담당을 지정하지 않는다.
+
+### 9-A.4 체결 확인
+
+```bash
+echo '{"id":1,"query":{"kind":"approvals"}}' | $HOST
+```
+
+`settled[]`의 행에서:
+
+| 필드 | 값 |
+|---|---|
+| `verdict` | `"approved"` |
+| `orders[].state` | `filled` / `partially_filled` / `accepted` — ⛔ `unsubmitted`면 안 나갔다 |
+| `orders[].brokerOrderId` | **벤더의 주문 id.** 우리 `clientOrderId`가 아닌 것이 #161 포트 확장의 증거다 |
+| `orders[].filledQuantity` | > 0 |
+| `orders[].averageFillPrice` | `Money` |
+| `divergence` | `null`이어야 한다. 아니면 **보여 준 것과 보낸 것이 다르다** — 절대 숨기지 않는다 |
+
+요약 문장(워커의 `ExecuteResult.summary`, stderr로 나온다):
+```
+1 of 1 order(s) reached the broker.
+```
+실패 문장 예:
+```
+316140: the broker refused the order — …
+316140: could not be sent (…). It is recorded and unsent; Aumos will ask the broker about it before trying again.
+```
+
+DB로 직접 보고 싶다면 (읽기 전용으로 연다):
+```bash
+sqlite3 -readonly "$AUMOS_HOME/kernel.db" \
+ "select id,state,venue_state,broker_order_id,filled_quantity,average_fill_price_minor from orders;"
+sqlite3 -readonly "$AUMOS_HOME/kernel.db" \
+ "select portfolio_id,asset_key,version,state,manager_instance_id,ground,assigned_by_decision_id from position_assignments;"
+sqlite3 -readonly "$AUMOS_HOME/kernel.db" \
+ "select id,sequence,action,manager_instance_id,substr(hash,1,20) from decisions order by sequence;"
+```
+
+### ✅ 체크포인트 ③
+- `approvals` 테이블에 `decision_id` 1행, `verdict='approved'`
+- `orders`에 `broker_order_id`가 채워지고 `filled_quantity > 0`
+- **`position_assignments`에 `state='assigned'`, `ground='approval'`, `manager_instance_id='agt_…'`, `version=1` 행** ← 체크박스를 켰다는 증거
+
+---
+
+## 9-B. 두 번째 런 — 자기 포지션 읽기 + WATCH 재arm (체크포인트 ④)
+
+체결이 장부에 반영되게 먼저 다시 마크한다(15분 창 주의):
+
+```bash
+{ echo '{"id":1,"command":{"kind":"mark-books","portfolioId":"pf_…"}}'; sleep 20; } | $HOST
+echo '{"id":1,"query":{"kind":"portfolio"}}' | $HOST     # positions[]에 그 종목이 서야 한다
+```
+
+두 번째 런:
+```bash
+ask '{"id":1,"command":{"kind":"start-run","packageId":"shareholder-rerating","managerInstanceId":"agt_…","live":true}}' 600
+RUN2=$(ls -t "$AUMOS_HOME/runs" | head -1)
+```
+
+### 무엇을 볼 것인가
+
+**① 매니저가 그 포지션을 자기 것으로 읽었는가.** `portfolio_get`이 모든 보유에 `assignment`를 실어 준다(#814). 툴 설명이 계약을 그대로 적는다:
+> *EVERY HOLDING SAYS WHO RUNS IT, IN `assignment`. `state: "assigned"` names the manager instance in `managerInstanceId`, and that is the SAME id `context_get` hands you for yourself — compare them.*
+
+```bash
+grep -n 'portfolio_get\|context_get\|assignment' "$AUMOS_HOME/runs/$RUN2/mcp-audit.jsonl" | head
+cat "$AUMOS_HOME/runs/$RUN2/invocation.json" | jq '.portfolio.positions[] | {symbol:.asset.symbol, assignment}'
+```
+✅ `assignment.state == "assigned"` **그리고** `assignment.managerInstanceId == "agt_…"`(설치한 그 인스턴스).
+
+⚠️ 이것이 **#819/#823이 닫은 결함의 반대 증거**다. `assignment`가 없으면 매니저가 자기 6% 포지션을 남의 것으로 읽고, `position-weight`가 **총**비중이라 감축 intent가 **매도로 나간다**. SR §5b(`ownHeldWeight`·`otherHeldWeight`·`hostTargetWeightFloor`)가 여기서 돈다.
+
+**② 두 번째 판단이 리뷰를 다시 arm했는가.** SR §7이 매 런 다음 리뷰를 arm하도록 적혀 있다.
+```bash
+echo '{"id":1,"query":{"kind":"plans"}}'  | $HOST
+echo '{"id":1,"query":{"kind":"theses"}}' | $HOST
+jq '.decision | {action, nextReview}' "$AUMOS_HOME/runs/$RUN2/decision.json"
+echo '{"id":1,"command":{"kind":"wake-status"}}' | $HOST
+```
+✅ `plans`에 `armed` 계획이 서고 그 `decisionId`가 두 번째 판단을 가리킨다.
+
+⚠️ **호스트는 「깨어난 런이 다시 arm한다」를 단언하지 않는다** — 그것은 제안의 몫이다. 세 `PROMPT.md`의 산문 보장이지 호스트가 강제하는 계약이 아니다. 그래서 이 체크포인트는 **관측**이지 단언이 아니다.
+
+**③ 두 번째 판단은 보통 `WATCH`/`HOLD`다.** 이미 담당이고 목표 비중에 도달했으면 `target-weight-already-held` 계열로 WAIT하는 것이 옳은 동작이다. ⛔ **두 번째 BUY가 나오면 그것이 재실행 중복(#787)이므로 승인하지 말고 기록한다.**
+
+### ✅ 체크포인트 ④
+- 두 번째 런의 `invocation.json`에서 그 포지션의 `assignment.managerInstanceId`가 **자기 id**
+- `plans`에 새로 arm된 리뷰
+- 두 번째 판단이 중복 매수를 내지 **않았다**
+
+---
+
+## 9-C. Forward Track Record (체크포인트 ⑤)
+
+```bash
+echo '{"id":1,"query":{"kind":"performance","portfolioId":"pf_…"}}' | $HOST
+```
+
+앱에서는 **PERFORMANCE는 라우트가 아니다** — MANAGERS에서 그 매니저 한 명의 페이지 안 섹션이다(#197). `apps/desktop/src/screens/Performance.tsx`의 `TrackRecord` / `TrackRecordCard`.
+
+볼 것:
+
+| 필드 | 기대값 |
+|---|---|
+| `instanceId` | `agt_…` |
+| `packageId` | `shareholder-rerating` |
+| `mode` | `live` |
+| **`runs[].decisionId`** | **승인한 `dec_…`** ← **이것이 「결정을 건다」의 실물이다** |
+| `runs[].runId` / `startedAt` / `outcome` | `decided` |
+| `axes[]` | 다섯 축 전부 `insufficient` — **정상** |
+| `portfolio` | 그 펀드 |
+
+축이 전부 `insufficient`인 이유(`track-record.ts`의 `MINIMUMS`):
+`reliabilityRuns: 5`, `disciplineDecisions: 5`, `coherenceDecisions: 3`, `acuityResolved: 10`, `composureIntervals: 2`.
+`acuity`는 그 위에 **판단의 `forecast.horizonDays`가 지나야** 해소되므로, 한 번의 런으로는 *「아직 아니다 — N일에 해소된다」*가 정답이다.
+
+⚠️ **여기서 확인되지 않는 것을 정확히 적는다** (`untilled/aumos#887`):
+- **체결 → 실적 연결이 없다.** `track-record.ts`의 입력에 fill·order가 **없다.**
+- 수수료·세금·배당 컬럼이 **0개**다.
+- 실현손익을 계산하는 곳이 **없다.**
+- `portfolioReturn`은 총평가액 delta, 즉 **평가손익이 전방수익률로 제시된다.**
+- 벤치마크는 머신당 하나, 기본 SPY/ARCX/USD — **원화 장부에 맞는 것이 없다.**
+- 전략별 집계 축이 **없다.**
+
+### ✅ 체크포인트 ⑤
+`performance`의 해당 인스턴스 행에서 `runs[]`가 `decisionId: dec_…`를 든다. **그 이상은 이 빌드에 없고, 없는 것을 없다고 기록하는 것이 이 체크포인트의 값이다.**
+
+---
+
+## 10. 정리 — 연습이 포지션보다 오래 살지 않게
+
+```bash
+# 1) 되판다. SR에게 청산을 시키는 것이 정석이지만(EXIT 판단 → 승인),
+#    연습을 끝내는 가장 확실한 길은 토스증권 앱에서 직접 매도하는 것이다.
+#    ⛔ Aumos에는 취소 경로가 없고, 미체결 주문도 앱에서만 취소된다.
+
+# 2) 자격증명 흔적 지우기
+rm -f ~/workspace/personal/aumos/.m8c-credentials.json
+unset TOSS_CLIENT_ID TOSS_CLIENT_SECRET
+
+# 3) 로그인 닫기 (키체인에 아무것도 안 넣었더라도 행은 지운다)
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"close-connection","connectionId":"conn_…"}}}' 15
+
+# 4) 저장소. ⚠️ 봉인된 판단이 들어 있다 — #256에 붙일 것을 먼저 뽑아낸 뒤에 지운다.
+#    지우기 전에:
+sqlite3 -readonly "$AUMOS_HOME/kernel.db" "select id,sequence,action,decided_at,hash from decisions;" > /tmp/256-decisions.txt
+cp -R "$AUMOS_HOME/runs" /tmp/256-runs
+# 그 다음에만:
+# rm -rf "$AUMOS_HOME"
+```
+
+⚠️ 매니저를 떼려면 `remove-manager-instance`인데 **런이 하나라도 있으면 거절한다**(기록을 고아로 만들지 않기 위해). 끄는 것은 `set-instance-mode` → `disabled`.
+
+---
+
+## 11. #256에 붙일 체크리스트
+
+```markdown
+## 실제 런 1회 — 관측 결과 (YYYY-MM-DD)
+
+환경: macOS <ver> · node <ver> · pnpm 11.0.8 · aumos <sha> · `claude` <ver>
+패키지: **shareholder-rerating 0.5.7** (`registry-fetch` 경로로 설치 — 게시된 바이트)
+브로커: 토스증권 **live**(샌드박스 없음) · 계좌 `<accountSeq>` · 장부 ₩<…>
+저장소: `$HOME/.aumos-256` (전용)
+
+- [ ] ① **설치** — `<AUMOS_HOME>/managers/<agt_…>/aumos.json` = 0.5.7, `runnable-managers`에 행
+      `open-dart@0.1.0` 설치 + `api-key` 저장, `source-gaps.json` = `[]`
+- [ ] ② **`decision_submit`** — `runs/<run_…>/decision.json` 존재, action = `<BUY|…>`,
+      `approvals.pending[]`에 `dec_…`. 해시체인 `verifyChain` 통과
+- [ ] ③ **승인 + 담당 지정 + 체결**
+      - `approvals` 1행 `verdict=approved`, `divergence=null`
+      - `orders`: `broker_order_id=<…>`, `state=<filled|…>`, `filled_quantity=<n>`, `average_fill_price=<…>`
+      - **`position_assignments`: `state=assigned`, `ground=approval`, `manager_instance_id=agt_…`, `version=1`**
+        (승인 화면의 「운용 담당」 체크박스 / `approve-decision.assignments`)
+- [ ] ④ **재읽기 + 재arm** — 두 번째 런의 `invocation.json`에서
+      `positions[].assignment.managerInstanceId == agt_…`, `state == "assigned"`
+      `plans`에 새 armed 계획, 두 번째 판단이 중복 매수를 내지 않음
+- [ ] ⑤ **Forward Track Record** — `performance`의 `shareholder-rerating` 행이
+      `runs[].decisionId == dec_…`. 다섯 축 전부 `insufficient`(최소치 미달, 정상)
+
+### ⬜ 이 런이 재지 못한 것
+- 체결 → Forward Track Record 연결은 **호스트에 없다** (untilled/aumos#887). 수수료·세금·배당 구분,
+  실현손익, 원화 벤치마크, 전략별 집계도 마찬가지.
+- `acuity`는 판단의 `forecast.horizonDays`가 지나야 해소된다 — 이 런으로는 「아직 아니다」가 정답.
+- 페이퍼 대조군이 없다. 토스에는 시뮬레이터가 없고 Alpaca는 XKRX를 못 다룬다.
+- 매니저 하나·판단 둘이다. 세 패키지 동시 운용은 여전히 #789 2단계의 것.
+- 주문 취소 경로를 재지 않았다 — Aumos에 없다(`cancelOrder`가 던진다).
+```
+
+---
+
+## 12. ⚠️ 코드에서 확정하지 못한 것
+
+| # | 항목 | 상태 |
+|---|---|---|
+| ⚠️-1 | **`claude` CLI 버전** | 핀은 **있고 강제된다**(`>=2.1.221 <3.0.0`). ⚠️ 남는 미지수는 **`claude` 3.x**다 — `belowMajor: 3`이므로 메이저 3이 나오면 `unsupported-version`으로 막힌다. 오너의 CLI가 이미 3.x면 **이 런북은 그대로 돌지 않는다**. 먼저 `vendors refresh`로 확인할 것 |
+| ⚠️-2 | **최소 주문 금액(더스트 하한)** | `PlanInput.minNotionalMinorUnits`가 선언만 있고 **생산자가 없다**(`planner.ts` 밖 어디에도). 실질 하한은 ⑴ `roundQuantity`의 `Math.trunc`(1주 미만 = 0주)와 ⑵ 토스의 거절뿐. **KRX/토스의 실제 최소 주문 금액을 코드가 모른다** |
+| ⚠-3 | **특정 종목 지목** | `start-run`에 `task`/`subject` 인자가 **없다**. 수동 런은 언제나 `PORTFOLIO_REVIEW`(#517). `ASSET_REVIEW`/`EVENT_REVIEW`는 Wake Engine이 이벤트를 이름 댈 때만 선다. 세 패키지의 `config.schema.json`도 `additionalProperties:false`에 심볼 필드가 없다 → 남은 손잡이는 **맨데이트 `objective` 자유 텍스트**뿐이고, 그것이 실제로 후보 선정을 얼마나 좁히는지는 **LLM 행동이라 코드가 답하지 않는다** |
+| ⚠️-4 | **호가 단위·상하한가** | 의도적으로 포트를 안 건넌다. 거절이 벤더 에러 본문으로만 온다 — 지정가가 어떤 형태로 거절되는지 실측 없음 |
+| ⚠️-5 | **`runtimes` 검사** | **판정이 갈렸다.** `packages/amp/src/manifest.ts:906`의 주석은 「설치 화면이 벤더를 이름으로 거절한다」고 적지만, `previewInstall`/`install-manager`를 훑어 그 검사를 **찾지 못했다** — `package-lint`(카탈로그 CI)만 `runtimes`를 읽는다. **실무상 무해하다**(SR은 `["claude"]`이고 우리도 `vendor: "claude"`로 설치한다). 다만 *「거절이 있다」*를 믿고 설계하지 말 것 |
+| ⚠️-6 | **`registry-fetch` 목적지 문서 불일치** | `CLAUDE.md`·`kernel-host/README.md`는 `~/.aumos/managers/<id>@<ver>/`라 적고 **코드는 `staging/<id>@<ver>/`**에 쓴다. 이 런북은 코드를 따랐다 |
+| ⚠️-7 | **staging TTL** | 호스트가 열릴 때 staging을 쓸되 1시간 안에 받은 것은 남긴다. 호스트를 여러 번 여닫으며 시간을 끌면 `registry-fetch`를 다시 해야 할 수 있다 |
+| ⚠️-8 | **`aumosHome()` 구현 둘이 fallback에서 갈린다** | 호스트는 `os.homedir()`, 워커는 `env.HOME`. `AUMOS_HOME`을 **명시하면** 문제가 없다 — 그래서 이 런북은 전 구간에서 명시한다 |
+| ⚠️-9 | **`AssignmentGround.investor`에 생산자가 없다** | 담당은 **주문이 실제로 나가는 승인에만** 올라탄다. 투자자가 화면에서 직접 담당을 지정/해제하는 길이 이 빌드에 없다 |
+| ⚠️-10 | **패키지 바이트 검증이 없다** | `origin.json`의 `sha`는 *요청한* 커밋의 기록이지 검증이 아니다(§45 미구현). 매니저 패키지에 서명·digest 대조가 없다 |
+| ⚠️-11 | **`.aumos/first-party.json`은 호스트가 안 읽는다** | 카탈로그 CI 산출물이다. publisher 귀속의 실제 근거는 `AUMOS_OFFICIAL_PACKAGES`(#477 이후 기본값 없음) + 패키지가 도착한 마켓플레이스 URL |
+| ⚠️-12 | **SR이 실제 OpenDART 응답으로 BUY에 닿는지** | fixture는 BUY에 닿지만 그 입력은 손으로 만든 값이다. **실제 DART 응답 모양으로 SR이 `programme.executedAmount`·`cet1`·`recurringEps`를 채울 수 있는지 아무도 재지 않았다** — 이것이 이 런이 재려는 바로 그 미지수다 |
+| ⚠️-13 | **주문이 실제로 체결되기까지의 시간** | `placeOrder` 직후 `GET /api/v1/orders/{id}`로 한 번 되읽는다. 그 시점에 `accepted`이고 체결은 나중일 수 있다 — `state`가 `filled`로 가는 것은 다음 reconcile/마크에서 보인다. **그 주기를 코드에서 확정하지 못했다.** 실무 대응: `mark-books`를 다시 돌리고 `approvals`를 다시 읽는다 |
+| ⚠️-14 | **`maxDrawdown`은 저장되고 집행되지 않는다** | 맨데이트에 적히지만 강제하는 곳이 없다(설계). 이 연습의 안전장치로 믿지 말 것 |
+| ⚠️-15 | **`AUMOS_WAKE`를 끌 것인가** | 이 런북은 Wake Engine을 켠 채로 돈다(스케줄 발화를 보려면 필요). ⚠️ 켜 두면 SR의 `30 16 * * 1-5`가 **저녁에 스스로 런을 띄워 구독을 쓴다**. 통제된 관측만 원하면 `AUMOS_WAKE=0`으로 띄운다 — **타이머 하나만** 꺼지고 `wake-tick`·`mark-books`·`start-run`은 그대로 돈다. 정확히 `'0'`이어야 하고, 없는 것은 켜진 것이다 |
+| ⚠️-16 | **동시 런 상한** | `MAX_LIVE_RUNS = 4`, 틱 간격 60초, 누락된 스케줄은 **따라잡지 않는다**(#642 strict skip, `CADENCE_GRACE_MS = 5분`). 노트북이 자고 있었다면 밀린 런은 **0건**이고 `CadenceGap` 행으로만 남는다 |
+| ⚠️-17 | **`run_…` id 형식** | 런 디렉토리 이름은 워커가 민팅한 run id다. 프로덕션 저장소에서의 정확한 형식을 확정하지 못했다 — 이 런북은 전부 `ls -t "$AUMOS_HOME/runs" \| head -1`로 집는다 |
+
+---
+
+### 부록 — 이 런북이 쓴 근거 파일
+
+```
+aumos/
+  CLAUDE.md                                     §"명령어" · §"환경변수"
+  services/kernel-host/README.md:1259-1383       "The live round trip at the second broker, by hand"
+  services/kernel-host/scripts/m8c-live.mjs      check|connect|accounts|book|read|order|auto
+  services/kernel-host/src/protocol.ts:1277      approve-decision (+ assignments, #785)
+  services/kernel-host/src/protocol.ts:2117      ApprovalPreviewView.assignments
+  services/kernel-host/src/track-record.ts       CLQT 다섯 축 · MINIMUMS · acuity()
+  services/kernel-host/src/views.ts:985-1100     performanceView
+  services/kernel-host/src/runtime-paths.ts:127  runWorkspace = <AUMOS_HOME>/runs
+  packages/credentials/src/catalog.ts:398-432    toss · environments: ['live']
+  packages/skill-gateway/src/adapters/toss-execution.ts   placeOrder · cancelOrder가 던진다
+  packages/skill-gateway/src/tools/decision.ts   decision_submit
+  packages/skill-gateway/src/tools/discovery.ts  portfolio_get · context_get
+  packages/manager-runtime/src/worker.ts:857     task 선택 (#517) · :1291 fixtures = live !== true
+  packages/manager-runtime/src/install.ts:71     AUMOS_APP_VERSION = '0.5.0'
+  packages/manager-runtime/src/setup.ts:812      install-manager
+  packages/manager-runtime/src/grant.ts:575      runPaths
+  packages/kernel/src/store/schema.ts:2110       position_assignments
+  packages/kernel/src/execution/approve.ts       approveDecision
+  packages/i18n/src/dictionary/ko-KR.ts:2006     approvals.assign.*
+
+aumos-catalogue/
+  managers/shareholder-rerating/{aumos.json,PROMPT.md,config.schema.json,README.ko.md}
+  managers/shareholder-rerating/fixtures/cases.json   financial-positive-reaches-buy
+  sources/open-dart/source.json                       credentials[0].name = "api-key"
+  .claude-plugin/marketplace.json                     게시의 정본
+```
