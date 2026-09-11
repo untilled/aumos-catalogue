@@ -652,10 +652,13 @@ chosen against it.
 - **Host integration.** Proposal storage, WATCH re-arming, and the link from an approved decision to an
   actual fill are #256's 검증 조건 and need a running host. Nothing in this repository can establish
   them, and this package does not claim they were checked.
-- **Position attribution across managers.** #256 asks that the host's support for position ownership,
-  open-proposal lookup and conflict adjudication be confirmed before multiple managers share one fund.
-  This package computes whole-account exposure from what it is handed and refuses rather than
-  splitting a limit; whether the host hands it *every* manager's open proposals is the host's
-  question, and until it is answered the safe operating shape is a separate fund per manager.
+- **Position attribution across managers — answered.** #256 asked that the host's support for
+  position ownership, open-proposal lookup and conflict adjudication be confirmed before multiple
+  managers share one fund. untilled/aumos#789 confirmed all three against the real host and back out
+  to a venue: every manager's open proposals arrive with their sizes, every position arrives with its
+  assignment, and execution is adjudicated by the host rather than by whoever proposed last. This
+  package computes whole-account exposure from what it is handed and refuses rather than splitting a
+  limit, and that is now measured on the inputs it actually receives. **Several managers may share
+  one fund.**
 - **The methodology's forward performance.** Nothing here measures it, and the catalogue deliberately
   shows none.
