@@ -917,6 +917,68 @@ check('the reference case classification does not by itself produce a purchase',
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 6b. The reference case **replayed** on as-of material. (#256)
+//
+// `reference-case.json`, above, is illustrative: it models the mechanism at three
+// invented points. This one is a replay — every field transcribed from the
+// investor's private record at a fixed commit, nothing dated after the decision
+// date, and every input the record does not carry left null rather than guessed.
+//
+// ⛔ What a green tick here means, precisely. It means the library, fed only what
+// was knowable on 2026-07-08, returns the answer the fixture records. It does
+// **not** re-audit the investor's reported result — #256 says that was never
+// audited and is not a validated edge — and no threshold was moved to reach it.
+// The observed intent is asserted *as observed*: had it been a purchase this
+// block would assert a purchase, and it is not one.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const replay = read('fixtures/reference-replay.json')
+
+check('the replay declares its eligibility and what it excluded', () => {
+  assert.ok(['eligible', 'ineligible'].includes(replay.replayEligibility), 'replayEligibility is eligible or ineligible')
+  assert.ok(Array.isArray(replay.excluded) && replay.excluded.length > 0, 'a replay with nothing excluded has not been checked for contamination')
+  for (const row of replay.excluded) {
+    assert.ok(['future_information', 'post_hoc_revision', 'data_missing'].includes(row.reason), `reference-replay.json: ${row.item} carries an unknown exclusion reason ${row.reason}`)
+  }
+})
+
+for (const variant of replay.variants) {
+  const result = runVerdict(variant.input)
+  const where = `reference-replay.json → ${variant.name}`
+  check(`${where} reaches what it reached`, () => {
+    assert.equal(result.data.classification.classification, variant.expect.classification, `${where}: classification`)
+    /** #256 again: the multiple is recorded and excludes nothing, replay or not. */
+    assert.equal(result.data.classification.excludedByValuationMultiple, false, `${where}: excluded on a valuation multiple`)
+    for (const key of ['qualifiesAsPosition', 'policyAnnounced', 'policyExecuting', 'policyInResults']) {
+      if (variant.expect[key] !== undefined) assert.equal(result.data.classification[key], variant.expect[key], `${where}: ${key}`)
+    }
+    assert.equal(result.data.intent, variant.expect.intent, `${where}: intent`)
+    assert.equal(result.data.review.name, variant.expect.review, `${where}: review`)
+    for (const code of variant.expect.causeCodes ?? []) assert.ok(has(result.causes, code), `${where}: expected cause ${code}, got ${codes(result.causes).join(', ') || '(none)'}`)
+    /**
+     * ⛔ #254, and the reason variant B exists. An input nobody could read says
+     * nothing about the thesis — and supplying it afterwards must not turn the
+     * run into a refutation either. Neither variant may report one.
+     */
+    if (variant.expect.noRefutation === true) {
+      assert.ok(!has(result.causes, 'thesis_refuted'), `${where}: an absent or a late-supplied input was filed as a refuted thesis`)
+    }
+  })
+}
+
+/**
+ * The same claim `reference-case.json` makes with its B and C variants, made once
+ * more on real as-of material: the contamination control classifies as a policy
+ * and financial turnaround and still proposes nothing. Whatever intent the replay
+ * reaches, it is reached by the ladder and not by the label.
+ */
+check('a replay variant that classifies as a turnaround still proposes nothing', () => {
+  const contaminated = replay.variants.find((variant) => variant.expect.qualifiesAsPosition === true)
+  assert.ok(contaminated, 'reference-replay.json carries a variant whose classification qualifies as a position')
+  assert.notEqual(contaminated.expect.intent, 'enter-staged', 'the classification is not the purchase')
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 7. The absent-input audit. (regression, after untilled/aumos-catalogue#265)
 //
 // ── The defect class, and why it needs its own section ─────────────────────
@@ -2534,6 +2596,6 @@ check('the manifest and the plugin agree, and the capabilities are the ones the 
   assert.match(manifest.provenance.commit, /^[0-9a-f]{40}$/)
 })
 
-console.log(`catalyst-turnaround: ${checks} checks over ${cases.cases.length} ladder cases, ${ledgerFixture.scenarios.length} ledger scenarios, ${staging.runs.length + staging.malformed.length} staged-plan runs, ${concentration.scenarios.length} concentration scenarios, ${scoreboard.scenarios.length} scoreboards and ${reference.variants.length} reference-case variants`)
+console.log(`catalyst-turnaround: ${checks} checks over ${cases.cases.length} ladder cases, ${ledgerFixture.scenarios.length} ledger scenarios, ${staging.runs.length + staging.malformed.length} staged-plan runs, ${concentration.scenarios.length} concentration scenarios, ${scoreboard.scenarios.length} scoreboards and ${reference.variants.length} reference-case variants, and ${replay.variants.length} reference-replay variants (${replay.replayEligibility})`)
 console.log(`catalyst-turnaround: ${ABSENCE_REGRESSIONS.length} absent-input regressions — a declared input removed from a passing run, and none of them buys anything or reports a refutation`)
 console.log(`catalyst-turnaround: the six catalyst outcomes reached ${new Set(SIX.map((name) => reached.get(name))).size} distinct judgements`)

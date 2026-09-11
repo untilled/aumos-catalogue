@@ -1,0 +1,172 @@
+{
+  "note": "#256's 완료 조건 «과거 세 사례는 당시 시점 자료만으로 분류·논거 복원이 되는지 확인한다», for this package's case — 한국가스공사 (036460).\n\nThis file is not `reference-case.json`. That one is ILLUSTRATIVE and models the mechanism at three invented points. This one is a **replay**: every field below is transcribed from the investor's own private record at a fixed commit, dated on or before the decision date, and anything dated later is in `excluded` rather than in `input`.\n\n⛔ What this fixture does **not** claim. It is not a re-audit of the investor's reported ~10% result, which #256 says was never re-audited and is not a validated edge. It is not a backtest, not a claim about this company, and not a reproduction of the upstream harness — the harness is a different program and this package implements the methodology rather than that program. No threshold in `lib/constants.mjs` was touched for it, and the outcome recorded here is whatever the library returned on the first run.\n\n⚠️ The decision date is **2026-07-08**, not 2026-05-25. The two 2026-05-25 plans in the source record name 우리금융지주 / KODEX 리츠인프라 / KT and do not mention this issuer at all; the record's own entry for it is `decision_date: 2026-07-08` in `data/decisions.jsonl` and `Opened: 2026-07-08` in the thesis. Replaying it at 2026-05-25 would have put the entire case in `excluded` for no reason other than a mistaken date.",
+  "symbol": "036460",
+  "market": "XKRX",
+  "decision": {
+    "decisionDate": "2026-07-08",
+    "sourceRepository": "the investor's private trading-harness checkout (not vendored here)",
+    "sourceCommit": "1fa18c595baa742f7323366a3c220fec5c6535a7",
+    "decisionRecord": "data/decisions.jsonl → 2026-07-08:A1:036460 (side BUY, intended_price 33150, status ready)"
+  },
+  "replayEligibility": "eligible",
+  "replayEligibilityReason": "The as-of record carries enough to reach a determinate classification and intent. Several inputs this package requires are absent from it and are recorded as `data_missing` below rather than invented; the run says so itself.",
+  "asOfFields": [
+    { "field": "case.policyDependent", "value": true, "source": "theses/036460_KOGAS.md @1439625 → Business", "sourceDate": "2026-07-08" },
+    { "field": "case.policyStage", "value": "executing", "source": "theses/036460_KOGAS.md @1439625 → Why Now («요금 정상화가 진행형»), Catalysts", "sourceDate": "2026-07-08" },
+    { "field": "case.earningsPathTraced", "value": false, "source": "theses/036460_KOGAS.md @1439625 → Fundamental Review («요금 인상 실행은 정치 변수라 불확실», Evidence Quality: 중)", "sourceDate": "2026-07-08", "note": "The as-of record asserts a receivable drawdown and an analyst target; it cites no filing stating a billed unit price that carries the revision into this issuer's own revenue." },
+    { "field": "case.valuationMultiple", "value": 23, "source": "theses/036460_KOGAS.md @1439625 → Valuation («EPS(TTM) 1,441 기준 P/E ~23»)", "sourceDate": "2026-07-08" },
+    { "field": "indicators[receivable-balance] prior", "value": 15400000000000, "source": "theses/036460_KOGAS.md @1439625 → Why Now («미수금 15.4조(2024)»); publication date taken from data/fundamentals/036460.json filing 20250325000742", "sourceDate": "2025-03-25" },
+    { "field": "indicators[receivable-balance] latest", "value": 13400000000000, "source": "theses/036460_KOGAS.md @1439625 → Why Now («→ ~13.4조»); publication date taken from data/fundamentals/036460.json filing 20260323001058", "sourceDate": "2026-03-23" },
+    { "field": "price.last", "value": 32700, "source": "data/history/036460.jsonl → 2026-07-08 close", "sourceDate": "2026-07-08" },
+    { "field": "price.targetPrice", "value": 46700, "source": "theses/036460_KOGAS.md @1439625 → Valuation / Expected Return (애널 평균 목표)", "sourceDate": "2026-07-08" },
+    { "field": "price.invalidationPrice", "value": 29200, "source": "theses/036460_KOGAS.md @1439625 → Position / Risk (hard stop)", "sourceDate": "2026-07-08" },
+    { "field": "price.stabilised", "value": true, "source": "theses/036460_KOGAS.md @1439625 → Why Now («바닥다지기(신저가 미갱신)», RSI 44 회복)", "sourceDate": "2026-07-08" },
+    { "field": "sizing.expectedActiveReturn", "value": 0.18, "source": "theses/036460_KOGAS.md @1439625 → Expected Return (확률가중 기대수익 ~+18%)", "sourceDate": "2026-07-08" }
+  ],
+  "excluded": [
+    { "item": "theses/036460_KOGAS.md Review Log entries from 2026-07-09 onward (챌린지 크로스체크, 7/13 요금 동결, Q1'26 OP beat, 미수금 13.9조/13.37조, 홍의락 사장 선임, 유가 전제 악화)", "reason": "future_information", "source": "theses/036460_KOGAS.md @1fa18c5", "note": "Every one of these is dated after the decision. They are also the material difference between the file at @1439625 and the file at the snapshot commit." },
+    { "item": "the Downside / Trap Risk paragraph dated 2026-07-09 (챌린지 크로스체크) and the split of Valuation / Expected Return into two sections", "reason": "post_hoc_revision", "source": "git log of theses/036460_KOGAS.md; first version 1439625 (2026-07-08), revised 8c098ef / 1d21034", "note": "Present in the snapshot file, absent from the version that existed on the decision date." },
+    { "item": "financials.liquidAssets, financials.monthlyCashBurn, financials.debtMaturingWithinYear, financials.securedRefinancing", "reason": "data_missing", "source": "no as-of source; data/fundamentals/036460.json carries equity and total debt but no maturity schedule, no liquid-asset line and no burn", "note": "Left null. The run reports `data_missing` for them rather than defaulting a burn of zero." },
+    { "item": "sizing.conviction, sizing.mandatePositionCap, book.caps.accountSingleName", "reason": "data_missing", "source": "the record states a 비코어 상한 28% category ceiling, which is not a single-name cap and was not substituted for one", "note": "`mandatePositionCap` is carried as the explicit string `not-declared`, which this package reads as a readable absence rather than as an unread input." }
+  ],
+  "variants": [
+    {
+      "name": "A-as-of-2026-07-08",
+      "why": "The decision date, with nothing dated after it. This is the replay.",
+      "expect": {
+        "classification": "research-candidate",
+        "excludedByValuationMultiple": false,
+        "policyAnnounced": true,
+        "policyExecuting": true,
+        "policyInResults": false,
+        "qualifiesAsPosition": false,
+        "intent": "research-watch",
+        "review": "earnings-path-untraced",
+        "causeCodes": ["data_missing", "research_incomplete"],
+        "noRefutation": true
+      },
+      "input": {
+        "asOf": "2026-07-08T01:00:00Z",
+        "symbol": "036460",
+        "market": "XKRX",
+        "held": false,
+        "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
+        "case": {
+          "policyDependent": true,
+          "policyStage": "executing",
+          "earningsPathTraced": false,
+          "earningsPathNote": "The as-of record asserts a receivable drawdown and an analyst target; no filing in it states a billed unit price that carries the revision into this issuer's own revenue",
+          "deteriorationCauseIdentified": true,
+          "valuationMultiple": 23
+        },
+        "catalysts": [
+          {
+            "id": "cat-2026-tariff",
+            "kind": "tariff-or-price-revision",
+            "source": { "url": "https://example.invalid/record/thesis-036460", "publisher": "investor-record", "documentId": "theses/036460_KOGAS.md@1439625" },
+            "publishedAt": "2026-07-08T00:00:00Z",
+            "reportDate": "2026-07-08T00:00:00Z",
+            "dateStatus": "estimated",
+            "expectedWindow": {
+              "startsAt": "2026-08-01T00:00:00Z",
+              "endsAt": "2026-12-31T00:00:00Z",
+              "uncertaintyDays": 90,
+              "basis": "the as-of record names a 2026 tariff pass-through as the catalyst and gives it no dated schedule, so the window is the record's own uncertainty rather than a date it states"
+            },
+            "confirmingIndicator": { "name": "recovery-adjusted receivable balance", "unit": "KRW", "source": "quarterly report, receivable note" },
+            "successCondition": "The receivable balance falls again in a quarterly report",
+            "failureCondition": "The tariff roadmap is delayed or withdrawn",
+            "evidenceIds": ["ev_thesis_036460_20260708"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [
+          {
+            "name": "recovery-adjusted receivable balance",
+            "channel": "receivable-balance",
+            "unit": "KRW",
+            "direction": "down-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2024-12-31T00:00:00Z", "publishedAt": "2025-03-25T00:00:00Z", "value": 15400000000000, "evidenceIds": ["ev_thesis_036460_20260708"] },
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-03-23T00:00:00Z", "value": 13400000000000, "evidenceIds": ["ev_thesis_036460_20260708"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": null, "monthlyCashBurn": null, "debtMaturingWithinYear": null, "securedRefinancing": null, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 32700, "entryPrice": null, "targetPrice": 46700, "invalidationPrice": 29200, "stabilised": true },
+        "sizing": { "expectedActiveReturn": 0.18, "conviction": null, "mandatePositionCap": "not-declared" },
+        "book": { "positions": [], "proposals": [], "caps": { "accountSingleName": null } }
+      }
+    },
+    {
+      "name": "B-contamination-control-the-later-record-supplied",
+      "why": "#254's rule, tested from the other side. Every field the replay excluded is put back — the traced earnings path the post-hoc revision asserts, and the survivability numbers no as-of source carries — and the question is whether the answer flips into a refutation. It must not: an input nobody could read says nothing about the thesis, and supplying it later says nothing either. The classification does change, which is the honest half of the result; the intent does not reach a purchase in either variant.",
+      "expect": {
+        "classification": "policy-financial-turnaround",
+        "excludedByValuationMultiple": false,
+        "qualifiesAsPosition": true,
+        "intent": "research-watch",
+        "review": "recovery-not-yet-a-path",
+        "noRefutation": true
+      },
+      "input": {
+        "asOf": "2026-07-08T01:00:00Z",
+        "symbol": "036460",
+        "market": "XKRX",
+        "held": false,
+        "strategy": "catalyst-turnaround",
+        "register": { "catalysts": null, "plan": null },
+        "case": {
+          "policyDependent": true,
+          "policyStage": "executing",
+          "earningsPathTraced": true,
+          "earningsPathNote": "⛔ supplied from the post-hoc revised record, not from as-of material — this variant exists to be compared against A, not to be believed",
+          "deteriorationCauseIdentified": true,
+          "valuationMultiple": 23
+        },
+        "catalysts": [
+          {
+            "id": "cat-2026-tariff",
+            "kind": "tariff-or-price-revision",
+            "source": { "url": "https://example.invalid/record/thesis-036460", "publisher": "investor-record", "documentId": "theses/036460_KOGAS.md@1439625" },
+            "publishedAt": "2026-07-08T00:00:00Z",
+            "reportDate": "2026-07-08T00:00:00Z",
+            "dateStatus": "estimated",
+            "expectedWindow": {
+              "startsAt": "2026-08-01T00:00:00Z",
+              "endsAt": "2026-12-31T00:00:00Z",
+              "uncertaintyDays": 90,
+              "basis": "the as-of record names a 2026 tariff pass-through as the catalyst and gives it no dated schedule"
+            },
+            "confirmingIndicator": { "name": "recovery-adjusted receivable balance", "unit": "KRW", "source": "quarterly report, receivable note" },
+            "successCondition": "The receivable balance falls again in a quarterly report",
+            "failureCondition": "The tariff roadmap is delayed or withdrawn",
+            "evidenceIds": ["ev_thesis_036460_20260708"],
+            "state": "scheduled"
+          }
+        ],
+        "transitions": [],
+        "indicators": [
+          {
+            "name": "recovery-adjusted receivable balance",
+            "channel": "receivable-balance",
+            "unit": "KRW",
+            "direction": "down-is-better",
+            "linksToCashFlow": true,
+            "observations": [
+              { "periodEnd": "2024-12-31T00:00:00Z", "publishedAt": "2025-03-25T00:00:00Z", "value": 15400000000000, "evidenceIds": ["ev_thesis_036460_20260708"] },
+              { "periodEnd": "2025-12-31T00:00:00Z", "publishedAt": "2026-03-23T00:00:00Z", "value": 13400000000000, "evidenceIds": ["ev_thesis_036460_20260708"] }
+            ]
+          }
+        ],
+        "financials": { "liquidAssets": 3000000000000, "monthlyCashBurn": 0, "debtMaturingWithinYear": 2000000000000, "securedRefinancing": 900000000000, "dilutionRisk": "none-disclosed" },
+        "price": { "last": 32700, "entryPrice": null, "targetPrice": 46700, "invalidationPrice": 29200, "stabilised": true },
+        "sizing": { "expectedActiveReturn": 0.18, "conviction": 0.45, "mandatePositionCap": "not-declared" },
+        "book": { "positions": [], "proposals": [], "caps": { "accountSingleName": 0.28 } }
+      }
+    }
+  ]
+}

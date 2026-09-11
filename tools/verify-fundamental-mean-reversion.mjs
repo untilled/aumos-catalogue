@@ -382,6 +382,65 @@ check('#813 — the sector axis folds the names before it adds them up', () => {
   assert.equal(answer.exposure, 0.22, 'the sector total added a holding and its own pending total')
   assert.deepEqual(answer.unclassified, [])
 })
+
+/**
+ * ── #256: «보유 종목에 복수 thesis가 붙어도 포지션 수량은 하나다» ──────────
+ *
+ * The host merges every row of one asset into one `Position` before this package
+ * sees it — `broker-book.ts` folds the broker's rows by asset, and
+ * `discovery-service.ts` maps positions one-to-one with at most one assignment
+ * per `assetKey`. So two holding rows for one name are a restatement of one
+ * quantity, and adding them was reading a 6% position as 12%.
+ *
+ * ⚠️ **Mixed attribution is the interesting half.** Two rows for one name
+ * carrying different `strategy` values are two claims about *whose* it is, not
+ * two positions: each bucket keeps its largest row and the position is the
+ * largest row of all, so the parts can never add to more than the whole.
+ */
+check('#256 — one name is one position however many theses point at it', () => {
+  const twoTheses = concentration({
+    holdings: [
+      { symbol: 'FMR001', sector: 'technology', weight: 0.06, strategy: STRATEGY_ID },
+      { symbol: 'FMR001', sector: 'technology', weight: 0.06, strategy: 'inst_shareholder_rerating' },
+    ],
+    openProposals: [],
+  }, 'FMR001')
+  assert.equal(twoTheses.heldWeight, 0.06, 'one position was counted twice because two theses were attached to it')
+  assert.equal(twoTheses.existingWeight, 0.06)
+  assert.equal(twoTheses.grossHeld, 0.06, 'and the gross axis carried the double through the whole book')
+  assert.ok(twoTheses.diagnostics.some((row) => row.code === 'duplicate_holding_rows' && row.severity === 'info'), 'the row arrived twice and nothing in the answer said so')
+
+  /** Mixed assignment: max per bucket, then one position, and own + other is the whole. */
+  const mixed = concentration({
+    holdings: [
+      { symbol: 'FMR001', weight: 0.04, strategy: STRATEGY_ID },
+      { symbol: 'FMR001', weight: 0.06, strategy: 'inst_shareholder_rerating' },
+    ],
+    openProposals: [],
+  }, 'FMR001')
+  assert.equal(mixed.heldWeight, 0.06, 'the two claims were added into a 0.10 position the account does not hold')
+  assert.equal(mixed.ownHeldWeight, 0.04, 'and this desk\'s own share is still its own largest row')
+  assert.equal(mixed.otherHeldWeight, 0.02)
+  assert.equal(round(mixed.ownHeldWeight + mixed.otherHeldWeight), mixed.heldWeight, 'the parts add to more than the whole')
+
+  /** A single row is untouched: the fold only ever fires on a second one. */
+  const one = concentration({ holdings: [{ symbol: 'FMR001', weight: 0.06, strategy: STRATEGY_ID }], openProposals: [] }, 'FMR001')
+  assert.equal(one.heldWeight, 0.06)
+  assert.deepEqual(one.diagnostics, [], 'a book with no duplicate row reported one')
+
+  /** And the sector axis folds the same name the same way, or the sector total is over by the smaller row. */
+  const sector = sectorConcentration({
+    holdings: [
+      { symbol: 'FMR001', sector: 'utilities', weight: 0.06, strategy: STRATEGY_ID },
+      { symbol: 'FMR001', sector: 'utilities', weight: 0.06, strategy: 'inst_shareholder_rerating' },
+      { symbol: 'FMR002', sector: 'utilities', weight: 0.1, strategy: 'evidence-gated' },
+    ],
+    openProposals: [],
+  }, 'utilities', 'FMR001')
+  assert.equal(sector.exposure, 0.16, 'the sector total counted one position twice')
+  assert.equal(sector.heldExposure, 0.16)
+  assert.equal(sector.ownWeight, 0.06)
+})
 /**
  * ── #814/#816: the holding row names its assignee, and the fold does not move ─
  *
@@ -621,13 +680,21 @@ check('#819 — a review of a position this desk does not run may not leave as a
    * ⚠️ **A shared position keeps the resize and loses the exit.** There is
    * something here to reduce, and the reduction is a total at or above the
    * floor rather than a `0`.
+   *
+   * ⚠️ **The numbers moved with #256's fold and the rule did not.** Two rows for
+   * one name are one position, so this book is a **0.06** position of which 0.04
+   * is assigned here and 0.02 is not — it was read as a 0.10 position before,
+   * which is the double this fold closes. What #819 asserts is unchanged: the
+   * floor is somebody else's share, it is above zero, and the exit is gone.
    */
-  const shared = classify('invalidation-triggered', sizeAgainst([...held(0.04, STRATEGY_ID), ...held(0.06, 'inst_shareholder_rerating')]))
+  const sharedSizing = sizeAgainst([...held(0.04, STRATEGY_ID), ...held(0.06, 'inst_shareholder_rerating')])
+  const shared = classify('invalidation-triggered', sharedSizing)
   assert.equal(shared.ownHeldWeight, 0.04)
-  assert.equal(shared.otherHeldWeight, 0.06)
-  assert.equal(shared.hostTargetWeightFloor, 0.06)
+  assert.equal(shared.otherHeldWeight, 0.02, 'the two rows were added, so the name was read as a 0.10 position the account does not hold')
+  assert.equal(shared.hostTargetWeightFloor, 0.02)
   assert.deepEqual([...shared.ampActions], ['RESIZE'], 'a shared position could still be exited, and an exit takes their half with it')
   assert.ok(codesOf(shared).includes('reduction_is_bounded_by_anothers_holding'))
+  assert.ok(sharedSizing.diagnostics.some((row) => row.code === 'duplicate_holding_rows'), 'the name arrived twice and the sizing did not say so')
 
   /** An account nobody folded is not an account with nobody in it. */
   const unread = classify('invalidation-triggered', null)
@@ -773,8 +840,15 @@ check('#823 — a real reduction still leaves, and the clamp is a ceiling and no
    */
   const shared = classify823('invalidation-triggered', sizeFor823([held823(0.04, STRATEGY_ID), held823(0.06, 'inst_shareholder_rerating')]))
   assert.equal(shared.ownHeldWeight, 0.04)
-  assert.equal(shared.positionWeight, 0.1)
-  assert.equal(shared.hostTargetWeight, round(0.06 + Math.min(shared.sizing.targetTotalWeight, 0.04)), 'a shared position was reduced by more than this desk\'s share of it')
+  /**
+   * ⚠️ **#256: two rows for one name are one position.** 0.04 assigned here and
+   * 0.06 assigned elsewhere is a **0.06** position with 0.02 of it somebody
+   * else's — not the 0.10 the sum used to report. The rule under test is the
+   * same one: the floor is theirs, and the reduction lands above it.
+   */
+  assert.equal(shared.positionWeight, 0.06)
+  assert.equal(shared.otherHeldWeight, 0.02)
+  assert.equal(shared.hostTargetWeight, round(0.02 + Math.min(shared.sizing.targetTotalWeight, 0.04)), 'a shared position was reduced by more than this desk\'s share of it')
   assert.ok(shared.hostTargetWeight >= shared.hostTargetWeightFloor, 'the reduction went below the floor, selling a holding this desk does not run')
   assert.ok(shared.hostTargetWeight < shared.positionWeight, 'and this desk could no longer reduce the part of the position that is its own')
   assert.equal(shared.exposureDirection, 'reduce')
@@ -1732,15 +1806,15 @@ check('a stabilisation reading that could not be taken is data-missing, not unco
   assert.deepEqual([...outcomes].sort(), ['confirmed', 'data-missing', 'falling-knife', 'stabilization-unconfirmed'])
 })
 
-check('a staged plan missing its own ceiling, expiry or rung weight adds nothing', () => {
+check('a staged plan missing its own ceiling, expiry, rung weight or fill history adds nothing', () => {
   const template = staged.cases.find((row) => row.name === 'first-stage-fires')
   const stageWith = (mutate) => {
     const plan = clone(template.plan)
     mutate(plan)
-    return execute({ operation: 'stagedPlan', asOf: ASOF, input: { plan, stageId: 'stage-1', satisfied: ['stabilisation-held', 'thesis-evidence'], gate: clone(template.gate) } })
+    return { sent: clone(plan), answer: execute({ operation: 'stagedPlan', asOf: ASOF, input: { plan, stageId: 'stage-1', satisfied: ['stabilisation-held', 'thesis-evidence'], gate: clone(template.gate) } }) }
   }
   const control = stageWith(() => {})
-  assert.equal(control.status, 'ok', 'the control still fires')
+  assert.equal(control.answer.status, 'ok', 'the control still fires')
 
   for (const [what, mutate, code] of [
     ['no cumulative target', (plan) => { delete plan.plannedTotalWeight }, 'staged_total_unstated'],
@@ -1748,13 +1822,31 @@ check('a staged plan missing its own ceiling, expiry or rung weight adds nothing
     ['no expiry', (plan) => { delete plan.expiresAt }, 'plan_expiry_unstated'],
     ['an unparseable expiry', (plan) => { plan.expiresAt = 'whenever' }, 'plan_expiry_unstated'],
     ['a rung with no weight', (plan) => { delete plan.stages[0].weight }, 'stage_weight_unstated'],
+    /**
+     * ⛔ **#256 — `filled` is now in this list, and it is the one that bought.**
+     * The other four refused before the fix; an absent or unreadable fill
+     * history did not, because `Array.isArray(x) ? x : []` answered «nothing
+     * committed yet» and the rung fired. `null` is deliberately *not* here: it
+     * is the positive statement that the ledger was read and holds nothing.
+     */
+    ['no ledger at all', (plan) => { delete plan.filled }, 'data_missing'],
+    ['a ledger that is not a list', (plan) => { plan.filled = 'stage-1' }, 'data_missing'],
+    ['a ledger that is an object', (plan) => { plan.filled = { 'stage-1': true } }, 'data_missing'],
   ]) {
-    const answer = stageWith(mutate)
+    const { sent, answer } = stageWith(mutate)
     assert.equal(answer.status, 'refused', `${what}: refused`)
     assert.equal(answer.code, code, `${what}: ${code}`)
-    assert.deepEqual(answer.plan, answer.plan && clone(answer.plan), `${what}: the ledger came back`)
-    assert.equal((answer.plan?.filled ?? []).length, 0, `${what}: and nothing was recorded against it`)
+    assert.deepEqual(answer.plan, sent, `${what}: the ledger came back unchanged rather than absent`)
   }
+
+  /** And the three states of `filled`, side by side, on one otherwise identical plan. */
+  assert.equal(stageWith((plan) => { plan.filled = [] }).answer.status, 'ok', 'an explicitly empty ledger is a ledger')
+  assert.equal(stageWith((plan) => { plan.filled = null }).answer.status, 'ok', 'null says the ledger was read and holds nothing, which is how catalyst-turnaround spells it')
+  const unread = stageWith((plan) => { delete plan.filled }).answer
+  assert.equal(unread.state.ledgerRead, false)
+  assert.equal(unread.state.committedWeight, null, 'a total nobody could form was reported as a total of nothing')
+  assert.equal(unread.state.remainingWeight, null, 'and the room left under the cumulative target was measured from it')
+  assert.ok(unread.diagnostics.some((row) => row.code === 'staged_ledger_unread' && row.severity === 'blocked'))
 })
 
 check('a reversion target whose prior-high check could not run is refused', () => {
@@ -2076,6 +2168,77 @@ check('every operation refuses a call with no asOf', () => {
   }
 })
 
-console.log(`✓ fundamental-mean-reversion — ${checks} check(s) over ${cases.cases.length} classification, ${sizing.cases.length} sizing, ${staged.cases.length} staged-plan and ${reversion.cases.length} target fixtures`)
-console.log('   ⛔ synthetic bars, and no host: proposal storage, WATCH re-arming, decision-to-fill linkage and')
+// ── ⑭ the reference case, replayed on as-of material (#256) ───────────────
+//
+// Every other fixture here carries synthetic bars. `reference-replay.json` does
+// not: its series is the daily OHLCV the investor's own record holds, truncated at
+// the last session that had closed when the decision was made, and its research
+// block is transcribed from the decision plan of that day. The thesis file is
+// excluded in full — it was written four days later and its technical premise
+// («RSI14 20대») does not reproduce from the record it sits on.
+//
+// ⛔ A green tick here does **not** re-audit the investor's reported result, which
+// #256 says was never audited and is not a validated edge. It says the library, fed
+// only what was knowable on the day, answers what the fixture records — and what it
+// records is `data-missing`, because the record's history is 63 bars short of what
+// a 200-bar average needs. That is a valid replay result, not a failure.
+const replay = read('reference-replay.json')
+
+check('the replay declares its eligibility and what it excluded', () => {
+  assert.ok(['eligible', 'ineligible'].includes(replay.replayEligibility), 'replayEligibility is eligible or ineligible')
+  assert.ok(Array.isArray(replay.excluded) && replay.excluded.length > 0, 'a replay with nothing excluded has not been checked for contamination')
+  for (const row of replay.excluded) {
+    assert.ok(['future_information', 'post_hoc_revision', 'data_missing'].includes(row.reason), `reference-replay.json: ${row.item} carries an unknown exclusion reason ${row.reason}`)
+  }
+})
+
+for (const row of replay.cases) {
+  const bars = replay.series
+    .filter(([date]) => date <= row.upTo)
+    .map(([date, open, high, low, close, volume]) => ({ timestamp: `${date}${replay.timestampSuffix}`, open, high, low, close, volume }))
+  const answer = execute({
+    operation: 'classifyCase',
+    asOf: row.asOf,
+    input: { ...row.input, series: { adjustment: row.declared ?? undefined, corporateActions: [], rows: bars } },
+  })
+
+  check(`reference-replay/${row.name}`, () => {
+    assert.equal(bars.length, row.measured.bars, `${row.name}: bar count`)
+    assert.equal(answer.outcome, row.expect.outcome, `${row.name}: outcome`)
+    assert.equal(answer.verdict, row.expect.verdict, `${row.name}: verdict`)
+    assert.equal(answer.code, row.expect.code, `${row.name}: diagnosis code`)
+    assert.equal(answer.lens, row.expect.lens, `${row.name}: lens`)
+    assert.equal(answer.technical?.rsi14 ?? null, row.measured.rsi14, `${row.name}: RSI`)
+    assert.equal(answer.technical?.drawdownFromHigh ?? null, row.measured.drawdownFromHigh, `${row.name}: drawdown`)
+    assert.equal(answer.technical?.ma200Distance ?? null, row.measured.ma200Distance, `${row.name}: distance from the 200-bar average`)
+    if (row.measured.close !== null) assert.equal(answer.technical?.close ?? null, row.measured.close, `${row.name}: newest close`)
+    for (const code of row.expect.diagnosticCodes ?? []) {
+      assert.ok((answer.diagnostics ?? []).some((entry) => entry.code === code), `${row.name}: expected diagnostic ${code}`)
+    }
+    /**
+     * ⛔ #254, and the reason the two contamination controls exist. An absent
+     * input says nothing about the thesis, and supplying it afterwards — three
+     * future sessions, or an adjustment basis nobody declared — must not turn the
+     * run into a refutation either.
+     */
+    if (row.expect.noRefutation === true) {
+      assert.notEqual(answer.code, 'thesis_refuted', `${row.name}: an absent or a late-supplied input was filed as a refuted thesis`)
+      assert.notEqual(answer.outcome, 'structural-earnings-damage', `${row.name}: unreadable history was filed as damage`)
+    }
+  })
+}
+
+check('the replay records the RSI the excluded thesis does not reproduce', () => {
+  /**
+   * Not a claim about the company — a claim about the record. The thesis excluded
+   * as a post-hoc revision asserts an RSI in the twenties at 2026-06-26; the series
+   * the same record holds gives the low forties at both dates the replay reads. The
+   * assertion is here so the exclusion has a checkable reason rather than a
+   * paragraph's.
+   */
+  for (const row of replay.cases) assert.ok(row.measured.rsi14 > 35, `${row.name}: RSI ${row.measured.rsi14}`)
+})
+
+console.log(`✓ fundamental-mean-reversion — ${checks} check(s) over ${cases.cases.length} classification, ${sizing.cases.length} sizing, ${staged.cases.length} staged-plan, ${reversion.cases.length} target fixtures and ${replay.cases.length} reference-replay runs (${replay.replayEligibility})`)
+console.log('   ⛔ synthetic bars everywhere but the replay, and no host: proposal storage, WATCH re-arming, decision-to-fill linkage and')
 console.log('      cross-manager exposure attribution are #256 criteria this checker cannot reach.')

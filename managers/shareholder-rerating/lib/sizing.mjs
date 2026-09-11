@@ -66,6 +66,26 @@ export function lossToInvalidation(input = {}) {
     )
     return { data: { lossFraction: null }, diagnostics }
   }
+  /**
+   * ⛔ **A stated invalidation price that is zero or negative is not a price** (#271
+   * finding ③.5). Until this check existed, `invalidationPrice: -100` on a ₩16,000 name
+   * gave `lossFraction = 1.00625` and **sized a BUY** of 0.99% — the arithmetic was
+   * conservative and the input was garbage, and a size computed from garbage is a size
+   * the run chose. The value *arrived*, so this is not `data_missing`; the thesis has an
+   * invalidation level nobody has actually written, which is `research_incomplete`.
+   */
+  if (invalidationPrice <= 0) {
+    diagnostics.push(
+      diagnostic(
+        'invalidation_price_not_positive',
+        'blocked',
+        'The invalidation price is zero or negative, which is not a price a share can trade at. State the level below the entry at which the thesis is wrong; a placeholder here would size a position on a loss that cannot happen.',
+        'invalidationPrice',
+        { entryPrice: round(entryPrice, 4), invalidationPrice: round(invalidationPrice, 4) },
+      ),
+    )
+    return { data: { lossFraction: null }, diagnostics }
+  }
   if (invalidationPrice >= entryPrice) {
     diagnostics.push(
       diagnostic(
