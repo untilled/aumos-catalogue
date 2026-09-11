@@ -185,6 +185,30 @@ export function bookIsReadable(book) {
  * 14% of this book right now, and a ceiling has to hold in both of the states the
  * account passes through.
  *
+ * ── One name is one position, however many theses point at it (#256) ───────
+ *
+ * ⛔ **Two holding rows for one symbol used to be added together.** A 6% row
+ * attributed here and a 6% row attributed to another desk read as a 12%
+ * position, and nothing in the answer said a row had been counted twice: the
+ * name then looked like it was at its ceiling and this desk's own buy was
+ * refused, or — one axis over — a sale was sized out of a quantity that does not
+ * exist. The host does not emit that shape. Its `broker-book.ts` merges every
+ * row of the same asset into **one** `Position` before this package sees it, and
+ * `discovery-service.ts` maps positions one-to-one with at most one assignment
+ * per `assetKey`. So a second row for a name is a restatement of the same
+ * quantity — a duplicate — and not a second holding.
+ *
+ * The fold is therefore `max` on the name, and `duplicate_holding_rows` (`info`)
+ * says it happened. #256: «보유 종목에 복수 thesis가 붙어도 포지션 수량은 하나다.»
+ *
+ * ⚠️ **Attribution folds the same way, one bucket at a time.** Two rows for one
+ * name carrying *different* `strategy` values are two claims about who the
+ * position belongs to, not two positions: each bucket keeps its own largest row,
+ * and the position is the largest row of all. `ownHeldWeight` is then clamped by
+ * `heldWeight` exactly as it was before, so mixed attribution can never make the
+ * parts add to more than the whole. Nothing about #814/#817/#819–#823 changes —
+ * those rules read `heldByStrategy`, and what moved is how a bucket is filled.
+ *
  * ⚠️ Callers must have established `bookIsReadable(book)` first. The defaults
  * below exist so the fold cannot throw, not so an unread book can be sized
  * against.
@@ -192,6 +216,8 @@ export function bookIsReadable(book) {
 export function concentration(book, symbol, strategyId = STRATEGY_ID) {
   const holdings = Array.isArray(book?.holdings) ? book.holdings : []
   const proposals = Array.isArray(book?.openProposals) ? book.openProposals : []
+  const diagnostics = []
+  const duplicated = []
 
   /**
    * One row per name the fund is exposed to: what is held, and the largest total
@@ -200,15 +226,29 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
   const byName = new Map()
   const nameOf = (row) => (typeof row?.symbol === 'string' ? row.symbol : 'unnamed')
   for (const row of holdings) {
-    const entry = byName.get(nameOf(row)) ?? { held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {} }
+    const name = nameOf(row)
+    const seen = byName.get(name)
+    const entry = seen ?? { held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {}, rows: 0 }
     const weight = finite(row?.weight) ? row.weight : 0
     const owner = row?.strategy ?? 'unattributed'
-    entry.held = round(entry.held + weight)
-    entry.heldByStrategy[owner] = round((entry.heldByStrategy[owner] ?? 0) + weight)
-    byName.set(nameOf(row), entry)
+    entry.rows += 1
+    if (entry.rows > 1 && !duplicated.includes(name)) duplicated.push(name)
+    /** One name, one quantity — the largest row, never the sum of them. */
+    entry.held = round(Math.max(entry.held, weight))
+    entry.heldByStrategy[owner] = round(Math.max(entry.heldByStrategy[owner] ?? 0, weight))
+    byName.set(name, entry)
+  }
+  if (duplicated.length > 0) {
+    diagnostics.push(diagnostic(
+      'duplicate_holding_rows',
+      'info',
+      `${duplicated.join(', ')} arrived as more than one holding row. A position is one quantity however many theses are attached to it, so the largest row is counted on each attribution and the rest are not added to it`,
+      'book.holdings',
+      { symbols: [...duplicated] },
+    ))
   }
   for (const row of proposals) {
-    const entry = byName.get(nameOf(row)) ?? { held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {} }
+    const entry = byName.get(nameOf(row)) ?? { held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {}, rows: 0 }
     const target = finite(row?.targetWeight) ? row.targetWeight : 0
     const owner = row?.strategy ?? 'unattributed'
     entry.pendingPeak = Math.max(entry.pendingPeak, target)
@@ -217,7 +257,7 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
   }
   const exposureOf = (entry) => round(Math.max(entry?.held ?? 0, entry?.pendingPeak ?? 0))
 
-  const entry = byName.get(symbol) ?? { held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {} }
+  const entry = byName.get(symbol) ?? { held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {}, rows: 0 }
   const heldWeight = round(entry.held)
   const existingWeight = exposureOf(entry)
   /** What the open proposals still require on top of the holding. Never negative. */
@@ -301,6 +341,8 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
      * Same split as `otherHeldWeight`, one axis wider.
      */
     grossOtherHeld: round(Math.max(0, grossHeld - ownHeldWeight)),
+    /** ⚠️ `info` only. A duplicated row is a shape to report, never a reason to refuse. */
+    diagnostics,
   }
 }
 
@@ -317,6 +359,12 @@ export function concentration(book, symbol, strategyId = STRATEGY_ID) {
  * the weight it asks a position to become, so a name held at 6% under a pending
  * total of 12% is 12% of this sector and not 18% of it. Adding the two here as
  * well as in `concentration` is the same overstatement twice.
+ *
+ * ⚠️ **And duplicate holding rows fold by `max` here too (#256).** The same
+ * sentence one axis up: a name that arrives twice is one position, so a sector
+ * total that added both rows was over by whichever row was smaller. The
+ * `duplicate_holding_rows` diagnostic is raised by `concentration`, which sees
+ * the same book; this function folds and does not say it twice.
  */
 export function sectorConcentration(book, sector, symbol, strategyId = STRATEGY_ID) {
   const holdings = Array.isArray(book?.holdings) ? book.holdings : []
@@ -331,8 +379,8 @@ export function sectorConcentration(book, sector, symbol, strategyId = STRATEGY_
     const entry = entryFor(typeof row?.symbol === 'string' ? row.symbol : 'unnamed')
     const weight = finite(row?.weight) ? row.weight : 0
     if (entry.sector === null && typeof row?.sector === 'string' && row.sector.length > 0) entry.sector = row.sector
-    entry.held = round(entry.held + weight)
-    if ((row?.strategy ?? 'unattributed') === strategyId) entry.ownHeld = round(entry.ownHeld + weight)
+    entry.held = round(Math.max(entry.held, weight))
+    if ((row?.strategy ?? 'unattributed') === strategyId) entry.ownHeld = round(Math.max(entry.ownHeld, weight))
   }
   for (const row of proposals) {
     const entry = entryFor(typeof row?.symbol === 'string' ? row.symbol : 'unnamed')
@@ -498,6 +546,8 @@ export function positionSizing(input = {}) {
   }
 
   const exposure = concentration(book, symbol, strategyId)
+  /** ⚠️ The duplicate-row finding travels with the answer; it never refuses one. */
+  diagnostics.push(...exposure.diagnostics)
   /**
    * ── The Mandate, under the host's names as well as this package's (#838) ──
    *

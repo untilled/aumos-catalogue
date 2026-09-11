@@ -252,6 +252,14 @@ The entry itself is a plan, not an order:
 - and the ledger, which `stagedPlan` keeps. **A re-run that finds the same conditions still
   true does not add again** — the ledger says the stage is filled and the call is refused.
 
+⛔ **Pass the ledger, always.** `plan.filled` is read in three states: `[]` and `null` both say
+*«the ledger was read and holds nothing»* — a plan opens that way — and **anything else, an
+absent field included, is nobody having read it**. A plan with no `filled` used to fire the rung
+that was already committed, which is the one thing this ledger exists to stop, so it is now
+refused with `data_missing` and nothing is added. Read the plan from your private folder and
+write back the `plan` the answer returns **verbatim**; on a refusal it comes back unchanged, so
+following that instruction can never erase your record.
+
 ⛔ **No stage fires on a price level or an elapsed period alone.** Adding because the price
 fell further is averaging into a thesis that is losing, and it is refused by name. A stage
 needs the thesis and the stabilisation to still hold, plus room in the loss budget.
@@ -307,6 +315,13 @@ open proposals in, which is right for a ceiling — a limit has to hold in every
 passes through — and wrong for an order, because an unfilled proposal is not a position. Adding
 one would have you buy another manager's unapproved judgement for them.
 `exposure.otherHeldWeight` is the holdings-only figure and is the one in the formula.
+
+⚠️ **One name is one position, however many theses point at it.** Two holding rows for one
+symbol are a restatement of the same quantity — the host merges the rows of an asset into one
+position before you see them — so the **largest** row is counted and the rest are not added to
+it. `duplicate_holding_rows` says when that happened. If the two rows disagree about whose the
+position is, each assignment keeps its own largest row and the position is the largest row of
+all, so what is yours plus what is not is the position and never more than it.
 
 ⚠️ **Unattributed lands in `otherHeldWeight`, and that is not a rare corner.** It is every
 holding bought by hand in a broker app and every position whose approval did not name a manager

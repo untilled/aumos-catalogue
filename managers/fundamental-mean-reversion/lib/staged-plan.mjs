@@ -22,6 +22,34 @@
  * and executions; this ledger owns *what this manager has already proposed under
  * this plan*, which is instance-private aggregate state and the only part of the
  * story the host does not already hold.
+ *
+ * ── `plan.filled` has three states, and two of them used to be one ─────────
+ *
+ * ⛔ **A ledger nobody read is not a ledger holding nothing.** `filled` was read
+ * as `Array.isArray(plan?.filled) ? plan.filled : []`, so a plan that arrived
+ * without the field — a hand-built object, a memory read that failed, a write
+ * that dropped it — said «no stage has been filled yet», which is the most
+ * permissive of all the states this module can be in. The stage that was already
+ * committed then fired again, `ok`, and the double add the whole file exists to
+ * refuse went out as a BUY. So the field is read in three states:
+ *
+ *   `[]`        read, and it holds nothing. A plan opens this way.
+ *   `null`      read, and it holds nothing — the same positive statement, spelled
+ *               the way `catalyst-turnaround`'s staged register spells it
+ *               (`lib/staging.mjs`, `previous === null`). Two sibling packages
+ *               under #256 answer «the memory was read and was empty» with the
+ *               same token.
+ *   otherwise   **nobody read it**: the field is absent, or it arrived as
+ *               something that is not a list of rungs. `committedWeight` is
+ *               `null` rather than `0`, and every stage is refused with
+ *               `data_missing` — increment 0, no BUY, and the plan handed back
+ *               unchanged.
+ *
+ * ⚠️ **`PROMPT.md` and `skills/fmr-staged-entry` say to write the returned plan
+ * back verbatim**, so a ledger that has been through one run always carries an
+ * array. Pass `filled: []` (or `null`) on the first run to say so out loud; a
+ * plan with no `filled` at all is a plan whose fill history this run has not
+ * seen, and adding on an unknown fill history is the one thing #256 forbids.
  */
 import { diagnostic, finite, round } from './core.mjs'
 
@@ -35,12 +63,26 @@ export const CONDITION_KINDS = Object.freeze({
   'target-reached': true,
 })
 
+/**
+ * The ledger in its three states — read-and-empty, read-and-holding, unread.
+ *
+ * ⛔ Returning `{ read: false }` rather than an empty list is the whole of the
+ * fix: every caller below has to say what it does with «unknown», and none of
+ * them may quietly spell it `0`.
+ */
+export function readLedger(filled) {
+  if (filled === null) return { read: true, rows: [] }
+  if (Array.isArray(filled)) return { read: true, rows: filled }
+  return { read: false, rows: [] }
+}
+
 /** What the plan has already committed, and what is left of its cumulative target. */
 export function stagedPlanState(plan, asOf) {
   const stages = Array.isArray(plan?.stages) ? plan.stages : []
-  const filled = Array.isArray(plan?.filled) ? plan.filled : []
-  const filledIds = new Set(filled.map((row) => row.stageId))
-  const committedWeight = round(filled.reduce((total, row) => total + (finite(row.weight) ? row.weight : 0), 0))
+  const ledger = readLedger(plan?.filled)
+  const filledIds = new Set(ledger.rows.map((row) => row.stageId))
+  /** ⛔ `null`, not `0`. A total nobody could form is not a total of nothing. */
+  const committedWeight = ledger.read ? round(ledger.rows.reduce((total, row) => total + (finite(row.weight) ? row.weight : 0), 0)) : null
   const expiresAt = Date.parse(plan?.expiresAt)
   const now = Date.parse(asOf)
   return {
@@ -48,11 +90,13 @@ export function stagedPlanState(plan, asOf) {
     decisionId: plan?.decisionId ?? null,
     symbol: plan?.symbol ?? null,
     plannedTotalWeight: plan?.plannedTotalWeight ?? null,
-    stages: stages.map((stage) => ({ ...stage, filled: filledIds.has(stage.stageId) })),
+    /** Whether `plan.filled` was a ledger at all. Everything below is `null` when it was not. */
+    ledgerRead: ledger.read,
+    stages: stages.map((stage) => ({ ...stage, filled: ledger.read ? filledIds.has(stage.stageId) : null })),
     committedWeight,
-    remainingWeight: finite(plan?.plannedTotalWeight) ? round(plan.plannedTotalWeight - committedWeight) : null,
+    remainingWeight: ledger.read && finite(plan?.plannedTotalWeight) ? round(plan.plannedTotalWeight - committedWeight) : null,
     expired: Number.isFinite(expiresAt) && Number.isFinite(now) ? now > expiresAt : null,
-    nextStage: stages.find((stage) => !filledIds.has(stage.stageId))?.stageId ?? null,
+    nextStage: ledger.read ? stages.find((stage) => !filledIds.has(stage.stageId))?.stageId ?? null : null,
   }
 }
 
@@ -78,6 +122,29 @@ export function applyStage(input = {}) {
   const refuse = (code, message, path, details) => {
     diagnostics.push(diagnostic(code, 'blocked', message, path, details))
     return { status: 'refused', code, plan, state, diagnostics }
+  }
+  /**
+   * A refusal whose *diagnosis* is `data_missing` while the diagnostic still
+   * names which fact was missing — the shape `positionSizing` already uses.
+   */
+  const refuseMissing = (diagnosticCode, message, path, details) => {
+    diagnostics.push(diagnostic(diagnosticCode, 'blocked', message, path, details))
+    return { status: 'refused', code: 'data_missing', plan, state, diagnostics }
+  }
+
+  /**
+   * ⛔ **Before anything else: was the ledger read?** Every refusal under this
+   * one is a judgement about *which* rungs are filled, and none of them can be
+   * made from a fill history nobody has seen. Absence is not an empty ledger —
+   * it is the state in which the second good stage fires.
+   */
+  if (!state.ledgerRead) {
+    return refuseMissing(
+      'staged_ledger_unread',
+      'The plan\'s fill history could not be read, so which rungs have already been committed is unknown. Pass `filled: []` (or null) to say the ledger was read and holds nothing; firing a stage on an unknown fill history is the double add this module exists to refuse',
+      'plan.filled',
+      { filled: plan?.filled ?? null, filledType: plan?.filled === undefined ? 'absent' : typeof plan?.filled },
+    )
   }
 
   const stage = (Array.isArray(plan?.stages) ? plan.stages : []).find((row) => row.stageId === stageId)
@@ -178,7 +245,8 @@ export function applyStage(input = {}) {
 
   const nextPlan = {
     ...plan,
-    filled: [...(Array.isArray(plan?.filled) ? plan.filled : []), { stageId, kind, weight: stage.weight ?? null, filledAt: asOf, satisfied: satisfiedKinds }],
+    /** ⚠️ Safe by construction: an unread ledger was refused above, so this is the read one. */
+    filled: [...readLedger(plan?.filled).rows, { stageId, kind, weight: stage.weight ?? null, filledAt: asOf, satisfied: satisfiedKinds }],
   }
   return { status: 'ok', code: null, stageId, kind, plan: nextPlan, state: stagedPlanState(nextPlan, asOf), diagnostics }
 }
