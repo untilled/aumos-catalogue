@@ -142,6 +142,14 @@ put on the wire to end.
 of one name is not 36% of it. Compute the whole-account exposure for the name and take the smaller
 of the account's limit and yours. A held name carrying two theses is still one position.
 
+⛔ **And that sentence is arithmetic, not a figure of speech.** If a name arrives as **two position
+rows**, they are a restatement of one quantity — the host merges the rows of an asset into one
+position before you see them — so the **largest** row is counted and the rest are not added to it.
+`duplicate_position_rows` says when that happened. Where the two rows disagree about whose the
+position is, each assignment keeps its own largest row and the position is the largest row of all,
+so what is yours plus what is not is the position and never more than it. The ceiling still binds
+on the folded number: two rows of 24% and 9% are a 24% position and still a breach.
+
 ## Stage 1 — The book you already have, before anything new
 
 **A held position is reviewed before a new one is looked for.** Every open catalyst in the register
