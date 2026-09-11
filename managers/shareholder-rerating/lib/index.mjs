@@ -251,7 +251,17 @@ export function evaluateCase(input = {}) {
 
   const mandate = input.mandate ?? {}
   const book = input.book
-  const account = { holdings: book.holdings, openProposals: book.openProposals, caps: mandate.caps, strategy: input.strategy }
+  /**
+   * ── The Mandate travels with the caps (`untilled/aumos#838`) ──────────────
+   *
+   * ⚠️ **`maxPositionWeight` and `cashFloor` are the account's two declared
+   * ceilings and this package reads neither under those names.** Handing the
+   * Mandate down beside `caps` is what lets `mandate.mjs` fill them in where the
+   * caller stated none — a run given the Mandate exactly as it arrives used to
+   * report `position_cap_not_stated` and wait. ⛔ `mandate.caps` still wins
+   * wherever it states something.
+   */
+  const account = { holdings: book.holdings, openProposals: book.openProposals, caps: { mandate, ...(mandate.caps ?? {}) }, strategy: input.strategy }
 
   /**
    * Pass one asks what the account permits this name to **be** — nothing is proposed
@@ -275,6 +285,7 @@ export function evaluateCase(input = {}) {
     riskBudgetWeight: mandate.riskBudgetWeight,
     lossFraction: loss.data.lossFraction,
     mandatePositionCap: mandate.mandatePositionCap,
+    mandate,
     accountNameLimit: exposure.data.maxTotalWeightForName ?? undefined,
     /** ⚠️ #833: the ceilings that name *this position*, which is what a sale is sized by. */
     accountNameLimitForReduction: exposure.data.reductionNameLimit ?? undefined,

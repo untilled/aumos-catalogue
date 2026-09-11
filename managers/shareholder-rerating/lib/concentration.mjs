@@ -73,6 +73,7 @@
  * package's and are not here.
  */
 
+import { capsWithMandate } from './mandate.mjs'
 import { diagnostic, finite, round } from './numbers.mjs'
 import { THRESHOLDS } from './thresholds.mjs'
 
@@ -127,13 +128,24 @@ export function heldAttribution(input = {}) {
  * @param {Array} input.openProposals  unapproved proposals: `{ symbol, sector, targetWeight, strategy, decisionId }` — required.
  *   ⚠️ `targetWeight` is the host's field and the host's meaning: the **total** weight that proposal asks
  *   this position to become, never an amount to add to what is held (#813)
- * @param {object} [input.caps]        `{ accountPositionCap, strategyPositionCap, accountSectorCap, accountGrossCap }`
+ * @param {object} [input.caps]        `{ accountPositionCap, strategyPositionCap, accountSectorCap, accountGrossCap }`, or `{ mandate }` carrying the invocation's Mandate (#838)
  * @param {string} [input.strategy]    this package's instance id, for the overlap message
  */
 export function concentration(input = {}) {
   const diagnostics = []
   const proposed = input.proposed ?? {}
-  const caps = input.caps ?? {}
+  /**
+   * ── The Mandate, under the host's names (`untilled/aumos#838`) ────────────
+   *
+   * ⚠️ `caps.mandate` is the invocation's Mandate verbatim and `mandate.mjs`
+   * translates it: `maxPositionWeight` is `accountPositionCap`, and the
+   * complement of `cashFloor` is `accountGrossCap` — the same statement the
+   * investor made, read off the field that carries it. Until #838 neither
+   * arrived under any name this file knows, so a run handed the Mandate as it
+   * comes reported `position_cap_not_stated` and every judgement over it waited.
+   * ⛔ A cap the caller states itself always wins.
+   */
+  const caps = capsWithMandate(input.caps ?? {})
   const symbol = proposed.symbol
   const sector = typeof proposed.sector === 'string' && proposed.sector.length > 0 ? proposed.sector : null
 

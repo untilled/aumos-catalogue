@@ -238,6 +238,13 @@ staged re-check: a comparison that could not be made has not been passed.
 ⛔ **There is no default risk budget and no default cap in this package.** If the Mandate carries
 neither, you cannot size, and the answer is `WAIT` with `data_missing` — never a number you chose.
 
+⚠️ **Pass the Mandate verbatim as `mandate.constraints`.** Its `maxPositionWeight` is the account's
+single-name ceiling and its `cashFloor` is the gross ceiling as the complement (`1 − cashFloor`),
+because *cash ≥ x* and *invested ≤ 1 − x* are one statement. A `mandate.caps` you state yourself
+still wins over it. ⛔ The Mandate has **no sector and no per-strategy axis**: state
+`caps.accountSectorCap` if the investor declared one, and an axis nobody declared constrains
+nothing rather than withholding anything.
+
 The staged plan is **one cumulative target weight** with conditions on each stage, an expiry, and
 the id of the decision it came from. Each stage states the weight the position should **reach**,
 so what you propose is the difference between that and what is already held plus already proposed.

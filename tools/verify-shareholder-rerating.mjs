@@ -1562,4 +1562,162 @@ const byId = (id) => {
   ok('#833 — `concentration` and `targetWeight` publish both folds, and an absent reduction limit is the same fold twice')
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The Mandate the host actually sends (`untilled/aumos#838`)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * ⛔ **Every cap in `fixtures/cases.json` was written by hand, and that is what
+ * let this defect live through twelve orders of work.** They state
+ * `mandate.mandatePositionCap` and `mandate.caps.*` because that is what this
+ * package calls them — so every assertion passed while a run handed the
+ * *investor's* Mandate answered WAIT: `position_cap_not_stated` left
+ * `withinLimits` at `null`, and `null` is not permission.
+ *
+ * The host's `mandate.constraints` is a closed set of eight fields, built here
+ * in full from `packages/amp/src/snapshots.ts`. Two of them are ceilings this
+ * package knows: `maxPositionWeight` is `accountPositionCap`, and the complement
+ * of `cashFloor` is `accountGrossCap`. No sector and no per-strategy axis exists
+ * in that contract at all.
+ *
+ * ⚠️ **The fixtures on disk are not touched** — every case below is a deep copy.
+ */
+{
+  const HOST_CONSTRAINTS = Object.freeze({
+    baseCurrency: 'KRW',
+    allowedAssetClasses: ['equity', 'etf', 'crypto', 'cash'],
+    maxPositionWeight: 0.1,
+    cashFloor: 0.1,
+    maxDrawdown: 0.06,
+    allowShorting: true,
+    allowLeverage: true,
+    excludedSymbols: [],
+  })
+  const hostMandate = (overrides = {}) => ({
+    mandateId: 'mdt_838',
+    version: 3,
+    label: 'Untilled',
+    objective: 'Compound the book without a drawdown that ends it',
+    horizonDays: 365,
+    constraints: { ...HOST_CONSTRAINTS, ...overrides },
+  })
+  const hostMandateWithout = (...fields) => {
+    const mandate = hostMandate()
+    for (const field of fields) delete mandate.constraints[field]
+    return mandate
+  }
+  const buyPath = (() => {
+    const fixture = cases.cases.find((row) => row.id === 'financial-positive-reaches-buy')
+    assert.ok(fixture, 'cases.json no longer carries the sized BUY case, so these regressions test nothing')
+    return fixture.input
+  })()
+  /** The same case with every hand-written ceiling stripped out and the Mandate in their place. */
+  const underMandate = (mandate, mutate = () => {}) => {
+    const input = structuredClone(buyPath)
+    delete input.mandate.mandatePositionCap
+    delete input.mandate.caps
+    if (mandate !== null) input.mandate.constraints = mandate.constraints ?? mandate
+    mutate(input)
+    return evaluateCase(input)
+  }
+
+  const control = evaluateCase(structuredClone(buyPath))
+  assert.equal(control.data.proposedAction, 'BUY', 'the positive control no longer buys, so the checks below test nothing')
+
+  const verbatim = underMandate(hostMandate())
+  assert.equal(verbatim.data.proposedAction, 'BUY', 'a Mandate carrying both ceilings still waited')
+  assert.ok(verbatim.data.targetTotalWeight > 0, 'and produced no weight')
+  assert.ok(
+    !codesOf(verbatim.diagnostics).includes('position_cap_not_stated'),
+    'the concentration limit the investor stated was reported as unstated',
+  )
+  ok('#838 — the Mandate as the host sends it sizes, under the names this package uses')
+
+  /**
+   * ⚠️ **The investor's number has to *bind*.** The risk budget sizes this case
+   * at 0.05333333, so a 0.02 concentration answer that was read and not applied
+   * leaves that standing.
+   */
+  const tight = underMandate(hostMandate({ maxPositionWeight: 0.02 }))
+  assert.equal(tight.data.targetTotalWeight, 0.02, "`maxPositionWeight` did not bind the single-name axis")
+  assert.ok(tight.data.targetTotalWeight < verbatim.data.targetTotalWeight)
+  ok('#838 — `maxPositionWeight` is the single-name ceiling and it binds')
+
+  /**
+   * ⚠️ **A 0.2 cash floor is a 0.8 gross ceiling.** With 0.78 of the book held
+   * elsewhere the gross axis is what is left, and `gross_cap_not_stated` — the
+   * note that says this Mandate declared none — must be gone.
+   */
+  const crowded = underMandate(hostMandate({ cashFloor: 0.2 }), (input) => {
+    input.book = { holdings: [{ symbol: 'OTHER', sector: 'industrials', weight: 0.78 }], openProposals: [] }
+  })
+  assert.ok(
+    !codesOf(crowded.diagnostics).includes('gross_cap_not_stated'),
+    'a declared cash floor was still reported as no gross ceiling at all',
+  )
+  assert.equal(crowded.data.maxTotalWeightBinding, 'accountGrossCap', "the investor's cash floor is what bound the name")
+  /**
+   * ⚠️ **The number, not just the axis name.** A 0.2 floor read *as* the ceiling
+   * rather than as its complement still reports `accountGrossCap` and is still
+   * wrong by 0.6 of the book; only the weight it leaves says which was read.
+   */
+  assert.equal(crowded.data.targetTotalWeight, 0.02, '0.8 invested less the 0.78 held elsewhere is what the floor leaves')
+  assert.equal(crowded.data.projectedGrossExposure, 0.8, 'and the book lands exactly on the ceiling the floor implies')
+  ok('#838 — `cashFloor` is the gross ceiling, as its complement, and it binds')
+
+  /**
+   * ⛔ **Declared-none is not unread, and this package already said so for the
+   * gross axis.** An investor who left the cash question blank has declined to
+   * constrain that axis; one who left the concentration question blank has not
+   * authorised a run to choose its own limit, and that stays a WAIT.
+   */
+  const noFloor = underMandate(hostMandateWithout('cashFloor'))
+  assert.equal(noFloor.data.proposedAction, 'BUY', 'a blank cash answer stopped this run from sizing')
+  assert.ok(codesOf(noFloor.diagnostics).includes('gross_cap_not_stated'), 'and the declined axis has to say so')
+
+  const noCap = underMandate(hostMandateWithout('maxPositionWeight'))
+  assert.equal(noCap.data.proposedAction, 'WAIT', 'a Mandate stating no concentration limit sized a position anyway')
+  assert.ok(codesOf(noCap.diagnostics).includes('position_cap_not_stated'))
+
+  const noMandate = underMandate(null)
+  assert.equal(noMandate.data.proposedAction, 'WAIT', 'an unread Mandate sized a position anyway')
+  assert.ok(codesOf(noMandate.diagnostics).includes('position_cap_not_stated'))
+  ok('#838 — a blank cash answer constrains nothing; a blank concentration answer and no Mandate at all still wait')
+
+  /**
+   * ⛔ **The differential this whole change is held to.** Every case that states
+   * its ceilings is byte-for-byte what it was, whatever Mandate rides alongside
+   * — including one whose numbers are different ones.
+   */
+  for (const [what, mandate, complete] of [
+    /**
+     * ⚠️ **Both axes stated, so there is nothing left for a Mandate to fill.**
+     * `cases.json` states `accountPositionCap` and leaves the gross axis to the
+     * `gross_cap_not_stated` note, and filling *that* is the fix rather than a
+     * regression — so this half completes the caps first and then asserts that
+     * a Mandate saying something else moves nothing.
+     */
+    ['the host snapshot', hostMandate({ maxPositionWeight: 0.9, cashFloor: 0.5 }), true],
+    ['a Mandate declaring neither', hostMandateWithout('maxPositionWeight', 'cashFloor'), false],
+  ]) {
+    for (const fixture of cases.cases) {
+      const withCaps = (input) => {
+        if (!complete) return input
+        input.mandate = { mandatePositionCap: 0.08, ...(input.mandate ?? {}) }
+        input.mandate.caps = { accountPositionCap: 0.1, accountGrossCap: 0.95, ...(input.mandate.caps ?? {}) }
+        return input
+      }
+      const stated = evaluateCase(withCaps(structuredClone(fixture.input)))
+      const beside = withCaps(structuredClone(fixture.input))
+      beside.mandate = { ...(beside.mandate ?? {}), constraints: mandate.constraints }
+      const alongside = evaluateCase(beside)
+      assert.equal(
+        JSON.stringify(alongside),
+        JSON.stringify(stated),
+        `${what}: ${fixture.id} moved when a Mandate was passed beside its stated caps`,
+      )
+    }
+  }
+  ok('#838 — a stated cap wins, so a Mandate riding alongside changes nothing at all')
+}
+
 console.log(`\nshareholder-rerating ok — ${checked} check(s)`)

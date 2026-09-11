@@ -29,6 +29,7 @@
  * here would be a position the investor never approved the size of.
  */
 
+import { mandateCeilings } from './mandate.mjs'
 import { diagnostic, finite, isBlocked, round } from './numbers.mjs'
 
 /**
@@ -118,13 +119,25 @@ export function lossToInvalidation(input = {}) {
  * @param {object} input
  * @param {number} input.riskBudgetWeight        the Mandate's loss budget for this idea, as a share of the book
  * @param {number} input.lossFraction            from `lossToInvalidation`
- * @param {number} input.mandatePositionCap      the Mandate's single-name ceiling
+ * @param {number} [input.mandatePositionCap] the Mandate's single-name ceiling
+ * @param {object} [input.mandate]           the invocation's Mandate, read where the cap above is not stated (#838)
  * @param {number} input.accountNameLimit        `maxTotalWeightForName` from `concentration` — every account axis, folded
  * @param {number} [input.accountNameLimitForReduction] `reductionNameLimit` from `concentration` — the axes that name
  *   *this position*, without the account's leftover room after other names (#833). Absent means the same fold twice
  * @param {number} input.minimumExecutableWeight the smallest position this venue can express
  */
 export function targetWeight(input = {}) {
+  /**
+   * ── The Mandate, under the host's names (`untilled/aumos#838`) ────────────
+   *
+   * ⚠️ `input.mandate` is the invocation's Mandate verbatim; `maxPositionWeight`
+   * is what this file calls `mandatePositionCap`. ⛔ Stated wins: a caller that
+   * names the cap gets its own number, and one that passes no Mandate is
+   * unchanged.
+   */
+  const mandatePositionCap = finite(input.mandatePositionCap)
+    ? input.mandatePositionCap
+    : mandateCeilings(input.mandate).accountPositionCap
   const diagnostics = []
   const { riskBudgetWeight, lossFraction } = input
 
@@ -148,7 +161,7 @@ export function targetWeight(input = {}) {
       ),
     )
   }
-  if (!finite(input.mandatePositionCap)) {
+  if (!finite(mandatePositionCap)) {
     diagnostics.push(
       diagnostic(
         'position_cap_not_stated',
@@ -192,7 +205,7 @@ export function targetWeight(input = {}) {
    */
   const capsAgainst = (accountLimit) =>
     [
-      ['mandatePositionCap', input.mandatePositionCap],
+      ['mandatePositionCap', mandatePositionCap],
       ['accountNameLimit', accountLimit],
     ].filter(([, value]) => finite(value))
   const foldCaps = (rows) =>
