@@ -241,8 +241,11 @@ book, carries no sector — no entry is opened and no stage fires**, and the ans
 could not classify and records it as missing data. Undeclared, the axis simply does not apply.
 Reviewing, trimming, re-adjudicating and exiting a position you already hold are untouched.
 
-**Known limits at first publication.** Duplicate-exposure attribution across several managers
-on one book, the storage of a proposal, the re-arming of a review and the link from a decision
+**Known limits.** The storage of a proposal, the re-arming of a review and the link from a decision
 to a real fill are all the host's, and none of them is exercised by this repository's checks.
-Until they have been verified on a running Aumos, running this alongside another manager that
-can hold the same name is best done on a separate fund.
+
+Duplicate-exposure attribution across several managers on one book was on that list and is not any
+more: untilled/aumos#789 verified it against a running kernel, and this package is now told both what
+every other manager has proposed and who each position belongs to. **You may run this alongside
+another manager that can hold the same name, on one fund.** What is still unmeasured anywhere is a
+live vendor session and a live broker fill.

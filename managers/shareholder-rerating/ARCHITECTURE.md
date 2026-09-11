@@ -565,5 +565,13 @@ follow-up owns that question, and this table is its inventory.
 
 The host-side half. Nothing in this repository can run an Aumos session, so proposal storage, WATCH
 re-arming, the link from a decision to an actual fill, and how the host attributes a position held
-under several theses are unverified by these checks. #256 requires that verification before this is
-run beside another manager on one funded book; until it exists, run it on a separate fund.
+under several theses are unverified *by these checks*.
+
+They were verified elsewhere. untilled/aumos#789 fed this package's real `lib` from the host's real
+kernel — sealing, position assignment, reservations, execution locks — and ran the resulting target
+weights back through the host to a venue, fifteen times. The host hands every manager's open
+proposals and the assignment of every position, and this package's exposure arithmetic is correct on
+top of them. **This may be run beside another manager on one funded book.**
+
+What those runs could not reach is a vendor CLI and a live broker: no measurement here or there
+exercises a real session or a real fill. The forward record is still the thing nobody has.

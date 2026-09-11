@@ -590,6 +590,10 @@ These are #256's host-integration criteria and every one of them needs a running
   package requires and refuses without;
 - benchmark comparison against a Korean equity index over the same holding period.
 
-Until the third of those is verified, running this package alongside another that can hold the
-same name is best done on a separate fund. That is stated on the README too, because it is a
-limit an investor is affected by rather than only a maintainer.
+The third of those is verified. untilled/aumos#789 ran this package's real `lib` on inputs built by
+the host's real kernel and pushed the answers back through it to a venue: the host reports every
+manager's open proposals with their target weights and every position with its assignment, and
+`positionSizing` counts them correctly on the inputs it is actually handed — which is the claim this
+list separated out. **Running this alongside another manager that can hold the same name no longer
+requires a fund of its own**, and the README says so too, because it is a limit an investor is
+affected by rather than only a maintainer. The rest of this list is untouched.
