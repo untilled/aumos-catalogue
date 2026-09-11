@@ -340,7 +340,16 @@ export function evaluateCase(input = {}) {
   if (!reduces) {
     if (!finite(entryTarget)) {
       const unexecutable = sized.diagnostics.some((row) => row.code === 'minimum_executable_not_met')
-      return wait(base, diagnostics, unexecutable ? 'position_not_executable' : 'data_missing')
+      /**
+       * ⚠️ **An invalidation price that arrived and is unusable is not an absence** (#254,
+       * #271 ③.5). `invalidation_price_missing` is `data_missing` — nothing to divide by.
+       * `invalidation_above_entry` and `invalidation_price_not_positive` are a level
+       * somebody wrote and nobody can trade at, and the work of writing the real one is
+       * this run's: `research_incomplete`, so the next run resumes at that section
+       * instead of waiting for a field that will never arrive.
+       */
+      const invalidationUnusable = loss.diagnostics.some((row) => row.severity === 'blocked')
+      return wait(base, diagnostics, unexecutable ? 'position_not_executable' : invalidationUnusable ? 'research_incomplete' : 'data_missing')
     }
     if (entryTarget <= 0) {
       return wait(base, diagnostics, 'risk_limit_exceeded')

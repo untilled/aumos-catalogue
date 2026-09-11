@@ -628,8 +628,50 @@ no network, no test framework — there is none in this repository and this pack
 | `scoreboard.json` | a failed catalyst under a positive price return still scoring zero on the catalyst side; an open window staying out of the denominator; a combined return being refused |
 | the absent-input regressions (in `tools/verify-catalyst-turnaround.mjs`, not a fixture file) | one declared input removed from a run that passes, twelve times over, asserting the run refuses rather than proceeds — and that none of them reports a refutation. They are in-memory mutations precisely so the positive fixtures keep passing for the reasons they already passed |
 | `reference-case.json` | the reference case classifying as a policy-and-financial turnaround at three points in its own story, never excluded on a valuation multiple, with the four channels kept apart — **and** a variant with the same classification that does not reach a purchase |
+| `reference-replay.json` | the same case replayed on the investor's own as-of material, with everything dated later listed as excluded: the classification it actually reaches, the intent it actually reaches, and that neither the replay nor its contamination control files a refutation. See below |
 
-⛔ **Every figure in `fixtures/` is illustrative.** None of it is a re-audited historical record, a
+### Reference case replay
+
+`fixtures/reference-replay.json` is the one file in `fixtures/` that is **not** illustrative, and it
+answers #256's «과거 세 사례는 당시 시점 자료만으로 분류·논거 복원이 되는지 확인한다». The case is
+**한국가스공사 (036460)** and the sources are the investor's own private record at commit `1fa18c5`:
+`theses/036460_KOGAS.md` **as it stood at commit `1439625`**, `data/history/036460.jsonl` for the
+close, and `data/fundamentals/036460.json` for the filing dates the indicator observations are
+published on. Each field carries its own source pointer. No balances, order ids or account values
+were taken.
+
+⚠️ **The decision date is 2026-07-08, not 2026-05-25.** The two 2026-05-25 plans in that record name
+우리금융지주 / KODEX 리츠인프라 / KT and do not mention this issuer; `data/decisions.jsonl` gives
+`2026-07-08:A1:036460` and the thesis says `Opened: 2026-07-08`. Replaying at the earlier date would
+have excluded the entire case over a wrong date.
+
+**What was excluded, and why.** Every Review Log row from 2026-07-09 onward — the challenge
+cross-check, the 7/13 tariff freeze, the Q1'26 operating beat, the 13.9조 / 13.37조 receivable
+figures, the new chief executive, the oil-price reversal — as `future_information`; and the
+restructured Downside / Valuation sections that only exist in later commits of the same file, as
+`post_hoc_revision`. Marked `data_missing`: `liquidAssets`, `monthlyCashBurn`,
+`debtMaturingWithinYear`, `securedRefinancing`, `conviction`, and any single-name account cap. The
+record's 비코어 상한 28% is a category ceiling and was **not** substituted for a single-name one.
+
+**Observed outcome.** `research-candidate` → intent **`research-watch`**, review
+`earnings-path-untraced`, causes `data_missing` and `research_incomplete`, and
+`excludedByValuationMultiple: false` on a P/E of 23. The as-of record asserts a receivable drawdown
+and an analyst target; it cites no filing stating a billed unit price that carries the revision into
+this issuer's own revenue — which is exactly the ⑴/⑵ pair `lib/classify.mjs` exists to separate.
+`replayEligibility` is **`eligible`**.
+
+The contamination control puts the excluded material back — the traced path the later revision
+asserts, plus survivability numbers no as-of source carries. The classification becomes
+`policy-financial-turnaround` and the intent **stays** `research-watch` (`recovery-not-yet-a-path`:
+one improving channel is below the channel floor). Neither variant reports a refutation, which is
+#254 checked from the side it usually is not.
+
+⛔ **The outcome above was not tuned.** No threshold in `lib/constants.mjs` was touched for this
+fixture, and what is recorded is what `runVerdict` returned on the first run. The investor's reported
+~10% result is **not** re-audited here or anywhere in this package; #256 is explicit that it was never
+audited and is not a validated edge.
+
+⛔ **Every other figure in `fixtures/` is illustrative.** None of it is a re-audited historical record, a
 transcription from the upstream repository, or a backtest. #256 is explicit that the upstream author's
 reported result was never re-audited and is not a validated edge; no threshold in `constants.mjs` was
 chosen against it.
