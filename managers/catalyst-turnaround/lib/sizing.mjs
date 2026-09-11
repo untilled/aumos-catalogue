@@ -381,8 +381,32 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
    * somebody else's — the axis where «how much of this is mine» belongs. That
    * changes what is left for this strategy; it does not change what the name
    * totals.
+   *
+   * ── And the **held** axis folds by `max` too, for a different reason (#256) ─
+   *
+   * ⛔ **Two position rows for one symbol used to be added.** A 15% row assigned
+   * to another desk beside a 9% row assigned here read as a 24% position, over a
+   * 20% account ceiling, and the answer was a `breach` with a
+   * `risk_limit_exceeded` cause on a book holding 15%. Nothing said a row had
+   * been counted twice.
+   *
+   * The host does not emit that shape. `broker-book.ts` merges every row of the
+   * same asset into one `Position` before the portfolio is published, and
+   * `discovery-service.ts` maps positions one-to-one with at most one assignment
+   * per `assetKey`. So a second row for a name is a **restatement of one
+   * quantity**, and #256 says the sentence outright: «보유 종목에 복수 thesis가
+   * 붙어도 포지션 수량은 하나다». `duplicate_position_rows` (`note`) records it.
+   *
+   * ⚠️ **Attribution folds one bucket at a time, and then once more.** Two rows
+   * for one name carrying different `strategy` values are two claims about
+   * *whose* the position is, not two positions: each bucket keeps its own
+   * largest row, and the position is the largest row of all. `ownHeld` and
+   * `otherHeld` below are unchanged in how they are derived — `otherHeld` is
+   * still `held − ownHeld` — so the parts can never add to more than the whole,
+   * and nothing in #814/#815/#846 moves. What moved is how a bucket is filled.
    */
   const bySymbol = new Map()
+  const duplicated = []
   const readRow = (row, source) => {
     if (typeof row?.symbol !== 'string' || !row.symbol) {
       diagnostics.push(diagnostic('exposure_row_unnamed', 'blocked', 'Every exposure row names the symbol it is exposure to', source))
@@ -402,12 +426,15 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
       diagnostics.push(diagnostic('exposure_weight_invalid', 'blocked', `Every ${source === 'positions' ? 'holding states \`weight\`' : 'open proposal states \`targetWeight\`, the total weight it asks the position to become'}, as a non-negative number`, `${source}[${row.symbol}]`))
       return
     }
-    const entry = bySymbol.get(row.symbol) ?? { symbol: row.symbol, sector: null, held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {} }
+    const entry = bySymbol.get(row.symbol) ?? { symbol: row.symbol, sector: null, held: 0, pendingPeak: 0, heldByStrategy: {}, pendingPeakByStrategy: {}, positionRows: 0 }
     if (entry.sector === null && typeof row.sector === 'string' && row.sector.length > 0) entry.sector = row.sector
     const owner = row.strategy ?? 'unattributed'
     if (source === 'positions') {
-      entry.held = round(entry.held + value)
-      entry.heldByStrategy[owner] = round((entry.heldByStrategy[owner] ?? 0) + value)
+      entry.positionRows += 1
+      if (entry.positionRows > 1 && !duplicated.includes(row.symbol)) duplicated.push(row.symbol)
+      /** One name, one quantity — the largest row, never the sum of them (#256). */
+      entry.held = round(Math.max(entry.held, value))
+      entry.heldByStrategy[owner] = round(Math.max(entry.heldByStrategy[owner] ?? 0, value))
     } else {
       entry.pendingPeak = Math.max(entry.pendingPeak, value)
       entry.pendingPeakByStrategy[owner] = Math.max(entry.pendingPeakByStrategy[owner] ?? 0, value)
@@ -416,6 +443,12 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
   }
   for (const row of positions) readRow(row, 'positions')
   for (const row of proposals) readRow(row, 'proposals')
+  if (duplicated.length > 0) {
+    /** ⚠️ `note`, never a refusal. A duplicated row is a shape to record, not a missing input. */
+    diagnostics.push(
+      diagnostic('duplicate_position_rows', 'note', `${duplicated.join(', ')} arrived as more than one position row. A position is one quantity however many theses are attached to it, so the largest row is counted on each attribution and the rest are not added to it`, 'positions', { symbols: [...duplicated] }),
+    )
+  }
 
   /** One name, one quantity: what the account is exposed to once the pending totals are folded in. */
   const exposureOf = (entry) => round(Math.max(entry.held, entry.pendingPeak))

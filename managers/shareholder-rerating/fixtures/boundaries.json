@@ -226,6 +226,78 @@
       "base": "staged[0]",
       "mutations": [{ "op": "delete", "path": "book" }],
       "expect": { "action": "unevaluated", "increment": 0, "reason": "account_state_unreadable", "outcomeCode": "data_missing" }
+    },
+    {
+      "id": "a-negative-invalidation-price-is-not-a-price",
+      "finding": "271-3.5",
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "note": "COMMONISATION-SURVEY ③.5: this package alone accepted `invalidationPrice: -100` and returned BUY 0.99% — a conservative size from an input nobody can trade at. The level arrived and is unusable, which is research left undone, not data missing.",
+      "mutations": [
+        {
+          "op": "set",
+          "path": "invalidationPrice",
+          "value": -100
+        }
+      ],
+      "expect": {
+        "route": "wait",
+        "outcomeCode": "research_incomplete",
+        "proposedAction": "WAIT",
+        "incrementWeight": 0,
+        "lossFraction": null,
+        "diagnosticCodes": [
+          "invalidation_price_not_positive"
+        ]
+      }
+    },
+    {
+      "id": "a-zero-invalidation-price-is-not-a-price",
+      "finding": "271-3.5",
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "note": "Zero sized a BUY of exactly the minimum executable weight, because lossFraction was 1 and the risk budget divided by 1 is a real number. It is not a level the thesis stops being true at.",
+      "mutations": [
+        {
+          "op": "set",
+          "path": "invalidationPrice",
+          "value": 0
+        }
+      ],
+      "expect": {
+        "route": "wait",
+        "outcomeCode": "research_incomplete",
+        "proposedAction": "WAIT",
+        "incrementWeight": 0,
+        "lossFraction": null,
+        "diagnosticCodes": [
+          "invalidation_price_not_positive"
+        ]
+      }
+    },
+    {
+      "id": "an-invalidation-at-or-above-entry-is-unfinished-research-not-a-missing-field",
+      "finding": "271-3.5",
+      "kind": "evaluateCase",
+      "base": "cases[0]",
+      "note": "Until 0.5.6 this returned data_missing. The field is present; what is absent is the section of the thesis that names where it is wrong, and the next run has to resume there rather than wait for a field that will never arrive (#254).",
+      "mutations": [
+        {
+          "op": "set",
+          "path": "invalidationPrice",
+          "value": 16000
+        }
+      ],
+      "expect": {
+        "route": "wait",
+        "outcomeCode": "research_incomplete",
+        "proposedAction": "WAIT",
+        "incrementWeight": 0,
+        "lossFraction": null,
+        "diagnosticCodes": [
+          "invalidation_above_entry"
+        ]
+      }
     }
   ]
 }

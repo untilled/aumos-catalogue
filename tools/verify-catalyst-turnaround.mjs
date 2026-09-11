@@ -281,6 +281,52 @@ for (const scenario of concentration.scenarios) {
 }
 
 /**
+ * ── #256: «보유 종목에 복수 thesis가 붙어도 포지션 수량은 하나다» ──────────
+ *
+ * The held axis folds by `max` for a reason that is not #813's. The host merges
+ * every row of one asset into one `Position` before the portfolio is published
+ * (`broker-book.ts`) and maps positions one-to-one with at most one assignment
+ * per `assetKey` (`discovery-service.ts`), so a second row for a name is a
+ * restatement of one quantity. Adding them read a 0.15 position as 0.24 and
+ * breached a 0.2 ceiling on a book that had 0.05 of room.
+ *
+ * ⚠️ The three fixture scenarios above carry the totals, the breach and the
+ * diagnostic. What is here is the attribution split, which the fixture loop does
+ * not read: buckets fold one at a time and the parts never exceed the whole.
+ */
+check('#256 — two rows for one name are one position, and its parts add to it', () => {
+  const fold = (positions) => accountConcentration({ positions, proposals: [], caps: { accountSingleName: 0.2 }, strategy: 'catalyst-turnaround' })
+
+  const mixed = fold([
+    { symbol: 'A00012', strategy: 'shareholder-rerating', weight: 0.15 },
+    { symbol: 'A00012', strategy: 'catalyst-turnaround', weight: 0.09 },
+  ])
+  const row = mixed.data.rows[0]
+  assert.equal(row.held, 0.15, 'the two rows were added into a position the account does not hold')
+  assert.equal(row.total, 0.15)
+  assert.equal(row.ownHeld, 0.09, 'this desk\'s own claim is still its own largest row')
+  assert.equal(row.otherHeld, 0.06)
+  assert.equal(round(row.ownHeld + row.otherHeld), row.held, 'the parts of one position add to more than the position')
+  assert.equal(row.breach, false, 'a 0.15 position breached a 0.2 ceiling')
+  assert.ok(has(mixed.diagnostics, 'duplicate_position_rows'), 'the name arrived twice and nothing said so')
+  assert.ok(!has(mixed.causes, 'risk_limit_exceeded'), 'a book with 0.05 of room refused on a limit')
+
+  /** A single row is untouched — the fold only ever fires on a second one. */
+  const one = fold([{ symbol: 'A00012', strategy: 'catalyst-turnaround', weight: 0.09 }])
+  assert.equal(one.data.rows[0].held, 0.09)
+  assert.ok(!has(one.diagnostics, 'duplicate_position_rows'), 'a book with no duplicate row reported one')
+
+  /** And an unattributed duplicate lands where an unattributed single row lands: not this desk's. */
+  const unattributed = fold([
+    { symbol: 'A00012', weight: 0.12 },
+    { symbol: 'A00012', weight: 0.08 },
+  ])
+  assert.equal(unattributed.data.rows[0].held, 0.12)
+  assert.equal(unattributed.data.rows[0].ownHeld, 0)
+  assert.equal(unattributed.data.rows[0].otherHeld, 0.12)
+})
+
+/**
  * ── #813: the host states a **total**, and three books it is measured on ───
  *
  * The scenarios are the A/B/C of `untilled/aumos` PR #815, which drove the real
@@ -871,6 +917,68 @@ check('the reference case classification does not by itself produce a purchase',
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 6b. The reference case **replayed** on as-of material. (#256)
+//
+// `reference-case.json`, above, is illustrative: it models the mechanism at three
+// invented points. This one is a replay — every field transcribed from the
+// investor's private record at a fixed commit, nothing dated after the decision
+// date, and every input the record does not carry left null rather than guessed.
+//
+// ⛔ What a green tick here means, precisely. It means the library, fed only what
+// was knowable on 2026-07-08, returns the answer the fixture records. It does
+// **not** re-audit the investor's reported result — #256 says that was never
+// audited and is not a validated edge — and no threshold was moved to reach it.
+// The observed intent is asserted *as observed*: had it been a purchase this
+// block would assert a purchase, and it is not one.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const replay = read('fixtures/reference-replay.json')
+
+check('the replay declares its eligibility and what it excluded', () => {
+  assert.ok(['eligible', 'ineligible'].includes(replay.replayEligibility), 'replayEligibility is eligible or ineligible')
+  assert.ok(Array.isArray(replay.excluded) && replay.excluded.length > 0, 'a replay with nothing excluded has not been checked for contamination')
+  for (const row of replay.excluded) {
+    assert.ok(['future_information', 'post_hoc_revision', 'data_missing'].includes(row.reason), `reference-replay.json: ${row.item} carries an unknown exclusion reason ${row.reason}`)
+  }
+})
+
+for (const variant of replay.variants) {
+  const result = runVerdict(variant.input)
+  const where = `reference-replay.json → ${variant.name}`
+  check(`${where} reaches what it reached`, () => {
+    assert.equal(result.data.classification.classification, variant.expect.classification, `${where}: classification`)
+    /** #256 again: the multiple is recorded and excludes nothing, replay or not. */
+    assert.equal(result.data.classification.excludedByValuationMultiple, false, `${where}: excluded on a valuation multiple`)
+    for (const key of ['qualifiesAsPosition', 'policyAnnounced', 'policyExecuting', 'policyInResults']) {
+      if (variant.expect[key] !== undefined) assert.equal(result.data.classification[key], variant.expect[key], `${where}: ${key}`)
+    }
+    assert.equal(result.data.intent, variant.expect.intent, `${where}: intent`)
+    assert.equal(result.data.review.name, variant.expect.review, `${where}: review`)
+    for (const code of variant.expect.causeCodes ?? []) assert.ok(has(result.causes, code), `${where}: expected cause ${code}, got ${codes(result.causes).join(', ') || '(none)'}`)
+    /**
+     * ⛔ #254, and the reason variant B exists. An input nobody could read says
+     * nothing about the thesis — and supplying it afterwards must not turn the
+     * run into a refutation either. Neither variant may report one.
+     */
+    if (variant.expect.noRefutation === true) {
+      assert.ok(!has(result.causes, 'thesis_refuted'), `${where}: an absent or a late-supplied input was filed as a refuted thesis`)
+    }
+  })
+}
+
+/**
+ * The same claim `reference-case.json` makes with its B and C variants, made once
+ * more on real as-of material: the contamination control classifies as a policy
+ * and financial turnaround and still proposes nothing. Whatever intent the replay
+ * reaches, it is reached by the ladder and not by the label.
+ */
+check('a replay variant that classifies as a turnaround still proposes nothing', () => {
+  const contaminated = replay.variants.find((variant) => variant.expect.qualifiesAsPosition === true)
+  assert.ok(contaminated, 'reference-replay.json carries a variant whose classification qualifies as a position')
+  assert.notEqual(contaminated.expect.intent, 'enter-staged', 'the classification is not the purchase')
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 7. The absent-input audit. (regression, after untilled/aumos-catalogue#265)
 //
 // ── The defect class, and why it needs its own section ─────────────────────
@@ -1113,21 +1221,45 @@ check('#817 — the weight handed to the host carries the part of the position t
   assert.equal(mine.otherHeldWeight, 0, 'the fixture book is this desk\'s own position')
   assert.equal(mine.hostTargetWeight, 0, 'a close-out on a wholly-own position is the host\'s exit')
 
-  /** …and the same close-out beside somebody else's holding stops at their weight. */
+  /**
+   * …and the same close-out beside somebody else's holding stops at their weight.
+   *
+   * ⛔ **The book that carries that fact is a *one-row* book (#256).** A position
+   * is one quantity however many theses point at it, so «0.05 mine and 0.04
+   * theirs of one name» is not two holdings — it is two claims on one 0.05
+   * position, and the row below is what actually reaches this package when the
+   * name is somebody else's.
+   */
   const shared = runVerdict({
     ...structuredClone(cases.cases.find((item) => item.name === 'catalyst-cancelled').input),
     book: {
       positions: [
-        { symbol: 'A00004', weight: 0.05, strategy: 'catalyst-turnaround' },
-        { symbol: 'A00004', weight: 0.04, strategy: 'inst_fundamental_mean_reversion' },
+        { symbol: 'A00004', weight: 0.04, strategy: 'catalyst-turnaround' },
+        { symbol: 'A00004', weight: 0.05, strategy: 'inst_fundamental_mean_reversion' },
       ],
       proposals: [],
       caps: { accountSingleName: 0.2 },
     },
   }).data
   assert.equal(shared.intent, 'close-out')
-  assert.equal(shared.otherHeldWeight, 0.04)
-  assert.equal(shared.hostTargetWeight, 0.04, 'an exit liquidated another manager\'s holding of the same name')
+  assert.equal(shared.concentration.rows[0].total, 0.05, 'two rows for one name were added into a position the account does not hold')
+  assert.equal(shared.ownHeldWeight, 0.04)
+  assert.equal(shared.otherHeldWeight, 0.01)
+  assert.equal(shared.hostTargetWeight, 0.01, 'an exit liquidated another manager\'s share of the same name')
+
+  /** …and a position wholly somebody else's is not this desk's to reduce at all (#846). */
+  const theirsOnly = runVerdict({
+    ...structuredClone(cases.cases.find((item) => item.name === 'catalyst-cancelled').input),
+    book: {
+      positions: [{ symbol: 'A00004', weight: 0.04, strategy: 'inst_fundamental_mean_reversion' }],
+      proposals: [],
+      caps: { accountSingleName: 0.2 },
+    },
+  }).data
+  assert.equal(theirsOnly.intent, 'reduction-not-this-desks')
+  assert.equal(theirsOnly.otherHeldWeight, 0.04)
+  assert.equal(theirsOnly.hostTargetWeight, 0.04, 'the weight that left moved a position this desk does not run')
+
 
   /** An unread book has no target at all: a `0` here would be an order. */
   const unread = runVerdict({ ...structuredClone(positive.input), book: { proposals: [], caps: { accountSingleName: 0.2 } } }).data
@@ -1435,10 +1567,18 @@ check('#825 — a purchase never reaches a target below what this desk holds, an
   const input = structuredClone(positive.input)
   input.held = true
   input.plan = structuredClone(staging.plan)
+  /**
+   * ⚠️ **The three weights are the same three; the rows that state them changed
+   * (#256).** A position is one quantity, so «0.1 mine» and «0.15 theirs» are
+   * not two holdings of 0.25 between them — the position is the larger row and
+   * this desk's claim is a bucket inside it. The book below is the 0.25 position
+   * with 0.1 of it assigned here, which is what the pair used to be read as, and
+   * every number this check is about is unmoved.
+   */
   input.book = {
     positions: [
+      { symbol: input.symbol, strategy: 'inst_shareholder_rerating', weight: 0.25 },
       { symbol: input.symbol, strategy: 'catalyst-turnaround', weight: 0.1 },
-      { symbol: input.symbol, strategy: 'inst_shareholder_rerating', weight: 0.15 },
     ],
     proposals: [],
     caps: CAPS,
@@ -1653,10 +1793,11 @@ check('#828 — a stage the account limit stops says the account limit stopped i
   const input = structuredClone(positive.input)
   input.held = true
   input.plan = structuredClone(staging.plan)
+  /** ⚠️ The 0.25 position with 0.1 of it assigned here — see #825 above on why the pair of rows moved (#256). */
   input.book = {
     positions: [
+      { symbol: input.symbol, strategy: 'inst_shareholder_rerating', weight: 0.25 },
       { symbol: input.symbol, strategy: 'catalyst-turnaround', weight: 0.1 },
-      { symbol: input.symbol, strategy: 'inst_shareholder_rerating', weight: 0.15 },
     ],
     proposals: [],
     caps: CAPS,
@@ -2175,10 +2316,16 @@ check('#846 — no own proposal takes an entry past the account ceiling it was s
  */
 check('#821 — a desk reduces its own share of a shared position and no more', () => {
   const shared = structuredClone(cases.cases.find((item) => item.name === 'catalyst-realised-and-priced-in').input)
+  /**
+   * ⚠️ **A 0.09 position with 0.05 of it assigned here (#256).** A name is one
+   * quantity however many theses point at it, so the two rows state the position
+   * and this desk's claim inside it rather than two holdings adding to 0.09.
+   * Every weight this check is about is the same weight.
+   */
   shared.book = {
     positions: [
+      { symbol: shared.symbol, strategy: 'inst_fundamental_mean_reversion', weight: 0.09 },
       { symbol: shared.symbol, strategy: 'catalyst-turnaround', weight: 0.05 },
-      { symbol: shared.symbol, strategy: 'inst_fundamental_mean_reversion', weight: 0.04 },
     ],
     proposals: [],
     caps: CAPS,
@@ -2193,7 +2340,11 @@ check('#821 — a desk reduces its own share of a shared position and no more', 
 
   /** …and where the sizing asks for **more** than this desk holds, a trim does not become a purchase. */
   const overSized = structuredClone(shared)
-  overSized.book.positions[0].weight = 0.005
+  /** The same shape one size down: a 0.045 position with 0.005 of it this desk's. */
+  overSized.book.positions = [
+    { symbol: shared.symbol, strategy: 'inst_fundamental_mean_reversion', weight: 0.045 },
+    { symbol: shared.symbol, strategy: 'catalyst-turnaround', weight: 0.005 },
+  ]
   const capped = runVerdict(overSized).data
   assert.equal(capped.intent, 'trim-into-realisation')
   assert.ok(capped.cumulativeTargetWeight > capped.ownHeldWeight, 'the fixture no longer sizes above what this desk holds, and this assertion no longer measures the clamp')
@@ -2445,6 +2596,6 @@ check('the manifest and the plugin agree, and the capabilities are the ones the 
   assert.match(manifest.provenance.commit, /^[0-9a-f]{40}$/)
 })
 
-console.log(`catalyst-turnaround: ${checks} checks over ${cases.cases.length} ladder cases, ${ledgerFixture.scenarios.length} ledger scenarios, ${staging.runs.length + staging.malformed.length} staged-plan runs, ${concentration.scenarios.length} concentration scenarios, ${scoreboard.scenarios.length} scoreboards and ${reference.variants.length} reference-case variants`)
+console.log(`catalyst-turnaround: ${checks} checks over ${cases.cases.length} ladder cases, ${ledgerFixture.scenarios.length} ledger scenarios, ${staging.runs.length + staging.malformed.length} staged-plan runs, ${concentration.scenarios.length} concentration scenarios, ${scoreboard.scenarios.length} scoreboards and ${reference.variants.length} reference-case variants, and ${replay.variants.length} reference-replay variants (${replay.replayEligibility})`)
 console.log(`catalyst-turnaround: ${ABSENCE_REGRESSIONS.length} absent-input regressions — a declared input removed from a passing run, and none of them buys anything or reports a refutation`)
 console.log(`catalyst-turnaround: the six catalyst outcomes reached ${new Set(SIX.map((name) => reached.get(name))).size} distinct judgements`)

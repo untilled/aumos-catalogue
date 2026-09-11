@@ -37,7 +37,7 @@
     },
     {
       "name": "one-name-under-two-theses-is-still-one-position",
-      "why": "Two managers both right about the same company is one exposure, and past the account limit it is a breach whichever thesis you read.",
+      "why": "⚠️ This scenario's name said #256's sentence and its arithmetic said the reverse: 0.15 + 0.09 = 0.24, a breach of a 0.2 ceiling on a book holding 0.15. Two position rows for one symbol are a restatement of one quantity — the host merges the rows of an asset into one Position before this package sees them — so the fold is `max`, the position is 0.15, and there is no breach to report. Attribution still splits it: 0.09 is this desk's and 0.06 is not.",
       "strategy": "catalyst-turnaround",
       "positions": [
         { "symbol": "A00012", "strategy": "shareholder-rerating", "weight": 0.15 },
@@ -45,7 +45,48 @@
       ],
       "proposals": [],
       "caps": { "accountSingleName": 0.2 },
-      "expect": { "total": { "A00012": 0.24 }, "breaches": ["A00012"], "causeCodes": ["risk_limit_exceeded"] }
+      "expect": {
+        "total": { "A00012": 0.15 },
+        "headroom": { "A00012": 0.14 },
+        "breaches": [],
+        "causeCodes": [],
+        "diagnosticCodes": ["duplicate_position_rows"]
+      }
+    },
+    {
+      "name": "duplicate-rows-still-breach-when-the-one-position-does",
+      "why": "The fold is not a way out of a ceiling. Once the duplicate rows are read as the one position they are, that position is 0.24 against a 0.2 limit and it is a breach — the same answer the sum used to give here for the wrong reason.",
+      "strategy": "catalyst-turnaround",
+      "positions": [
+        { "symbol": "A00012", "strategy": "shareholder-rerating", "weight": 0.24 },
+        { "symbol": "A00012", "strategy": "catalyst-turnaround", "weight": 0.09 }
+      ],
+      "proposals": [],
+      "caps": { "accountSingleName": 0.2 },
+      "expect": {
+        "total": { "A00012": 0.24 },
+        "breaches": ["A00012"],
+        "causeCodes": ["risk_limit_exceeded"],
+        "diagnosticCodes": ["duplicate_position_rows"]
+      }
+    },
+    {
+      "name": "duplicate-rows-under-one-thesis-are-one-position-too",
+      "why": "The same rule where both rows carry this desk's own name. Two 0.06 rows are a 0.06 position, all of it this desk's, and not a 0.12 one — a sum here would refuse this desk's own next rung against exposure the account does not have.",
+      "strategy": "catalyst-turnaround",
+      "positions": [
+        { "symbol": "A00012", "strategy": "catalyst-turnaround", "weight": 0.06 },
+        { "symbol": "A00012", "strategy": "catalyst-turnaround", "weight": 0.06 }
+      ],
+      "proposals": [],
+      "caps": { "accountSingleName": 0.2 },
+      "expect": {
+        "total": { "A00012": 0.06 },
+        "headroom": { "A00012": 0.2 },
+        "breaches": [],
+        "causeCodes": [],
+        "diagnosticCodes": ["duplicate_position_rows"]
+      }
     }
   ]
 }

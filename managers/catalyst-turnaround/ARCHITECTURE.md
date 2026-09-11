@@ -129,6 +129,40 @@ ceiling has to hold in both of the states the account passes through.
 calls is a run that can be argued out of subtracting, and every axis — the name, the sector and
 the whole book — has to fold the same way or one name is counted twice on one of them.
 
+## One name is one position, however many theses point at it (#256)
+
+The **held** axis folds by `max` too, and for a reason that is not #813's. #256: «보유 종목에
+복수 thesis가 붙어도 포지션 수량은 하나다».
+
+Two position rows for one symbol were **added**. A 15% row assigned to another desk beside a 9%
+row assigned here read as a 24% position, over a 20% account ceiling — a `breach`, a
+`risk_limit_exceeded` cause and `headroomForStrategy: 0` on a book holding 15% with 5% of room.
+Nothing in the answer said a row had been counted twice.
+
+⛔ **The host does not emit that shape.** `broker-book.ts` merges every row of the same asset into
+one `Position` before the portfolio is published, and `discovery-service.ts` maps positions
+one-to-one with at most one assignment per `assetKey`. A second row for a name is a **restatement
+of one quantity**, so:
+
+```
+held = the largest position row for the name      (never their sum)
+```
+
+`duplicate_position_rows` (`note`) names the symbols it fired on. It is a fact worth recording and
+never a refusal — a duplicated row is a shape, not a missing input, and the ceiling still binds on
+the folded position: two rows of 24% and 9% are a 24% position and still a breach.
+
+⚠️ **Attribution folds one bucket at a time, and then once more.** Two rows for one name carrying
+different `strategy` values are two claims about *whose* the position is, not two positions: each
+bucket keeps its own largest row, and the position is the largest row of all. `ownHeld` is that
+bucket and `otherHeld` is still `held − ownHeld`, so the parts of a position can never add to more
+than the position — 0.09 assigned here beside 0.15 assigned elsewhere is a **0.15** position with
+0.09 of it this desk's. ⛔ Nothing in #814/#815/#817/#821/#825/#828/#846 changes: those rules read
+`ownHeld`, `otherHeld` and `headroomForStrategy`, and what moved is how a bucket is filled.
+
+⚠️ **The sector axis folds with it**, because it sums the same `bySymbol` rows: a sector total that
+counted one position twice was over by whichever row was smaller.
+
 ## The weight that leaves is a third number (#817)
 
 `#813` and `#814` were both the **reading** direction. This is the **writing** one, and until #817
@@ -624,12 +658,54 @@ no network, no test framework — there is none in this repository and this pack
 | `cases.json` | one run per rung of the ladder, and — asserted **across** cases — that catalyst realisation, one delay, repeated delay, cancellation, a reversing recovery indicator and a deteriorating refinancing reach six *different* judgements. A change collapsing two of them passes every per-case check and fails this one |
 | `ledger.json` | confirmed vs estimated dates; announcement time vs report date; a prior-year source not opening a window; a price move never confirming success; terminal states not reopening; contrary evidence surviving a restatement; a delay costing three things; a closed window being flagged for adjudication |
 | `staging.json` | the same plan read four times. The second read is the point: the same due stage, and nothing added |
-| `concentration.json` | open proposals counting as exposure; per-strategy caps not summing into a larger account limit; a proposal restating the position rather than stacking on it; one name under two theses still being one position |
+| `concentration.json` | open proposals counting as exposure; per-strategy caps not summing into a larger account limit; a proposal restating the position rather than stacking on it; one name under two theses being one position — **folded by `max`, with the breach that follows from the folded number and not from the sum** (#256) |
 | `scoreboard.json` | a failed catalyst under a positive price return still scoring zero on the catalyst side; an open window staying out of the denominator; a combined return being refused |
 | the absent-input regressions (in `tools/verify-catalyst-turnaround.mjs`, not a fixture file) | one declared input removed from a run that passes, twelve times over, asserting the run refuses rather than proceeds — and that none of them reports a refutation. They are in-memory mutations precisely so the positive fixtures keep passing for the reasons they already passed |
 | `reference-case.json` | the reference case classifying as a policy-and-financial turnaround at three points in its own story, never excluded on a valuation multiple, with the four channels kept apart — **and** a variant with the same classification that does not reach a purchase |
+| `reference-replay.json` | the same case replayed on the investor's own as-of material, with everything dated later listed as excluded: the classification it actually reaches, the intent it actually reaches, and that neither the replay nor its contamination control files a refutation. See below |
 
-⛔ **Every figure in `fixtures/` is illustrative.** None of it is a re-audited historical record, a
+### Reference case replay
+
+`fixtures/reference-replay.json` is the one file in `fixtures/` that is **not** illustrative, and it
+answers #256's «과거 세 사례는 당시 시점 자료만으로 분류·논거 복원이 되는지 확인한다». The case is
+**한국가스공사 (036460)** and the sources are the investor's own private record at commit `1fa18c5`:
+`theses/036460_KOGAS.md` **as it stood at commit `1439625`**, `data/history/036460.jsonl` for the
+close, and `data/fundamentals/036460.json` for the filing dates the indicator observations are
+published on. Each field carries its own source pointer. No balances, order ids or account values
+were taken.
+
+⚠️ **The decision date is 2026-07-08, not 2026-05-25.** The two 2026-05-25 plans in that record name
+우리금융지주 / KODEX 리츠인프라 / KT and do not mention this issuer; `data/decisions.jsonl` gives
+`2026-07-08:A1:036460` and the thesis says `Opened: 2026-07-08`. Replaying at the earlier date would
+have excluded the entire case over a wrong date.
+
+**What was excluded, and why.** Every Review Log row from 2026-07-09 onward — the challenge
+cross-check, the 7/13 tariff freeze, the Q1'26 operating beat, the 13.9조 / 13.37조 receivable
+figures, the new chief executive, the oil-price reversal — as `future_information`; and the
+restructured Downside / Valuation sections that only exist in later commits of the same file, as
+`post_hoc_revision`. Marked `data_missing`: `liquidAssets`, `monthlyCashBurn`,
+`debtMaturingWithinYear`, `securedRefinancing`, `conviction`, and any single-name account cap. The
+record's 비코어 상한 28% is a category ceiling and was **not** substituted for a single-name one.
+
+**Observed outcome.** `research-candidate` → intent **`research-watch`**, review
+`earnings-path-untraced`, causes `data_missing` and `research_incomplete`, and
+`excludedByValuationMultiple: false` on a P/E of 23. The as-of record asserts a receivable drawdown
+and an analyst target; it cites no filing stating a billed unit price that carries the revision into
+this issuer's own revenue — which is exactly the ⑴/⑵ pair `lib/classify.mjs` exists to separate.
+`replayEligibility` is **`eligible`**.
+
+The contamination control puts the excluded material back — the traced path the later revision
+asserts, plus survivability numbers no as-of source carries. The classification becomes
+`policy-financial-turnaround` and the intent **stays** `research-watch` (`recovery-not-yet-a-path`:
+one improving channel is below the channel floor). Neither variant reports a refutation, which is
+#254 checked from the side it usually is not.
+
+⛔ **The outcome above was not tuned.** No threshold in `lib/constants.mjs` was touched for this
+fixture, and what is recorded is what `runVerdict` returned on the first run. The investor's reported
+~10% result is **not** re-audited here or anywhere in this package; #256 is explicit that it was never
+audited and is not a validated edge.
+
+⛔ **Every other figure in `fixtures/` is illustrative.** None of it is a re-audited historical record, a
 transcription from the upstream repository, or a backtest. #256 is explicit that the upstream author's
 reported result was never re-audited and is not a validated edge; no threshold in `constants.mjs` was
 chosen against it.

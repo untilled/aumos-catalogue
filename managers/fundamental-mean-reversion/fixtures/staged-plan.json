@@ -1,5 +1,5 @@
 {
- "note": "The ledger, and the six ways a stage is refused. The second case is the one the whole file exists for.",
+ "note": "The ledger, and the ways a stage is refused. The second case is the one the whole file exists for, and the three at the end are the states in which nobody read the ledger at all.",
  "asOf": "2026-08-29T00:00:00Z",
  "cases": [
   {
@@ -625,6 +625,205 @@
     "code": null,
     "committedWeight": 0,
     "remainingWeight": 0.035
+   }
+  },
+  {
+   "name": "ledger-absent-is-not-an-empty-ledger",
+   "why": "The first case with `filled` removed. It used to fire the rung again — an absent ledger read as «nothing has been committed yet», which is the most permissive state there is and the double add this module exists to refuse.",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ]
+   },
+   "stageId": "stage-1",
+   "satisfied": [
+    "stabilisation-held",
+    "thesis-evidence"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "refused",
+    "code": "data_missing"
+   },
+   "measured": {
+    "status": "refused",
+    "code": "data_missing",
+    "committedWeight": null,
+    "remainingWeight": null
+   }
+  },
+  {
+   "name": "ledger-null-is-read-and-empty",
+   "why": "null is the positive statement — the ledger was read and holds nothing — spelled the way catalyst-turnaround’s staged register spells it. A first rung fires on it.",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": null
+   },
+   "stageId": "stage-1",
+   "satisfied": [
+    "stabilisation-held",
+    "thesis-evidence"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "ok"
+   },
+   "measured": {
+    "status": "ok",
+    "code": null,
+    "committedWeight": 0.015,
+    "remainingWeight": 0.02
+   }
+  },
+  {
+   "name": "ledger-not-a-list-is-unread",
+   "why": "A `filled` that is not a list of rungs is not a fill history. It was silently discarded and read as an empty one.",
+   "plan": {
+    "planId": "plan_fmr_001",
+    "decisionId": "dec_fmr_001",
+    "symbol": "FMR001",
+    "plannedTotalWeight": 0.035,
+    "expiresAt": "2026-12-31T00:00:00Z",
+    "stages": [
+     {
+      "stageId": "stage-1",
+      "kind": "add",
+      "weight": 0.015,
+      "conditions": [
+       "stabilisation-held",
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "stage-2",
+      "kind": "add",
+      "weight": 0.012,
+      "conditions": [
+       "earnings-confirmation"
+      ]
+     },
+     {
+      "stageId": "stage-3",
+      "kind": "add",
+      "weight": 0.02,
+      "conditions": [
+       "thesis-evidence"
+      ]
+     },
+     {
+      "stageId": "trim-1",
+      "kind": "trim",
+      "weight": -0.015,
+      "conditions": [
+       "target-reached"
+      ]
+     }
+    ],
+    "filled": "stage-1"
+   },
+   "stageId": "stage-1",
+   "satisfied": [
+    "stabilisation-held",
+    "thesis-evidence"
+   ],
+   "gate": {
+    "thesisIntact": true,
+    "stabilisationOutcome": "confirmed",
+    "lossBudgetRemaining": 0.004
+   },
+   "expect": {
+    "status": "refused",
+    "code": "data_missing"
+   },
+   "measured": {
+    "status": "refused",
+    "code": "data_missing",
+    "committedWeight": null,
+    "remainingWeight": null
    }
   }
  ]
