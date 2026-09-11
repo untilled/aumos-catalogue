@@ -125,15 +125,18 @@ wakes the manager next, so a failed run has a defined way back.
 - **What a key costs.** OpenDART is free and requires registration. The broker connection is one
   you already have; Aumos relays the vendor's answer and never exposes the credential to this
   package.
-- **Settings.** Four, all optional: how often a held thesis is fully re-argued, how many theses this
-  instance carries at once, the smallest position worth opening in won, and your dividend
-  withholding rate. Nothing in them can loosen your Mandate.
+- **Settings.** Five, all optional: how often a held thesis is fully re-argued, how many theses this
+  instance carries at once, the smallest position worth opening in won, your dividend withholding
+  rate, and the share of the book risked on one idea. Nothing in them can loosen your Mandate, and
+  the last may only be lowered.
 - **Where you approve.** Everywhere. It proposes one decision per run; you approve it, Aumos sizes
   and routes the order. There is no capability in this package that can place one.
-- **What your Mandate must state.** A risk budget and a single-name cap. This package carries no
-  default for either, so an account that states neither gets a wait and an explanation rather than
-  a size somebody guessed. A sector ceiling is optional — state none and the sector axis simply
-  does not apply. State one and it is checked; if the account's sector classification is
+- **What your Mandate must state.** A single-name cap — your concentration limit. This package
+  carries no default for it, so an account that states none gets a wait and an explanation rather
+  than a size somebody guessed. It does carry its own **risk budget**, 1% of the book on one idea,
+  because no Mandate has a field for that and a package that refused without one would never
+  trade; you can lower it in the settings and not raise it. A sector ceiling is optional — state
+  none and the sector axis simply does not apply. State one and it is checked; if the account's sector classification is
   incomplete, purchases wait until it is not.
 
 ## What it is bad at

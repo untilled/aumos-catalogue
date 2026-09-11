@@ -11,11 +11,26 @@
  * an accounting materiality share, and one is a floating-point noise floor.
  *
  * ⚠️ **What is deliberately *not* here is as important as what is.** There is no
- * default risk budget, no default position cap, no default sector cap and no default
- * entry discount. Those are the Mandate's to state, and a package that carried a
- * fallback would be sizing every silent invocation to a number the investor never
- * approved. Their absence is `unevaluated` — the run says it could not size — and
- * never a pass.
+ * default position cap, no default sector cap and no default entry discount. Those
+ * are the Mandate's to state, and a package that carried a fallback would be sizing
+ * every silent invocation to a number the investor never approved. Their absence is
+ * `unevaluated` — the run says it could not size — and never a pass.
+ *
+ * ⚠️ **The per-idea risk budget used to be on that list and it was wrong there
+ * (`untilled/aumos#841`).** It was written as the Mandate's to state, and this host's
+ * Mandate is a closed set of eight fields with no such axis in it — so the sentence
+ * «there is no default risk budget, and without one the answer is WAIT» meant
+ * *always* WAIT: measured on the committed fixtures, every one of the four cases that
+ * does anything at all flipped to `data_missing` the moment the investor's own Mandate
+ * was handed in verbatim. A refusal no investor can lift is not a discipline, it is a
+ * package that does not run. So the budget is pre-registered below, where the two
+ * control packages already keep theirs — `catalyst-turnaround`'s `kellyFraction` and
+ * `fundamental-mean-reversion`'s `perThesisRiskBudget` — and `config` may narrow it.
+ *
+ * ⛔ **A run handed no Mandate at all still refuses.** The discriminator is #838's:
+ * a Mandate that was *read* and declares no per-idea axis is an undeclared axis, and
+ * an undeclared axis constrains nothing; a run carrying no Mandate is nobody having
+ * looked, and that is still `unevaluated`.
  */
 
 export const THRESHOLDS = {
@@ -85,3 +100,62 @@ export const THRESHOLDS = {
    */
   weightTolerance: 1e-6,
 }
+
+/**
+ * ── The sizing policy, pre-registered rather than fitted (`untilled/aumos#841`) ──
+ *
+ * ⛔ **These two are not thresholds that classify.** Nothing above decides how large
+ * a position is and nothing here decides what a case *is*; they are in one file
+ * because this file's claim is that every number this package fixed is readable in
+ * one screen, and a fixed number kept somewhere else breaks that claim rather than
+ * honouring the distinction.
+ *
+ * ⚠️ **`config` may narrow the budget and may never widen it.** A wider value is
+ * refused, reported, and the number below governs — `fundamental-mean-reversion`'s
+ * rule, for the same quantity in the same units.
+ */
+export const SIZING_POLICY = Object.freeze({
+  /**
+   * `riskBudgetWeight` — share of the whole book this methodology is willing to lose
+   * on **one** idea reaching the price at which its thesis is no longer true.
+   *
+   * 0.01, and it is derived from a number this package already published for an
+   * unrelated reason rather than chosen for an outcome: `maxActiveTheses` is 6, so a
+   * fully committed instance of this methodology puts 6 × 0.01 = **6% of the book**
+   * at risk if every open thesis reaches its invalidation on the same day. That is
+   * the aggregate `fundamental-mean-reversion` arrives at independently — 0.0075 on
+   * eight theses, «roughly 6% of the book at risk» in its own words — from a
+   * different methodology and a different loss profile, which is what makes it an
+   * inherited number and not a fitted one.
+   *
+   * ⛔ **It was not moved to make any fixture pass.** Every case in `fixtures/` states
+   * its own budget and `stated wins`, so no committed expectation depends on this
+   * constant at all; the differential in `tools/verify-shareholder-rerating.mjs`
+   * asserts exactly that.
+   *
+   * ⚠️ **It is a numerator and never a size.** `targetWeight` still takes the minimum
+   * of what it funds and every cap that applies, and on a loss to invalidation in this
+   * methodology's ordinary 15–20% range it funds 5–6.7% of the book — a number the
+   * investor's own `maxPositionWeight` is then free to cut and routinely does.
+   */
+  riskBudgetWeight: 0.01,
+
+  /**
+   * `minimumExecutablePosition` — in won. The smallest position worth opening in this
+   * venue, and the default behind `config.minimumExecutablePosition`.
+   *
+   * 500000, the number `config.schema.json` and `PROMPT.md` have both published since
+   * this package shipped. ⚠️ **It was a knob with no reader until #841**: the
+   * arithmetic wanted `minimumExecutableWeight`, a weight, and nothing turned won into
+   * a weight — so the published setting governed nothing and the absent weight refused
+   * every run whose Mandate did not state one, which is no Mandate this host sends.
+   *
+   * ⚠️ **The conversion needs the size of the book and there is no way around that.**
+   * `weight = minimumExecutablePosition / book.totalValue`, and `book.totalValue` is
+   * `portfolio.totalValue` from the invocation (`packages/amp/src/snapshots.ts`), in
+   * major units of the account's base currency. ⛔ A run that states no account value
+   * is refused exactly as before: skipping the floor because the book size is unknown
+   * is the «an absent input is not an input that passed» defect wearing a third name.
+   */
+  minimumExecutablePosition: 500000,
+})

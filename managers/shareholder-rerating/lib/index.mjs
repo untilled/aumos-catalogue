@@ -42,11 +42,12 @@
  */
 
 export { finite, round, diagnostic, isBlocked, isUnevaluated } from './numbers.mjs'
-export { THRESHOLDS } from './thresholds.mjs'
+export { THRESHOLDS, SIZING_POLICY } from './thresholds.mjs'
 export { returnComposition } from './return-composition.mjs'
 export { capitalHeadroom, ISSUER_KINDS } from './capital-headroom.mjs'
 export { classifyCase, REQUIRED_OUTPUTS, ROUTES } from './classify.mjs'
 export { lossToInvalidation, targetWeight } from './sizing.mjs'
+export { sizingPolicy } from './policy.mjs'
 export { stagedIncrement } from './staged-plan.mjs'
 export { concentration, heldAttribution } from './concentration.mjs'
 
@@ -56,6 +57,7 @@ import { returnComposition } from './return-composition.mjs'
 import { capitalHeadroom } from './capital-headroom.mjs'
 import { classifyCase } from './classify.mjs'
 import { lossToInvalidation, targetWeight } from './sizing.mjs'
+import { sizingPolicy } from './policy.mjs'
 import { concentration, heldAttribution } from './concentration.mjs'
 
 /**
@@ -281,15 +283,27 @@ export function evaluateCase(input = {}) {
   base.projectedGrossExposure = exposure.data.projectedGrossExposure
   base.maxTotalWeightBinding = exposure.data.maxTotalWeightBinding
 
+  /**
+   * ── The two numbers the Mandate cannot carry (`untilled/aumos#841`) ───────
+   *
+   * ⚠️ **`riskBudgetWeight` and `minimumExecutableWeight` have no producer in this
+   * host at all**, so reading them off the Mandate meant every run handed the
+   * investor's own Mandate sized nothing and waited. `policy.mjs` answers both from
+   * this package's pre-registration once the Mandate has actually been read, and
+   * answers neither when no Mandate arrived. ⛔ Stated still wins over both.
+   */
+  const policy = sizingPolicy({ mandate, book, config: input.config })
+  diagnostics.push(...policy.diagnostics)
+
   const sized = targetWeight({
-    riskBudgetWeight: mandate.riskBudgetWeight,
+    riskBudgetWeight: policy.riskBudgetWeight ?? undefined,
     lossFraction: loss.data.lossFraction,
     mandatePositionCap: mandate.mandatePositionCap,
     mandate,
     accountNameLimit: exposure.data.maxTotalWeightForName ?? undefined,
     /** ⚠️ #833: the ceilings that name *this position*, which is what a sale is sized by. */
     accountNameLimitForReduction: exposure.data.reductionNameLimit ?? undefined,
-    minimumExecutableWeight: mandate.minimumExecutableWeight,
+    minimumExecutableWeight: policy.minimumExecutableWeight ?? undefined,
   })
   diagnostics.push(...sized.diagnostics)
   base.targetTotalWeight = sized.data.targetTotalWeight
@@ -414,14 +428,14 @@ export function evaluateCase(input = {}) {
    * The venue minimum applies to the **order**, which is the increment. A target that
    * clears it can still be reached by an addition that does not.
    */
-  if (increment + 1e-12 < mandate.minimumExecutableWeight) {
+  if (increment + 1e-12 < policy.minimumExecutableWeight) {
     diagnostics.push(
       diagnostic(
         'increment_below_minimum_executable',
         'blocked',
         'The addition this stage asks for is below the smallest order this venue can express. It waits for the target to move away from the holding rather than being rounded up to something nothing calculated.',
-        'mandate.minimumExecutableWeight',
-        { incrementWeight: round(increment), minimumExecutableWeight: round(mandate.minimumExecutableWeight) },
+        'minimumExecutableWeight',
+        { incrementWeight: round(increment), minimumExecutableWeight: round(policy.minimumExecutableWeight) },
       ),
     )
     return wait(base, diagnostics, 'position_not_executable')

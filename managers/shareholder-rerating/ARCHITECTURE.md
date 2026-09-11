@@ -146,7 +146,7 @@ risk budget; a stage that does not fit the remaining budget waits rather than be
 | `account-concentration-caps-never-sum` | `risk_limit_exceeded` on 8% binding, not 18% |
 | `a-cap-binds-the-total-and-the-increment-is-what-is-left` | `BUY` — a 4% cap on the total, 3% already carried, 1% proposed |
 | `position-below-the-venue-minimum-is-refused` | `position_not_executable` — refused, not rounded up |
-| `no-mandate-numbers-is-unevaluated-not-a-default` | `data_missing` — no default risk budget exists |
+| `no-mandate-numbers-is-unevaluated-not-a-default` | `data_missing` — a run that read no Mandate sizes nothing (`untilled/aumos#841`) |
 
 `fixtures/return-composition.json` — the two legs, the three double counts, the unreceivable
 dividend and the untaxed one. `fixtures/staged-plans.json` — eleven states of one plan, including

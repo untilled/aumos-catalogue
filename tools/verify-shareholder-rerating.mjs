@@ -1700,9 +1700,20 @@ const byId = (id) => {
     ['a Mandate declaring neither', hostMandateWithout('maxPositionWeight', 'cashFloor'), false],
   ]) {
     for (const fixture of cases.cases) {
+      /**
+       * ⚠️ **The two sizing numbers are completed on both rows and the caps only on
+       * the first (`untilled/aumos#841`).** This differential's claim is «a Mandate
+       * fills a name the caller left empty and moves nothing the caller stated», and
+       * until #841 it completed the *caps* alone — so a fixture stating no risk
+       * budget had one filled in by the Mandate on one side of the comparison and
+       * not the other, and the differential reported the fix as a regression. That
+       * is the same mistake in the same file as the one #841 found: a differential
+       * has to state everything the Mandate could fill, or it is measuring the fill.
+       */
       const withCaps = (input) => {
+        input.mandate = { riskBudgetWeight: 0.01, minimumExecutableWeight: 0.005, ...(input.mandate ?? {}) }
         if (!complete) return input
-        input.mandate = { mandatePositionCap: 0.08, ...(input.mandate ?? {}) }
+        input.mandate = { mandatePositionCap: 0.08, ...input.mandate }
         input.mandate.caps = { accountPositionCap: 0.1, accountGrossCap: 0.95, ...(input.mandate.caps ?? {}) }
         return input
       }
@@ -1718,6 +1729,234 @@ const byId = (id) => {
     }
   }
   ok('#838 — a stated cap wins, so a Mandate riding alongside changes nothing at all')
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The two numbers the Mandate cannot carry (`untilled/aumos#841`)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * ⛔ **`#838` closed half of this and the half it left standing was the whole of
+ * sizing.** `riskBudgetWeight` and `minimumExecutableWeight` were read off
+ * `mandate.*` and **no producer of either name exists anywhere in the host** —
+ * not in the Mandate's closed set of eight fields, not on the investment-principles
+ * screen. Both absences are `unevaluated`, `unevaluated` blocks, and blocked
+ * sizing is `WAIT`. Measured on these very fixtures with the host's Mandate handed
+ * in verbatim: the four cases that do anything at all all flipped to
+ * `data_missing`, and *"there is no default risk budget … the answer is WAIT"*
+ * meant **always** WAIT.
+ *
+ * ⚠️ **`#838`'s own checker did not catch it, and how it missed is the lesson.**
+ * Its `underMandate` helper deleted the caps and kept the rest of
+ * `input.mandate`, so the two sizing numbers rode along in every comparison. A
+ * check that completes some of what the host cannot send is measuring the part it
+ * completed. Everything below builds the Mandate from the eight published fields
+ * and states **nothing else**.
+ *
+ * ⚠️ **The fixtures on disk are not touched** — every case below is a deep copy.
+ */
+{
+  const HOST_CONSTRAINTS = Object.freeze({
+    baseCurrency: 'KRW',
+    allowedAssetClasses: ['equity', 'etf', 'crypto', 'cash'],
+    maxPositionWeight: 0.1,
+    cashFloor: 0.1,
+    maxDrawdown: 0.06,
+    allowShorting: true,
+    allowLeverage: true,
+    excludedSymbols: [],
+  })
+  const hostMandate = (overrides = {}) => ({
+    mandateId: 'mdt_841',
+    version: 3,
+    label: 'Untilled',
+    objective: 'Compound the book without a drawdown that ends it',
+    horizonDays: 365,
+    constraints: { ...HOST_CONSTRAINTS, ...overrides },
+  })
+  /**
+   * ⚠️ **`book.totalValue` is `portfolio.totalValue`** — `packages/amp/src/snapshots.ts`
+   * carries it on every invocation, in major units of the account's base currency.
+   * The venue minimum is published in won and a weight only against a total, so this
+   * is the second host field this package had never read. ⛔ It is not optional
+   * anywhere below: a run that states no account value is refused, because a floor
+   * skipped for want of a denominator is a floor that passed a check nobody made.
+   */
+  const BOOK_VALUE = 50_000_000_000
+
+  /** One fixture, its whole Mandate replaced by the host's and nothing else stated. */
+  const underHost = (id, { mandate = hostMandate(), config, totalValue = BOOK_VALUE, mutate = () => {} } = {}) => {
+    const fixture = cases.cases.find((row) => row.id === id)
+    assert.ok(fixture, `cases.json no longer carries ${id}, so these regressions test nothing`)
+    const input = structuredClone(fixture.input)
+    input.mandate = mandate === null ? {} : structuredClone(mandate)
+    if (totalValue !== null) input.book = { ...(input.book ?? {}), totalValue }
+    if (config !== undefined) input.config = config
+    mutate(input)
+    return evaluateCase(input)
+  }
+
+  /**
+   * ── The sweep the issue's table is ────────────────────────────────────────
+   *
+   * ⛔ **Not one of the fifteen may report either absence.** Naming the two codes
+   * rather than only the four flipped answers is deliberate: an implementation that
+   * reached `BUY` while still reporting `risk_budget_not_stated` would be sizing on
+   * a number it had just called missing.
+   */
+  {
+    const acting = new Map([
+      ['financial-positive-reaches-buy', ['BUY', 'buy-path', 0.05333333]],
+      ['reference-plan-is-classified-not-screened-out', ['BUY', 'buy-path', 0.05714286]],
+      ['account-concentration-caps-never-sum', ['WAIT', 'trim-or-exit-review', 0.05333333]],
+      ['a-cap-binds-the-total-and-the-increment-is-what-is-left', ['BUY', 'buy-path', 0.05333333]],
+    ])
+    for (const fixture of cases.cases) {
+      const answer = underHost(fixture.id)
+      const codes = codesOf(answer.diagnostics)
+      for (const absence of ['risk_budget_not_stated', 'minimum_executable_not_stated', 'position_cap_not_stated']) {
+        assert.ok(
+          !codes.includes(absence),
+          `${fixture.id}: the investor's own Mandate was reported as carrying no ${absence}`,
+        )
+      }
+      const expected = acting.get(fixture.id)
+      if (expected === undefined) continue
+      const [action, route, weight] = expected
+      assert.equal(answer.data.proposedAction, action, `${fixture.id}: the Mandate the host sends no longer reaches ${action}`)
+      assert.equal(answer.data.route, route, `${fixture.id}: route moved`)
+      assert.equal(answer.data.targetTotalWeight, weight, `${fixture.id}: the weight the pre-registered budget funds moved`)
+    }
+  }
+  ok('#841 — every case reaches its answer under the Mandate the host actually sends, and none reports an absence')
+
+  /**
+   * ⛔ **The discriminator, and the reason this is not a loosening.** A Mandate that
+   * was *read* and declares no per-idea axis is an undeclared axis, which #838
+   * already settled constrains nothing. A run carrying **no Mandate** is nobody
+   * having looked, and it refuses exactly as it did.
+   */
+  {
+    const blind = underHost('financial-positive-reaches-buy', { mandate: null })
+    assert.equal(blind.data.proposedAction, 'WAIT', 'a run handed no Mandate at all sized a position')
+    assert.ok(codesOf(blind.diagnostics).includes('risk_budget_not_stated'), 'and did not say the budget was missing')
+    assert.ok(codesOf(blind.diagnostics).includes('position_cap_not_stated'), 'and did not say the cap was missing')
+    const verbatim = evaluateCase(structuredClone(cases.cases.find((row) => row.id === 'no-mandate-numbers-is-unevaluated-not-a-default').input))
+    assert.equal(verbatim.data.outcomeCode, 'data_missing', 'the no-Mandate fixture stopped refusing')
+    assert.ok(
+      !codesOf(verbatim.diagnostics).includes('risk_budget_from_methodology'),
+      'the pre-registered budget leaked into a run that carried no Mandate',
+    )
+  }
+  ok('#841 — a Mandate that was read fills the axis it has no field for; no Mandate at all still refuses')
+
+  /**
+   * ⚠️ **A numerator and never a size.** The investor's own concentration answer
+   * still cuts it, and the answer says the cap is what bound.
+   */
+  {
+    const capped = underHost('financial-positive-reaches-buy', { mandate: hostMandate({ maxPositionWeight: 0.02 }) })
+    assert.equal(capped.data.proposedAction, 'BUY', 'the tight cap refused rather than binding')
+    assert.equal(capped.data.targetTotalWeight, 0.02, 'the investor\'s concentration answer did not cut the pre-registered budget')
+    assert.ok(codesOf(capped.diagnostics).includes('cap_is_binding'), 'and the proposal presented a ceiling as a calculation')
+  }
+  ok('#841 — the pre-registered budget is a numerator and the investor\'s ceiling still binds')
+
+  /**
+   * ⚠️ **`config` narrows and may not widen**, `fundamental-mean-reversion`'s rule for
+   * the same quantity in the same units. ⛔ The refused value is not clamped silently:
+   * the answer is the pre-registered one and a `warn` says why.
+   */
+  {
+    const narrow = underHost('financial-positive-reaches-buy', { config: { riskBudgetWeight: 0.005 } })
+    assert.equal(narrow.data.targetTotalWeight, 0.02666667, 'a narrower configured budget did not size the position')
+    assert.ok(
+      narrow.diagnostics.some((row) => row.code === 'risk_budget_from_methodology' && row.details.source === 'config'),
+      'and the run did not say which number it fell back to',
+    )
+    const wide = underHost('financial-positive-reaches-buy', { config: { riskBudgetWeight: 0.05 } })
+    assert.equal(wide.data.targetTotalWeight, 0.05333333, 'a configured budget wider than the pre-registered one governed the run')
+    assert.ok(codesOf(wide.diagnostics).includes('risk_budget_config_widens'), 'and it was widened silently')
+  }
+  ok('#841 — `config.riskBudgetWeight` narrows the pre-registered budget and cannot widen it')
+
+  /**
+   * ── The venue floor, which was a published setting with no reader ─────────
+   *
+   * `config.minimumExecutablePosition` has said 500,000 won since this package
+   * shipped and nothing ever read it: the arithmetic wanted a weight. It is a weight
+   * only against the size of the book.
+   */
+  {
+    const small = underHost('financial-positive-reaches-buy', { totalValue: 5_000_000 })
+    assert.equal(small.data.proposedAction, 'WAIT', 'a position of a handful of shares was proposed')
+    assert.equal(small.data.outcomeCode, 'position_not_executable', 'and it was refused for the wrong reason')
+    assert.ok(codesOf(small.diagnostics).includes('minimum_executable_not_met'), 'and the venue floor did not bind')
+
+    const lowered = underHost('financial-positive-reaches-buy', { totalValue: 5_000_000, config: { minimumExecutablePosition: 100_000 } })
+    assert.equal(lowered.data.proposedAction, 'BUY', 'the configured venue minimum was not read')
+    assert.equal(lowered.data.targetTotalWeight, 0.05333333, 'and the weight moved with it')
+
+    /**
+     * ⚠️ **The floor applies to the order as well as to the position, and that is a
+     * second reader of the same number** (`index.mjs`'s increment gate). A target
+     * that clears the floor can still be reached by an addition that does not, and
+     * until #841 that gate read `mandate.minimumExecutableWeight` — the name with no
+     * producer — so on the host's Mandate it compared against `undefined` and let
+     * every addition through.
+     */
+    const sliver = underHost('financial-positive-reaches-buy', {
+      totalValue: 50_000_000,
+      mutate: (input) => {
+        input.book.openProposals = [
+          { symbol: input.symbol, sector: input.sector, targetWeight: 0.05, strategy: 'shareholder-rerating', decisionId: 'dec_own_841' },
+        ]
+      },
+    })
+    assert.equal(sliver.data.incrementWeight, 0.00333333, 'the increment this account still has room for moved')
+    assert.equal(sliver.data.proposedAction, 'WAIT', 'an order below the smallest this venue can express was proposed')
+    assert.ok(
+      codesOf(sliver.diagnostics).includes('increment_below_minimum_executable'),
+      'and the order floor did not bind on a floor the package derived rather than was handed',
+    )
+
+    const blind = underHost('financial-positive-reaches-buy', { totalValue: null })
+    assert.equal(blind.data.proposedAction, 'WAIT', 'the venue floor was skipped because the book size was unknown')
+    assert.ok(codesOf(blind.diagnostics).includes('minimum_executable_not_stated'), 'and nothing said the comparison had not been made')
+    assert.ok(codesOf(blind.diagnostics).includes('account_value_not_stated'), 'and nothing named the field that fixes it')
+  }
+  ok('#841 — the venue floor is the published won amount over the size of the book, and an unknown book still refuses')
+
+  /**
+   * ⛔ **The differential this change is held to.** Every case that states both
+   * numbers is byte-for-byte what it was, whatever Mandate, config and account value
+   * ride alongside — which is what makes «stated wins» a property rather than a
+   * sentence, and what makes every committed fixture above untouched by any of this.
+   */
+  {
+    /**
+     * ⚠️ **Everything a Mandate could fill is stated, caps included.** Otherwise this
+     * measures #838's fill rather than #841's: the gross axis is filled from
+     * `cashFloor` and the case would differ for a reason this block is not about.
+     */
+    const stateBoth = (input) => {
+      input.mandate = { riskBudgetWeight: 0.01, minimumExecutableWeight: 0.005, mandatePositionCap: 0.08, ...(input.mandate ?? {}) }
+      input.mandate.caps = { accountPositionCap: 0.1, accountGrossCap: 0.95, ...(input.mandate.caps ?? {}) }
+      return input
+    }
+    for (const fixture of cases.cases) {
+      const stated = evaluateCase(stateBoth(structuredClone(fixture.input)))
+      const beside = stateBoth(structuredClone(fixture.input))
+      beside.mandate.constraints = hostMandate().constraints
+      beside.book = { ...(beside.book ?? {}), totalValue: BOOK_VALUE }
+      beside.config = { riskBudgetWeight: 0.002, minimumExecutablePosition: 9_000_000_000 }
+      assert.equal(
+        JSON.stringify(evaluateCase(beside)),
+        JSON.stringify(stated),
+        `${fixture.id} moved when a Mandate, a config and an account value rode beside its stated numbers`,
+      )
+    }
+  }
+  ok('#841 — a stated budget and a stated venue floor win, so nothing riding alongside changes anything')
 }
 
 console.log(`\nshareholder-rerating ok — ${checked} check(s)`)
