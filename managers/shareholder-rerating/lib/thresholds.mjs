@@ -141,21 +141,54 @@ export const SIZING_POLICY = Object.freeze({
   riskBudgetWeight: 0.01,
 
   /**
-   * `minimumExecutablePosition` — in won. The smallest position worth opening in this
-   * venue, and the default behind `config.minimumExecutablePosition`.
+   * `minimumExecutablePosition` — an amount of money, and `minimumExecutablePositionCurrency`
+   * is the currency it is an amount of. The smallest position worth opening in the venue
+   * this methodology was written against, and the defaults behind the two settings of the
+   * same names.
    *
-   * 500000, the number `config.schema.json` and `PROMPT.md` have both published since
-   * this package shipped. ⚠️ **It was a knob with no reader until #841**: the
-   * arithmetic wanted `minimumExecutableWeight`, a weight, and nothing turned won into
-   * a weight — so the published setting governed nothing and the absent weight refused
-   * every run whose Mandate did not state one, which is no Mandate this host sends.
+   * 500000 **KRW**, the number `config.schema.json` and `PROMPT.md` have both published
+   * since this package shipped. ⚠️ **It was a knob with no reader until #841**, and the
+   * reader #841 gave it read the amount and not its unit (`untilled/aumos#845`):
    *
-   * ⚠️ **The conversion needs the size of the book and there is no way around that.**
-   * `weight = minimumExecutablePosition / book.totalValue`, and `book.totalValue` is
-   * `portfolio.totalValue` from the invocation (`packages/amp/src/snapshots.ts`), in
-   * major units of the account's base currency. ⛔ A run that states no account value
-   * is refused exactly as before: skipping the floor because the book size is unknown
-   * is the «an absent input is not an input that passed» defect wearing a third name.
+   *   weight = minimumExecutablePosition / book.totalValue
+   *
+   * On the book this package was written for that is right. On **a dollar book of
+   * $100,000 it is 500000 / 100000 = 5.0**, a floor of five hundred per cent of the
+   * account, which no position can clear — so every case sized and then refused, and
+   * the package was structurally `WAIT` on any account not denominated in won.
+   * Measured on the fifteen committed fixtures under the host's own Mandate: eight
+   * acting on a won book, **three** on a dollar one, six of them refused by this floor.
+   *
+   * ⚠️ **And the wrong reading of `totalValue` was the one that looked green.** The host
+   * sends `portfolio.totalValue` as a `Money` — `{ currency, minorUnits, exponent? }`,
+   * an integer count of minor units — so a reader that hands `minorUnits` straight in
+   * passes 10,000,000 for a $100,000 book and this floor lands back in its ordinary
+   * range. Seven of the fifteen act on that reading and three on the correct one. A
+   * unit that is only in the prose is a unit the arithmetic cannot check, which is why
+   * the currency is a value here now rather than the word «won» in a comment.
+   *
+   * ── What the amount says, and to which book ───────────────────────────────
+   *
+   * ⚠️ **A venue minimum is money and cannot be restated as a weight.** 500,000 won is
+   * «a KOSPI share in the ordinary 10,000–100,000 won range, in a quantity that can be
+   * staged into and trimmed»; the same statement as a share of the book is 0.1 of a
+   * five-million-won account and 0.00001 of a fifty-billion-won one. So this package
+   * does **not** pre-register a weight: there is no non-fitted number to pre-register,
+   * and `thresholds.mjs` opens by saying none of its numbers was fitted.
+   *
+   * ⛔ **So the amount governs the book it was declared for and no other.** Where the
+   * account's `baseCurrency` is this currency the arithmetic above is unchanged to the
+   * byte. Where it differs, this package has published no minimum for that venue: the
+   * axis is **undeclared**, and #838 settled that an undeclared axis constrains nothing
+   * rather than withholding everything — said out loud, with the setting that fixes it
+   * named. An investor whose venue is a dollar venue states
+   * `minimumExecutablePosition` in `USD`, or states `minimumExecutableWeight` outright
+   * and skips currency altogether.
+   *
+   * ⛔ **An account whose currency is unknown still refuses**, as one whose size is
+   * unknown always has. A currency the run never read and a currency it read and found
+   * different are not the same fact: the first is nobody having looked.
    */
   minimumExecutablePosition: 500000,
+  minimumExecutablePositionCurrency: 'KRW',
 })

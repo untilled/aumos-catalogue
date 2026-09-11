@@ -220,6 +220,17 @@ required, and an unverified one returns `unevaluated` with an increment of zero.
 extends to `requiredInvestment` (an unstated commitment is not zero), the venue minimum, and the
 three classification inputs whose absence would otherwise skip the trap, flip and programme tests.
 
+⚠️ **The venue minimum is an amount of money and therefore has a currency** (`untilled/aumos#845`).
+`minimumExecutablePosition / book.totalValue` is a weight only when both are the same money, so the
+amount names its currency (`minimumExecutablePositionCurrency`, KRW) and governs a book denominated
+in that and no other. ⛔ On any other book the venue minimum for **that** account is undeclared, and
+an undeclared axis constrains nothing and says so — the #838 rule, not a skipped check; what is
+still a skipped check, and still refuses, is a book whose currency or size was never read at all.
+An investor states their own as an amount in their own currency or as `minimumExecutableWeight`, a
+share of the book that needs no currency. ⛔ **No weight is pre-registered**: the same amount is 0.1
+of a five-million-won book and 0.00001 of a fifty-billion-won one, so any default here would be
+fitted to one account size.
+
 ⛔ **The #269 regressions build their own inputs or mutate a `structuredClone` of a committed one.**
 `fixtures/cases.json` was not reshaped for them; the only edit it carries in that change is the
 vocabulary migration `sectorKind: "financial"` → `"bank"`, with every `expect` block unchanged, and

@@ -1959,4 +1959,294 @@ const byId = (id) => {
   ok('#841 — a stated budget and a stated venue floor win, so nothing riding alongside changes anything')
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The venue floor is money, and money has a currency (`untilled/aumos#845`)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * ⛔ **`#841` gave `minimumExecutablePosition` its first reader and the reader read the
+ * amount without its unit.** 500,000 is won; divided by a **dollar** book of $100,000 it
+ * is `500000 / 100000 = 5.0`, a floor of five hundred per cent of the account, which no
+ * position can clear. So every case that reached sizing sized correctly and was then
+ * refused, and this package was structurally `WAIT` on any book not denominated in won.
+ *
+ * Measured on these fifteen fixtures under the host's Mandate handed in verbatim:
+ * **eight act on a won book and three on a dollar one**, the five that went missing
+ * refused by this floor alone.
+ *
+ * ⚠️ **And the *wrong* reading of `totalValue` was the one that looked green.** The host
+ * sends `portfolio.totalValue` as a `Money` — an integer count of **minor** units — so a
+ * caller handing `minorUnits` straight in passes 10,000,000 for that $100,000 book and
+ * the floor lands back in its ordinary range: seven act. Two readings of one field, the
+ * correct one strictly worse-looking than the wrong one, and the unit lived only in the
+ * prose where no arithmetic could check it.
+ *
+ * ⛔ **Nothing here pre-registers a weight to replace the amount.** A venue minimum is
+ * money — «a share in its ordinary price range, in a quantity that can be staged into
+ * and trimmed» — and the same statement is 0.1 of a five-million-won book and 0.00001 of
+ * a fifty-billion-won one. There is no non-fitted weight to publish and `thresholds.mjs`
+ * opens by saying none of its numbers was fitted. What moved instead is that the amount
+ * now **names its currency** and governs the book it was declared for: elsewhere the
+ * axis is undeclared, which #838 already settled constrains nothing and says so.
+ *
+ * ⚠️ **The account-currency axis is why this lived through thirteen orders of work** —
+ * every fixture, every regression and every sweep above is a won book. Every block below
+ * states a currency.
+ *
+ * ⚠️ **The fixtures on disk are not touched** — every case below is a deep copy.
+ */
+{
+  const constraintsIn = (baseCurrency) => ({
+    baseCurrency,
+    allowedAssetClasses: ['equity', 'etf', 'crypto', 'cash'],
+    maxPositionWeight: 0.1,
+    cashFloor: 0.1,
+    maxDrawdown: 0.06,
+    allowShorting: true,
+    allowLeverage: true,
+    excludedSymbols: [],
+  })
+  const hostMandateIn = (baseCurrency) => ({
+    mandateId: 'mdt_845',
+    version: 3,
+    label: 'Untilled',
+    objective: 'Compound the book without a drawdown that ends it',
+    horizonDays: 365,
+    constraints: constraintsIn(baseCurrency),
+  })
+  /** A won book and a dollar book of ordinary size for each, and nothing else stated. */
+  const WON_BOOK = 50_000_000_000
+  const DOLLAR_BOOK = 100_000
+
+  const underBook = (id, { currency = 'USD', totalValue = DOLLAR_BOOK, config, mandate, mutate = () => {} } = {}) => {
+    const fixture = cases.cases.find((row) => row.id === id)
+    assert.ok(fixture, `cases.json no longer carries ${id}, so these regressions test nothing`)
+    const input = structuredClone(fixture.input)
+    input.mandate = structuredClone(mandate ?? hostMandateIn(currency))
+    if (totalValue !== null) input.book = { ...(input.book ?? {}), totalValue }
+    if (config !== undefined) input.config = config
+    mutate(input)
+    return evaluateCase(input)
+  }
+  const sweep = (options) =>
+    cases.cases.map((fixture) => [fixture.id, underBook(fixture.id, options)])
+
+  /**
+   * ── The sweep the issue's table is ────────────────────────────────────────
+   *
+   * ⛔ **The answer to «what does this book do» may not depend on what it is
+   * denominated in.** Both sides state the ordinary size of their own currency, so a
+   * floor that is genuinely about the venue binds on neither — and until #845 the
+   * dollar side refused five of the eight that act.
+   */
+  {
+    const won = new Map(sweep({ currency: 'KRW', totalValue: WON_BOOK }))
+    const dollar = new Map(sweep({ currency: 'USD', totalValue: DOLLAR_BOOK }))
+    const acting = (answers) => [...answers.values()].filter((a) => a.data.proposedAction !== 'WAIT').length
+    assert.equal(acting(won), 8, 'the won sweep no longer acts on eight, so the comparison below tests nothing')
+    assert.equal(
+      acting(dollar),
+      8,
+      'a dollar book acts on a different number of cases than a won book of the same ordinary size',
+    )
+    for (const [id, answer] of dollar) {
+      const reference = won.get(id)
+      assert.equal(answer.data.proposedAction, reference.data.proposedAction, `${id}: the action moved with the currency`)
+      assert.equal(answer.data.route, reference.data.route, `${id}: the route moved with the currency`)
+      assert.equal(
+        answer.data.targetTotalWeight,
+        reference.data.targetTotalWeight,
+        `${id}: the weight moved with the currency`,
+      )
+      assert.ok(
+        !codesOf(answer.diagnostics).includes('minimum_executable_not_met'),
+        `${id}: a dollar-denominated book was refused by a floor published in won`,
+      )
+    }
+  }
+  ok('#845 — a dollar book reaches the same fifteen answers as a won book of the same ordinary size')
+
+  /**
+   * ⚠️ **Undeclared, and it says which two currencies made it so.** #838 settled that an
+   * axis nothing declares constrains nothing; ⛔ what it never licensed is doing that
+   * *silently*, so the note has to name the mismatch and the settings that fix it.
+   * `minimum_executable_not_stated` is the other thing — it is `unevaluated` and blocks —
+   * and reporting it here would be refusing all over again.
+   */
+  {
+    const answer = underBook('financial-positive-reaches-buy')
+    const note = answer.diagnostics.find((row) => row.code === 'minimum_executable_currency_mismatch')
+    assert.ok(note, 'a floor that did not apply to this book was dropped without a word')
+    assert.equal(note.severity, 'warn', 'a loosening was reported at a severity nobody reads')
+    assert.equal(note.details.minimumExecutablePositionCurrency, 'KRW')
+    assert.equal(note.details.baseCurrency, 'USD')
+    assert.equal(note.details.minimumExecutablePosition, 500000)
+    assert.ok(
+      !codesOf(answer.diagnostics).includes('minimum_executable_not_stated'),
+      'a declared absence was reported as an unevaluated one, which blocks',
+    )
+    assert.equal(answer.data.proposedAction, 'BUY')
+  }
+  ok('#845 — a floor published in another currency is a declared absence, named, and never a silent one')
+
+  /**
+   * ⛔ **A currency the run never read is nobody having looked, and that still refuses** —
+   * the same rule #841 already applies to a book whose *size* is unknown, on the other
+   * half of the same denominator. ⚠️ The Mandate here is read (`allowedAssetClasses` is a
+   * marker) and carries no `baseCurrency`, so this is not the no-Mandate path.
+   */
+  {
+    const blind = underBook('financial-positive-reaches-buy', {
+      totalValue: WON_BOOK,
+      mandate: { allowedAssetClasses: ['equity'], maxPositionWeight: 0.1, cashFloor: 0.1 },
+    })
+    assert.equal(blind.data.proposedAction, 'WAIT', 'a book of unknown currency divided an amount of won by it anyway')
+    assert.ok(codesOf(blind.diagnostics).includes('account_currency_not_stated'), 'and nothing named the field that fixes it')
+    assert.ok(codesOf(blind.diagnostics).includes('minimum_executable_not_stated'), 'and nothing said the comparison was never made')
+  }
+  ok('#845 — an account whose currency was never read refuses, as one whose size was never read always has')
+
+  /**
+   * ⚠️ **An investor whose venue is a dollar venue states it in dollars**, and the floor
+   * then binds there exactly as the won one binds on a won book — the same two-sided
+   * check #841 makes, moved one currency over.
+   */
+  {
+    const priced = { minimumExecutablePosition: 400, minimumExecutablePositionCurrency: 'USD' }
+    const ordinary = underBook('financial-positive-reaches-buy', { config: priced })
+    assert.equal(ordinary.data.proposedAction, 'BUY', 'a floor stated in the account\'s own currency was not applied at all')
+    assert.equal(ordinary.data.targetTotalWeight, 0.05333333, 'and the weight moved')
+    assert.ok(
+      ordinary.diagnostics.some((row) => row.code === 'minimum_executable_from_position'),
+      'and the run did not say which floor it used',
+    )
+
+    const tiny = underBook('financial-positive-reaches-buy', { config: priced, totalValue: 5_000 })
+    assert.equal(tiny.data.proposedAction, 'WAIT', 'a position of a handful of shares was proposed on a small dollar book')
+    assert.equal(tiny.data.outcomeCode, 'position_not_executable', 'and it was refused for the wrong reason')
+    assert.ok(codesOf(tiny.diagnostics).includes('minimum_executable_not_met'), 'and the floor the investor stated did not bind')
+
+    /**
+     * ⛔ **And it is an amount of *that* money and of no other.** A floor of $1,000,000
+     * against a five-million-**won** book is 0.2 if the code is ignored, which refuses
+     * this case; it is a fact about a dollar venue and constrains a won book not at all.
+     */
+    /** ⚠️ An ISO code is a code however it was typed. */
+    const shouted = underBook('financial-positive-reaches-buy', {
+      config: { minimumExecutablePosition: 400, minimumExecutablePositionCurrency: 'usd' },
+      totalValue: 5_000,
+    })
+    assert.equal(shouted.data.proposedAction, 'WAIT', 'a floor currency typed in lower case stopped matching the book')
+    assert.ok(codesOf(shouted.diagnostics).includes('minimum_executable_not_met'))
+
+    const elsewhere = underBook('financial-positive-reaches-buy', {
+      currency: 'KRW',
+      totalValue: 5_000_000,
+      config: { minimumExecutablePosition: 1_000_000, minimumExecutablePositionCurrency: 'USD' },
+    })
+    assert.equal(elsewhere.data.proposedAction, 'BUY', 'a dollar amount was divided by a won book')
+    assert.ok(codesOf(elsewhere.diagnostics).includes('minimum_executable_currency_mismatch'))
+  }
+  ok('#845 — a venue minimum stated in the account\'s own currency binds on that account')
+
+  /**
+   * ⚠️ **The one spelling of this floor that never needs a currency**, and it wins over
+   * the amount on either book — which is what makes «state a weight» the answer for an
+   * investor whose currency this package has never heard of.
+   */
+  {
+    const dollar = underBook('financial-positive-reaches-buy', { config: { minimumExecutableWeight: 0.01 } })
+    assert.equal(dollar.data.proposedAction, 'BUY')
+    assert.equal(dollar.data.targetTotalWeight, 0.05333333)
+    assert.ok(
+      dollar.diagnostics.some((row) => row.code === 'minimum_executable_from_weight' && row.details.minimumExecutableWeight === 0.01),
+      'the run did not say it sized against a floor given as a weight',
+    )
+    assert.ok(
+      !codesOf(dollar.diagnostics).includes('minimum_executable_currency_mismatch'),
+      'a floor that needs no currency still reported a currency mismatch',
+    )
+
+    const blocking = underBook('financial-positive-reaches-buy', { config: { minimumExecutableWeight: 0.2 } })
+    assert.equal(blocking.data.proposedAction, 'WAIT', 'a weight floor above the sized position did not bind')
+    assert.ok(codesOf(blocking.diagnostics).includes('minimum_executable_not_met'))
+
+    /**
+     * ⛔ **On a won book it wins over the amount too.** 500,000 on a five-million-won
+     * book is 0.1 and refuses this case; the stated 0.01 does not, and which answer
+     * arrives is the whole of «stated wins».
+     */
+    const won = underBook('financial-positive-reaches-buy', {
+      currency: 'KRW',
+      totalValue: 5_000_000,
+      config: { minimumExecutableWeight: 0.01 },
+    })
+    assert.equal(won.data.proposedAction, 'BUY', 'the amount governed a run that stated the floor as a weight')
+    assert.ok(!codesOf(won.diagnostics).includes('minimum_executable_from_position'))
+  }
+  ok('#845 — `config.minimumExecutableWeight` needs no currency and wins over the published amount')
+
+  /**
+   * ⛔ **An unrecognised code compares unequal rather than being validated.** The host's
+   * own table knows five currencies and guesses the rest, and a second list in a package
+   * is a list that goes stale against the first — so the safe direction is that a code
+   * nobody recognises leaves the floor *undeclared* rather than dividing won by it.
+   */
+  {
+    const odd = underBook('financial-positive-reaches-buy', {
+      currency: 'KRW',
+      totalValue: 5_000_000,
+      config: { minimumExecutablePositionCurrency: 'XYZ' },
+    })
+    assert.ok(codesOf(odd.diagnostics).includes('minimum_executable_currency_mismatch'))
+    /**
+     * ⚠️ **The book is small enough that the won amount would bind if the code were
+     * ignored** — 500,000 over five million is 0.2 and refuses this case — so `BUY` is
+     * the answer only if the unrecognised code actually stood the floor down.
+     */
+    assert.equal(odd.data.proposedAction, 'BUY', 'an unrecognised floor currency was treated as the pre-registered one')
+    assert.ok(!codesOf(odd.diagnostics).includes('minimum_executable_not_met'))
+  }
+  ok('#845 — a floor currency this package does not recognise is undeclared and never applied anyway')
+
+  /**
+   * ⛔ **The differential the whole change is held to: a won book does not move.** Every
+   * one of the fifteen, under the host's Mandate and the two configurations #841 pinned,
+   * answers exactly what it answered — the currency axis only ever *stops* an amount
+   * being applied to money it is not an amount of.
+   *
+   * ⚠️ Stating the currency explicitly and leaving it to the pre-registered default are
+   * the same run, which is what makes the default a default rather than a second answer.
+   */
+  {
+    for (const totalValue of [WON_BOOK, 5_000_000]) {
+      for (const fixture of cases.cases) {
+        const bare = underBook(fixture.id, { currency: 'KRW', totalValue })
+        const spelled = underBook(fixture.id, {
+          currency: 'KRW',
+          totalValue,
+          config: { minimumExecutablePositionCurrency: 'KRW' },
+        })
+        assert.equal(
+          JSON.stringify(spelled),
+          JSON.stringify(bare),
+          `${fixture.id}: naming the pre-registered floor currency moved a won book`,
+        )
+      }
+    }
+    const acting = new Map([
+      ['financial-positive-reaches-buy', ['BUY', 'buy-path', 0.05333333]],
+      ['reference-plan-is-classified-not-screened-out', ['BUY', 'buy-path', 0.05714286]],
+      ['account-concentration-caps-never-sum', ['WAIT', 'trim-or-exit-review', 0.05333333]],
+      ['a-cap-binds-the-total-and-the-increment-is-what-is-left', ['BUY', 'buy-path', 0.05333333]],
+    ])
+    for (const [id, [action, route, weight]] of acting) {
+      const answer = underBook(id, { currency: 'KRW', totalValue: WON_BOOK })
+      assert.equal(answer.data.proposedAction, action, `${id}: the won book stopped reaching ${action}`)
+      assert.equal(answer.data.route, route, `${id}: route moved on the won book`)
+      assert.equal(answer.data.targetTotalWeight, weight, `${id}: the weight moved on the won book`)
+    }
+  }
+  ok('#845 — the won book this package was written for answers exactly what it answered')
+}
+
 console.log(`\nshareholder-rerating ok — ${checked} check(s)`)

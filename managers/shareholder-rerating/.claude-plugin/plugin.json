@@ -1,5 +1,5 @@
 {
   "name": "shareholder-rerating",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Korea-listed single equities whose earnings and capital headroom support a shareholder return programme that is actually being executed, held for the discount that closing it should close. Separates re-rating from dividends in every number, and never counts a company's buyback as the investor's income."
 }

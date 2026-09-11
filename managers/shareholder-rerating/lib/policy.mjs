@@ -38,10 +38,48 @@
  * ⚠️ **Stated always wins.** A caller naming `mandate.riskBudgetWeight` or
  * `mandate.minimumExecutableWeight` gets its own number and nothing here is consulted,
  * which is what keeps every committed fixture byte-for-byte unchanged.
+ *
+ * ── The floor is money, and money has a currency (`untilled/aumos#845`) ─────
+ *
+ * The reader #841 gave `minimumExecutablePosition` read the amount and not its unit.
+ * 500,000 is won; divided by a **dollar** book of $100,000 it is a floor of 5.0 — five
+ * hundred per cent of the account — so every case that reached sizing was then refused
+ * by it and this package was structurally `WAIT` on any book not denominated in won.
+ * Measured on the fifteen committed fixtures under the host's Mandate verbatim: eight
+ * acting on a won book and **three** on a dollar one, six refused by this floor alone.
+ *
+ * ⚠️ **The reading that looked green was the wrong one.** `portfolio.totalValue` arrives
+ * as a `Money` — an integer count of **minor units** — and a caller that hands
+ * `minorUnits` straight in passes 10,000,000 for that $100,000 book, which puts the
+ * floor back in its ordinary range: seven of the fifteen act. The unit lived only in
+ * prose, so nothing could check it; now the currency is a value on both sides and the
+ * arithmetic runs only when they are the same money.
+ *
+ * ⛔ **No weight was pre-registered to replace it.** A venue minimum is «a share in the
+ * ordinary price range, in a quantity that can be staged into and trimmed», which is
+ * 0.1 of a five-million-won book and 0.00001 of a fifty-billion-won one — there is no
+ * non-fitted weight to publish, and `thresholds.mjs` opens by saying none of its numbers
+ * was fitted. What an investor can state, and now can, is their own: as an amount in
+ * their own currency, or as a weight that needs no currency at all.
  */
-import { mandateCeilings } from './mandate.mjs'
+import { hostConstraints, mandateCeilings } from './mandate.mjs'
 import { diagnostic, finite, round } from './numbers.mjs'
 import { SIZING_POLICY } from './thresholds.mjs'
+
+/**
+ * An ISO 4217 code out of whatever a caller wrote, or `null` when nobody wrote one.
+ *
+ * ⛔ **It is not validated against a list.** The host's own table knows five currencies
+ * and guesses the minor unit of everything else (`packages/domain/src/money.ts`), and a
+ * second list in a manager package is a list that goes stale against the first one. All
+ * this answer is used for is «is this the money the floor is an amount of», and for that
+ * an unrecognised code compares unequal, which is the safe direction.
+ */
+function currencyCode(value) {
+  if (typeof value !== 'string') return null
+  const code = value.trim().toUpperCase()
+  return code === '' ? null : code
+}
 
 /**
  * `{ riskBudgetWeight, minimumExecutableWeight, sources }` plus the diagnostics that
@@ -104,23 +142,84 @@ export function sizingPolicy(input = {}) {
   }
 
   /**
-   * ── The venue floor ──────────────────────────────────────────────────────
+   * ── The venue floor, which is money and therefore has a currency ──────────
    *
    * ⛔ **Without the size of the book this is unexpressible and the refusal stands.**
    * 500,000 won is a weight only against a total, and a floor skipped because the
    * total is unknown is a floor that passed a check it never made.
+   *
+   * ⛔ **And without the currency of the book it is unexpressible in the same way**
+   * (`untilled/aumos#845`). The amount divided by the total is a weight only when both
+   * are the same money. Until #845 the division ran on whatever arrived, so a dollar
+   * book of $100,000 got a floor of 500000/100000 = **5.0** — five hundred per cent of
+   * the account — and every case this package can act on sized and was then refused by
+   * it. Measured on the fifteen committed fixtures under the host's Mandate: eight
+   * acting on a won book, three on a dollar one.
+   *
+   * ⚠️ **A currency that was read and differs is an undeclared axis, not a missing
+   * input.** This package published a minimum for a Korean venue; about a dollar
+   * venue it has published nothing, and #838 settled that an axis the Mandate declares
+   * nothing on constrains nothing rather than withholding everything. So the floor is
+   * `0` there and a `warn` names both currencies and the two settings that state one.
+   * ⛔ A currency the run never read is nobody having looked, and that still refuses.
    */
   let minimumExecutableWeight = null
   let minimumSource = 'unresolved'
   if (finite(mandate.minimumExecutableWeight)) {
     minimumExecutableWeight = mandate.minimumExecutableWeight
     minimumSource = 'stated'
+  } else if (finite(config.minimumExecutableWeight) && config.minimumExecutableWeight >= 0) {
+    /**
+     * ⚠️ **The one spelling of this floor that never needs a currency.** An investor
+     * whose venue is not the one this package was written against states the smallest
+     * position it can express as a share of the book, and nothing below is consulted.
+     */
+    minimumExecutableWeight = config.minimumExecutableWeight
+    minimumSource = 'config-weight'
+    diagnostics.push(
+      diagnostic(
+        'minimum_executable_from_weight',
+        'info',
+        `This instance states the smallest position its venue can express as ${round(minimumExecutableWeight)} of the book, so no amount of money and no currency entered this run's floor.`,
+        'config.minimumExecutableWeight',
+        { minimumExecutableWeight: round(minimumExecutableWeight) },
+      ),
+    )
   } else if (declared.read) {
     const position = finite(config.minimumExecutablePosition) && config.minimumExecutablePosition >= 0
       ? config.minimumExecutablePosition
       : SIZING_POLICY.minimumExecutablePosition
+    const floorCurrency = currencyCode(config.minimumExecutablePositionCurrency)
+      ?? SIZING_POLICY.minimumExecutablePositionCurrency
+    const bookCurrency = currencyCode(hostConstraints(mandate)?.baseCurrency)
     const totalValue = input.book?.totalValue
-    if (finite(totalValue) && totalValue > 0) {
+    if (bookCurrency === null) {
+      diagnostics.push(
+        diagnostic(
+          'account_currency_not_stated',
+          'warn',
+          `The venue minimum is ${round(position, 0)} ${floorCurrency} and whether that is a statement about this account at all depends on what this account is denominated in. Pass the Mandate's \`constraints.baseCurrency\` — or state \`config.minimumExecutableWeight\`, which needs no currency.`,
+          'mandate.constraints.baseCurrency',
+          { minimumExecutablePosition: round(position, 0), minimumExecutablePositionCurrency: floorCurrency },
+        ),
+      )
+    } else if (bookCurrency !== floorCurrency) {
+      minimumExecutableWeight = 0
+      minimumSource = 'undeclared'
+      diagnostics.push(
+        diagnostic(
+          'minimum_executable_currency_mismatch',
+          'warn',
+          `The smallest position this methodology published is ${round(position, 0)} ${floorCurrency} and this book is denominated in ${bookCurrency}, so it is a fact about another venue and says nothing about this one. No venue floor constrained this run: state \`config.minimumExecutablePosition\` with \`config.minimumExecutablePositionCurrency\` set to ${bookCurrency}, or state \`config.minimumExecutableWeight\` as a share of the book.`,
+          'config.minimumExecutablePositionCurrency',
+          {
+            minimumExecutablePosition: round(position, 0),
+            minimumExecutablePositionCurrency: floorCurrency,
+            baseCurrency: bookCurrency,
+          },
+        ),
+      )
+    } else if (finite(totalValue) && totalValue > 0) {
       minimumExecutableWeight = round(position / totalValue)
       minimumSource = finite(config.minimumExecutablePosition) ? 'config' : 'methodology'
       diagnostics.push(
