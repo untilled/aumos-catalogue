@@ -1891,6 +1891,182 @@ check('#269 — the withheld entry is a WATCH about the account, and the held ru
   assert.equal(reduction.verdict, 'RE_ADJUDICATE', 'a risk-reducing rung was replaced by the account absence below it')
 })
 
+// ── ⑬ the Mandate the host actually sends (`untilled/aumos#838`) ──────────
+/**
+ * ⛔ **Every cap above this line was written by hand, and that is what let this
+ * defect live through twelve orders of work.** The fixtures state
+ * `{ singleNameCap, grossCap }` because that is what this package calls them —
+ * so every assertion passed while a run handed the *investor's* Mandate refused
+ * on both of them and sized nothing at all.
+ *
+ * The host's `mandate.constraints` is a closed set of eight fields. It is built
+ * here, in full, from `packages/amp/src/snapshots.ts`, and the checks below
+ * drive the package with **nothing else**:
+ *
+ *   `maxPositionWeight` → `singleNameCap`   `cashFloor` → `grossCap` as `1 − cashFloor`
+ *   and no sector or per-strategy axis exists in that contract at all.
+ *
+ * ⚠️ **The fixtures on disk are not touched.** The Mandate is built in this file
+ * and every case is a deep copy, so a reviewer sees the difference between two
+ * inputs rather than having to diff two fixture files.
+ */
+const HOST_CONSTRAINTS = Object.freeze({
+  baseCurrency: 'KRW',
+  allowedAssetClasses: ['equity', 'etf', 'crypto', 'cash'],
+  maxPositionWeight: 0.1,
+  cashFloor: 0.1,
+  maxDrawdown: 0.06,
+  allowShorting: true,
+  allowLeverage: true,
+  excludedSymbols: [],
+})
+const hostMandate = (overrides = {}) => ({
+  mandateId: 'mdt_838',
+  version: 3,
+  label: 'Untilled',
+  objective: 'Compound the book without a drawdown that ends it',
+  horizonDays: 365,
+  constraints: { ...HOST_CONSTRAINTS, ...overrides },
+})
+/** The constraints object with a key deleted rather than set to `undefined`. */
+const hostMandateWithout = (...fields) => {
+  const mandate = hostMandate()
+  for (const field of fields) delete mandate.constraints[field]
+  return mandate
+}
+const sizeWithMandate = (mandate, mutate = () => {}) => {
+  const input = positiveSizing()
+  input.mandate = mandate
+  mutate(input)
+  return execute({ operation: 'positionSizing', asOf: ASOF, input })
+}
+
+check('the Mandate as the host sends it sizes, under the names this package uses', () => {
+  for (const [what, mandate] of [
+    ['the snapshot verbatim', hostMandate()],
+    ['the bare constraints object', hostMandate().constraints],
+  ]) {
+    const answer = sizeWithMandate(mandate)
+    assert.equal(answer.status, 'ok', `${what}: a Mandate carrying both ceilings refused`)
+    assert.ok(answer.targetTotalWeight > 0, `${what}: and produced no weight`)
+    assert.deepEqual(
+      answer.diagnostics.filter((row) => row.severity === 'unevaluated' || row.severity === 'blocked'),
+      [],
+      `${what}: and a BUY over it is authorised by checks that actually ran`,
+    )
+  }
+})
+
+check('`maxPositionWeight` is the single-name ceiling and it binds', () => {
+  /**
+   * ⚠️ **Measured, not asserted structurally.** The investor's 0.02 has to
+   * *bind* — the risk budget sizes this case at 0.03623596, so a cap that was
+   * merely read and not applied leaves that number standing.
+   */
+  const loose = sizeWithMandate(hostMandate())
+  assert.equal(loose.bindingConstraint, 'risk-budget', 'the 0.1 ceiling is wider than the risk budget, as the control assumes')
+  const tight = sizeWithMandate(hostMandate({ maxPositionWeight: 0.02 }))
+  assert.equal(tight.status, 'ok')
+  assert.equal(tight.bindingConstraint, 'single-name-headroom', 'the investor\'s concentration answer is what bound it')
+  assert.equal(tight.targetTotalWeight, 0.02)
+  assert.ok(tight.targetTotalWeight < loose.targetTotalWeight)
+})
+
+check('`cashFloor` is the gross ceiling, as its complement, and it binds', () => {
+  /**
+   * ⚠️ **The same regression #269 wrote for a hand-written `grossCap`, driven
+   * off the field the investor actually answers.** A 0.2 cash floor is a 0.8
+   * gross ceiling; 0.79 of the book held elsewhere leaves 0.01.
+   */
+  const crowded = sizeWithMandate(hostMandate({ cashFloor: 0.2 }), (input) => {
+    input.book.holdings = [{ symbol: 'OTHER', weight: 0.79, strategy: 'another-manager' }]
+  })
+  assert.equal(crowded.status, 'ok')
+  assert.equal(crowded.bindingConstraint, 'gross-headroom', 'the declared cash floor is what bound it')
+  assert.equal(crowded.targetTotalWeight, 0.01, 'so the 3.6% the risk budget wanted becomes the 1% the floor leaves')
+
+  const full = sizeWithMandate(hostMandate({ cashFloor: 0.2 }), (input) => {
+    input.book.holdings = [{ symbol: 'OTHER', weight: 0.8, strategy: 'another-manager' }]
+  })
+  assert.equal(full.status, 'refused')
+  assert.equal(full.code, 'risk_limit_exceeded')
+  assert.equal(full.bindingConstraint, 'gross-headroom')
+})
+
+check('a Mandate that declares no cash floor constrains nothing, and no Mandate at all still refuses', () => {
+  /**
+   * ⛔ **The two facts this package already separated one axis over.** The
+   * sector branch reads an undeclared ceiling as *«the investor declined to
+   * constrain that axis»* and an unreadable one as a refusal; the gross branch
+   * refused both, four lines away, under a name the host has never sent.
+   */
+  const undeclared = sizeWithMandate(hostMandateWithout('cashFloor'))
+  assert.equal(undeclared.status, 'ok', 'an investor who left the cash question blank stopped this run from sizing')
+  assert.ok(
+    undeclared.diagnostics.some((row) => row.code === 'gross_cap_not_applicable' && row.severity === 'info'),
+    'and the declined axis has to say so rather than be silently skipped',
+  )
+  assert.deepEqual(
+    undeclared.diagnostics.filter((row) => row.severity === 'unevaluated' || row.severity === 'blocked'),
+    [],
+    'a declared absence is not an unevaluated reading',
+  )
+  /** The gross ceiling is genuinely gone: a book 99% invested is not stopped by it. */
+  const wide = sizeWithMandate(hostMandateWithout('cashFloor'), (input) => {
+    input.book.holdings = [{ symbol: 'OTHER', weight: 0.99, strategy: 'another-manager' }]
+  })
+  assert.equal(wide.status, 'ok')
+  assert.notEqual(wide.bindingConstraint, 'gross-headroom')
+
+  /** ⛔ And the unread case is untouched: no Mandate in sight is still a refusal. */
+  const unread = sizeWith((input) => { delete input.mandate.grossCap })
+  assert.equal(unread.status, 'refused', 'an unread gross cap stopped refusing')
+  assert.equal(unread.code, 'data_missing')
+  assert.ok(unread.diagnostics.some((row) => row.code === 'mandate_gross_cap_missing'))
+})
+
+check('a Mandate that declares no concentration limit still refuses', () => {
+  /**
+   * ⚠️ **And that refusal is right.** `maxPositionWeight` is a field the host
+   * really sends and the screen really asks for; an investor who left it blank
+   * has not authorised this run to choose its own limit. ⛔ Only the *gross*
+   * axis changed, because the host has no field of that name to leave blank.
+   */
+  const answer = sizeWithMandate(hostMandateWithout('maxPositionWeight'))
+  assert.equal(answer.status, 'refused')
+  assert.equal(answer.code, 'data_missing')
+  assert.ok(answer.diagnostics.some((row) => row.code === 'mandate_single_name_cap_missing'))
+})
+
+check('a stated cap wins, so a Mandate riding alongside changes nothing at all', () => {
+  /**
+   * ⛔ **The differential this whole change is held to.** Every case that states
+   * its ceilings must be byte-for-byte what it was, whatever else is passed —
+   * including a Mandate whose numbers are different ones.
+   */
+  for (const [what, mandate] of [
+    ['the host snapshot', hostMandate({ maxPositionWeight: 0.9, cashFloor: 0.5 })],
+    ['a Mandate declaring neither', hostMandateWithout('maxPositionWeight', 'cashFloor')],
+  ]) {
+    for (const book of [
+      { holdings: [], openProposals: [] },
+      { holdings: [{ symbol: 'OTHER', weight: 0.79, strategy: 'another-manager' }], openProposals: [] },
+      { holdings: [{ symbol: 'FMR001', weight: 0.04, strategy: 'another-manager' }], openProposals: [] },
+    ]) {
+      const stated = sizeWith((input) => { input.book = clone(book) })
+      const alongside = sizeWith((input) => {
+        input.book = clone(book)
+        Object.assign(input.mandate, mandate)
+      })
+      assert.equal(
+        JSON.stringify(alongside),
+        JSON.stringify(stated),
+        `${what}: a stated cap stopped winning over the Mandate beside it`,
+      )
+    }
+  }
+})
+
 // ── ⑬ asOf is not optional ────────────────────────────────────────────────
 check('every operation refuses a call with no asOf', () => {
   for (const operation of ['priceState', 'stabilisation', 'reversionTarget', 'positionSizing', 'stagedPlan', 'classifyCase']) {

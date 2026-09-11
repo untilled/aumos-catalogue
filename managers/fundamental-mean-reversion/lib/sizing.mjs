@@ -38,6 +38,7 @@
  * business a company is in. This package makes no such reading.
  */
 import { THRESHOLDS, diagnostic, finite, narrowingOnly, round } from './core.mjs'
+import { mandateCeilings } from './mandate.mjs'
 
 /**
  * The fewest adjacent readable closes from which «the worst session in this
@@ -497,26 +498,53 @@ export function positionSizing(input = {}) {
   }
 
   const exposure = concentration(book, symbol, strategyId)
-  const singleNameCap = finite(mandate.singleNameCap) ? mandate.singleNameCap : null
-  const grossCap = finite(mandate.grossCap) ? mandate.grossCap : null
+  /**
+   * ── The Mandate, under the host's names as well as this package's (#838) ──
+   *
+   * ⚠️ **`maxPositionWeight` is the single-name ceiling and `1 − cashFloor` is
+   * the gross one.** Both are questions the investor is actually asked and both
+   * arrive on every invocation; this package read neither, so a run handed the
+   * Mandate verbatim refused on both lines below and sized nothing. The names
+   * this file uses still win where a caller states them, which is why nothing
+   * measured here moves. `mandate.mjs` carries the rule and the discriminator.
+   */
+  const ceilingsDeclared = mandateCeilings(mandate)
+  const singleNameCap = ceilingsDeclared.singleNameCap
+  const grossCap = ceilingsDeclared.grossCap
   if (singleNameCap === null) {
     diagnostics.push(diagnostic('mandate_single_name_cap_missing', 'blocked', 'The mandate\'s single-name ceiling is what this weight is measured against and it is missing. A run that sized without it would be choosing its own limit', 'mandate.singleNameCap'))
     return { status: 'refused', code: 'data_missing', haircut, exposure, diagnostics }
   }
   /**
-   * ⛔ **And the gross cap is refused on the same argument.** It was named in
-   * this function's input contract and, when absent, its headroom was `null`,
-   * filtered out of the ceiling list, and silently not applied — a declared
-   * account limit that a caller could omit its way past.
+   * ⛔ **An unread gross cap refuses; a Mandate that declares none constrains
+   * nothing.** The refusal is the older half and it stands: named in this
+   * function's input contract and absent, its headroom was `null`, filtered out
+   * of the ceiling list and silently not applied — a declared account limit a
+   * caller could omit its way past.
+   *
+   * ⚠️ **What #838 separated out is the other half.** There is no `grossCap`
+   * anywhere in the host's Mandate; what there is is `cashFloor`, and an
+   * investor who answered neither question has declined to constrain the gross
+   * axis rather than left a gap. That is `sizing.mjs`'s own sector sentence —
+   * *declared and unevaluable refuses; undeclared constrains nothing* — applied
+   * to the axis that was contradicting it four lines away.
    */
   if (grossCap === null) {
+    if (!ceilingsDeclared.read) {
+      diagnostics.push(diagnostic(
+        'mandate_gross_cap_missing',
+        'blocked',
+        'The mandate\'s gross ceiling is named in this operation\'s input contract and was not readable. An unreadable limit is not an absent one, and dropping it from the list of ceilings is the difference between a book at 79% invested and one with room',
+        'mandate.grossCap',
+      ))
+      return { status: 'refused', code: 'data_missing', haircut, exposure, diagnostics }
+    }
     diagnostics.push(diagnostic(
-      'mandate_gross_cap_missing',
-      'blocked',
-      'The mandate\'s gross ceiling is named in this operation\'s input contract and was not readable. An unreadable limit is not an absent one, and dropping it from the list of ceilings is the difference between a book at 79% invested and one with room',
+      'gross_cap_not_applicable',
+      'info',
+      'This mandate was read and states neither a gross ceiling nor a cash floor, so the gross axis is not applicable on this run rather than unchecked. Said out loud, because an axis nobody looked at and an axis nobody declared must not leave the same trace',
       'mandate.grossCap',
     ))
-    return { status: 'refused', code: 'data_missing', haircut, exposure, diagnostics }
   }
   /**
    * ── the sector ceiling, which nothing here used to read (#269) ───────────
@@ -645,7 +673,7 @@ export function positionSizing(input = {}) {
     { name: 'strategy-headroom', value: strategyCap === null ? null : round(strategyCap - otherName) },
   ]
   const residualAxes = (otherGross, otherSector) => [
-    { name: 'gross-headroom', value: round(grossCap - otherGross) },
+    { name: 'gross-headroom', value: grossCap === null ? null : round(grossCap - otherGross) },
     { name: 'sector-headroom', value: otherSector === null ? null : round(sectorCap - otherSector) },
   ]
   const ceilingsAgainst = (otherName, otherGross, otherSector) =>
