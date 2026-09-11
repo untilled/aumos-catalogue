@@ -2076,6 +2076,77 @@ check('every operation refuses a call with no asOf', () => {
   }
 })
 
-console.log(`✓ fundamental-mean-reversion — ${checks} check(s) over ${cases.cases.length} classification, ${sizing.cases.length} sizing, ${staged.cases.length} staged-plan and ${reversion.cases.length} target fixtures`)
-console.log('   ⛔ synthetic bars, and no host: proposal storage, WATCH re-arming, decision-to-fill linkage and')
+// ── ⑭ the reference case, replayed on as-of material (#256) ───────────────
+//
+// Every other fixture here carries synthetic bars. `reference-replay.json` does
+// not: its series is the daily OHLCV the investor's own record holds, truncated at
+// the last session that had closed when the decision was made, and its research
+// block is transcribed from the decision plan of that day. The thesis file is
+// excluded in full — it was written four days later and its technical premise
+// («RSI14 20대») does not reproduce from the record it sits on.
+//
+// ⛔ A green tick here does **not** re-audit the investor's reported result, which
+// #256 says was never audited and is not a validated edge. It says the library, fed
+// only what was knowable on the day, answers what the fixture records — and what it
+// records is `data-missing`, because the record's history is 63 bars short of what
+// a 200-bar average needs. That is a valid replay result, not a failure.
+const replay = read('reference-replay.json')
+
+check('the replay declares its eligibility and what it excluded', () => {
+  assert.ok(['eligible', 'ineligible'].includes(replay.replayEligibility), 'replayEligibility is eligible or ineligible')
+  assert.ok(Array.isArray(replay.excluded) && replay.excluded.length > 0, 'a replay with nothing excluded has not been checked for contamination')
+  for (const row of replay.excluded) {
+    assert.ok(['future_information', 'post_hoc_revision', 'data_missing'].includes(row.reason), `reference-replay.json: ${row.item} carries an unknown exclusion reason ${row.reason}`)
+  }
+})
+
+for (const row of replay.cases) {
+  const bars = replay.series
+    .filter(([date]) => date <= row.upTo)
+    .map(([date, open, high, low, close, volume]) => ({ timestamp: `${date}${replay.timestampSuffix}`, open, high, low, close, volume }))
+  const answer = execute({
+    operation: 'classifyCase',
+    asOf: row.asOf,
+    input: { ...row.input, series: { adjustment: row.declared ?? undefined, corporateActions: [], rows: bars } },
+  })
+
+  check(`reference-replay/${row.name}`, () => {
+    assert.equal(bars.length, row.measured.bars, `${row.name}: bar count`)
+    assert.equal(answer.outcome, row.expect.outcome, `${row.name}: outcome`)
+    assert.equal(answer.verdict, row.expect.verdict, `${row.name}: verdict`)
+    assert.equal(answer.code, row.expect.code, `${row.name}: diagnosis code`)
+    assert.equal(answer.lens, row.expect.lens, `${row.name}: lens`)
+    assert.equal(answer.technical?.rsi14 ?? null, row.measured.rsi14, `${row.name}: RSI`)
+    assert.equal(answer.technical?.drawdownFromHigh ?? null, row.measured.drawdownFromHigh, `${row.name}: drawdown`)
+    assert.equal(answer.technical?.ma200Distance ?? null, row.measured.ma200Distance, `${row.name}: distance from the 200-bar average`)
+    if (row.measured.close !== null) assert.equal(answer.technical?.close ?? null, row.measured.close, `${row.name}: newest close`)
+    for (const code of row.expect.diagnosticCodes ?? []) {
+      assert.ok((answer.diagnostics ?? []).some((entry) => entry.code === code), `${row.name}: expected diagnostic ${code}`)
+    }
+    /**
+     * ⛔ #254, and the reason the two contamination controls exist. An absent
+     * input says nothing about the thesis, and supplying it afterwards — three
+     * future sessions, or an adjustment basis nobody declared — must not turn the
+     * run into a refutation either.
+     */
+    if (row.expect.noRefutation === true) {
+      assert.notEqual(answer.code, 'thesis_refuted', `${row.name}: an absent or a late-supplied input was filed as a refuted thesis`)
+      assert.notEqual(answer.outcome, 'structural-earnings-damage', `${row.name}: unreadable history was filed as damage`)
+    }
+  })
+}
+
+check('the replay records the RSI the excluded thesis does not reproduce', () => {
+  /**
+   * Not a claim about the company — a claim about the record. The thesis excluded
+   * as a post-hoc revision asserts an RSI in the twenties at 2026-06-26; the series
+   * the same record holds gives the low forties at both dates the replay reads. The
+   * assertion is here so the exclusion has a checkable reason rather than a
+   * paragraph's.
+   */
+  for (const row of replay.cases) assert.ok(row.measured.rsi14 > 35, `${row.name}: RSI ${row.measured.rsi14}`)
+})
+
+console.log(`✓ fundamental-mean-reversion — ${checks} check(s) over ${cases.cases.length} classification, ${sizing.cases.length} sizing, ${staged.cases.length} staged-plan, ${reversion.cases.length} target fixtures and ${replay.cases.length} reference-replay runs (${replay.replayEligibility})`)
+console.log('   ⛔ synthetic bars everywhere but the replay, and no host: proposal storage, WATCH re-arming, decision-to-fill linkage and')
 console.log('      cross-manager exposure attribution are #256 criteria this checker cannot reach.')

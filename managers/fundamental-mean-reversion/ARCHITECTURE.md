@@ -518,8 +518,10 @@ at the candidate passes every other one.
 
 ## Fixtures
 
-Synthetic bars, generated once and committed. ⛔ **They are shapes, not prices.** No vendor data
-is redistributed and no assertion over them is evidence about a market.
+Synthetic bars, generated once and committed. ⛔ **They are shapes, not prices**, and no assertion
+over them is evidence about a market. The one exception is `reference-replay.json`, described
+below, whose series is real daily OHLCV from one listed name — public exchange data, carried
+because a replay of an actual decision cannot be run on invented bars.
 
 `fixtures/series.json` holds eleven series, each 300 weekday sessions ending 2026-08-28, as
 compact `[date, open, high, low, close, volume]` rows. The other three files reference them by
@@ -566,6 +568,41 @@ earning-power range missing its inputs, a band above the prior high, and no basi
 
 Every case's `measured` block is committed, so a change in the arithmetic shows up as a fixture
 diff rather than as a quiet re-ranking.
+
+### Reference case replay
+
+`fixtures/reference-replay.json` answers one of #256's completion conditions — «과거 세 사례는 당시
+시점 자료만으로 분류·논거 복원이 되는지 확인한다». The case is **NAVER (035420), decided
+2026-06-24**, and the sources are the investor's own private record at commit `1fa18c5`: the
+decision plan `plans/2026-06-24_decision_v2.md` for the research half, and `data/history/035420.jsonl`
+for the series. Each field in the fixture carries its own source pointer. Nothing else from that
+record is here: no balances, no order ids, no account values.
+
+**What was excluded, and why.** `theses/035420_NAVER.md` in full, as a `post_hoc_revision` — git says
+it was first committed 2026-06-28, four days after the decision, and revised three times after that.
+Its own «Why Now» claims RSI14 in the twenties at 2026-06-26; the series in the same record gives
+**40.48** at 2026-06-23 and **39.61** at 2026-06-26, and the decision plan itself records RSI 40.7. A
+thesis whose technical premise does not reproduce from the record it sits on is not as-of material.
+Also excluded as `future_information`: the 2026-06-26 plan the thesis cites, the 2026-06-27 account
+snapshot, and every Review Log row from 2026-07-20 on. Marked `data_missing`: the series adjustment
+basis (the history file declares none), `sizing.downsideValue`, and `research.maxWaitDays`.
+
+**Observed outcome.** `data-missing` → **WATCH**, code `data_missing`, with `history_too_short` and
+`adjustment_basis_undeclared`. The record's history begins 2025-09-12, which leaves **187 completed
+bars** against the 250 this package requires before it will read a 200-bar average — so `ma200`,
+`ma200Distance` and the discovery gate are all unadjudicable. `replayEligibility` in the fixture is
+**`ineligible`**, and that is the honest result rather than a failure: the classification could not
+be restored from as-of material, and the run says which material was short.
+
+Two contamination controls sit beside it — three future sessions added, and the adjustment basis
+asserted — and neither moves the answer or produces a refutation, which is #254's rule checked from
+the side it is usually not checked from.
+
+⛔ **The outcome above was not tuned.** No threshold in `lib/core.mjs` was touched for this fixture,
+and the value recorded is what the library returned on the first run. The investor's reported ~10%
+result is **not** re-audited here, by this fixture or anywhere in this package; #256 is explicit that
+it was never audited and is not a validated edge. This is a replay of one classification, not a
+performance claim.
 
 ## Running the checks
 

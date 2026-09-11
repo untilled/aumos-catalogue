@@ -189,6 +189,52 @@ for (const code of ['data_missing', 'research_incomplete', 'thesis_refuted', 'ri
 ok('data_missing, research_incomplete, thesis_refuted and risk_limit_exceeded are each reached by a fixture')
 
 /**
+ * ── ⑵b the reference case, replayed on as-of material (#256) ──────────────
+ *
+ * `cases.json` is illustrative. `reference-replay.json` is not: every field in it
+ * is transcribed from the investor's private record at a fixed commit, dated on or
+ * before 2026-05-25, with everything later — and the whole thesis file, which did
+ * not exist until 2026-06-28 — listed as excluded rather than mixed in. Inputs the
+ * record does not carry are `null` and named as `data_missing`; none was estimated,
+ * and no exit line was read as a fair value.
+ *
+ * ⛔ A green tick here does **not** re-audit the investor's reported result, which
+ * #256 says was never audited and is not a validated edge. It says the library, fed
+ * only what was knowable on the day, answers what the fixture records. The answer is
+ * a WAIT, it was not tuned to be one, and nothing was tuned to make it a BUY either.
+ */
+const replay = await read('reference-replay.json')
+
+assert.ok(['eligible', 'ineligible'].includes(replay.replayEligibility), 'reference-replay.json: replayEligibility is eligible or ineligible')
+assert.ok(Array.isArray(replay.excluded) && replay.excluded.length > 0, 'reference-replay.json: a replay with nothing excluded has not been checked for contamination')
+for (const row of replay.excluded) {
+  assert.ok(['future_information', 'post_hoc_revision', 'data_missing'].includes(row.reason), `reference-replay.json: ${row.item} carries an unknown exclusion reason ${row.reason}`)
+}
+ok(`reference-replay — ${replay.replayEligibility}, ${replay.excluded.length} excluded item(s), each with a reason`)
+
+for (const fixture of replay.cases) {
+  const answer = evaluateCase(fixture.input)
+  const where = `reference-replay/${fixture.id}`
+  for (const key of ['case', 'route', 'outcomeCode', 'proposedAction']) {
+    assert.equal(answer.data[key], fixture.expect[key], `${where}: ${key}`)
+  }
+  for (const code of fixture.expect.diagnosticCodes ?? []) {
+    assert.ok(codesOf(answer.diagnostics).includes(code), `${where}: expected diagnostic ${code}, got ${codesOf(answer.diagnostics).join(', ')}`)
+  }
+  /**
+   * ⛔ #254, and the reason the contamination controls are here. An input nobody
+   * could read says nothing about the thesis; supplying it afterwards — a later
+   * account state, or a capital ratio read off the wrong line — must not turn the
+   * run into a refutation either.
+   */
+  if (fixture.expect.noRefutation === true) {
+    assert.notEqual(answer.data.outcomeCode, 'thesis_refuted', `${where}: an absent or a late-supplied input was filed as a refuted thesis`)
+    assert.notEqual(answer.data.case, 'capital-inadequate', `${where}: an unreadable capital position was filed as an inadequate one`)
+  }
+  ok(`${where} — ${answer.data.case} → ${answer.data.route} → ${answer.data.proposedAction}`)
+}
+
+/**
  * ── ⑶ the staged plan ─────────────────────────────────────────────────────
  */
 for (const fixture of staged.cases) {
