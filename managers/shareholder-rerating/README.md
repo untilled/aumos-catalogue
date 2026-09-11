@@ -125,10 +125,14 @@ wakes the manager next, so a failed run has a defined way back.
 - **What a key costs.** OpenDART is free and requires registration. The broker connection is one
   you already have; Aumos relays the vendor's answer and never exposes the credential to this
   package.
-- **Settings.** Five, all optional: how often a held thesis is fully re-argued, how many theses this
-  instance carries at once, the smallest position worth opening in won, your dividend withholding
-  rate, and the share of the book risked on one idea. Nothing in them can loosen your Mandate, and
-  the last may only be lowered.
+- **Settings.** Seven, all optional: how often a held thesis is fully re-argued, how many theses this
+  instance carries at once, the smallest position worth opening — as an amount, in a currency you
+  name, or as a share of the book — your dividend withholding rate, and the share of the book risked
+  on one idea. Nothing in them can loosen your Mandate, and the last may only be lowered.
+- **If your account is not in won.** The smallest position worth opening is an *amount of money*,
+  and the 500,000 KRW this package publishes is a fact about a Korean venue. On a book denominated
+  in anything else that floor simply does not apply: the run says so and nothing else changes. Give
+  it your own — an amount plus its currency, or a share of the book — if you want one.
 - **Where you approve.** Everywhere. It proposes one decision per run; you approve it, Aumos sizes
   and routes the order. There is no capability in this package that can place one.
 - **What your Mandate must state.** A single-name cap — your concentration limit. This package

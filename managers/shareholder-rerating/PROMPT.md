@@ -93,10 +93,24 @@ this file. Then the Mandate's limits and the book: holdings, cash, and **open pr
 approved yet**, including other managers'. An unapproved proposal is exposure that is about to
 exist, and every weight below counts it.
 
-⚠️ **Pass the size of the book as `book.totalValue`** — the invocation's `portfolio.totalValue`, in
-major units of the account's base currency. The venue minimum below is published in won and is a
-weight only against a total, so without it this package cannot say whether the position it sized
-is one this venue can express, and it refuses rather than assuming it is.
+⚠️ **Pass the size of the book as `book.totalValue`, converted to major units yourself.** The
+invocation carries `portfolio.totalValue` as a **`Money`** — `{ currency, minorUnits, exponent? }`,
+an integer count of *minor* units — and this package wants a plain number of *major* ones:
+
+    book.totalValue = portfolio.totalValue.minorUnits / 10 ** (portfolio.totalValue.exponent ?? decimals(currency))
+
+where `decimals` is the currency's own minor unit: **0 for KRW and JPY, 2 for USD, EUR and GBP**.
+⛔ **Do not hand `minorUnits` straight in.** On a won book the two are the same number and nothing
+goes wrong; on a $100,000 book `minorUnits` is 10,000,000, a hundred times the account, and the
+venue floor below then lands back in its ordinary range — so **the wrong reading is the one that
+looks like it works** and only a dollar book ever shows it. Say in your reasoning which currency the
+account is in and what total you passed.
+
+⚠️ **Pass the account's currency too, as the Mandate's `constraints.baseCurrency`** — hand the
+Mandate through as it arrived and it is already there. The venue minimum below is an *amount of
+money*, and an amount is a weight only against a total denominated in the same money. Without the
+total this package refuses rather than assuming the position is executable; without the currency it
+refuses for the same reason, because a currency nobody read is not a currency that matched.
 
 Read your own folder next: the staged-plan ledger, the candidates a previous run left unfinished,
 and the review you armed last time. **A run that follows a failed one continues that work.** If
@@ -498,7 +512,9 @@ Everything above happens on every run. These are loaded when the run reaches the
 |---|---|---|
 | `deepReviewIntervalDays` | **30** | how often a held thesis gets a full re-argument rather than a price check |
 | `maxActiveTheses` | **6** | how many completed theses this instance carries at once, so depth beats breadth |
-| `minimumExecutablePosition` | **500000** KRW | below this a position cannot be scaled or trimmed in this venue, so it is refused rather than opened. ⚠️ It becomes a weight as `minimumExecutablePosition / book.totalValue`, and without the account's value nothing is sized |
+| `minimumExecutablePosition` | **500000** | below this a position cannot be scaled or trimmed in that venue, so it is refused rather than opened. ⚠️ It becomes a weight as `minimumExecutablePosition / book.totalValue`, and without the account's value nothing is sized |
+| `minimumExecutablePositionCurrency` | **KRW** | the money the amount above is an amount of. ⛔ It governs **only** a book whose `baseCurrency` is this: on any other the venue minimum for this account is **undeclared**, the run says so in a `warn`, and no floor constrains it. That is a declared absence and not a pass — say it in `uncertainty` |
+| `minimumExecutableWeight` | **unset** | the same floor as a share of the book, which needs no currency. There is no default: a venue minimum is money, and the same amount is 0.1 of a small book and 0.00001 of a large one, so any weight here would be fitted to one account size. Stated, it wins outright |
 | `riskBudgetWeight` | **0.01** | share of the book this methodology risks on one idea reaching its invalidation. ⚠️ It may be **narrowed** here and never widened: a larger setting is refused, reported, and 0.01 governs |
 | `dividendWithholdingTaxRate` | **0.154** | the rate the net dividend leg is computed at when the invocation states none |
 

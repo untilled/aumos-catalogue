@@ -23,7 +23,21 @@
       "type": "number",
       "minimum": 0,
       "default": 500000,
-      "description": "In won. The smallest position worth opening in this venue: below it, a KOSPI-listed share priced anywhere in the ordinary 10,000-100,000 won range gives a position of a handful of shares, which cannot be staged into or trimmed without changing the weight materially, and whose result is round-trip cost rather than the idea. A weight below this is refused rather than rounded up to it. It becomes a weight as minimumExecutablePosition / book.totalValue, so a run that does not state the size of the account cannot make the comparison and refuses rather than skipping it."
+      "description": "An amount of money, in the currency minimumExecutablePositionCurrency names. The smallest position worth opening in that venue: below it, a KOSPI-listed share priced anywhere in the ordinary 10,000-100,000 won range gives a position of a handful of shares, which cannot be staged into or trimmed without changing the weight materially, and whose result is round-trip cost rather than the idea. A weight below this is refused rather than rounded up to it. It becomes a weight as minimumExecutablePosition / book.totalValue, so a run that does not state the size of the account cannot make the comparison and refuses rather than skipping it. It governs ONLY a book denominated in that same currency: on any other the venue minimum for this account is undeclared, the run says so, and no floor constrains it. State minimumExecutableWeight instead to give the floor as a share of the book, which needs no currency at all."
+    },
+    "minimumExecutablePositionCurrency": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{3}$",
+      "default": "KRW",
+      "description": "ISO 4217 code of the money minimumExecutablePosition is an amount of. KRW because this methodology was written against a Korean venue, and it is a setting rather than a sentence in the prose because a unit that only the prose carries is a unit the arithmetic cannot check: 500,000 divided by a 100,000 dollar book is a floor of 5.0 - five hundred per cent of the account - which no position clears, so the package waited on every book not denominated in won. It is compared against the Mandate's constraints.baseCurrency. An unrecognised code simply compares unequal, which leaves the venue floor undeclared rather than misapplied.",
+      "examples": ["KRW", "USD"]
+    },
+    "minimumExecutableWeight": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "The same floor as a share of the whole book, and the one spelling of it that needs no currency. There is no default and there is deliberately none: a venue minimum is an amount of money - a share in its ordinary price range, in a quantity that can be staged into and trimmed - and the same statement is 0.1 of a five-million-won account and 0.00001 of a fifty-billion-won one, so no weight could be published here that was not fitted to one account size. Stated, it wins over minimumExecutablePosition outright and nothing about currency is consulted.",
+      "examples": [0.004]
     },
     "riskBudgetWeight": {
       "type": "number",

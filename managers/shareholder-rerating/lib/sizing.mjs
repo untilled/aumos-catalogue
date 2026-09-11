@@ -194,7 +194,7 @@ export function targetWeight(input = {}) {
       diagnostic(
         'minimum_executable_not_stated',
         'unevaluated',
-        'The smallest position this venue can express was not stated and could not be derived, so whether the computed weight is executable at all is unknown. It is not assumed to be: it is published in won and becomes a weight only against `book.totalValue`.',
+        'The smallest position this venue can express was not stated and could not be derived, so whether the computed weight is executable at all is unknown. It is not assumed to be: it is published as an amount of money in one named currency, and becomes a weight only against a `book.totalValue` denominated in that same currency. State `config.minimumExecutableWeight` to give it as a share of the book instead.',
         'minimumExecutableWeight',
       ),
     )
