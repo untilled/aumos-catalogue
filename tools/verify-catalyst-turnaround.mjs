@@ -2031,6 +2031,142 @@ check('#831 — the entry ceiling still folds open proposals in, and the two fol
 })
 
 
+// ─────────────────────────────────────────────────────────────────────────────
+// `untilled/aumos#846` — this desk's own open proposal is not a discount on
+// anybody else's exposure.
+//
+// `headroomForStrategy` is «what is left of the single-name ceiling for *this*
+// desk», and it was computed as a residual: `total − this desk's share`, where
+// `total` is #813's `max` fold over the name and the share is
+// `max(ownHeld, ownPendingTotal)`. On a book where **this desk's own pending
+// total is the peak**, that residual is not other desks' exposure — it is other
+// desks' exposure *minus this desk's own unfilled proposal*, and everything the
+// other desks hold drops out of the ceiling with it.
+//
+// ⚠️ **The issue reads the direction the other way round** — «own pending is
+// counted as somebody else's and subtracted from own headroom» — and that is not
+// what the line does; an own pending total can only ever make this residual
+// **smaller**. Measured on `accountConcentration` with a 20% account ceiling:
+//
+//   other desk holds 0.06 · own pending 0.12  → headroom 0.20, and 0.14 with no
+//                                               own proposal on the name
+//   other desk holds 0.15 · own pending 0.12  → headroom 0.17, and 0.05 without
+//
+// ⛔ **And it reaches the exchange, which the issue says it does not.** On the
+// entry ladder over a 0.15 position another desk runs, `hostTargetWeight` went
+// from **0.20** — exactly the declared ceiling — to **0.27** the moment this desk
+// had an open proposal of its own on the name. #813's `max` fold stands above the
+// *sizing* and there is nothing above `otherHeldWeight + ownTarget`.
+//
+// The term is now read off the **other desks' own rows** rather than off a
+// residual: what they hold, and what their open totals ask for once this desk's
+// *holding* is credited against them — a total covers the whole position, so a
+// 0.15 total over this desk's 0.06 adds 0.09 (that credit is #828's own
+// arithmetic and every number it locked is byte-identical). This desk's
+// **proposal** credits nothing, because an unfilled proposal is not a position.
+//
+// ⚠️ **Two axes and only one of them moves**, which is #813/#814's sentence one
+// term over: an own pending total still moves `total`, still moves `breach` and
+// still moves the sector total — the account really is heading there — and it
+// moves the room left for the desk that wrote it by nothing at all.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One name, one other desk's holding, and this desk's own pending total on top of it. */
+const ownPendingBook = (otherHeld, ownPending) => ({
+  positions: otherHeld === null ? [] : [{ symbol: 'A00007', weight: otherHeld, strategy: 'inst_shareholder_rerating' }],
+  proposals: ownPending === null ? [] : [{ symbol: 'A00007', targetWeight: ownPending, strategy: 'catalyst-turnaround' }],
+  caps: { accountSingleName: 0.2 },
+  strategy: 'catalyst-turnaround',
+  candidate: { symbol: 'A00007', sector: null },
+})
+
+check('#846 — this desk’s own open proposal does not widen the room left to this desk', () => {
+  for (const otherHeld of [null, 0.06, 0.15, 0.19]) {
+    const baseline = accountConcentration(ownPendingBook(otherHeld, null))
+    const expected = baseline.data.headroom.A00007 ?? baseline.data.unusedHeadroom
+    for (const ownPending of [0.02, 0.12, 0.2, 0.25]) {
+      const answer = accountConcentration(ownPendingBook(otherHeld, ownPending))
+      const where = `#846 → other holds ${otherHeld} · own pending ${ownPending}`
+      assert.equal(
+        answer.data.headroom.A00007,
+        expected,
+        `${where}: this desk's own unfilled proposal moved the room left to this desk, which is ${expected} on the same holdings with no proposal of its own`,
+      )
+    }
+  }
+})
+
+check('#846 — the ceiling that folds proposals in is never above the one that folds only holdings', () => {
+  for (const otherHeld of [null, 0.06, 0.15, 0.19]) {
+    for (const ownPending of [null, 0.02, 0.12, 0.2, 0.25]) {
+      for (const otherPending of [null, 0.08, 0.15, 0.25]) {
+        const book = ownPendingBook(otherHeld, ownPending)
+        if (otherPending !== null) book.proposals = [...book.proposals, { symbol: 'A00007', targetWeight: otherPending, strategy: 'inst_evidence_gated' }]
+        const answer = accountConcentration(book)
+        const row = answer.data.rows.find((entry) => entry.symbol === 'A00007')
+        if (row === undefined) continue
+        const where = `#846 → other holds ${otherHeld} · own pending ${ownPending} · other pending ${otherPending}`
+        assert.ok(
+          row.headroomForStrategy <= row.heldOnlyHeadroomForStrategy + 1e-12,
+          `${where}: the fold that also counts open proposals came out **above** the one that counts holdings alone (${row.headroomForStrategy} against ${row.heldOnlyHeadroomForStrategy}), so an unfilled proposal loosened a ceiling`,
+        )
+      }
+    }
+  }
+})
+
+check('#846 — three pending books, and each desk’s proposal is charged to the desk that wrote it', () => {
+  const room = (otherHeld, own, other) => {
+    const book = ownPendingBook(otherHeld, own)
+    if (other !== null) book.proposals = [...book.proposals, { symbol: 'A00007', targetWeight: other, strategy: 'inst_evidence_gated' }]
+    return accountConcentration(book).data.headroom.A00007
+  }
+  // own only · other only · both — on an empty book, so only the proposals speak.
+  assert.equal(room(null, 0.15, null), 0.2, 'this desk’s own pending total took room away from this desk')
+  assert.equal(room(null, null, 0.15), 0.05, 'another desk’s pending total stopped taking room')
+  assert.equal(room(null, 0.12, 0.15), 0.05, 'this desk’s own pending total masked another desk’s out of the ceiling')
+  // and the same three over a holding this desk does not run.
+  assert.equal(room(0.15, null, null), 0.05)
+  assert.equal(room(0.15, 0.12, null), 0.05, 'this desk’s own pending total masked another desk’s **holding** out of the ceiling')
+  assert.equal(room(0.15, 0.2, 0.08), 0.05)
+  // #828's credit is untouched: a total covers the whole position, so this desk's holding is inside another desk's.
+  const withOwnHolding = accountConcentration({
+    positions: [{ symbol: 'A00007', weight: 0.06, strategy: 'catalyst-turnaround' }],
+    proposals: [{ symbol: 'A00007', targetWeight: 0.15, strategy: 'inst_shareholder_rerating' }],
+    caps: { accountSingleName: 0.2 },
+    strategy: 'catalyst-turnaround',
+  })
+  assert.equal(withOwnHolding.data.headroom.A00007, 0.11, '#828’s credit for this desk’s own holding inside another desk’s total moved')
+})
+
+check('#846 — no own proposal takes an entry past the account ceiling it was sized under', () => {
+  for (const otherHeld of [0, 0.06, 0.1, 0.15, 0.19]) {
+    const baselineInput = structuredClone(positive.input)
+    baselineInput.book = {
+      positions: otherHeld === 0 ? [] : [{ symbol: baselineInput.symbol, strategy: 'inst_shareholder_rerating', weight: otherHeld }],
+      proposals: [],
+      caps: CAPS,
+    }
+    const baseline = runVerdict(baselineInput).data
+    for (const ownPending of [0.02, 0.12, 0.2, 0.25]) {
+      const input = structuredClone(baselineInput)
+      input.book = { ...input.book, proposals: [{ symbol: input.symbol, strategy: 'catalyst-turnaround', targetWeight: ownPending }] }
+      const data = runVerdict(input).data
+      const where = `#846 → other holds ${otherHeld} · own pending ${ownPending}`
+      assert.ok(
+        !Number.isFinite(data.hostTargetWeight) || data.hostTargetWeight <= CAPS.accountSingleName + 1e-12,
+        `${where}: ${data.hostTargetWeight} left for the exchange under a ${CAPS.accountSingleName} single-name ceiling`,
+      )
+      assert.equal(
+        data.hostTargetWeight,
+        baseline.hostTargetWeight,
+        `${where}: the weight that leaves moved because this desk had an open proposal of its own on the name`,
+      )
+      assert.equal(data.intent, baseline.intent, `${where}: the word moved on a book whose holdings did not`)
+    }
+  }
+})
+
 /**
  * ⑷ **A share of the name, not all of it.** The clamp is a ceiling on the
  * reduction target and never a floor: a desk holding part of a position reduces

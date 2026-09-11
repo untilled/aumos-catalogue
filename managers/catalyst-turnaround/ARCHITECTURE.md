@@ -437,6 +437,58 @@ arithmetic for what the limit did. It cannot: `headroomForStrategy` and `targetW
 same eight-place grain, so a room the fold does not take to zero is at least `1e-8` and sizes to at
 least `1e-8`. That claim is an assertion in the checker rather than a sentence here.
 
+## The room left to this desk was a residual, and a residual is not somebody else's (`untilled/aumos#846`)
+
+`headroomForStrategy` is *«what is left of the single-name ceiling for this desk»*, and it was
+computed as a **residual**: `total − this desk's share`, where `total` is `#813`'s `max` fold over
+the whole name and the share is `max(ownHeld, ownPendingTotal)`. On a book where **this desk's own
+open proposal is the peak**, that residual is not other desks' exposure — it is other desks'
+exposure *minus this desk's own unfilled proposal*, and everything they hold drops out of the
+ceiling with it.
+
+⚠️ **The issue reads the direction the other way round.** `untilled/aumos#846` names it as «this
+desk's own pending is counted as somebody else's and subtracted from its own headroom», and that is
+not what the line did: a residual can only ever be made **smaller** by an own proposal. What it did
+was **loosen** a ceiling, which is the one thing a ceiling may not do.
+
+⛔ **And it reached the exchange, which the issue says it does not.** `hostTargetWeight` is
+`otherHeldWeight + cumulativeTargetWeight` and `#813`'s `max` fold stands above the *sizing* rather
+than above that sum, so nothing clamped it. Measured on the entry ladder, 20% account single-name
+ceiling, one other desk holding the name and this desk carrying an open proposal of its own:
+
+| other desk holds | this desk's own pending | `accountHeadroom` | `hostTargetWeight` |
+|---|---|---|---|
+| 0.06 | none · **0.12** | 0.14 · **0.20** | 0.18 · 0.18 |
+| 0.10 | none · **0.02** | 0.10 · **0.12** | 0.20 · ⛔ **0.22** |
+| 0.15 | none · **0.12** | 0.05 · **0.17** | 0.20 · ⛔ **0.27** |
+| 0.19 | none · **0.12** | 0.01 · **0.13** | 0.20 · ⛔ **0.31** |
+
+The term is now read off the **other desks' own rows** rather than off a residual: what they
+**hold**, and what their open totals **ask for** once this desk's *holding* is credited against
+them.
+
+```
+otherStrategies = min(total, max(otherHeld, max over O ≠ this desk of (pendingTotal[O] − ownHeld)))
+```
+
+⚠️ **That credit is a holding and never a proposal.** A `position-weight` target covers the whole
+position, so another desk's 0.15 total over this desk's 0.06 holding adds 0.09 of theirs — which is
+`#828`'s own arithmetic, and every number `#813`, `#828` and `#831` locked is byte-identical. This
+desk's **proposal** credits nothing against it, because an unfilled proposal is not a position.
+
+⚠️ **Two axes, and an own proposal moves only the first.** It still moves `total`, still moves
+`breach` and still moves the sector total — the account really is heading there — and it moves the
+room left to the desk that wrote it by nothing at all. That is `#813`/`#814`'s sentence one term
+over.
+
+⚠️ **The invariant that says so in one line.** `headroomForStrategy ≤ heldOnlyHeadroomForStrategy`,
+always: the two differ in exactly one term and the one that also counts proposals can only ever be
+the tighter of them. The old residual broke it — 0.16 against 0.14 on a 0.06 position another desk
+runs, under an own pending total of 0.02 — and it is now swept rather than asserted in prose.
+
+⛔ **Why nobody saw it.** Every book in `#813`, `#828` and `#831` carries **another desk's** pending
+total; not one of them carries this desk's own. The axis was missing, not the assertion.
+
 ## The sector axis: the judgement #269 asked for, and what came of it
 
 **The question.** #269 required each of the three #256 packages to be *read* and judged under a
