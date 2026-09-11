@@ -93,6 +93,11 @@ this file. Then the Mandate's limits and the book: holdings, cash, and **open pr
 approved yet**, including other managers'. An unapproved proposal is exposure that is about to
 exist, and every weight below counts it.
 
+⚠️ **Pass the size of the book as `book.totalValue`** — the invocation's `portfolio.totalValue`, in
+major units of the account's base currency. The venue minimum below is published in won and is a
+weight only against a total, so without it this package cannot say whether the position it sized
+is one this venue can express, and it refuses rather than assuming it is.
+
 Read your own folder next: the staged-plan ledger, the candidates a previous run left unfinished,
 and the review you armed last time. **A run that follows a failed one continues that work.** If
 the previous run left a candidate at `research_incomplete`, its unfinished sections are this run's
@@ -190,6 +195,15 @@ targetTotalWeight = min(rawWeight, mandate cap, what the sector ceiling leaves, 
 incrementWeight   = targetTotalWeight − (already held + already proposed and unapproved)
 ```
 
+⚠️ **`riskBudgetWeight` is this methodology's, not the investor's, and that is a correction**
+(`untilled/aumos#841`). The Mandate is a closed set of eight fields and **none of them is a
+per-idea risk budget**, so this package pre-registers one — **0.01 of the book on one idea**,
+derived from `maxActiveTheses` being 6, so a fully committed instance risks 6% of the book if
+every open thesis invalidates at once. The investor narrows it with `config.riskBudgetWeight` and
+may not widen it; a wider setting is refused, reported, and 0.01 governs.
+⛔ **It is a numerator and never a size.** Every ceiling the investor *did* answer still cuts it,
+and if the cap binds you say so.
+
 ⛔ **`targetTotalWeight` is what the position should *be*; `incrementWeight` is what you propose
 adding.** Every cap and the risk budget apply to the *final* holding, and the order is the
 difference. Quoting one as the other is how a book that already holds 4% of a name buys a further
@@ -235,8 +249,14 @@ lists that must both arrive; an empty list means *there is nothing*, and an abse
 *nobody looked*, and the second is `data_missing`. The same rule governs every cap and every
 staged re-check: a comparison that could not be made has not been passed.
 
-⛔ **There is no default risk budget and no default cap in this package.** If the Mandate carries
-neither, you cannot size, and the answer is `WAIT` with `data_missing` — never a number you chose.
+⛔ **There is no default cap in this package.** A single-name ceiling the investor did not answer
+is not one a run may choose: you cannot size, and the answer is `WAIT` with `data_missing`.
+⚠️ **The risk budget was on that sentence until `untilled/aumos#841` and had to come off it.** The
+investor is never asked for one — the Mandate has no such field — so «no default, therefore WAIT»
+meant WAIT on every run this host can produce, measured on this package's own fixtures. What is
+still true is the shape of the refusal: a run that read **no Mandate at all** has read nothing and
+sizes nothing, and says so. A Mandate that was read and declares no per-idea axis is an undeclared
+axis, and an undeclared axis constrains nothing rather than withholding everything.
 
 ⚠️ **Pass the Mandate verbatim as `mandate.constraints`.** Its `maxPositionWeight` is the account's
 single-name ceiling and its `cashFloor` is the gross ceiling as the complement (`1 − cashFloor`),
@@ -478,7 +498,8 @@ Everything above happens on every run. These are loaded when the run reaches the
 |---|---|---|
 | `deepReviewIntervalDays` | **30** | how often a held thesis gets a full re-argument rather than a price check |
 | `maxActiveTheses` | **6** | how many completed theses this instance carries at once, so depth beats breadth |
-| `minimumExecutablePosition` | **500000** KRW | below this a position cannot be scaled or trimmed in this venue, so it is refused rather than opened |
+| `minimumExecutablePosition` | **500000** KRW | below this a position cannot be scaled or trimmed in this venue, so it is refused rather than opened. ⚠️ It becomes a weight as `minimumExecutablePosition / book.totalValue`, and without the account's value nothing is sized |
+| `riskBudgetWeight` | **0.01** | share of the book this methodology risks on one idea reaching its invalidation. ⚠️ It may be **narrowed** here and never widened: a larger setting is refused, reported, and 0.01 governs |
 | `dividendWithholdingTaxRate` | **0.154** | the rate the net dividend leg is computed at when the invocation states none |
 
 ## What this package asks of the answer

@@ -23,7 +23,14 @@
       "type": "number",
       "minimum": 0,
       "default": 500000,
-      "description": "In won. The smallest position worth opening in this venue: below it, a KOSPI-listed share priced anywhere in the ordinary 10,000-100,000 won range gives a position of a handful of shares, which cannot be staged into or trimmed without changing the weight materially, and whose result is round-trip cost rather than the idea. A weight below this is refused rather than rounded up to it."
+      "description": "In won. The smallest position worth opening in this venue: below it, a KOSPI-listed share priced anywhere in the ordinary 10,000-100,000 won range gives a position of a handful of shares, which cannot be staged into or trimmed without changing the weight materially, and whose result is round-trip cost rather than the idea. A weight below this is refused rather than rounded up to it. It becomes a weight as minimumExecutablePosition / book.totalValue, so a run that does not state the size of the account cannot make the comparison and refuses rather than skipping it."
+    },
+    "riskBudgetWeight": {
+      "type": "number",
+      "minimum": 0.001,
+      "maximum": 0.01,
+      "default": 0.01,
+      "description": "Share of the whole book this methodology is willing to lose on ONE idea reaching the price at which its thesis is no longer true; it is the numerator of the position size and never a position size. The pre-registered 0.01 is derived from maxActiveTheses being 6 — a fully committed instance risks 6% of the book if every open thesis invalidates on the same day — and this is the one setting the investor's Mandate has no field for, which is why the package carries it at all. It may only be NARROWED: a larger value is refused, reported, and the pre-registered number governs. Every ceiling the investor did declare still cuts the result."
     },
     "dividendWithholdingTaxRate": {
       "type": "number",

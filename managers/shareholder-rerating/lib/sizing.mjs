@@ -9,10 +9,19 @@
  *   rawWeight    = riskBudgetWeight / lossFraction
  *   targetWeight = min(rawWeight, every cap that applies)
  *
- * `riskBudgetWeight` is the share of the whole book the investor's Mandate permits to
- * be lost on this one idea, and `lossFraction` is the share of the position that is
- * lost if the price reaches the level at which this thesis is no longer true. Their
- * ratio is the weight at which those two statements are the same statement.
+ * `riskBudgetWeight` is the share of the whole book that may be lost on this one idea,
+ * and `lossFraction` is the share of the position that is lost if the price reaches
+ * the level at which this thesis is no longer true. Their ratio is the weight at which
+ * those two statements are the same statement.
+ *
+ * ⚠️ **The line above used to say «the investor's Mandate permits», and on this host
+ * that was false** (`untilled/aumos#841`). The Mandate is a closed set of eight fields
+ * with no per-idea risk axis in it, so there is no Mandate any investor can write that
+ * carries this number — the sentence named a field with no producer anywhere. Where it
+ * comes from now is `policy.mjs`: stated wins, a Mandate that was read falls back to
+ * the pre-registered `SIZING_POLICY.riskBudgetWeight`, and a run carrying no Mandate at
+ * all still refuses. ⛔ This function did not change: it is still handed a number and
+ * still refuses without one.
  *
  * ⚠️ **Derived from `managers/evidence-gated/lib/sizing.mjs`** — the min-of-caps fold,
  * the venue-minimum refusal (`minimum_executable_not_met`, which refuses rather than
@@ -24,9 +33,11 @@
  * input — a number a model writes about its own confidence, multiplied into a weight,
  * is a size the model chose.
  *
- * ⛔ **There is no default risk budget and no default cap.** An invocation whose
- * Mandate states neither is one this package cannot size, and it says so. A fallback
- * here would be a position the investor never approved the size of.
+ * ⛔ **There is no default cap.** An invocation whose Mandate states none is one this
+ * package cannot size, and it says so: a ceiling the investor did not answer is not a
+ * ceiling a run may choose. ⚠️ The risk **budget** was on that sentence until #841 and
+ * had to come off it — the investor is never asked for one, so «no default» meant no
+ * run, ever. Its pre-registration lives in `thresholds.mjs` with its derivation.
  */
 
 import { mandateCeilings } from './mandate.mjs'
@@ -117,14 +128,14 @@ export function lossToInvalidation(input = {}) {
  * a host reading it as either was wrong on the other.
  *
  * @param {object} input
- * @param {number} input.riskBudgetWeight        the Mandate's loss budget for this idea, as a share of the book
+ * @param {number} input.riskBudgetWeight        the loss budget for this idea as a share of the book, from `policy.mjs`
  * @param {number} input.lossFraction            from `lossToInvalidation`
  * @param {number} [input.mandatePositionCap] the Mandate's single-name ceiling
  * @param {object} [input.mandate]           the invocation's Mandate, read where the cap above is not stated (#838)
  * @param {number} input.accountNameLimit        `maxTotalWeightForName` from `concentration` — every account axis, folded
  * @param {number} [input.accountNameLimitForReduction] `reductionNameLimit` from `concentration` — the axes that name
  *   *this position*, without the account's leftover room after other names (#833). Absent means the same fold twice
- * @param {number} input.minimumExecutableWeight the smallest position this venue can express
+ * @param {number} input.minimumExecutableWeight the smallest position this venue can express, from `policy.mjs`
  */
 export function targetWeight(input = {}) {
   /**
@@ -146,7 +157,7 @@ export function targetWeight(input = {}) {
       diagnostic(
         'risk_budget_not_stated',
         'unevaluated',
-        'The Mandate states how much of the book may be lost on one idea, and this invocation did not carry it. This package has no default: a size chosen here is a size the investor never approved.',
+        'No risk budget reached this arithmetic. The Mandate has no per-idea risk axis, so this is resolved from the methodology\'s pre-registered budget once a Mandate has been read at all — and a run that carried no Mandate has read nothing and sizes nothing.',
         'riskBudgetWeight',
       ),
     )
@@ -183,7 +194,7 @@ export function targetWeight(input = {}) {
       diagnostic(
         'minimum_executable_not_stated',
         'unevaluated',
-        'The smallest position this venue can express was not stated, so whether the computed weight is executable at all is unknown. It is not assumed to be.',
+        'The smallest position this venue can express was not stated and could not be derived, so whether the computed weight is executable at all is unknown. It is not assumed to be: it is published in won and becomes a weight only against `book.totalValue`.',
         'minimumExecutableWeight',
       ),
     )
