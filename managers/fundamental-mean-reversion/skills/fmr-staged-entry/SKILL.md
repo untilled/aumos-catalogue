@@ -73,6 +73,14 @@ answer returns — **verbatim**. A stage already in `filled` is refused with
 `stage_already_filled`, and on any refusal the plan comes back unchanged rather than absent, so
 following that instruction can never erase your own record.
 
+⛔ **`filled` has three states and the third one refuses.** `[]` and `null` both say *«the ledger
+was read and holds nothing»* — open a plan with `"filled": []` — and **anything else, including
+the field simply not being there, is nobody having read it**. That used to read as an empty
+ledger, so the rung that was already committed fired a second time, `ok`, and the increment left
+as a BUY. It is now `data_missing` / `staged_ledger_unread`: nothing is added, `committedWeight`
+comes back `null` rather than `0`, and the plan is handed back untouched. If your memory read
+failed, say so and re-read it — do not build a plan without the field.
+
 ⚠️ **The ledger is what *this manager has proposed*, not what the fund holds.** Aumos Portfolio
 owns holdings and executions. If a proposal was refused or a fill never happened, the ledger
 and the book disagree — and the book is right. Reconcile against `portfolio_read` before

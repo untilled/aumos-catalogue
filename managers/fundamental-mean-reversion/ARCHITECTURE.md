@@ -88,6 +88,7 @@ The three shapes, and the rule for each:
 | shape | what it did | what it does |
 |---|---|---|
 | a collection defaulted to empty | an unread book had **unlimited** headroom under every cap | `bookIsReadable` requires both arrays; an empty one is a fact, a missing one refuses |
+| a **ledger** defaulted to empty | an unread staged ledger said «no rung has been committed», so the rung that was already filled fired again | `readLedger` has three states; an unread `plan.filled` refuses with `data_missing` |
 | a guard written `finite(x) && …` | the check silently did not run when its input was absent | the absent input refuses first: `mandate_gross_cap_missing`, `target_prior_high_unreadable`, `staged_total_unstated`, `plan_expiry_unstated`, `stage_weight_unstated` |
 | a clamp with a floor | a plausible number stood in for a measurement | `gapHaircut` returns `measurable: false` and `positionSizing` refuses on it |
 
@@ -100,6 +101,29 @@ facts worth recording.
 (#254), so none of them may be reported as `thesis_refuted`, and none of them is
 `risk_limit_exceeded` either — that code means the judgement was made, was positive, and the
 book has no room.
+
+### `plan.filled` has three states (#256)
+
+The staged ledger is the one piece of state the host does not hold — *what this manager has
+already proposed under this plan* — and it was read as `Array.isArray(plan?.filled) ? plan.filled
+: []`. That is the same defect as the book one line above, on the field where it buys: an absent
+ledger says «nothing has been committed yet», the rung whose conditions are still true fires a
+second time, and the answer is `ok`.
+
+| `plan.filled` | what it means | `applyStage` |
+|---|---|---|
+| `[]` | read, and holds nothing. A plan opens this way | the next rung is judged on its merits |
+| `null` | read, and holds nothing — the same positive statement, spelled the way `catalyst-turnaround`'s staged register spells it (`lib/staging.mjs`, `previous === null`) | the same |
+| absent, or not a list | **nobody read it** | refused, `data_missing` / `staged_ledger_unread`, increment 0, no BUY |
+
+⚠️ Two sibling packages under #256 now answer *«the memory was read and was empty»* with the same
+token. `PROMPT.md` and `skills/fmr-staged-entry` tell a run to write the returned plan back
+**verbatim**, so a ledger that has been through one run always carries an array; what the third
+row catches is the run that never got one back.
+
+⛔ `stagedPlanState` reports `committedWeight: null` and `remainingWeight: null` in that state
+rather than `0`. A total nobody could form is not a total of nothing, and `0` is the reading that
+leaves room under the cumulative target for a rung that was already spent.
 
 ### The two weights
 
@@ -151,6 +175,37 @@ ceiling has to hold in both of the states the account passes through.
 ⛔ **The netting lives here rather than in the caller.** A run that is asked to subtract before it
 calls is a run that can be argued out of subtracting, and every axis — the name, the sector and
 the whole book — has to fold the same way or one name is counted twice on one of them.
+
+## One name is one position, however many theses point at it (#256)
+
+The other half of the same sentence. #256: «보유 종목에 복수 thesis가 붙어도 포지션 수량은
+하나다». Two holding rows for one symbol were **added** — a 6% row assigned here and a 6% row
+assigned elsewhere read as a 12% position, with nothing in the answer saying a row had been
+counted twice.
+
+That shape is not one the host emits. `broker-book.ts` merges every row of the same asset into
+one `Position` before the portfolio is published, and `discovery-service.ts` maps positions
+one-to-one with at most one assignment per `assetKey`. So a second row for a name is a
+restatement of one quantity, and the fold on the held axis is `max` — the same word as the
+pending axis one section up, for a different reason.
+
+```
+held = the largest holding row for the name      (never their sum)
+```
+
+`duplicate_holding_rows` (`info`) names the symbols it fired on. It is a fact worth recording and
+never a refusal: a duplicated row is a shape, not a missing input.
+
+⚠️ **Mixed attribution folds per bucket, then once more.** Two rows for one name carrying
+different `strategy` values are two claims about *whose* the position is, not two positions. Each
+bucket keeps its own largest row and the position is the largest row of all, so
+`ownHeldWeight + otherHeldWeight` is the position and never more than it — 0.04 assigned here
+beside 0.06 assigned elsewhere is a **0.06** position with 0.02 of it somebody else's. Nothing in
+#814/#817/#819–#823 changes: those rules read `heldByStrategy` and `otherHeldWeight`, and what
+moved is how a bucket is filled.
+
+⚠️ **The sector axis folds the same name the same way.** A sector total that added both rows was
+over by whichever row was smaller, which is the netting sentence of #813 one axis across.
 
 ## The weight that leaves is a third number (#817)
 
