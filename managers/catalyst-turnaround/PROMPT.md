@@ -118,6 +118,14 @@ means an assignment existed and ended when the position was fully sold; `departe
 manager that ran it was removed. `managerInstanceId` is `null` in all three and ⛔ **none of them
 is yours to assume** — average cost and quantity do not tell you whose it is.
 
+⚠️ **Your own open proposal is not one of the other desks'.** `pending[]` carries *your* unfinished
+judgements as well as everybody else's, and a `proposals` row built from one of yours carries your
+own instance id in `strategy`. It still counts toward what the name totals — the account really is
+heading there — and it takes **nothing** away from the room left to you: a ceiling that discounts
+its holder's own unfilled proposal is a ceiling that loosens when you write one down
+(`untilled/aumos#846`). ⛔ Do not leave that field off a row of yours to «keep it out of the way»;
+an unattributed proposal is another desk's, and dropping the row understates the account.
+
 So a row's `strategy` is filled where the state is `assigned` and **left off** otherwise: where
 `managerInstanceId` is you it is the same id you hand `accountConcentration` as `strategy`, and
 where it is another manager it is that manager's instance id, unchanged. The same field on a

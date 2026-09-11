@@ -509,7 +509,6 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
     for (const owner of new Set([...Object.keys(entry.heldByStrategy), ...Object.keys(entry.pendingPeakByStrategy)])) {
       byStrategy[owner] = round(Math.min(total, Math.max(entry.heldByStrategy[owner] ?? 0, entry.pendingPeakByStrategy[owner] ?? 0)))
     }
-    const otherStrategies = round(Math.max(0, total - (byStrategy[strategy] ?? 0)))
     /**
      * ── Holdings only, split by attribution — the write direction (#817) ─────
      *
@@ -529,11 +528,54 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
     const ownHeld = round(entry.heldByStrategy[strategy] ?? 0)
     const otherHeld = round(Math.max(0, held - ownHeld))
     /**
+     * ── What the **other** desks take, read off their own rows (`untilled/aumos#846`) ─
+     *
+     * ⛔ **This was a residual — `total − this desk's share` — and a residual is
+     * not other desks' exposure.** `total` is #813's `max` fold over the whole
+     * name, and this desk's share of it is `max(ownHeld, ownPendingTotal)`. On a
+     * book where *this desk's own open proposal is the peak*, subtracting that
+     * share takes every other desk's holding out of the ceiling along with it:
+     * a 0.15 position another desk runs, under this desk's own pending total of
+     * 0.12, left `headroomForStrategy` at 0.17 of a 0.20 ceiling where the same
+     * holdings with no proposal of this desk's leave 0.05. ⚠️ **And it reached
+     * the exchange**: `hostTargetWeight` is `otherHeld + ownTarget`, so the entry
+     * ladder sent 0.27 out under a declared 0.20 single-name limit.
+     *
+     * ⚠️ **The issue that found it reads the direction the other way round** —
+     * «this desk's own pending is counted as somebody else's and subtracted from
+     * its own headroom». It never was: a residual can only ever be made *smaller*
+     * by an own proposal. What it did was loosen a ceiling, which is the one
+     * thing a ceiling may not do.
+     *
+     * So the term is read off the other desks' rows: what they **hold**, and what
+     * their open totals **ask for** once this desk's holding is credited against
+     * them. ⚠️ **That credit is a holding and never a proposal.** A
+     * `position-weight` total covers the whole position, so another desk's 0.15
+     * total over this desk's 0.06 holding adds 0.09 of theirs — which is #828's
+     * own arithmetic and every number it locked is unchanged. This desk's
+     * *proposal* credits nothing against it, because an unfilled proposal is not
+     * a position.
+     *
+     * ⚠️ **Two axes, and an own proposal moves only the first.** It still moves
+     * `total`, still moves `breach` and still moves the sector total — the
+     * account really is heading there — and it moves the room left to the desk
+     * that wrote it by nothing at all.
+     */
+    let otherPendingAdds = 0
+    for (const [owner, pendingTotal] of Object.entries(entry.pendingPeakByStrategy)) {
+      if (owner === strategy) continue
+      otherPendingAdds = Math.max(otherPendingAdds, pendingTotal - ownHeld)
+    }
+    /**
      * What is left for *this* strategy in *this* name. The binding limit is the
      * smaller of the account's and this strategy's, minus whatever every other
      * strategy is already holding or has already proposed — which is the line
      * that makes the per-strategy caps unable to sum.
+     *
+     * ⚠️ Clamped to the name's own total, so this cannot be widened by an
+     * attribution that disagrees with the position.
      */
+    const otherStrategies = round(Math.min(total, Math.max(0, otherHeld, otherPendingAdds)))
     const row = {
       symbol: entry.symbol,
       held,
