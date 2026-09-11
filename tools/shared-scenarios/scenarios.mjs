@@ -233,30 +233,14 @@ export const SCENARIOS = [
       why: '#256: «보유 종목에 복수 thesis가 붙어도 포지션 수량은 하나다». Two rows for one symbol are two claims about one position.',
     },
     /**
-     * ⛔ **A contract-③ violation in two of the three, recorded and not fixed
-     * here.** Both add the rows instead of folding them, so one position reads
-     * as 0.016 of the account when it is 0.01 of it. The direction is
-     * conservative — an over-counted position blocks a purchase rather than
-     * authorising one — which is why it has survived: it refuses legitimate
-     * increases and reports a book position that does not exist, and neither
-     * shows up as a wrong order. #256's rule is explicit and this is what it is
-     * about; `shareholder-rerating` implements it (the larger row wins and the
-     * duplicate is reported).
-     *
-     * ⚠️ **Not fixed in the change that adds this suite** — #256's own rule that
-     * a fix for something the checks missed does not travel with the check that
-     * found it. Each wants its own issue against its own package.
+     * ⚠️ **This was a contract-③ violation in two of the three when the suite
+     * was written** — `catalyst-turnaround` and `fundamental-mean-reversion`
+     * summed the rows and read one position as 0.016 of the account. Recorded
+     * here as `knownDefect`, fixed in their own PRs (#300 and #299: the larger
+     * row wins, the duplicate is reported), and the entries deleted once the
+     * runner reported them stale. The scenario now asserts the folded answer
+     * for all three.
      */
-    knownDefect: {
-      'catalyst-turnaround': {
-        exposure: 0.016,
-        note: 'the two holding rows are summed (`entry.held + value` in `accountConcentration`), so one position is counted twice',
-      },
-      'fundamental-mean-reversion': {
-        exposure: 0.016,
-        note: 'the two holding rows are summed (`entry.held + weight` in `concentration`), so one position is counted twice',
-      },
-    },
   },
   {
     id: 'unattributed-holding',
