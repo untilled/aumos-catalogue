@@ -209,6 +209,43 @@ jobs:
       # network, no test framework, for the same reasons `check:allocator` is.
       - run: npm run check:fundamental-mean-reversion
 
+      # The three packages above are each checked against their own fixtures, and
+      # that is the shape a per-package checker can have: it can say a package is
+      # self-consistent and it cannot say two packages answer one situation the
+      # same way. `COMMONISATION-SURVEY.md` (#270, PR #271) executed all three on
+      # one set of inputs and found that on **three of the four** boundaries they
+      # have each promised to hold, they did not — and that nothing in this
+      # repository would ever have said so.
+      #
+      # This is the suite that says so (#256). One scenario file holding the
+      # situation and the answer that matters, three thin adapters translating it
+      # into each package's input shape, and four assertions per scenario per
+      # package: did it authorise an increase, which of #256's four causes if it
+      # refused, the exposure the caps were measured against, and the
+      # total-versus-increment relation.
+      #
+      # ⛔ **It asserts nothing else, and the list of what it must not assert is
+      # the load-bearing half.** Field names, severities, diagnostic codes,
+      # output shapes — and splitting conditions, sizing formulas, exit logic,
+      # classification vocabularies and thresholds, which are each package's own.
+      # A cross-package assertion over any of those is commonisation of policy
+      # through the back door, which is what #256 forbids and what the survey
+      # declined to do in code.
+      #
+      # ⚠️ **A disagreement is reported, not removed.** Where the three answer
+      # differently by policy the scenario records which answer each gives and
+      # why, and the entry is checked like any other. Where one of them answers a
+      # contract **wrongly**, it is recorded as a `knownDefect`, printed loudly,
+      # and left unfixed — #256's own rule that a fix for something the checks
+      # missed does not travel with the check that found it. The job goes red for
+      # exactly one thing: a contract violation nobody recorded.
+      #
+      # ⛔ Nothing under `managers/` moved to add this, so no package's version
+      # did either. Plain Node over the three `lib/` directories — no install, no
+      # network, no fixtures of its own — and before `check:pins` for the reason
+      # written at the end of this file.
+      - run: npm run check:shared-scenarios
+
       # ── Last, and that position is the point ──────────────────────────────
       #
       # The pair to `check:index`, and a different question: `check:index` asks
