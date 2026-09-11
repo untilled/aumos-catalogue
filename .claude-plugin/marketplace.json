@@ -227,7 +227,7 @@
           "source_request",
           "connection_request"
         ],
-        "enginesAumos": ">=0.4.0",
+        "enginesAumos": ">=0.5.0",
         "provenance": {
           "sourceRepo": "https://github.com/morethanmin/trading-harness",
           "commit": "1fa18c595baa742f7323366a3c220fec5c6535a7",
@@ -358,7 +358,7 @@
           "source_request",
           "connection_request"
         ],
-        "enginesAumos": ">=0.4.0",
+        "enginesAumos": ">=0.5.0",
         "provenance": {
           "sourceRepo": "https://github.com/morethanmin/trading-harness",
           "commit": "1fa18c595baa742f7323366a3c220fec5c6535a7",
@@ -444,7 +444,7 @@
           "source_request",
           "connection_request"
         ],
-        "enginesAumos": ">=0.4.0",
+        "enginesAumos": ">=0.5.0",
         "provenance": {
           "sourceRepo": "https://github.com/morethanmin/trading-harness",
           "commit": "1fa18c595baa742f7323366a3c220fec5c6535a7",

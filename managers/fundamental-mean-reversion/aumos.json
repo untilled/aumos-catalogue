@@ -24,7 +24,7 @@
     "notice": "./NOTICE.md"
   },
   "engines": {
-    "aumos": ">=0.4.0"
+    "aumos": ">=0.5.0"
   },
   "ampVersion": 1,
   "contributes": {
