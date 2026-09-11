@@ -2163,6 +2163,137 @@ check('the config schema and the methodology constants agree', () => {
   }
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The Mandate the host actually sends (`untilled/aumos#838`)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * ⛔ **Every cap in `fixtures/cases.json` was written by hand, and that is what
+ * let this defect live through twelve orders of work.** They state
+ * `caps.accountSingleName` and `sizing.mandatePositionCap` because that is what
+ * this package calls them — so every assertion passed while a run handed the
+ * *investor's* Mandate answered `wait-for-data` on a book it could read.
+ *
+ * The host's `mandate.constraints` is a closed set of eight fields. It is built
+ * here, in full, from `packages/amp/src/snapshots.ts`, and the checks below
+ * drive `runVerdict` with **nothing else**: `maxPositionWeight` is the account's
+ * single-name limit, and no sector or per-strategy axis exists in that contract.
+ *
+ * ⚠️ **The fixtures on disk are not touched** — every case below is a deep copy.
+ */
+const HOST_CONSTRAINTS = Object.freeze({
+  baseCurrency: 'KRW',
+  allowedAssetClasses: ['equity', 'etf', 'crypto', 'cash'],
+  maxPositionWeight: 0.15,
+  cashFloor: 0.1,
+  maxDrawdown: 0.06,
+  allowShorting: true,
+  allowLeverage: true,
+  excludedSymbols: [],
+})
+const hostMandate = (overrides = {}) => ({
+  mandateId: 'mdt_838',
+  version: 3,
+  label: 'Untilled',
+  objective: 'Compound the book without a drawdown that ends it',
+  horizonDays: 365,
+  constraints: { ...HOST_CONSTRAINTS, ...overrides },
+})
+const hostMandateWithout = (...fields) => {
+  const mandate = hostMandate()
+  for (const field of fields) delete mandate.constraints[field]
+  return mandate
+}
+const BUY_PATH = 'completed-positive-thesis-reaches-the-buy-path'
+const buyPathInput = () => {
+  const fixture = cases.cases.find((row) => row.name === BUY_PATH)
+  assert.ok(fixture, 'cases.json no longer carries the sized BUY case, so these regressions test nothing')
+  return structuredClone(fixture.input)
+}
+/** The same case with every hand-written ceiling stripped out. */
+const withoutStatedCaps = (input) => {
+  delete input.book.caps.accountSingleName
+  delete input.sizing.mandatePositionCap
+  return input
+}
+const verdictWith = (mutate) => {
+  const input = buyPathInput()
+  mutate(input)
+  return runVerdict(input)
+}
+
+check('#838 — the Mandate as the host sends it sizes, under the names this package uses', () => {
+  const control = verdictWith(() => {})
+  assert.equal(control.data.intent, 'enter-staged', 'the positive control no longer sizes, so the checks below test nothing')
+
+  for (const [what, mandate] of [
+    ['the snapshot verbatim', hostMandate()],
+    ['the bare constraints object', hostMandate().constraints],
+  ]) {
+    const answer = verdictWith((input) => {
+      withoutStatedCaps(input)
+      input.mandate = mandate
+    })
+    assert.equal(answer.data.intent, 'enter-staged', `${what}: a Mandate carrying the concentration limit still waited`)
+    assert.deepEqual(codes(answer.causes ?? []), [], `${what}: and it reported an absence`)
+    /**
+     * ⚠️ **The investor's 0.15 has to *bind*.** This package's own ceiling is
+     * 0.2, so a Mandate that was read and not applied leaves 0.2 standing.
+     */
+    assert.equal(answer.data.cumulativeTargetWeight, 0.15, `${what}: the investor's own limit is what sized it`)
+  }
+})
+
+check('#838 — a Mandate declaring no concentration limit falls to the house ceiling, and says so', () => {
+  /**
+   * ⛔ **`readDeclared`'s three states, which the host cannot speak.** Its
+   * schema omits an unanswered optional field rather than sending a sentinel, so
+   * a Mandate that *was* read and declares nothing has to arrive as
+   * `not-declared` — the house cap with two notes — and never as `unread`.
+   */
+  const answer = verdictWith((input) => {
+    withoutStatedCaps(input)
+    input.mandate = hostMandateWithout('maxPositionWeight')
+  })
+  assert.equal(answer.data.intent, 'enter-staged')
+  assert.deepEqual(codes(answer.causes ?? []), [], 'a declared absence is not missing data')
+  assert.equal(answer.data.cumulativeTargetWeight, METHODOLOGY.defaultSingleNameCap, 'the house ceiling is what bound it')
+  assert.ok(has(answer.diagnostics, 'mandate_position_cap_not_declared'))
+  assert.ok(has(answer.diagnostics, 'account_single_name_cap_not_declared'))
+})
+
+check('#838 — no Mandate at all is still unread, and still refuses', () => {
+  const answer = verdictWith(withoutStatedCaps)
+  assert.equal(answer.data.intent, 'wait-for-data', 'an unread cap stopped withholding the entry')
+  assert.ok(has(answer.causes ?? [], 'data_missing'))
+  assert.equal(answer.data.cumulativeTargetWeight, null)
+  assert.ok(
+    !has(answer.diagnostics, 'mandate_position_cap_not_declared'),
+    'an unread field left the trace of a declared absence, which is the distinction readDeclared exists for',
+  )
+})
+
+check('#838 — a stated cap wins, so a Mandate riding alongside changes nothing at all', () => {
+  /**
+   * ⛔ **The differential this whole change is held to.** Every case that states
+   * its ceilings is byte-for-byte what it was, whatever Mandate is passed —
+   * including one whose numbers are different ones.
+   */
+  for (const [what, mandate] of [
+    ['the host snapshot', hostMandate({ maxPositionWeight: 0.9 })],
+    ['a Mandate declaring none', hostMandateWithout('maxPositionWeight')],
+  ]) {
+    for (const name of cases.cases.map((row) => row.name)) {
+      const stated = runVerdict(structuredClone(cases.cases.find((row) => row.name === name).input))
+      const alongside = runVerdict({ ...structuredClone(cases.cases.find((row) => row.name === name).input), mandate })
+      assert.equal(
+        JSON.stringify(alongside),
+        JSON.stringify(stated),
+        `${what}: ${name} moved when a Mandate was passed beside its stated caps`,
+      )
+    }
+  }
+})
+
 check('the manifest and the plugin agree, and the capabilities are the ones the prompt uses', () => {
   const manifest = read('aumos.json')
   const plugin = read('.claude-plugin/plugin.json')

@@ -62,7 +62,12 @@ Say in your reasoning which of these you fell back to, if any.
 
 Call `invocation_read` first. Then read, in this order:
 
-1. **the Mandate** — the single-name, sector, total-risk and cash constraints that bind you;
+1. **the Mandate** — the single-name, sector, total-risk and cash constraints that bind you.
+   ⚠️ **Pass it to the tools verbatim, as `mandate`.** Its `maxPositionWeight` is what this
+   package calls the account's single-name limit, and nothing else has to be transcribed; a
+   `caps.accountSingleName` you state yourself still wins over it. ⛔ The Mandate has **no sector
+   and no per-strategy axis** — an investor who wants one states `caps.accountSector` — and an
+   axis it does not carry constrains nothing rather than withholding anything;
 2. **the book** — real holdings, cash, and **every open proposal on this fund, including other
    managers'**. ⚠️ Exposure is measured across real holdings **and** unfilled proposals. A name
    another manager has proposed and not yet filled is exposure this book has already committed to;

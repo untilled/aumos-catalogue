@@ -72,10 +72,21 @@ export function runVerdict(input = {}) {
     improvingChannelCount: recovery.data.improvingChannelCount ?? 0,
     cashFlowLinked: recovery.data.cashFlowLinked === true,
   })
+  /**
+   * ── The Mandate, wherever the caller put it (`untilled/aumos#838`) ────────
+   *
+   * ⚠️ **`input.mandate` is the invocation's Mandate verbatim.** It is read
+   * beside the caps rather than instead of them: `maxPositionWeight` is the
+   * account's single-name limit under the host's own name, and until #838
+   * nothing translated it — a run handed the Mandate as it arrives answered
+   * `wait-for-data` on a book it could read and a cap the investor had stated.
+   * ⛔ `input.book.caps` still wins wherever it states something.
+   */
+  const mandate = input.mandate ?? input.book?.caps?.mandate
   const concentration = accountConcentration({
     positions: input.book?.positions,
     proposals: input.book?.proposals,
-    caps: input.book?.caps ?? {},
+    caps: { ...(mandate === undefined ? {} : { mandate }), ...(input.book?.caps ?? {}) },
     strategy,
     /**
      * ⚠️ **`input.sector` is the fund's risk-management sector and not this
@@ -109,6 +120,7 @@ export function runVerdict(input = {}) {
     stopDistance: invalidation.data.stopDistance,
     conviction: input.sizing?.conviction,
     mandatePositionCap: input.sizing?.mandatePositionCap,
+    mandate,
     accountHeadroom: headroom,
     heldOnlyAccountHeadroom: heldOnlyHeadroom,
     config,

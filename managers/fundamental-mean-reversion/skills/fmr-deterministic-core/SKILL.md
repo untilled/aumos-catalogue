@@ -97,7 +97,7 @@ the current price — that is a finding about the target, not a reason to widen 
   "entryPrice": 172000,
   "invalidationPrice": 145000,
   "nav": 400000000,
-  "mandate": { "singleNameCap": 0.10, "grossCap": 0.90 },
+  "mandate": { "…": "the invocation's `mandate`, verbatim" },
   "book": {
     "holdings": [ { "symbol": "…", "weight": 0.06, "strategy": "another-manager" } ],
     "openProposals": [ { "symbol": "…", "targetWeight": 0.025, "strategy": "another-manager" } ]
@@ -113,8 +113,19 @@ the current price — that is a finding about the target, not a reason to widen 
   accepted, a missing one is refused with `book_unreadable`. A book nobody could read is not a
   book with nothing in it, and treating it as empty is how a run that never saw the account
   returns a full target weight.
-- `mandate.singleNameCap` **and** `mandate.grossCap` are both required. An unreadable limit is
-  not an absent one.
+- **`mandate` is the invocation's Mandate, passed verbatim** — the snapshot or its `constraints`.
+  The host's names are read: `maxPositionWeight` is the single-name ceiling, and `cashFloor` is the
+  gross one as its complement (`1 − cashFloor`), because *cash ≥ x* and *invested ≤ 1 − x* are one
+  statement. ⛔ The Mandate has **no sector and no per-strategy axis**; those two exist only if you
+  state them yourself as `mandate.sectorCap` and `mandate.strategyCap`.
+- You may state `singleNameCap`, `grossCap`, `sectorCap` and `strategyCap` outright instead, and a
+  stated one always wins over the Mandate beside it.
+- ⛔ **A single-name ceiling is required either way.** An investor who left the concentration
+  question blank has not authorised this run to choose its own limit, and it refuses.
+- ⚠️ **An unread limit is not an absent one.** A Mandate that *was* read and states no cash floor
+  has declined to constrain the gross axis — it constrains nothing and says so
+  (`gross_cap_not_applicable`). Passing no Mandate at all and no `grossCap` is the unread case and
+  still refuses.
 - `execution.halted` and `execution.dailyPriceLimit` must be **booleans**. On KRX the daily
   price limit is `true`; declare it. An omitted flag is not read as `false` — it is reported as
   `execution_conditions_undeclared` (`unevaluated`), and `classifyCase` will not reach BUY over

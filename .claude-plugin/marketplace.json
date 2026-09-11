@@ -197,7 +197,7 @@
       "name": "catalyst-turnaround",
       "source": "./managers/catalyst-turnaround",
       "description": "Korea-listed companies with an identifiable event that would repair the business and its balance sheet, held for as long as the event's own window and no longer. Keeps a catalyst ledger — scheduled, in progress, realised, delayed, failed — and never records a rising share price as a catalyst that worked.",
-      "version": "0.6.3",
+      "version": "0.6.4",
       "metadata": {
         "name": "Catalyst Turnaround",
         "publisher": "aumos",
@@ -328,7 +328,7 @@
       "name": "fundamental-mean-reversion",
       "source": "./managers/fundamental-mean-reversion",
       "description": "Korea-listed single names whose price has fallen further than the damage to the business justifies. Researches the fall's causes before the chart, takes the recovery only after pre-registered stabilisation evidence, and names a target range that says whether it is a price band, a moving average or a valuation.",
-      "version": "0.6.2",
+      "version": "0.6.3",
       "metadata": {
         "name": "Fundamental Mean Reversion",
         "publisher": "aumos",
@@ -413,7 +413,7 @@
       "name": "shareholder-rerating",
       "source": "./managers/shareholder-rerating",
       "description": "Korea-listed single equities whose earnings and capital headroom support a shareholder return programme that is actually being executed, held for the discount that closing it should close. Separates re-rating from dividends in every number, and never counts a company's buyback as the investor's income.",
-      "version": "0.5.2",
+      "version": "0.5.3",
       "metadata": {
         "name": "Shareholder Rerating",
         "publisher": "aumos",
