@@ -1347,11 +1347,25 @@ export const OPERATIONS = {
    * field over had the whole calculation refused as an unknown key, while a run
    * that did not could report no floor at all. ⛔ Absent is not `[]`: absent is
    * unreadable, `[]` is a floor of zero.
+   *
+   * ⛔ **Two of the five keys are refused, and the contract says so before the
+   * call (#136).** `armed` and `journalArmed` are declared for the same reason
+   * `standingPlans` is — `strict` answers an undeclared key as an unknown one,
+   * and these two have a named diagnostic that says where the value actually
+   * belongs. What was missing is that the contract read as five accepted keys,
+   * so the only place either was called refused was `schedule.mjs`, after the
+   * call. The `nested` notes below are that sentence moved in front of it,
+   * which is where `minimumExecutableWeight` already puts
+   * `experimentalPositionFloor`.
    */
   reconcileArmedReviews: {
     group: 'schedule',
     surface: 'published',
     mode: 'strict', keys: { previous: OBJECT, sequence: ARRAY, standingPlans: ARRAY, armed: ANY, journalArmed: ANY },
+    nested: {
+      armed: '⛔ **A refused key**, declared so that passing it is named rather than dropped: it is `armed_state_misplaced` / blocked, and a run that writes the null `nextState` back erases the record. The standing arms arrive as `previous` — the whole value read from `run/armed-reviews` — and read at the top level they are invisible, so every standing review is re-armed.',
+      journalArmed: '⛔ **A refused key** on the same terms: it is `armed_journal_not_a_receipt` / blocked. `decisions[].armed` is past tense — what became of what was armed — and is not an input to this operation at all. What stood at `asOf` is `invocation.standingPlans`, which is the separate `standingPlans` key beside this one.',
+    },
     shape: armedRecord,
     describe: 'the reviews to arm — every one of them, because the published rule is to re-arm at every judgement and nothing this operation is handed could suppress one anyway — plus which of them this instance has already promised at this instant, and which flow it promised at a **different** instant, which is the one duplicate the host does not fold — reported with that older promise\'s `planId` where `standingPlans` names it, and with which silence it is where it does not. Hand it the invocation\'s `standingPlans` and it also reports `standingArms: { atLeast }`, the floor of what stood at `asOf` — report-only, and absent from it means unreadable while `[]` means a floor of zero',
     run: (input, asOf) => reconcileArmedReviews({ ...input, asOf }),
