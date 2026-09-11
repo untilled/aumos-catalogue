@@ -1,0 +1,131 @@
+{
+  "note": "#256's 완료 조건 «과거 세 사례는 당시 시점 자료만으로 분류·논거 복원이 되는지 확인한다», for this package's case — 우리금융지주 (316140), decided 2026-05-25.\n\nEvery field in `input` is transcribed from the investor's own private record at a fixed commit and is dated on or before the decision date. Anything dated later, and anything that exists only in a later revision of the thesis file, is in `excluded` instead. Where the as-of record has no value for an input this package requires, the field is `null` and is listed as `data_missing` — nothing was estimated, and no exit line was repurposed as a fair value.\n\n⛔ What this fixture does **not** claim. It is not a re-audit of the investor's reported ~10% result, which #256 says was never re-audited and is not a validated edge. It is not a backtest and not a reproduction of the upstream harness, which is a different program. No threshold in `lib/thresholds.mjs` was touched for it. The outcome below is whatever `evaluateCase` returned on the first run, and it is a WAIT.",
+  "symbol": "316140",
+  "decision": {
+    "decisionDate": "2026-05-25",
+    "sourceRepository": "the investor's private trading-harness checkout (not vendored here)",
+    "sourceCommit": "1fa18c595baa742f7323366a3c220fec5c6535a7",
+    "decisionRecord": "plans/2026-05-25_decision_v2.md (액션 A1, 매수 52주 @31,300) superseded the same day by plans/2026-05-25_decision_v3.md (53주 across T1/T2/T3)"
+  },
+  "replayEligibility": "ineligible",
+  "replayEligibilityReason": "The as-of record carries no CET1 or capital-policy target, no fair-value range, no per-share dividend, no buyback execution or cancellation amount and no recurring EPS — that is, none of the inputs this package's classification is built from. The run reaches `data-missing` / WAIT and says which inputs are absent. The classification could not be restored from as-of material, and that is the finding, not a failure of the run.",
+  "asOfFields": [
+    { "field": "valuation.price", "value": 31300, "source": "data/history/316140.jsonl → 2026-05-22 close (the last session before the decision); the same figure is the 참조가 in plans/2026-05-25_decision_v3.md", "sourceDate": "2026-05-22" },
+    { "field": "sector / issuerKind", "value": "financials / bank", "source": "plans/2026-05-25_decision_v2.md → 액션 A1 («금융주 환원 경쟁», 신한·KB 대비)", "sourceDate": "2026-05-25" },
+    { "field": "programme.policyRatio", "value": 0.35, "source": "plans/2026-05-25_decision_v2.md → 액션 A1 사유 («환원율 35%+ 정책 강화»)", "sourceDate": "2026-05-25" },
+    { "field": "yieldContext.dividendYield", "value": 0.0338, "source": "plans/2026-05-25_decision_v2.md → 액션 A1 사유 («배당수익률 3.38%»)", "sourceDate": "2026-05-25" },
+    { "field": "invalidationPrice", "value": 28000, "source": "plans/2026-05-25_decision_v3.md → 액션 A1 Exit Plan (손절 28,000, 전량)", "sourceDate": "2026-05-25" },
+    { "field": "mandate.caps.accountPositionCap", "value": 0.2, "source": "plans/2026-05-25_decision_v2.md → 집중도 주의 («일반적 단일종목 20% 캡»)", "sourceDate": "2026-05-25" },
+    { "field": "book.holdings", "value": "[] — the account held no financial-sector name", "source": "plans/2026-05-25_decision_v2.md → 매수 후 예상 비중 (우리금융지주 진입 전 0%), 액션 A1 («현재 포트 금융 노출 0%»)", "sourceDate": "2026-05-25" },
+    { "field": "book.openProposals", "value": "one reservation on 015760 at ~3.9% of the account", "source": "plans/2026-05-25_decision_v2.md → 진행 중 (한국전력 5주 @39,400, 재예약 금지)", "sourceDate": "2026-05-25" },
+    { "field": "completedOutputs", "value": "returnPolicyEvidence, invalidationConditions, stagedPlan, targetWeightRisk", "source": "plans/2026-05-25_decision_v3.md — the four of this package's required outputs the plan actually produced", "sourceDate": "2026-05-25" }
+  ],
+  "excluded": [
+    { "item": "theses/316140_woori-financial.md in its entirety", "reason": "post_hoc_revision", "source": "git log of theses/316140_woori-financial.md — first committed 6414daf (2026-06-28), a month after the decision, and revised twice more", "note": "Its own Review Log opens at 2026-05-25 while the file did not exist then, and its 'Why Now' is written from the position rather than towards it («기존 분할 진입은 완료된 상태»)." },
+    { "item": "the 2026-06-24 account snapshot (holding 53주 @30,360, 총자산 대비 18.57%, RSI 47.5)", "reason": "future_information", "source": "plans/2026-06-24_decision_v2.md → 현재 포지션 스냅샷", "note": "Used only in variant B as a contamination control." },
+    { "item": "financial.cet1, financial.policyTargetCet1, financial.regulatoryMinimumCet1, financial.riskWeightedAssets, financial.roe, financial.creditCostRatio, financial.creditCostGuidance, financial.projectFinanceExposureRatio", "reason": "data_missing", "source": "no as-of source. The plan states BIS 16.63%, which is a total-capital ratio and not CET1, and it was not substituted for one; data/fundamentals/316140.json carries only operating income, net income, equity and total debt", "note": "This is the largest single gap: capital headroom is the input this package's classification turns on." },
+    { "item": "valuation.fairValue.bear / base / bull and valuation.fairValueBasis", "reason": "data_missing", "source": "no as-of source. The plan's 35,000 / 38,000 / 41,000 are 익절 lines and 28,000 is a stop; none is a fair-value estimate and none was read as one", "note": "PBR 0.83x is stated but this package takes no PBR input." },
+    { "item": "valuation.cashDividend.perShare, valuation.buyback.executedAmount / cancelledAmount, programme.announcedAmount / executedAmount / windowDays / elapsedDays / priorPolicyRatio", "reason": "data_missing", "source": "no as-of source; the plan states a yield and a policy ratio and names 자사주 매입 중단 only as a thesis-break trigger", "note": "Without an announced and an executed amount the package cannot tell «announced» from «being executed», which is one of the four look-alikes it exists to separate." },
+    { "item": "earnings.pretaxProfit, earnings.nonRecurringPretaxGain, earnings.dps, earnings.eps, earnings.recurringEps", "reason": "data_missing", "source": "the plan states 1Q 순익 6,043억, which is net income and not pretax profit, and data/fundamentals/316140.json carries no EPS, DPS or non-recurring split", "note": "The one-off-earnings test needs reported and recurring EPS and had neither." },
+    { "item": "mandate.riskBudgetWeight, mandate.mandatePositionCap, mandate.minimumExecutableWeight, mandate.caps.accountSectorCap", "reason": "data_missing", "source": "no as-of source; the plan's 40% 배분 비중 is the investor's own allocation instruction and is not a mandate risk budget" }
+  ],
+  "cases": [
+    {
+      "id": "as-of-2026-05-25",
+      "note": "The replay. Only material dated on or before 2026-05-25, with every absent input left null.",
+      "expect": {
+        "case": "data-missing",
+        "route": "wait",
+        "outcomeCode": "data_missing",
+        "proposedAction": "WAIT",
+        "diagnosticCodes": ["capital_inputs_missing", "fair_value_range_incomplete", "dividend_not_stated", "data_missing"],
+        "noRefutation": true
+      },
+      "input": {
+        "symbol": "316140",
+        "sector": "financials",
+        "issuerKind": "bank",
+        "strategy": "shareholder-rerating",
+        "valuation": { "price": 31300, "fairValue": null, "cashDividend": null, "buyback": null },
+        "financial": {
+          "cet1": null,
+          "policyTargetCet1": null,
+          "regulatoryMinimumCet1": null,
+          "riskWeightedAssets": null,
+          "marketCap": null,
+          "roe": null,
+          "creditCostRatio": null,
+          "creditCostGuidance": null,
+          "projectFinanceExposureRatio": null
+        },
+        "programme": { "announcedAmount": null, "executedAmount": null, "windowDays": null, "elapsedDays": null, "policyRatio": 0.35, "priorPolicyRatio": null },
+        "earnings": { "pretaxProfit": null, "nonRecurringPretaxGain": null, "dps": null, "eps": null, "recurringEps": null },
+        "yieldContext": { "dividendYield": 0.0338, "sectorMedianDividendYield": null },
+        "invalidationPrice": 28000,
+        "mandate": { "riskBudgetWeight": null, "mandatePositionCap": null, "minimumExecutableWeight": null, "caps": { "accountPositionCap": 0.2, "accountSectorCap": null } },
+        "book": { "holdings": [], "openProposals": [{ "symbol": "015760", "weight": 0.039 }] },
+        "completedOutputs": ["returnPolicyEvidence", "invalidationConditions", "stagedPlan", "targetWeightRisk"]
+      }
+    },
+    {
+      "id": "contamination-control-later-account-state",
+      "note": "⛔ Contamination control, not a replay. The account state the book only had on 2026-06-24 is put back — a 18.57% holding of this name. #254's rule is that an absence is not a refutation; the other half of it is that supplying the absent thing later must not turn the run into one either. The answer does not move: the classification is about the company and it was never readable, so the account state cannot decide it.",
+      "expect": { "case": "data-missing", "route": "wait", "outcomeCode": "data_missing", "proposedAction": "WAIT", "noRefutation": true },
+      "input": {
+        "symbol": "316140",
+        "sector": "financials",
+        "issuerKind": "bank",
+        "strategy": "shareholder-rerating",
+        "valuation": { "price": 31300, "fairValue": null, "cashDividend": null, "buyback": null },
+        "financial": {
+          "cet1": null,
+          "policyTargetCet1": null,
+          "regulatoryMinimumCet1": null,
+          "riskWeightedAssets": null,
+          "marketCap": null,
+          "roe": null,
+          "creditCostRatio": null,
+          "creditCostGuidance": null,
+          "projectFinanceExposureRatio": null
+        },
+        "programme": { "announcedAmount": null, "executedAmount": null, "windowDays": null, "elapsedDays": null, "policyRatio": 0.35, "priorPolicyRatio": null },
+        "earnings": { "pretaxProfit": null, "nonRecurringPretaxGain": null, "dps": null, "eps": null, "recurringEps": null },
+        "yieldContext": { "dividendYield": 0.0338, "sectorMedianDividendYield": null },
+        "invalidationPrice": 28000,
+        "mandate": { "riskBudgetWeight": null, "mandatePositionCap": null, "minimumExecutableWeight": null, "caps": { "accountPositionCap": 0.2, "accountSectorCap": null } },
+        "book": { "holdings": [{ "symbol": "316140", "weight": 0.1857, "strategy": "shareholder-rerating" }], "openProposals": [] },
+        "completedOutputs": ["returnPolicyEvidence", "invalidationConditions", "stagedPlan", "targetWeightRisk"]
+      }
+    },
+    {
+      "id": "contamination-control-bis-read-as-cet1",
+      "note": "⛔ Contamination control of a second kind — not a later fact but a wrong one. BIS 16.63% is in the as-of plan and it is a total-capital ratio; reading it into `cet1` is the substitution the replay refused to make. It is here so that the refusal is visible rather than asserted: the run still waits, because the rest of the classification is still unreadable, and it still does not file a refutation.",
+      "expect": { "case": "data-missing", "route": "wait", "outcomeCode": "data_missing", "proposedAction": "WAIT", "noRefutation": true },
+      "input": {
+        "symbol": "316140",
+        "sector": "financials",
+        "issuerKind": "bank",
+        "strategy": "shareholder-rerating",
+        "valuation": { "price": 31300, "fairValue": null, "cashDividend": null, "buyback": null },
+        "financial": {
+          "cet1": 0.1663,
+          "policyTargetCet1": 0.125,
+          "regulatoryMinimumCet1": 0.105,
+          "riskWeightedAssets": 200000000000000,
+          "marketCap": 23000000000000,
+          "roe": null,
+          "creditCostRatio": null,
+          "creditCostGuidance": null,
+          "projectFinanceExposureRatio": null
+        },
+        "programme": { "announcedAmount": null, "executedAmount": null, "windowDays": null, "elapsedDays": null, "policyRatio": 0.35, "priorPolicyRatio": null },
+        "earnings": { "pretaxProfit": null, "nonRecurringPretaxGain": null, "dps": null, "eps": null, "recurringEps": null },
+        "yieldContext": { "dividendYield": 0.0338, "sectorMedianDividendYield": null },
+        "invalidationPrice": 28000,
+        "mandate": { "riskBudgetWeight": null, "mandatePositionCap": null, "minimumExecutableWeight": null, "caps": { "accountPositionCap": 0.2, "accountSectorCap": null } },
+        "book": { "holdings": [], "openProposals": [] },
+        "completedOutputs": ["returnPolicyEvidence", "invalidationConditions", "stagedPlan", "targetWeightRisk"]
+      }
+    }
+  ]
+}

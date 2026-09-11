@@ -561,6 +561,43 @@ left behind:
 There is no shared library in this repository and this pull request did not create one; #256's
 follow-up owns that question, and this table is its inventory.
 
+## Reference case replay
+
+`fixtures/reference-replay.json` answers one of #256's completion conditions — «과거 세 사례는 당시
+시점 자료만으로 분류·논거 복원이 되는지 확인한다». The case is **우리금융지주 (316140), decided
+2026-05-25**, and the sources are the investor's own private record at commit `1fa18c5`:
+`plans/2026-05-25_decision_v2.md` and `plans/2026-05-25_decision_v3.md`, the 2026-05-22 close in
+`data/history/316140.jsonl`, and the OpenDART filings in `data/fundamentals/316140.json` that were
+available by 2026-05-15. Each field in the fixture carries its own source pointer. Nothing else from
+that record is here: no balances, no order ids, no account values.
+
+**What was excluded, and why.** `theses/316140_woori-financial.md` in full, as a `post_hoc_revision` —
+git says it was first committed 2026-06-28, a month after the decision, and its «Why Now» is written
+from inside the position rather than towards it. The 2026-06-24 account snapshot as
+`future_information`. And then the large one, all of it `data_missing`: **CET1 and the capital policy
+target, the fair-value range, the per-share dividend, the buyback executed and cancelled amounts, the
+programme's announced amount and window, and recurring EPS.** The plan states BIS 16.63%, which is a
+total-capital ratio and not CET1, and it was **not** read into `financial.cet1`. The plan's 35,000 /
+38,000 / 41,000 are 익절 lines and 28,000 is a stop; none of them is a fair value and none was read as
+one. PBR 0.83x is stated and this package takes no PBR input.
+
+**Observed outcome.** `data-missing` → route `wait` → **WAIT**, `outcomeCode: data_missing`, naming
+`capital_inputs_missing`, `fair_value_range_incomplete` and `dividend_not_stated`. `replayEligibility`
+is **`ineligible`**: the as-of record carries essentially none of the inputs this package's
+classification is built from, so the classification could not be restored. That is a valid replay
+result and it is the finding — not a failure of the run, which refuses correctly and says what it
+could not read.
+
+Two contamination controls sit beside it: the later holding weight put back, and BIS read into
+`cet1`. Neither moves the answer, and — the assertion that matters — neither reaches
+`capital-inadequate` or `thesis_refuted`. An unreadable capital position is **not** an inadequate one,
+which is #254 checked from the side it usually is not.
+
+⛔ **The outcome above was not tuned.** No threshold in `lib/thresholds.mjs` was touched for this
+fixture, and what is recorded is what `evaluateCase` returned on the first run. The investor's
+reported ~10% result is **not** re-audited here or anywhere in this package; #256 is explicit that it
+was never audited and is not a validated edge.
+
 ## What has not been verified here
 
 The host-side half. Nothing in this repository can run an Aumos session, so proposal storage, WATCH
