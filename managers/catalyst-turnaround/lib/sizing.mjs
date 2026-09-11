@@ -1,5 +1,6 @@
 import { METHODOLOGY } from './constants.mjs'
 import { NOT_DECLARED, cause, diagnostic, finite, readDeclared, round } from './diagnostics.mjs'
+import { mandateCeilings } from './mandate.mjs'
 
 /**
  * ── What a wrong answer costs, and therefore how large the position is ─────
@@ -74,6 +75,16 @@ export function targetWeight({
    * answer as if it had.
    */
   heldOnlyAccountHeadroom,
+  /**
+   * ── The Mandate itself, under the host's names (`untilled/aumos#838`) ─────
+   *
+   * ⚠️ **`maxPositionWeight` is `mandatePositionCap` and nothing translated
+   * it.** Pass the invocation's `mandate` verbatim — the snapshot or its
+   * `constraints` — and the reading above resolves from it where the caller
+   * named no cap of its own. ⛔ It never overrides one that was named: a stated
+   * cap, a stated sentinel and an unread field keep the three traces they have.
+   */
+  mandate,
   config = {},
 } = {}) {
   const diagnostics = []
@@ -88,11 +99,12 @@ export function targetWeight({
    * declares no per-position cap produced the same, full-sized answer. They are
    * different facts and only one of them may size anything.
    */
-  const mandate = readDeclared(mandatePositionCap)
+  const declared = mandateCeilings(mandate)
+  const mandateReading = readDeclared(mandatePositionCap ?? declared.singleNameCap)
   const headroom = readDeclared(accountHeadroom)
   const heldOnlyHeadroom = readDeclared(heldOnlyAccountHeadroom)
   for (const [name, reading] of [
-    ['mandatePositionCap', mandate],
+    ['mandatePositionCap', mandateReading],
     ['accountHeadroom', headroom],
   ]) {
     if (reading.state === 'unread') {
@@ -101,10 +113,10 @@ export function targetWeight({
       )
     }
   }
-  if (mandate.state === 'unread' || headroom.state === 'unread') {
+  if (mandateReading.state === 'unread' || headroom.state === 'unread') {
     return { data: { targetWeight: null, cumulativeTargetWeight: null, heldOnlyTargetWeight: null }, diagnostics, causes }
   }
-  if (mandate.state === 'not-declared') {
+  if (mandateReading.state === 'not-declared') {
     diagnostics.push(
       diagnostic('mandate_position_cap_not_declared', 'note', `The Mandate was read and declares no per-position cap, so this package's own ceiling of ${houseCap} binds. Recorded because "no cap declared" and "cap not read" produce the same number and must not produce the same record`, 'mandatePositionCap'),
     )
@@ -144,7 +156,7 @@ export function targetWeight({
    * a book with no open proposals the two are the same number, byte for byte.
    */
   const foldCaps = (room) => {
-    const caps = [houseCap, mandate.value, room].filter(finite)
+    const caps = [houseCap, mandateReading.value, room].filter(finite)
     const bindingCap = caps.length > 0 ? Math.max(0, Math.min(...caps)) : 0
     return { bindingCap, sized: round(Math.min(raw, bindingCap)), capBinds: raw > bindingCap }
   }
@@ -207,7 +219,7 @@ export function targetWeight({
         riskBudget: round(riskBudget),
         stopDistance: round(stopDistance),
       },
-      caps: { house: houseCap, mandate: mandate.value, mandateState: mandate.state, accountHeadroom: headroom.value, accountHeadroomState: headroom.state, heldOnlyAccountHeadroom: heldOnlyHeadroom.value, heldOnlyAccountHeadroomState: heldOnlyHeadroom.state },
+      caps: { house: houseCap, mandate: mandateReading.value, mandateState: mandateReading.state, accountHeadroom: headroom.value, accountHeadroomState: headroom.state, heldOnlyAccountHeadroom: heldOnlyHeadroom.value, heldOnlyAccountHeadroomState: heldOnlyHeadroom.state },
       units: { targetWeight: 'portfolio-weight', rawWeight: 'portfolio-weight', bindingCap: 'portfolio-weight' },
     },
     diagnostics,
@@ -267,6 +279,16 @@ export function targetWeight({
  * package's own reading of what business a company is in.
  */
 export function accountConcentration({ positions, proposals, caps = {}, strategy = null, candidate = null } = {}) {
+  /**
+   * ── The Mandate itself, under the host's names (`untilled/aumos#838`) ─────
+   *
+   * ⚠️ `caps.mandate` is the invocation's Mandate verbatim, and `mandate.mjs`
+   * turns it into this file's vocabulary: `maxPositionWeight` is the account's
+   * single-name limit, and an axis the host's contract does not carry is a
+   * **declared** absence rather than an unread one. ⛔ A cap the caller states
+   * itself always wins, so a caller that passes no Mandate is unchanged.
+   */
+  const declared = mandateCeilings(caps.mandate)
   const diagnostics = []
   const causes = []
 
@@ -288,7 +310,7 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
       )
     }
   }
-  const accountReading = readDeclared(caps.accountSingleName)
+  const accountReading = readDeclared(caps.accountSingleName ?? declared.singleNameCap)
   if (accountReading.state === 'unread') {
     causes.push(
       cause('data_missing', `The account's single-name limit was not read. Pass the number, or pass ${JSON.stringify(NOT_DECLARED)} to say the Mandate was read and declares none`, 'caps.accountSingleName'),
@@ -401,7 +423,7 @@ export function accountConcentration({ positions, proposals, caps = {}, strategy
   /**
    * ── the sector axis, read or reported as unreadable ────────────────────────
    */
-  const sectorCapReading = readDeclared(caps.accountSector)
+  const sectorCapReading = readDeclared(caps.accountSector ?? declared.sectorCap)
   let sectorState = 'not-applicable'
   let sectorRows = null
   /**
