@@ -129,6 +129,40 @@ ceiling has to hold in both of the states the account passes through.
 calls is a run that can be argued out of subtracting, and every axis — the name, the sector and
 the whole book — has to fold the same way or one name is counted twice on one of them.
 
+## One name is one position, however many theses point at it (#256)
+
+The **held** axis folds by `max` too, and for a reason that is not #813's. #256: «보유 종목에
+복수 thesis가 붙어도 포지션 수량은 하나다».
+
+Two position rows for one symbol were **added**. A 15% row assigned to another desk beside a 9%
+row assigned here read as a 24% position, over a 20% account ceiling — a `breach`, a
+`risk_limit_exceeded` cause and `headroomForStrategy: 0` on a book holding 15% with 5% of room.
+Nothing in the answer said a row had been counted twice.
+
+⛔ **The host does not emit that shape.** `broker-book.ts` merges every row of the same asset into
+one `Position` before the portfolio is published, and `discovery-service.ts` maps positions
+one-to-one with at most one assignment per `assetKey`. A second row for a name is a **restatement
+of one quantity**, so:
+
+```
+held = the largest position row for the name      (never their sum)
+```
+
+`duplicate_position_rows` (`note`) names the symbols it fired on. It is a fact worth recording and
+never a refusal — a duplicated row is a shape, not a missing input, and the ceiling still binds on
+the folded position: two rows of 24% and 9% are a 24% position and still a breach.
+
+⚠️ **Attribution folds one bucket at a time, and then once more.** Two rows for one name carrying
+different `strategy` values are two claims about *whose* the position is, not two positions: each
+bucket keeps its own largest row, and the position is the largest row of all. `ownHeld` is that
+bucket and `otherHeld` is still `held − ownHeld`, so the parts of a position can never add to more
+than the position — 0.09 assigned here beside 0.15 assigned elsewhere is a **0.15** position with
+0.09 of it this desk's. ⛔ Nothing in #814/#815/#817/#821/#825/#828/#846 changes: those rules read
+`ownHeld`, `otherHeld` and `headroomForStrategy`, and what moved is how a bucket is filled.
+
+⚠️ **The sector axis folds with it**, because it sums the same `bySymbol` rows: a sector total that
+counted one position twice was over by whichever row was smaller.
+
 ## The weight that leaves is a third number (#817)
 
 `#813` and `#814` were both the **reading** direction. This is the **writing** one, and until #817
@@ -624,7 +658,7 @@ no network, no test framework — there is none in this repository and this pack
 | `cases.json` | one run per rung of the ladder, and — asserted **across** cases — that catalyst realisation, one delay, repeated delay, cancellation, a reversing recovery indicator and a deteriorating refinancing reach six *different* judgements. A change collapsing two of them passes every per-case check and fails this one |
 | `ledger.json` | confirmed vs estimated dates; announcement time vs report date; a prior-year source not opening a window; a price move never confirming success; terminal states not reopening; contrary evidence surviving a restatement; a delay costing three things; a closed window being flagged for adjudication |
 | `staging.json` | the same plan read four times. The second read is the point: the same due stage, and nothing added |
-| `concentration.json` | open proposals counting as exposure; per-strategy caps not summing into a larger account limit; a proposal restating the position rather than stacking on it; one name under two theses still being one position |
+| `concentration.json` | open proposals counting as exposure; per-strategy caps not summing into a larger account limit; a proposal restating the position rather than stacking on it; one name under two theses being one position — **folded by `max`, with the breach that follows from the folded number and not from the sum** (#256) |
 | `scoreboard.json` | a failed catalyst under a positive price return still scoring zero on the catalyst side; an open window staying out of the denominator; a combined return being refused |
 | the absent-input regressions (in `tools/verify-catalyst-turnaround.mjs`, not a fixture file) | one declared input removed from a run that passes, twelve times over, asserting the run refuses rather than proceeds — and that none of them reports a refutation. They are in-memory mutations precisely so the positive fixtures keep passing for the reasons they already passed |
 | `reference-case.json` | the reference case classifying as a policy-and-financial turnaround at three points in its own story, never excluded on a valuation multiple, with the four channels kept apart — **and** a variant with the same classification that does not reach a purchase |
