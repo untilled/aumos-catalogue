@@ -20,7 +20,7 @@
 | ④ | 다음 런이 그 포지션을 **자기 것**으로 읽고 WATCH/리뷰를 다시 arm한다 | `portfolio_get`의 `assignment.managerInstanceId` == 자기 `context_get` id; `plans` 질의 |
 | ⑤ | Forward Track Record가 그 판단을 건다 | `performance` 질의의 `runs[].decisionId` |
 
-⚠️ **⑤의 뜻을 미리 좁혀 둔다.** 「체결 → Forward Track Record」 연결은 **이 빌드에 없다**(`untilled/aumos#887`). `track-record.ts`의 입력은 runs/decisions/plans/marks뿐이고 fill·order가 없다. 한 번의 런으로 관측 가능한 것은 **인스턴스 행이 서고 그 행의 `runs[]`가 `decisionId`를 든다**까지이며, 다섯 축(reliability/discipline/coherence/acuity/composure)은 전부 `insufficient`로 나온다(최소치: 런 5, 판단 5, 해소된 판단 10). **그것이 정상이고, 그대로 기록하는 것이 이 체크포인트다.**
+⚠️ **⑤의 뜻 — `untilled/aumos#899`(2026-09-12 머지) 이후.** 「체결 → Forward Track Record」 연결이 **이제 있다**: `track-record`가 order/fill을 입력으로 받고, 판단마다 실현·평가·전방 세 층을 따로 기록하며(⛔ 합산 필드 없음), 관측된 수수료·제세금을 주문 행에 싣고, 벤치마크는 통화별(KRW 069500 · USD SPY)로 판단 자체의 보유 창에서 잰다. 한 번의 런으로 볼 것은 `decisionRecords[].window.opened == "fill"`(체결이 실적에 닿았다는 증거)과 `costs.fees.status`(**`data_missing`이어야지 `0`이면 결함** — 마이그레이션이 백필도 기본값도 두지 않았다)이다. 다섯 축(reliability/discipline/coherence/acuity/composure)은 여전히 `insufficient`로 나온다(최소치: 런 5, 판단 5, 해소된 판단 10). **그것이 정상이고, 그대로 기록하는 것이 이 체크포인트다.**
 
 ---
 
@@ -629,13 +629,12 @@ echo '{"id":1,"query":{"kind":"performance","portfolioId":"pf_…"}}' | $HOST
 `reliabilityRuns: 5`, `disciplineDecisions: 5`, `coherenceDecisions: 3`, `acuityResolved: 10`, `composureIntervals: 2`.
 `acuity`는 그 위에 **판단의 `forecast.horizonDays`가 지나야** 해소되므로, 한 번의 런으로는 *「아직 아니다 — N일에 해소된다」*가 정답이다.
 
-⚠️ **여기서 확인되지 않는 것을 정확히 적는다** (`untilled/aumos#887`):
-- **체결 → 실적 연결이 없다.** `track-record.ts`의 입력에 fill·order가 **없다.**
-- 수수료·세금·배당 컬럼이 **0개**다.
-- 실현손익을 계산하는 곳이 **없다.**
-- `portfolioReturn`은 총평가액 delta, 즉 **평가손익이 전방수익률로 제시된다.**
-- 벤치마크는 머신당 하나, 기본 SPY/ARCX/USD — **원화 장부에 맞는 것이 없다.**
-- 전략별 집계 축이 **없다.**
+⚠️ **`untilled/aumos#887`이 요구한 여섯 가지는 `#899`로 들어갔다** — 단, 실제 체결로 들어오는 수수료·제세금과 069500 마크는 이 런에서 처음 관측된다. 볼 곳:
+- `performance` → 해당 인스턴스 행 → `decisionRecords[]`: `realised`(체결 둘) · `unrealised`(마크) · `forward`(진입 마크 → 창 종료 마크) 세 층이 **따로** 있고 합산 필드가 없다.
+- `decisionRecords[].window.opened == "fill"` — 체결이 실적에 닿았다는 증거.
+- 주문 행의 `fees`/`taxes` — 토스 체결 응답의 `execution.commission`/`tax`가 실려야 하고, 없으면 `null`(=`data_missing`)이지 `0`이 아니다.
+- `benchmarks[]` — 통화마다 한 행. 원화 장부면 `069500/XKRX`가 마크돼 있어야 하고, 마크가 없으면 `benchmark-absent-for-currency` 문장이 뜬다(가격 소스를 붙이라는 뜻).
+- `aggregate` — 판단 수, 귀속/미귀속, hit-rate(SELL은 내려야 맞힘, WAIT은 ±5%), 층별 분위수(3건 미만이면 `insufficient`).
 
 ### ✅ 체크포인트 ⑤
 `performance`의 해당 인스턴스 행에서 `runs[]`가 `decisionId: dec_…`를 든다. **그 이상은 이 빌드에 없고, 없는 것을 없다고 기록하는 것이 이 체크포인트의 값이다.**
@@ -691,11 +690,13 @@ cp -R "$AUMOS_HOME/runs" /tmp/256-runs
       `positions[].assignment.managerInstanceId == agt_…`, `state == "assigned"`
       `plans`에 새 armed 계획, 두 번째 판단이 중복 매수를 내지 않음
 - [ ] ⑤ **Forward Track Record** — `performance`의 `shareholder-rerating` 행이
-      `runs[].decisionId == dec_…`. 다섯 축 전부 `insufficient`(최소치 미달, 정상)
+      `runs[].decisionId == dec_…`, `decisionRecords[].window.opened == "fill"`,
+      주문 행 `fees`/`taxes`가 관측값 또는 `null`(0 아님), `benchmarks[]`에 KRW 행.
+      다섯 축 전부 `insufficient`(최소치 미달, 정상)
 
 ### ⬜ 이 런이 재지 못한 것
-- 체결 → Forward Track Record 연결은 **호스트에 없다** (untilled/aumos#887). 수수료·세금·배당 구분,
-  실현손익, 원화 벤치마크, 전략별 집계도 마찬가지.
+- 배당은 두 브로커 어댑터 모두 관측 불가라 컬럼 없이 `data_missing`이다(untilled/aumos#899). 069500은
+  가격수익 지수라 초과수익이 분배수익률만큼 낙관적이다.
 - `acuity`는 판단의 `forecast.horizonDays`가 지나야 해소된다 — 이 런으로는 「아직 아니다」가 정답.
 - 페이퍼 대조군이 없다. 토스에는 시뮬레이터가 없고 Alpaca는 XKRX를 못 다룬다.
 - 매니저 하나·판단 둘이다. 세 패키지 동시 운용은 여전히 #789 2단계의 것.
@@ -758,3 +759,260 @@ aumos-catalogue/
   sources/open-dart/source.json                       credentials[0].name = "api-key"
   .claude-plugin/marketplace.json                     게시의 정본
 ```
+
+---
+
+## 알파카 페이퍼 펀드에서 하는 변형
+
+> 투자자가 **알파카 페이퍼 계좌를 연동한 펀드**를 하나 더 열어 두었다. 이 절은 그 펀드에서
+> 무엇이 닫히고 무엇이 안 닫히는지, 그리고 **패키지를 바꿔야 하는 지점**을 적는다.
+>
+> ⛔ **결론을 먼저 적는다.** 알파카 페이퍼에서 SR/CT/FMR은 **BUY에 닿을 수 없다.** 세 패키지는
+> `markets: ["XKRX"]`이고 가격을 `connection:passthrough` **토스**로 받는다. 알파카 펀드에는
+> 그 연결이 없으므로 국내 종목에 쓸 가격 도구가 아예 안 선다 → `data_missing` → WAIT/WATCH.
+> **체크포인트 ③⑤(체결·실적)은 다른 패키지로 재고, 토스 실계좌 경로는 그대로 남는다.**
+
+### A. 왜 SR이 알파카 펀드에서 BUY에 못 닿는가 — 그런데 설치는 된다
+
+호스트는 **매니저를 시장으로 막지 않는다.** `packages/manager-runtime/src/install.ts:706-745`가
+내는 것은 **비차단** 문제 둘뿐이다:
+
+```
+connection-not-linked  blocking: false
+  "This manager names broker logins this fund does not have: toss."
+source-not-installed   blocking: false
+```
+
+그래서 `acknowledged: true`면 **SR은 알파카 펀드에 깨끗이 설치된다.** 런도 뜬다. 다만
+`AUMOS_BROKER_RELAYS`에 `toss`가 없으니 `connection_request`가 국내 가격을 못 가져오고, SR은
+`book.totalValue`와 가격 없이는 사이징을 못 해 **`data_missing` → WAIT**로 끝난다.
+
+⚠️ **그것은 결함이 아니라 이 런북이 재려던 경계 하나가 실제로 도는 것**이므로, 기록할 값이 있다.
+
+### B. 다섯 체크포인트를 둘로 가른다
+
+| | 알파카 페이퍼 + **SR**로 증명되는 것 | 근거 |
+|---|---|---|
+| ① **설치** | ✅ 전부 | `managers/<agt_…>/aumos.json` 0.5.7, `runnable-managers`에 행. 비차단 경고 둘이 **문장으로** 뜨는 것까지 확인 가능 |
+| ② **`decision_submit`** | ✅ **단, WAIT/WATCH의 봉인** | `runs/<run_…>/decision.json` 존재 + `decisions` 행 + 해시체인. ⛔ 승인 대기열에는 **안 선다**(WAIT는 `MOVES_THE_BOOK`이 아니다) |
+| ③ 승인→담당→주문→체결 | ❌ **불가** | 나갈 주문이 없다 |
+| ④ **다음 런 재읽기 + 리뷰 재arm** | ⚠️ **절반** | 두 번째 런이 돌고 `plans`에 arm은 확인 가능. ⛔ **`assignment.managerInstanceId`를 자기 것으로 읽는 절반은 못 잰다** — 담당 행은 «주문이 실제로 나가는 승인»에만 생긴다(⚠️-9) |
+| ⑤ Forward Track Record | ❌ 사실상 불가 | 행은 서지만 층 ①②가 전부 비고, 국내 종목이라 `benchmarks`도 안 맞는다 |
+
+**그러므로 알파카 펀드에서 SR로 하는 일은 ①②와 ④의 절반**이고, 그것만으로도
+*「세 카탈로그 패키지를 import하거나 실제 `decision_submit`을 내게 한 호스트 테스트는 없다」*
+(#850)라는 문장은 **지워진다.** 그것이 이 변형의 값이다.
+
+### C. 알파카 페이퍼 연결 — 토스와 다른 점
+
+**`judgeConnection`은 `alpaca` + `paper`를 받는다.** ✅ 코드로 확인:
+`packages/credentials/src/catalog.ts`의 알파카 행이 `environments: ['paper','live']`이고,
+`connectorHasEnvironment('alpaca','paper')`가 참이라 `unsupported-environment` 거절에 안 걸린다.
+(토스는 `environments: ['live']` 하나라 `paper`가 이름으로 거절된다.)
+
+```bash
+export AUMOS_HOME="$HOME/.aumos-256"
+ export ALPACA_API_KEY_ID='…'          # ⚠️ paper 쌍. LIVE는 ALPACA_LIVE_* 로 이름이 다르다
+ export ALPACA_API_SECRET_KEY='…'
+
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"open-connection","connector":"alpaca","environment":"paper","label":"Alpaca Paper"}}}' 15
+ask '{"id":1,"command":{"kind":"broker-accounts"}}' 30
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"attach-account","portfolioId":"pf_…","connectionId":"conn_…","accountRef":"<alpaca account id>","baseCurrency":"USD"}}}' 20
+```
+
+호스트: `BROKER_PAPER_URL = https://paper-api.alpaca.markets/v2`(라이브는 `api.alpaca.markets/v2`).
+환경은 **Connection 행의 사실**이지 전역 플래그가 아니다.
+
+| | 토스 | 알파카 페이퍼 |
+|---|---|---|
+| 환경 | `live` 하나 — 진짜 돈 | **`paper`** — 모의 돈 |
+| **주문 취소** | ⛔ **불가.** `cancelOrder`가 던진다 | ✅ **된다.** `alpaca-execution.ts`가 `client_order_id`로 벤더 id를 찾아 `DELETE /orders/{id}` |
+| 소수점 주식 | 언제나 `fractionable: false` → `Math.trunc` | **종목마다 다르다** — 어댑터가 `raw.fractionable === true`를 그대로 읽는다. ETF는 보통 가능 |
+| 수수료·제세금 | 체결 통보에 실려 온다 → 기록됨 | ⛔ **응답에 그 이름이 없다** → 컬럼이 영구 NULL (§E) |
+| 가격 소스 | `connection:passthrough` toss | `connection:passthrough` alpaca |
+
+⚠️ **카탈로그에 `alpaca-market` 소스는 없다.** `sources/`는 `coinbase-exchange`,
+`fsc-securities-product`, `open-dart`, `openbb-fmp`, `sec-edgar` 다섯뿐이다. `atlas-trend-us`는
+**소스를 하나도 안 쓰고** 가격·기업행동을 `connection_request`로 알파카 연결에서 직접 받는다 →
+**`install-source`를 할 일이 없다.**
+
+⚠️ **최소 주문 금액은 여전히 코드가 모른다**(본편 ⚠️-2). `minNotionalMinorUnits`는 생산자가 없고,
+실질 하한은 `roundQuantity`와 알파카의 거절뿐이다.
+
+### D. ③⑤를 재려면 — `atlas-trend-us` 0.2.3
+
+**추천 이유:** 알파카 페이퍼에서 **실제로 체결까지 가는 유일한 짧은 경로**다.
+
+- `markets: ["XNAS","ARCX","BATS"]`, `assetClasses: ["etf","cash"]` — 알파카가 실제로 채우는 것.
+- `capabilities`에 **`connection:passthrough` + `connectors: ["alpaca"]`** 하나뿐. ⛔ **소스가 없다** →
+  OpenDART도 SEC도 필요 없고, 설치 시 `source-not-installed` 경고도 안 뜬다.
+- `config.schema.json`에 **required 필드가 없다**(`historyDays`, `feed`, `targetVolatility` 등 전부 기본값).
+- `engines.aumos: ">=0.3.18"` — 호스트 0.5.0에서 통과.
+- **`REBALANCE` 또는 `WAIT`을 낸다.** `REBALANCE`는 `MOVES_THE_BOOK`이라 **승인 대기열에 선다** → ③이 열린다.
+- 대안 `evidence-gated` 0.11.1도 알파카를 알지만 `toss`+`alpaca`·`sec-edgar`+`open-dart`를 전부
+  이름 대고 capability가 14개다 — **세팅이 훨씬 길다.** ③⑤만 재는 데는 과하다.
+
+⚠️ 스케줄이 **`0 22 LW * *` UTC**(매월 마지막 평일) 하나다 — 기다리지 말고 **수동 `start-run`**으로 띄운다.
+
+```bash
+ask '{"id":1,"command":{"kind":"registry-fetch","packageId":"atlas-trend-us","version":"0.2.3"}}' 30
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"install-manager",
+  "packagePath":"'"$AUMOS_HOME"'/staging/atlas-trend-us@0.2.3",
+  "portfolioId":"pf_alpaca…","vendor":"claude","acknowledged":true}}}' 30
+echo '{"id":1,"command":{"kind":"runnable-managers"}}' | $HOST      # mode == "live" 확인
+ask '{"id":1,"command":{"kind":"start-run","packageId":"atlas-trend-us","managerInstanceId":"agt_…","live":true}}' 900
+```
+
+**맨데이트 — 작게, 그리고 `baseCurrency: "USD"`로**:
+
+```bash
+ask '{"id":1,"command":{"kind":"apply-setting","setting":{"kind":"open-mandate","draft":{
+  "label":"#256-alpaca",
+  "objective":"카탈로그 매니저 실런 — 알파카 페이퍼. 소액 ETF 바스켓.",
+  "horizonDays":3650,
+  "constraints":{"baseCurrency":"USD","allowedAssetClasses":["etf","cash"],
+    "maxPositionWeight":0.25,"cashFloor":0.05,"maxDrawdown":0.5,
+    "allowShorting":false,"allowLeverage":false,"excludedSymbols":[]}}}}}' 20
+```
+
+- **`allowedAssetClasses`에 `etf`가 반드시 있어야 한다** — 없으면 맨데이트가 자산군을 **이름으로** 거절한다.
+- **`baseCurrency: "USD"`가 #899의 통화별 벤치마크 기본값을 타게 한다**(§E).
+- 페이퍼 계좌 잔고는 **$2,000~$10,000** 권장. `atlas-trend-us`는 바스켓 전체를 한 `REBALANCE`로
+  내므로 다리가 여럿이고, 각 다리가 1주(또는 소수점 최소)에 못 미치면 조용히 빠진다.
+
+### E. #899가 바꾼 것 — 본편 §9-C의 ⑤ 주의문은 **낡았다**
+
+⚠️ **본편은 「체결 → Forward Track Record 연결이 없다(#887)」라고 적었는데, `#899`가 머지되어
+그 문장은 더 이상 참이 아니다.** 확인: `ef5e3638` (`체결이 실적에 닿고, 세 층은 더해지지 않으며,
+벤치마크는 장부의 돈으로 골라진다`), 마이그레이션 `0058_order_observed_costs`.
+
+`performance` 질의에서 새로 볼 것:
+
+```bash
+echo '{"id":1,"query":{"kind":"performance","portfolioId":"pf_alpaca…"}}' | $HOST
+```
+
+**① 세 층 — `TrackRecordView.decisionRecords[]`와 `.aggregate`**
+
+| 필드 | 뜻 | 알파카 첫 런에서의 기대값 |
+|---|---|---|
+| `realised` | **체결 둘의 차.** 진입·청산이 **둘 다** 있을 때만 `measured` | `data_missing` — 아직 안 팔았다 |
+| `unrealised` | 진입 체결가와 마크의 차 | ✅ **`measured`** — 이것이 체결이 실적에 닿은 증거다 |
+| `forward` | 진입 시점 마크와 창 종료 마크의 차. **체결이 없어도 존재한다** | 창이 아직 열려 있으면 `to`가 읽는 시각 |
+| `excessOverBenchmark` | 층 ③ − 벤치마크 | 벤치마크 마크가 쌓여야 |
+| `benchmarkReturn` | **그 판단 자신의 창**의 지수 수익 (⛔ 전역 `windowDays`가 아니다) | |
+
+⛔ **층을 가로지르는 종합 수가 없다** — 셋을 더한 하나의 숫자를 찾지 말 것. `aggregate`는 각 층을
+**분위수**(`p25`/`median`/`p75`)로 따로 읽는다(한 판단이 표를 끌고 가지 못하게).
+
+`decisionRecords[]`의 각 행에 `fills.entry`/`fills.exit`(`FillRefView`: `orderId`·`decisionId`·`at`·
+`side`·`quantity`·`price`)와 `window.opened: 'fill' | 'sealed'`가 있다 — **`opened: "fill"`이면
+체결이 창을 열었다는 뜻이고, 그것이 본편 ⑤가 못 재던 바로 그 연결이다.**
+
+**② 수수료·제세금 — 알파카에서는 `data_missing`이어야 하고 `0`이면 결함이다**
+
+`ObservedAmountView`:
+```
+status: 'observed' | 'data_missing'
+amount: Money | null      // ⛔ data_missing이면 null. 절대 0이 아니다
+observations: number
+reason: Phrase | null
+```
+⚠️ **알파카 어댑터는 `fees`·`taxes`를 읽지 않고 그것이 그 벤더에 대한 사실이다** — 그 거래소의 주문
+문서에 그 이름이 없고 수수료는 `activities` 원장에 있는데 `BrokerReadPort`에 `activities()`가 없다.
+마이그레이션이 **백필도 기본값도 두지 않은** 이유가 이것이다:
+
+> ⚠️ `NULL`은 «0원»이 아니다. `'0'`을 답한 체결은 **관측된 0원**이고 아무 말도 안 한 체결은 부재다.
+
+**그래서 관측할 것**: `costs.fees.status === "data_missing"`, `costs.taxes.status === "data_missing"`,
+`amount === null`. **`0`이 보이면 그것을 결함으로 기록한다.**
+`costs.dividends`는 **어느 브로커에서도 언제나 `data_missing`**이다(입금 이벤트를 읽을 경로가 없다).
+
+**③ 통화별 벤치마크 — `PerformanceView.benchmarks[]`**
+
+`services/kernel-host/src/wake/live.ts:569`:
+```ts
+const DEFAULT_BENCHMARK = {
+  USD: { symbol: 'SPY',    market: 'ARCX' },
+  KRW: { symbol: '069500', market: 'XKRX' },   // KODEX 200
+}
+```
+- **하나가 아니라 목록이다.** 전에는 「기계에 마크된 첫 번째 지수」 하나가 모든 행에 붙었고, 그것이
+  원화 장부를 미국 ETF에 재던 구조적 원인이었다. 이제 **장부가 쓰는 통화마다 하나**다.
+- `BenchmarkRowView`: `asset`·`label`·`since`·`marks`. `asset.currency`가 어느 돈에 대한 것인지 말한다.
+- **USD 펀드라 `SPY/ARCX`가 그대로 붙는다** — `atlas-trend-us`가 미국 ETF 바스켓이므로 이 비교가 처음으로 뜻을 갖는다.
+- ⚠️ KRW 기본값 `069500`은 **가격 수익**이지 배당 재투자 총수익이 아니다(분배금을 관측할 경로가 없다).
+- 덮어쓰기: `AUMOS_BENCHMARK_USD="QQQ:XNAS"` 꼴. 빈 문자열은 «그 행을 그리지 마라».
+- ⛔ **`PerformanceView.benchmarkAbsent`(기계 전체에 지수가 없다)와 `TrackRecordView`의 행별 부재
+  («이 돈으로 된 지수가 없다»)는 다른 사실이다.** 하나만 매니저에 대한 것이다.
+
+⚠️ 다섯 축(`axes[]`)은 여전히 `insufficient`다 — 최소치(런 5·판단 5·해소된 판단 10)는 #899가 안 건드렸다.
+
+### F. 이 변형이 #256에서 닫는 것과 닫지 못하는 것
+
+**닫는다**
+- 「세 카탈로그 패키지 중 하나가 실제 호스트에서 실제 CLI로 `decision_submit`을 냈다」 — SR로.
+- 「승인 → 담당 지정 → 주문 → 체결 → 실적」의 **기계 경로 전체** — `atlas-trend-us`로, 모의 돈으로.
+- #899의 세 층·관측된 비용·통화별 벤치마크가 **실제 체결 위에서** 어떻게 읽히는지.
+
+**닫지 못한다**
+- ⛔ **SR/CT/FMR 중 어느 것도 BUY에 닿지 못한다.** 셋 다 XKRX + 토스 가격이고, 알파카 펀드에는 그
+  연결이 없다. #256의 *「각 패키지의 BUY 가능한 양성 사례」*를 **실런으로** 확인하려면 **토스 실계좌가
+  여전히 필요하다**(본편 전체).
+- ⛔ SR의 담당 귀속(`position_assignments`)은 알파카 펀드에서 안 생긴다 — 담당은 주문이 실제로 나가는
+  승인에만 올라탄다.
+- ⛔ KRW 벤치마크(`069500`)는 원화 장부가 있어야 마크된다.
+
+**그러므로 순서는**: 알파카 페이퍼에서 ①②④-절반(SR) + ③⑤(atlas) 를 먼저 닫고, **토스 실계좌 런은
+본편 그대로 남긴다.** 알파카 런이 본편을 대체하지 않는다.
+
+### G. #256에 붙일 체크리스트 (알파카 페이퍼 변형)
+
+```markdown
+## 알파카 페이퍼 펀드 런 — 관측 결과 (YYYY-MM-DD)
+
+환경: macOS · node <ver> · aumos <sha, #899 포함> · `claude` <ver>
+펀드: `#256-alpaca` · baseCurrency **USD** · Alpaca **paper** (`paper-api.alpaca.markets/v2`)
+
+### SR로 잰 것 (①②④-절반)
+- [ ] ① `shareholder-rerating` 0.5.7이 알파카 펀드에 **설치된다** —
+      비차단 경고 둘이 문장으로 뜬다: `connection-not-linked`(toss), `source-not-installed`(open-dart)
+- [ ] ② 실제 CLI 런이 `decision_submit`을 냈다 — `runs/<run_…>/decision.json` 존재,
+      `action = <WAIT|WATCH>`, `outcomeCode = data_missing`, 해시체인 통과
+      ⚠️ 승인 대기열에는 서지 않는다(WAIT은 `MOVES_THE_BOOK`이 아니다) — 예상된 결과
+- [ ] ④-절반 두 번째 런이 돌고 `plans`에 리뷰가 다시 arm됐다
+      ⬜ `assignment` 재읽기 절반은 못 쟀다 — 담당 행이 없다(주문이 안 나갔다)
+
+### atlas-trend-us 0.2.3으로 잰 것 (③⑤)
+- [ ] ③ `REBALANCE` → 승인 화면 「운용 담당」 체크 → 주문 → 체결
+      `orders`: `broker_order_id=<…>`, `state=filled`, `filled_quantity=<n>`
+      `position_assignments`: `state=assigned`, `ground=approval`, `manager_instance_id=agt_…`
+      ⚠️ 알파카는 취소가 **된다** — 토스와 다른 점
+- [ ] ⑤ `performance`에서 (#899):
+      - `decisionRecords[].window.opened == "fill"`  ← **체결이 실적에 닿았다**
+      - `aggregate.unrealised` = `measured` · `realised` = `data_missing`(아직 미청산)
+      - `costs.fees.status == "data_missing"` · `costs.taxes.status == "data_missing"` ·
+        `amount == null` ← ⛔ **`0`이면 결함이다.** 알파카는 주문 응답에 그 이름이 없다
+      - `costs.dividends.status == "data_missing"` (언제나)
+      - `benchmarks[]`에 `SPY/ARCX/USD` 한 행
+      - `axes[]`는 전부 `insufficient` (최소치 미달 — 정상)
+
+### ⬜ 이 런이 닫지 못한 것
+- SR/CT/FMR의 **BUY 양성 경로**는 여전히 미확인 — 셋 다 XKRX + 토스 가격이고
+  알파카 펀드에는 그 연결이 없다. **토스 실계좌 런이 여전히 필요하다.**
+- KRW 벤치마크(`069500`)는 원화 장부가 없어 마크되지 않았다.
+- `realised`(층 ①)는 청산 체결이 없어 재지 못했다.
+```
+
+### ⚠️ 확인 필요 (이 절에서 추가된 것)
+
+| # | 항목 | 상태 |
+|---|---|---|
+| ⚠️-A1 | **본편 §9-C의 ⑤ 주의문이 낡았다** | `#899`(`ef5e3638`)가 머지되어 「체결 → Forward Track Record 연결이 없다」는 **더 이상 참이 아니다**. 저장소에 커밋된 본편(`docs/runbooks/real-run-issue-256.md`)도 그에 맞춰 고쳐야 한다 |
+| ⚠️-A2 | **카탈로그에 `alpaca-market` 소스가 없다** | `sources/`는 다섯뿐(coinbase-exchange · fsc-securities-product · open-dart · openbb-fmp · sec-edgar). `atlas-trend-us`는 소스를 안 쓰고 `connection_request`로 알파카에서 직접 받는다 — 조정자 메모의 전제 하나가 틀렸다 |
+| ⚠️-A3 | **알파카 소수점 주식** | 어댑터가 `raw.fractionable`을 종목마다 읽는다. **어떤 ETF가 실제로 `true`를 답하는지 재지 않았다** — 소수점이 안 되는 다리가 1주 미만이면 조용히 빠진다 |
+| ⚠️-A4 | **알파카 최소 주문 금액** | 본편 ⚠️-2 그대로 — `minNotionalMinorUnits`에 생산자가 없다. 알파카의 실제 하한(통상 $1 notional)을 코드가 모른다 |
+| ⚠️-A5 | **`atlas-trend-us`가 한 번에 몇 다리를 내는가** | 바스켓 전체를 한 `REBALANCE`로 낸다. 다리 수와 필요한 최소 잔고를 실측하지 않았다 — $2,000~$10,000은 **추정**이다 |
+| ⚠️-A6 | **페이퍼 계좌의 체결 지연** | 알파카 페이퍼는 정규장 밖에서 `accepted`로 머물 수 있다. `filled`까지의 주기를 재지 않았다(본편 ⚠️-13과 같은 미지수) |
+| ⚠️-A7 | **`decisionRecords`를 읽는 별도 질의가 없다** | `TrackRecordView`의 필드이므로 `performance` 질의 하나로 전부 내려온다. 판단이 많아졌을 때의 페이로드 크기를 재지 않았다 |
+| ⚠️-A8 | **`evidence-gated` 0.11.1을 실제로 굴려 보지 않았다** | 알파카를 알지만 capability 14개 + 소스 둘이라 세팅이 길다. ③⑤에는 `atlas-trend-us`가 낫다는 판단은 **매니페스트 비교에 근거한 것이지 실행 비교가 아니다** |
