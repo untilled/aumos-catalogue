@@ -1,0 +1,350 @@
+{
+  "note": "The mechanical properties of the candidate ledger, one scenario per rule. `base` is a well-formed call — one carried candidate, one fresh observation of it — and each scenario shallow-merges its `overrides` onto it, so a scenario's diff is exactly the thing being tested. Every figure is illustrative. The shape is `fixtures/ledger.json`'s: base + scenarios[{name, why, overrides, expect}]. ⛔ The ledger written here and the catalyst register written by `lib/ledger.mjs` are two documents joined by catalystIds[] and never merged.",
+  "asOf": "2026-06-30T07:00:00Z",
+  "base": {
+    "ruleVersion": "ct-event-1",
+    "registerCatalystIds": ["cat-unit-price-2026h2"],
+    "cursor": { "kind": "dart-receipt", "value": "20260626000377", "atEpochMs": 1782000000000 },
+    "failedRanges": [],
+    "previous": {
+      "schemaVersion": 1,
+      "strategy": "catalyst-turnaround",
+      "ruleVersion": "ct-event-1",
+      "updatedAtEpochMs": 1771891200000,
+      "cursor": { "kind": "dart-receipt", "value": "20260501000101", "atEpochMs": 1771891200000 },
+      "failedRanges": [],
+      "candidates": [
+        {
+          "symbol": "036460",
+          "market": "XKRX",
+          "state": "researching",
+          "discoveredAtEpochMs": 1769817600000,
+          "lastSeenAtEpochMs": 1771891200000,
+          "discoveryPath": ["dart:working-capital-normalisation"],
+          "ruleVersion": "ct-event-1",
+          "hypothesis": "억눌린 규제 단가가 정상화되면 미수금 잔액이 3분기부터 감소로 돌아선다.",
+          "sectionsComplete": ["event-decomposition"],
+          "openQuestions": ["개정 단가가 3분기 매출에 반영되는 시점"],
+          "evidenceIds": ["ev_prior_0401"],
+          "catalystIds": ["cat-unit-price-2026h2"],
+          "nextReviewAtEpochMs": 1782950400000,
+          "nextReviewCondition": "3분기 보고서 접수",
+          "excludedReasonCode": null,
+          "history": [{ "atEpochMs": 1769817600000, "from": null, "to": "discovered", "ruleVersion": "ct-event-1" }]
+        }
+      ]
+    },
+    "observations": [
+      {
+        "symbol": "036460",
+        "market": "XKRX",
+        "discoveryPath": ["dart:tariff-or-price-normalisation"],
+        "evidenceIds": ["ev_gazette_0602"],
+        "lastSeenAtEpochMs": 1782000000000
+      }
+    ],
+    "transitions": []
+  },
+  "scenarios": [
+    {
+      "name": "a-carried-candidate-is-resumed-and-not-duplicated",
+      "why": "The control. The same name found a second way is one row with two discovery paths — never a second row, and therefore never a second proposal on one name.",
+      "overrides": {},
+      "expect": {
+        "candidateCount": 1,
+        "state": "researching",
+        "discoveryPath": ["dart:working-capital-normalisation", "dart:tariff-or-price-normalisation"],
+        "evidenceIdsInclude": ["ev_prior_0401", "ev_gazette_0602"],
+        "discoveredAtEpochMs": 1769817600000,
+        "nextLedgerWritten": true,
+        "diagnosticCodes": []
+      }
+    },
+    {
+      "name": "an-unread-ledger-is-data-missing-and-writes-nothing",
+      "why": "`undefined` is nobody having read the key. A run that cannot see its own roster cannot tell a new name from one it has been researching for a month, and writing either down would be a guess in a durable record.",
+      "overrides": { "previous": "__undefined__" },
+      "expect": {
+        "candidateCount": 0,
+        "nextLedgerWritten": false,
+        "previousRead": "unread",
+        "causeCodes": ["data_missing"],
+        "noBlockedDiagnostic": true
+      }
+    },
+    {
+      "name": "a-ledger-read-and-empty-seeds",
+      "why": "`null` is a positive statement: the key was read and holds nothing. It re-seeds, which is what stops the key ever locking itself — the failure #222 found next door, where one malformed write made a key permanently unreadable by its own owner.",
+      "overrides": { "previous": null },
+      "expect": {
+        "candidateCount": 1,
+        "state": "discovered",
+        "previousRead": "seed",
+        "nextLedgerWritten": true,
+        "diagnosticCodes": []
+      }
+    },
+    {
+      "name": "a-hand-written-blob-degrades-rather-than-locking-the-key",
+      "why": "The pre-#305 writes carry descriptive fields and no schemaVersion. Carrying less history is never carrying wrong history, and the sibling keys are named rather than copied — the byte budget measures this document's own fields.",
+      "overrides": {
+        "previous": { "notes": "a hand-written scratch file", "watchlist": ["036460"] }
+      },
+      "expect": {
+        "candidateCount": 1,
+        "previousRead": "degraded-no-schema",
+        "previousExtraKeys": ["notes", "watchlist"],
+        "nextLedgerWritten": true
+      }
+    },
+    {
+      "name": "a-schema-version-this-code-does-not-know-is-refused",
+      "why": "A writer this code has never seen may have shaped its rows in a way this one would silently drop, and dropping history is the failure the whole file guards against.",
+      "overrides": { "previous": { "schemaVersion": 2, "candidates": [] } },
+      "expect": {
+        "nextLedgerWritten": false,
+        "diagnosticCodes": ["candidate_ledger_unknown_version"],
+        "diagnosticSeverities": { "candidate_ledger_unknown_version": "blocked" }
+      }
+    },
+    {
+      "name": "a-ledger-written-after-as-of-is-refused",
+      "why": "A document from a later run can hold only past-dated rows and still carry that run's judgement backwards. The per-row check does not catch it, which is why it is checked on the document.",
+      "overrides": {
+        "previous": { "schemaVersion": 1, "updatedAtEpochMs": 1790000000000, "candidates": [] }
+      },
+      "expect": {
+        "nextLedgerWritten": false,
+        "diagnosticCodes": ["candidate_ledger_after_as_of"]
+      }
+    },
+    {
+      "name": "evidence-ids-cannot-be-dropped-on-restatement",
+      "why": "The row came back without the id that put it in the ledger. The carried value wins, the id is reinstated, and the run stops rather than proceeding on a record that reads clean — a laundered record is worse than a missing one.",
+      "overrides": {
+        "observations": [
+          { "symbol": "036460", "market": "XKRX", "restated": true, "evidenceIds": ["ev_gazette_0602"], "discoveryPath": [] }
+        ]
+      },
+      "expect": {
+        "evidenceIdsInclude": ["ev_prior_0401", "ev_gazette_0602"],
+        "diagnosticCodes": ["candidate_evidence_dropped"],
+        "diagnosticSeverities": { "candidate_evidence_dropped": "blocked" },
+        "nextLedgerWritten": false
+      }
+    },
+    {
+      "name": "a-terminal-state-cannot-be-restated-away",
+      "why": "The carried record says excluded and this run handed back researching. A state that was reached is left where it is; moving it is an explicit transition with a reason, not a restatement.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "catalyst-turnaround",
+          "ruleVersion": "ct-event-1",
+          "updatedAtEpochMs": 1771891200000,
+          "candidates": [
+            {
+              "symbol": "036460",
+              "market": "XKRX",
+              "state": "excluded",
+              "excludedReasonCode": "no-traced-path",
+              "ruleVersion": "ct-event-1",
+              "evidenceIds": ["ev_prior_0401"],
+              "discoveryPath": [],
+              "history": []
+            }
+          ]
+        },
+        "observations": [
+          { "symbol": "036460", "market": "XKRX", "state": "researching", "evidenceIds": ["ev_prior_0401"], "discoveryPath": [] }
+        ]
+      },
+      "expect": {
+        "state": "excluded",
+        "diagnosticCodes": ["candidate_state_regressed"],
+        "diagnosticSeverities": { "candidate_state_regressed": "blocked" },
+        "nextLedgerWritten": false
+      }
+    },
+    {
+      "name": "an-excluded-candidate-re-enters-only-on-a-reason-and-new-evidence",
+      "why": "A name this desk refused comes back because something changed. Re-reading what excluded it is not that something, and an extension argued from the same evidence is the position arguing with the record.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "catalyst-turnaround",
+          "ruleVersion": "ct-event-1",
+          "updatedAtEpochMs": 1771891200000,
+          "candidates": [
+            { "symbol": "036460", "market": "XKRX", "state": "excluded", "ruleVersion": "ct-event-1", "evidenceIds": ["ev_prior_0401"], "discoveryPath": [], "history": [] }
+          ]
+        },
+        "observations": [],
+        "transitions": [
+          { "symbol": "036460", "market": "XKRX", "to": "triaged", "observedAt": "2026-06-20T00:00:00Z", "evidenceIds": ["ev_prior_0401"] }
+        ]
+      },
+      "expect": {
+        "state": "excluded",
+        "diagnosticCodes": ["excluded_reentry_without_reason"],
+        "nextLedgerWritten": false
+      }
+    },
+    {
+      "name": "the-same-re-entry-with-a-reason-and-a-new-id-is-accepted",
+      "why": "The other half of the rule above, so what is being asserted is the reason and the new evidence rather than the transition itself.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "catalyst-turnaround",
+          "ruleVersion": "ct-event-1",
+          "updatedAtEpochMs": 1771891200000,
+          "candidates": [
+            { "symbol": "036460", "market": "XKRX", "state": "excluded", "ruleVersion": "ct-event-1", "evidenceIds": ["ev_prior_0401"], "discoveryPath": [], "history": [] }
+          ]
+        },
+        "observations": [],
+        "transitions": [
+          {
+            "symbol": "036460",
+            "market": "XKRX",
+            "to": "triaged",
+            "observedAt": "2026-06-20T00:00:00Z",
+            "evidenceIds": ["ev_gazette_0602"],
+            "reentryReason": "The ministry published the effective date that was missing when this name was excluded"
+          }
+        ]
+      },
+      "expect": {
+        "state": "triaged",
+        "historyGrew": true,
+        "evidenceIdsInclude": ["ev_prior_0401", "ev_gazette_0602"],
+        "nextLedgerWritten": true,
+        "diagnosticCodes": []
+      }
+    },
+    {
+      "name": "an-illegal-transition-is-refused",
+      "why": "The state machine is the record. discovered does not lead to proposed, because the two states in between are the work.",
+      "overrides": {
+        "transitions": [{ "symbol": "036460", "market": "XKRX", "to": "discovered", "observedAt": "2026-06-20T00:00:00Z" }]
+      },
+      "expect": {
+        "state": "researching",
+        "diagnosticCodes": ["candidate_transition_illegal"],
+        "nextLedgerWritten": false
+      }
+    },
+    {
+      "name": "a-rule-version-change-is-flagged-and-never-migrated",
+      "why": "A candidate admitted under one gate is not a candidate under the next one. It comes back exactly as stored, marked for re-evaluation, with both versions named. Re-stamping it here would make every gate change retroactively true of every name already in the ledger.",
+      "overrides": { "ruleVersion": "ct-event-2" },
+      "expect": {
+        "storedRuleVersion": "ct-event-1",
+        "requiresReevaluation": ["XKRX:036460"],
+        "diagnosticCodes": ["rule_version_changed"],
+        "diagnosticSeverities": { "rule_version_changed": "unevaluated" },
+        "nextLedgerWritten": true
+      }
+    },
+    {
+      "name": "a-copied-price-series-is-refused",
+      "why": "Prices, bars, filing bodies, holdings, cash and open proposals are re-read from the host every run. A private copy is a second source of truth that nothing reconciles and that reads exactly like a fresh one when it is a month old — #305 puts this in the scope-out list by name.",
+      "overrides": {
+        "observations": [
+          {
+            "symbol": "036460",
+            "market": "XKRX",
+            "evidenceIds": ["ev_prior_0401"],
+            "discoveryPath": [],
+            "priceHistory": { "close": [12100, 12450, 12780], "volume": [110000, 98000, 132000] }
+          }
+        ]
+      },
+      "expect": {
+        "diagnosticCodes": ["memory_holds_vendor_payload"],
+        "diagnosticSeverities": { "memory_holds_vendor_payload": "blocked" },
+        "nextLedgerWritten": false
+      }
+    },
+    {
+      "name": "a-copied-holding-is-refused-too",
+      "why": "The other family: the account. A quantity, a weight or an average cost in a research roster is the book restated where nothing will ever reconcile it.",
+      "overrides": {
+        "observations": [
+          { "symbol": "036460", "market": "XKRX", "evidenceIds": ["ev_prior_0401"], "discoveryPath": [], "quantity": 1200, "averageCost": 11900 }
+        ]
+      },
+      "expect": { "diagnosticCodes": ["memory_holds_vendor_payload"], "nextLedgerWritten": false }
+    },
+    {
+      "name": "a-catalyst-id-the-register-does-not-carry-is-refused",
+      "why": "The two documents are joined by this key and by nothing else, so a link that does not resolve is a candidate resting on a row nobody can read.",
+      "overrides": { "registerCatalystIds": ["cat-something-else"] },
+      "expect": {
+        "diagnosticCodes": ["catalyst_link_dangling"],
+        "nextLedgerWritten": false
+      }
+    },
+    {
+      "name": "an-unread-register-leaves-the-link-unverified-rather-than-good",
+      "why": "The register was not passed, so the ids could not be resolved. The link is carried unchanged and is not claimed to be good — which is the same three-state discipline the rest of this package applies to every limit it reads.",
+      "overrides": { "registerCatalystIds": "__undefined__" },
+      "expect": {
+        "diagnosticCodes": ["catalyst_link_unverified"],
+        "diagnosticSeverities": { "catalyst_link_unverified": "unevaluated" },
+        "nextLedgerWritten": true
+      }
+    },
+    {
+      "name": "a-failed-range-that-failed-again-counts-the-attempt",
+      "why": "The attempts count is the record of how long a hole has been open. A run that re-writes the entry from scratch resets it, which is the same failure as a delay count that restarts — one document over.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "catalyst-turnaround",
+          "ruleVersion": "ct-event-1",
+          "updatedAtEpochMs": 1771891200000,
+          "candidates": [],
+          "failedRanges": [
+            { "kind": "dart-receipt", "from": "20260602000411", "to": "20260626000377", "reasonCode": "vendor_quota_exhausted", "firstFailedAtEpochMs": 1771891200000, "attempts": 2 }
+          ]
+        },
+        "observations": [],
+        "failedRanges": [
+          { "kind": "dart-receipt", "from": "20260602000411", "to": "20260626000377", "reasonCode": "vendor_quota_exhausted", "firstFailedAtEpochMs": 1782000000000, "attempts": 1 }
+        ]
+      },
+      "expect": {
+        "failedRangeAttempts": 3,
+        "failedRangeFirstFailedAtEpochMs": 1771891200000,
+        "nextLedgerWritten": true
+      }
+    },
+    {
+      "name": "a-hypothesis-longer-than-one-sentence-is-refused",
+      "why": "A roster holds one sentence. Longer than that is research prose, and research prose belongs in the proposal where a person reads it rather than in a durable index that has a byte budget.",
+      "overrides": {
+        "observations": [
+          { "symbol": "036460", "market": "XKRX", "evidenceIds": ["ev_prior_0401"], "discoveryPath": [], "hypothesis": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가" }
+        ]
+      },
+      "expect": { "diagnosticCodes": ["candidate_hypothesis_too_long"], "nextLedgerWritten": false }
+    },
+    {
+      "name": "more-than-eight-evidence-ids-is-a-citation-store",
+      "why": "Past eight the roster has stopped being a roster. The ids that matter are the ones the proposal actually rests on, and the rest are in Evidence where they belong.",
+      "overrides": {
+        "observations": [
+          { "symbol": "036460", "market": "XKRX", "discoveryPath": [], "evidenceIds": ["ev_prior_0401", "ev_2", "ev_3", "ev_4", "ev_5", "ev_6", "ev_7", "ev_8", "ev_9"] }
+        ]
+      },
+      "expect": { "diagnosticCodes": ["candidate_ledger_capacity"], "nextLedgerWritten": false }
+    }
+  ],
+  "idempotency": {
+    "why": "#305 asks that a repeated run produce no duplicate ledger row and no duplicate proposal. The mechanical half is that this operation is a pure function of its inputs and that feeding its own output back in is a fixed point: the second run's ledger equals the first's except for the instant it was written, which is the same instant because asOf is the same.",
+    "runs": 2
+  },
+  "forbiddenKeys": ["open", "high", "low", "close", "volume", "bars", "rows", "excerpt", "quantity", "weight", "cash", "averageCost", "targetWeight", "pending", "proposals"]
+}

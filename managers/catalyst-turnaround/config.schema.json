@@ -74,6 +74,20 @@
       "maximum": 250,
       "default": 60,
       "description": "Sessions of price behind the secondary confirmation that the fall has stopped. Roughly a quarter of trading. It confirms and it never qualifies: nothing in this package may turn price stabilisation, an oscillator or a valuation multiple into a universal entry condition, and the deepest fall is never preferred for being the deepest."
+    },
+    "discoveryBudgetFilings": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 500,
+      "default": 100,
+      "description": "How many OpenDART receipts one run may read while looking for a new candidate, as opposed to while reviewing what is already held. 100 is one page of the host's filings index, which is requested at a fixed page_count of 100 newest-first over a five-year window, so the budget is one page rather than a number somebody liked. It is a cost ceiling and never a correctness rule: a run that spends the whole budget on held names reports discovery_not_run and must not report that no new candidate qualified."
+    },
+    "researchCompletionFloor": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3,
+      "default": 1,
+      "description": "How many shortlisted candidates a run must take all the way to the traced path, the survivability answer and the invalidation condition before it ends. 1 is the smallest number that forbids the behaviour this methodology is most prone to — reading five names shallowly and stopping — and a completed research candidate that does not become a position is a finished run. Raising it raises the cost of every run rather than the quality of any one finding."
     }
   }
 }

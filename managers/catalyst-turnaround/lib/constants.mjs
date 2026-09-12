@@ -125,6 +125,34 @@ export const METHODOLOGY = Object.freeze({
    * condition, so nothing in this package can turn this window into a gate.
    */
   stabilisationWindowDays: 60,
+
+  /**
+   * `discoveryBudgetFilings` — a count of OpenDART receipts one run may read
+   * while **looking for** something, as opposed to while reviewing what is held.
+   *
+   * 100, and the number is read off the vendor rather than chosen. The host's
+   * filings index requests a fixed `page_count=100`, newest-first, over a
+   * five-year window (`skills/ct-event-sweep/SKILL.md` carries the measured
+   * contract), so one page is the natural unit of a sweep and this budget is one
+   * page. ⚠️ It is a **cost ceiling and never a correctness rule**: exceeding it
+   * is a `note`, and what is refused is spending the whole budget on held names
+   * and then reporting that nothing new qualified — that run is
+   * `discovery_not_run` (`aumos-catalogue#305`).
+   */
+  discoveryBudgetFilings: 100,
+
+  /**
+   * `researchCompletionFloor` — how many shortlisted candidates one run must
+   * take **all the way** before it ends.
+   *
+   * 1. #305's own initial operating value, and the argument for it is the one
+   * this whole package is built on: «한 번에 여러 종목을 얕게 읽고 종료하는 행동은
+   * 허용하지 않는다». Three names read shallowly produce three research
+   * candidates and no finding; one name read to the end produces a traced path, a
+   * survivability answer and an invalidation condition, which is a complete run
+   * whether or not it ends in a purchase. Stated policy; not fitted.
+   */
+  researchCompletionFloor: 1,
 })
 
 /** The states a catalyst may hold. The order is the ledger's column order. */

@@ -99,6 +99,7 @@ flowchart TB
         BOOK["Your book — holdings, cash,<br/>and every open proposal on this fund"]:::reads
         FILE["Filings and policy documents<br/>receivables, debt, cash flow, notices"]:::reads
         REG["Its own catalyst register<br/>windows, delay counts, contrary findings"]:::reads
+        LED["Its own candidate ledger<br/>names in progress, open questions,<br/>the receipt it stopped at"]:::reads
         PX["Adjusted won price history"]:::reads
     end
 
@@ -108,6 +109,14 @@ flowchart TB
         direction TB
         U1["Re-read every open catalyst<br/>scheduled · in progress · realised · delayed · failed"]:::judges
         U2["Did a window arrive?<br/>adjudicate success, delay or failure"]:::judges
+    end
+
+    subgraph SWEEP["Not held: find something, and say what was looked at"]
+        direction TB
+        S1["Resume — retry the receipt ranges that failed<br/>and finish the research left open"]:::judges
+        S2["Declare the universe and the filing window"]:::judges
+        S3["Sweep new filings and policy notices<br/>forward from the last successful receipt"]:::judges
+        S4["Shortlist at most three, finish at least one,<br/>and record which of the four this run was:<br/>candidates_produced · no_candidate_qualified ·<br/>discovery_not_run · discovery_incomplete"]:::judges
     end
 
     subgraph NEW["Not held: build the case"]
@@ -141,7 +150,7 @@ flowchart TB
 
     WAKE --> IN --> HELD
     HELD -- yes --> UPDATE --> SIZE
-    HELD -- no --> NEW --> SIZE
+    HELD -- no --> SWEEP --> NEW --> SIZE
     SIZE --> OUT --> ARM --> MAND --> YOU --> ORD
 ```
 
@@ -160,9 +169,9 @@ manager is whatever you confirm on the install screen.
 | | |
 |---|---|
 | **Market** | Korea-listed single equities, in won. Not ETFs, not overseas listings |
-| **Data sources** | filings and public policy documents through `open-dart` for the receivable, working-capital, debt and cash-flow lines; a connected market-data login for adjusted won price history |
+| **Data sources** | filings and public policy documents through `open-dart` for the receivable, working-capital, debt and cash-flow lines — read through the host's own OpenDART source cache, both routes of it: the corporate-code list that maps a ticker to the identifier filings are keyed by, and the filings index it then reads. A connected Toss market-data login supplies adjusted won price history **and** the Korea-listed enumeration this manager declares as its universe before it sweeps, because nothing else in the host can list a market. Web sources — a ministry gazette, a tariff decision — are filed as evidence with their url, publisher and publication date before anything cites them |
 | **What a key costs** | an OpenDART key is free from Korea's Financial Supervisory Service on registration. The price connection is a login this fund already has; no brokerage account has to be attached for market data |
-| **Its own memory** | it keeps a catalyst register — open windows, delay counts, and which contrary findings are on the record. Without it a position that has slipped three times reads as a first slip, and the manager says so rather than guessing |
+| **Its own memory** | **two records, never merged.** A catalyst register — open windows, delay counts, and which contrary findings are on the record; without it a position that has slipped three times reads as a first slip, and the manager says so rather than guessing. And a candidate ledger beside it — which names it is researching, what question each one is still open on, the receipt it stopped reading at, and the ranges it still owes a retry. Neither holds copied prices, filings, holdings or cash: those are re-read from your account and the sources every run |
 | **Settings** | the catalyst horizon, the delay budget, the runway and refinancing floors, the number of improving channels required, the single-name ceiling and the trim threshold are all yours to set. The shape of the method is not: the catalyst record's required fields, the state machine, and the refusal to read a price move as success are the methodology |
 | **The book** | it reads your holdings **and every open proposal on the fund**, because a name another manager has proposed and not yet filled is exposure you have already committed to |
 | **Your approval** | **it proposes and never trades.** Every judgement is a proposal your Aumos judges against your Mandate and you approve or refuse |
@@ -182,6 +191,13 @@ manager is whatever you confirm on the install screen.
 - **Dilution.** The companies this finds are frequently the companies that need money. A correct
   business thesis funded by an equity raise is a wrong per-share thesis, and the manager states the
   risk rather than pricing it.
+- **Finding things at all.** Its entrance is an event in a filing or a gazette, and that sweep is incremental,
+  budgeted and resumable rather than exhaustive. ⛔ **An unread filing window is reported as
+  `discovery_not_run`, never as «no candidate was found».** Those two sentences produce the same empty
+  answer and mean opposite things, and the only one this manager may write about the market is the one
+  where the universe was declared, every required lane answered, and no range failed. Expect runs that
+  honestly report having looked nowhere — a run that spent its whole filing budget reviewing what you
+  already hold is one of them.
 - **The quiet one: it is at its least comfortable when it is working.** The run that adjudicates a
   deadline as a failure and proposes an exit is the run that will look worst if the event arrives two
   months later.

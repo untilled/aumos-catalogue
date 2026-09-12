@@ -6,8 +6,9 @@ carries none of this.
 ## What is code here, and what is not
 
 The catalogue's default is prose, and this package keeps it: `PROMPT.md` is what every run walks
-through, and the three documents under `skills/` are the stages that apply to one case — a
-policy-dependent company, a deadline that has arrived, a source that did not answer.
+through, and the four documents under `skills/` are the stages that apply to one case — a
+policy-dependent company, a deadline that has arrived, a source that did not answer, and the
+incremental sweep that finds an event nobody handed this desk.
 
 `lib/` holds only what #258's and #256's completion criteria require to be **checkably** right rather
 than model-judged. The test applied to each candidate was: *does this fail silently when a model does
@@ -18,6 +19,8 @@ it?*
 | `constants.mjs` | every threshold, with its unit and its argument | a number that lives in three documents drifts in two of them |
 | `diagnostics.mjs` | the four causes and their lanes | «absence is not refutation» is a lookup, not a judgement |
 | `ledger.mjs` | the catalyst record, its state machine, delays, staleness, adjudication | a model asked «has this slipped before?» reads its own notes |
+| `discovery.mjs` | one run's own statistics, the four-status verdict, the lane vocabulary and the cursor rule | «no candidate» and «no sweep» are the same empty answer and opposite findings, and only a table can be made to tell them apart |
+| `candidate-memory.mjs` | the candidate ledger: states, migration, monotonic history, the caps and the content prohibition | a private record a model edits freely is a record that quietly loses the id it was opened on |
 | `recovery.mjs` | point-in-time indicator comparison, channel folding, survivability | a figure published after `asOf` still produces a delta |
 | `sizing.mjs` | loss to invalidation, target weight, whole-account concentration | the cap becomes the order size unless something subtracts |
 | `staging.mjs` | the staged plan, and the refusal to add a filled stage twice | the second run's mistake is the *same right number*, again |
@@ -656,6 +659,8 @@ no network, no test framework — there is none in this repository and this pack
 | fixture | what it pins |
 |---|---|
 | `cases.json` | one run per rung of the ladder, and — asserted **across** cases — that catalyst realisation, one delay, repeated delay, cancellation, a reversing recovery indicator and a deteriorating refinancing reach six *different* judgements. A change collapsing two of them passes every per-case check and fails this one |
+| `discovery.json` | the four statuses reached by four different runs; `013` read as an empty range and `020` as a failed one; the cursor pinned to where it was found on every incomplete sweep, including the partial one where a range really did succeed; an untraced path watched at `unevaluated` rather than refused; last year's gazette making no candidate at all; an undeclared universe reported and never blocking; a dark run refused only for not disclosing itself. Every scenario is run twice and compared |
+| `candidate-memory.json` | `undefined` vs `null` on the stored key; the migration table, one row at a time; evidence ids that cannot be dropped on a restatement; a terminal state that cannot be restated away; an excluded name re-entering only on a reason **and** a new id; a rule-version change flagged and never migrated; the byte, row and id caps; and the content prohibition asserted once per forbidden key rather than once per fixture |
 | `ledger.json` | confirmed vs estimated dates; announcement time vs report date; a prior-year source not opening a window; a price move never confirming success; terminal states not reopening; contrary evidence surviving a restatement; a delay costing three things; a closed window being flagged for adjudication |
 | `staging.json` | the same plan read four times. The second read is the point: the same due stage, and nothing added |
 | `concentration.json` | open proposals counting as exposure; per-strategy caps not summing into a larger account limit; a proposal restating the position rather than stacking on it; one name under two theses being one position — **folded by `max`, with the breach that follows from the folded number and not from the sum** (#256) |
@@ -716,12 +721,52 @@ chosen against it.
   `initialize`, once per session. It is not restated here, and where anything in this package appears
   to disagree with it, the schema governs. What *is* shown in `PROMPT.md` is the catalyst row, which is
   this package's own shape and which no host specifies.
-- **Evidence ids.** Minted by the host. This package cites them and never creates one.
+- **Evidence ids.** Minted by the host. This package cites them and never creates one — including the
+  ones a web reading earns through `observation:file`, whose round trip spans two runs because
+  evidence filed inside a run is not committed until the run ends.
+- **The source cache.** `source_cache_read` / `source_cache_refresh` hold the OpenDART corporate-code
+  list and the filings index per fund. This package reads its lane statuses **off** that store's four
+  states rather than keeping a second cache in private memory, which #305 forbids by name.
 - **Sizing the order, routing and filling it.** The manager proposes a target weight; Aumos judges it
   against the Mandate, sizes the order, routes and fills. There is no `broker:write` capability and
   this package would not know what to do with one.
 - **Waking the manager.** Every judgement arms its own next review because nothing else reliably does,
   and Aumos may refuse an arming — which is a normal outcome to be recorded, not retried differently.
+
+## The two documents in private memory, and why they are two (#305)
+
+`manager-memory` holds **two** documents for this manager and they are never merged:
+
+| document | owner | what it holds | what it may never hold |
+|---|---|---|---|
+| the **catalyst register** | `lib/ledger.mjs` | registered catalysts, their windows, delay counts, contrary evidence, history | anything about a name that is not a registered catalyst |
+| the **candidate ledger** | `lib/candidate-memory.mjs` | candidates and their state, the research cursor, the ranges still owed a retry, open questions, next review conditions | prices, bars, candles, filing bodies or excerpts; quantities, weights, cash, average costs, target weights; pending proposals |
+
+⛔ **The join is `catalystIds[]` on a candidate and nothing else**, and it points one way: a candidate
+names register rows, and a register row never names a candidate. The verifier asserts that the written
+candidate ledger carries no register field — `delayCount`, `windowEndEpochMs`, `confirmingIndicator`,
+`successCondition`, `contraryEvidence`, `dateStatus` — because a copy of the register inside the
+roster is a second source of truth that nothing reconciles.
+
+Two reasons for two documents rather than one bigger one. ⑴ They answer different questions on
+different runs: the register is read to judge a **position**, the ledger to resume a **sweep**. ⑵
+`manager-memory` has no multi-file atomic write — writes are temp+rename per file with an
+`expectedHash` compare-and-set, and there is no transaction across files — so one document per
+concern, each with its cursor inside itself, is the only shape in which a half-written run is a
+half-written *one* of them.
+
+### The contract, restated
+
+- **Lane vocabulary**: `open` · `partial` · `dark` · `unstated`, mapped onto the host's own source-cache
+  states rather than invented beside them. A lane nobody asked about is `unstated` and never `open`.
+- **Required lanes here**: filing and web. Price is optional, because this desk's entrance is an event.
+- **Status set**: `candidates_produced` · `no_candidate_qualified` · `discovery_not_run` ·
+  `discovery_incomplete`. `no_candidate_qualified` needs all three of a declared universe, every
+  required lane `open`, and an empty `symbolsFailed`.
+- **Cursor rule**: `cursorAfter === cursorBefore` whenever the status is neither of the two complete
+  ones; the cursor kind is `dart-receipt` and its value is an `rcept_no`.
+- **Severities**: this package's own three — `blocked`, `unevaluated`, `note`. ⛔ No fifth cause code:
+  `cause()` throws on a word outside the four, so everything #305 added is a `diagnostic()` row.
 
 ## What has not been verified
 
@@ -738,3 +783,15 @@ chosen against it.
   one fund.**
 - **The methodology's forward performance.** Nothing here measures it, and the catalogue deliberately
   shows none.
+- **The discovery pipeline's host surface (#305).** Four gaps are named rather than papered over, and
+  each is a claim this package does **not** make. ⑴ There is no point-in-time XKRX universe: the only
+  whole-market enumeration is the broker connection's own listing, whose accepted filter values are
+  undeclared and whose survivorship properties are unmeasured, so `universeSource` records what was
+  swept and never asserts that it was the market. ⑵ Whether this package is actually **granted**
+  `source-cache:read` / `:write` against a real fund has not been observed; until it is, the filing
+  lane's four states are a contract this package reads correctly and has not seen answered. ⑶ The
+  `observation:file` → `evidenceId` round trip spans **two** runs, because evidence filed inside a run
+  is not committed until the run ends — the carry key is designed for it and the two-run behaviour has
+  not been watched end to end. ⑷ A manual run is always `PORTFOLIO_REVIEW` and `start-run` takes no
+  symbol, so nothing can point this manager at one name; the sweep is the only entrance, and that is a
+  host limitation rather than a design choice.
