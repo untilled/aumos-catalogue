@@ -1,0 +1,255 @@
+{
+  "note": "The discovery-run record of `lib/discovery.mjs`, one scenario per rule of docs/contracts/discovery-run.md. `base` is a well-formed run that swept a declared universe through both required lanes and produced one candidate; each scenario shallow-merges its `overrides` onto it, so a scenario's diff is exactly the thing being tested. Every figure is illustrative and no symbol here is a recommendation.",
+  "asOf": "2026-02-27T00:00:00Z",
+  "base": {
+    "runId": "run_sr_0227",
+    "asOf": "2026-02-27T00:00:00Z",
+    "ruleVersion": "sr-gate-1",
+    "universe": { "source": "open-dart:/api/list.json via source-cache", "count": 942 },
+    "symbolsAttempted": 60,
+    "symbolsSucceeded": 60,
+    "symbolsFailed": [],
+    "filingsRead": 80,
+    "researchCompleted": 1,
+    "budgetSpentOnHoldings": false,
+    "lanes": { "price": "unstated", "filing": "open", "web": "open" },
+    "screened": [
+      {
+        "symbol": "316140",
+        "market": "XKRX",
+        "resumed": false,
+        "axes": { "discount": true, "earningsQuality": true, "execution": true }
+      }
+    ],
+    "cursorBefore": { "kind": "dart-receipt", "value": "20260105000111", "atEpochMs": 1767398400000 },
+    "cursorAfter": { "kind": "dart-receipt", "value": "20260226000742", "atEpochMs": 1772150400000 },
+    "uncertainty": ["A 결과보고서 for one name arrives after the quarterly close and is not read yet."]
+  },
+  "scenarios": [
+    {
+      "name": "a-swept-run-with-one-candidate-produces-candidates",
+      "why": "The control. Without it a scenario that fails for an unrelated reason reads as the rule working.",
+      "overrides": {},
+      "expect": {
+        "discoveryStatus": "candidates_produced",
+        "gatePassed": 1,
+        "newCandidates": 1,
+        "resumedCandidates": 0,
+        "cursorAfterValue": "20260226000742",
+        "priceLaneStatus": "unstated",
+        "filingLaneStatus": "open",
+        "webLaneStatus": "open",
+        "blocked": false,
+        "diagnosticCodes": []
+      }
+    },
+    {
+      "name": "the-price-lane-is-optional-here-and-its-absence-changes-nothing",
+      "why": "This desk's entrance is the disclosure sweep. A price series does not open a case here, so an unstated price lane must not degrade the status — the opposite of `fundamental-mean-reversion`, where it is required.",
+      "overrides": { "lanes": { "price": "dark", "filing": "open", "web": "open" } },
+      "expect": { "discoveryStatus": "candidates_produced", "priceLaneStatus": "dark", "blocked": false }
+    },
+    {
+      "name": "a-swept-universe-with-nothing-passing-is-the-only-claim-about-the-market",
+      "why": "Both required lanes open, no failed symbol, a declared universe — and nothing cleared the three axes. This is the one status that says something about the companies rather than about the run.",
+      "overrides": {
+        "screened": [
+          { "symbol": "000000", "market": "XKRX", "axes": { "discount": true, "earningsQuality": false, "execution": true } }
+        ],
+        "researchCompleted": 0,
+        "uncertainty": ["세 축을 모두 통과한 이름이 없습니다 (no_candidate_qualified)."]
+      },
+      "expect": {
+        "discoveryStatus": "no_candidate_qualified",
+        "gatePassed": 0,
+        "cursorAfterValue": "20260226000742",
+        "diagnosticCodes": ["candidate_axes_incomplete"],
+        "diagnosticSeverities": { "candidate_axes_incomplete": "info" },
+        "watching": ["000000"],
+        "blocked": false
+      }
+    },
+    {
+      "name": "one-axis-does-not-make-a-candidate-and-the-missing-ones-are-named",
+      "why": "A high yield alone is what a dividend trap looks like. The row stays `watching`, the diagnostic names which axes were never read, and it is `unevaluated` rather than `info` because an unread axis is an absence.",
+      "overrides": {
+        "screened": [
+          { "symbol": "011070", "market": "XKRX", "axes": { "discount": true } }
+        ],
+        "researchCompleted": 0,
+        "uncertainty": ["세 축을 모두 통과한 이름이 없습니다 (no_candidate_qualified)."]
+      },
+      "expect": {
+        "discoveryStatus": "no_candidate_qualified",
+        "gatePassed": 0,
+        "watching": ["011070"],
+        "diagnosticCodes": ["candidate_axes_incomplete"],
+        "diagnosticSeverities": { "candidate_axes_incomplete": "unevaluated" },
+        "missingAxes": ["earningsQuality", "execution"],
+        "screenedState": "watching",
+        "blocked": false
+      }
+    },
+    {
+      "name": "an-undeclared-universe-is-discovery-not-run-and-never-blocked",
+      "why": "The book whose universe is undeclared is exactly the book that still has to be watched on the sell side. Zero discovery is a report, not a stop.",
+      "overrides": { "universe": null, "screened": [], "researchCompleted": 0, "cursorAfter": null, "uncertainty": ["유니버스를 선언하지 못했습니다 (discovery_not_run)."] },
+      "expect": {
+        "discoveryStatus": "discovery_not_run",
+        "universeDeclared": false,
+        "diagnosticCodes": ["universe_undeclared"],
+        "diagnosticSeverities": { "universe_undeclared": "unevaluated" },
+        "cursorAfterValue": "20260105000111",
+        "blocked": false
+      }
+    },
+    {
+      "name": "holdings-review-that-ate-the-budget-is-discovery-not-run",
+      "why": "#305 says it in as many words: 보유 검토가 탐색 예산을 소진했다면 신규 후보를 못 찾았다고 쓰지 말고 `discovery_not_run`으로 보고한다. The run did not look.",
+      "overrides": { "budgetSpentOnHoldings": true, "screened": [], "researchCompleted": 0, "cursorAfter": null, "uncertainty": ["보유 검토가 탐색 예산을 소진했습니다 (discovery_not_run)."] },
+      "expect": {
+        "discoveryStatus": "discovery_not_run",
+        "diagnosticCodes": ["discovery_budget_spent_on_holdings"],
+        "cursorAfterValue": "20260105000111",
+        "blocked": false
+      }
+    },
+    {
+      "name": "both-required-lanes-dark-is-discovery-not-run",
+      "why": "A filing lane that answered nothing and a web lane nobody asked is zero discovery capacity, whatever the universe says.",
+      "overrides": { "lanes": { "price": "open", "filing": "dark", "web": "unstated" }, "screened": [], "researchCompleted": 0, "cursorAfter": null, "uncertainty": ["필수 레인이 모두 어둡습니다 (discovery_not_run)."] },
+      "expect": {
+        "discoveryStatus": "discovery_not_run",
+        "diagnosticCodes": ["discovery_lane_unstated", "discovery_lane_dark"],
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-proposal-that-had-no-discovery-and-does-not-say-so-is-refused",
+      "why": "The output an investor cannot tell from a considered no-change. The token travels verbatim because the prose around it is written in the invocation's language.",
+      "overrides": { "universe": null, "screened": [], "researchCompleted": 0, "cursorAfter": null, "uncertainty": ["이번 실행은 신규 후보를 찾지 못했습니다."] },
+      "expect": {
+        "discoveryStatus": "discovery_not_run",
+        "diagnosticCodes": ["discovery_not_run_undisclosed"],
+        "blocked": true,
+        "notRunDisclosed": false
+      }
+    },
+    {
+      "name": "the-same-run-carrying-the-token-verbatim-is-accepted",
+      "why": "The other half of the rule, so that what is refused above is the missing disclosure and not the status itself.",
+      "overrides": {
+        "universe": null,
+        "screened": [],
+        "researchCompleted": 0,
+        "cursorAfter": null,
+        "uncertainty": ["이번 실행은 유니버스를 선언하지 못해 탐색을 수행하지 않았습니다 (discovery_not_run)."]
+      },
+      "expect": { "discoveryStatus": "discovery_not_run", "notRunDisclosed": true, "blocked": false }
+    },
+    {
+      "name": "a-failed-range-leaves-the-run-incomplete",
+      "why": "A universe was declared and part of it was never read. That is neither a market with nothing in it nor a run that did not look.",
+      "overrides": {
+        "symbolsAttempted": 60,
+        "symbolsSucceeded": 57,
+        "symbolsFailed": ["005930", "068270", "051910"],
+        "lanes": { "price": "unstated", "filing": "partial", "web": "open" },
+        "screened": [],
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "filingLaneStatus": "partial",
+        "cursorAfterValue": "20260105000111",
+        "diagnosticCodes": ["cursor_advanced_past_incomplete_range"],
+        "blocked": true
+      }
+    },
+    {
+      "name": "the-cursor-never-steps-over-a-failed-page",
+      "why": "A cursor that advanced past a transient vendor error turns it into a permanently unread slice of the market — silently, once, and nothing later ever looks there again.",
+      "overrides": {
+        "symbolsSucceeded": 59,
+        "symbolsFailed": ["005930"],
+        "cursorAfter": { "kind": "dart-receipt", "value": "20260226000742", "atEpochMs": 1772150400000 }
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "cursorAfterValue": "20260105000111",
+        "diagnosticCodes": ["cursor_advanced_past_incomplete_range", "candidates_produced_within_incomplete_sweep"],
+        "blocked": true
+      }
+    },
+    {
+      "name": "a-failed-range-outranks-a-name-that-came-through-the-gate",
+      "why": "The precedence of docs/contracts/discovery-run.md: `discovery_not_run` > `discovery_incomplete` > `candidates_produced` > `no_candidate_qualified`. One name cleared the three axes and another part of the same sweep was never read, so both rows of the decision table hold — and the word reported is the one about how much of the market this run actually read, because that is the fact a later reader cannot reconstruct. ⚠️ The candidate is not lost: it is still counted in `newCandidates` and still handed to the ledger, and `candidates_produced_within_incomplete_sweep` says so.",
+      "overrides": {
+        "symbolsSucceeded": 59,
+        "symbolsFailed": ["005930"],
+        "cursorAfter": null
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "gatePassed": 1,
+        "newCandidates": 1,
+        "resumedCandidates": 0,
+        "cursorAfterValue": "20260105000111",
+        "diagnosticCodes": ["candidates_produced_within_incomplete_sweep"],
+        "diagnosticSeverities": { "candidates_produced_within_incomplete_sweep": "info" },
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-partial-required-lane-outranks-a-produced-candidate-too",
+      "why": "The same precedence reached by the other half of the `discovery_incomplete` condition: no symbol failed, but the filing lane answered for only part of the range. A lane that answered for some of the range is not a lane that answered, and a name found inside the half that was read does not make the other half read.",
+      "overrides": {
+        "lanes": { "price": "unstated", "filing": "partial", "web": "open" },
+        "cursorAfter": null
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "gatePassed": 1,
+        "newCandidates": 1,
+        "filingLaneStatus": "partial",
+        "cursorAfterValue": "20260105000111",
+        "diagnosticCodes": ["candidates_produced_within_incomplete_sweep"],
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-symbol-index-cursor-belongs-to-another-strategy",
+      "why": "This package resumes from an `rcept_no`. Resuming from a symbol index reads a different market and reports it as this one.",
+      "overrides": { "cursorAfter": { "kind": "symbol-index", "value": "011070", "atEpochMs": 1772150400000 } },
+      "expect": { "diagnosticCodes": ["cursor_kind_unexpected"], "blocked": true }
+    },
+    {
+      "name": "a-resumed-candidate-counts-as-resumed-and-not-as-new",
+      "why": "«이번 실행이 새로 찾은 이름» and «지난 실행이 남긴 이름을 이어받았다» are different facts about the run, and one folded into the other makes a desk that never finds anything look productive.",
+      "overrides": {
+        "screened": [
+          { "symbol": "316140", "market": "XKRX", "resumed": true, "axes": { "discount": true, "earningsQuality": true, "execution": true } }
+        ]
+      },
+      "expect": { "discoveryStatus": "candidates_produced", "newCandidates": 0, "resumedCandidates": 1, "blocked": false }
+    },
+    {
+      "name": "a-completion-floor-nobody-met-is-said-out-loud",
+      "why": "Reading many names shallowly and stopping looks productive in a log and produces no judgement. `researchCompletionFloor` is the setting and this is its reader.",
+      "overrides": { "researchCompleted": 0 },
+      "expect": { "discoveryStatus": "candidates_produced", "diagnosticCodes": ["research_completion_floor_unmet"], "blocked": false }
+    },
+    {
+      "name": "a-filing-budget-that-was-overrun-is-reported-and-not-refused",
+      "why": "The budget is a run-cost ceiling and not a rule about the market; what it buys is the guarantee that the next run still has a turn.",
+      "overrides": { "filingsRead": 220 },
+      "expect": { "discoveryStatus": "candidates_produced", "diagnosticCodes": ["discovery_budget_exceeded"], "blocked": false }
+    },
+    {
+      "name": "counts-that-do-not-reconcile-are-refused",
+      "why": "A coverage number nobody can reconstruct is worse than none: it is the number that later reads as a market this desk swept.",
+      "overrides": { "symbolsAttempted": 10, "symbolsSucceeded": 60, "symbolsFailed": ["005930"] },
+      "expect": { "diagnosticCodes": ["symbol_counts_inconsistent"], "blocked": true }
+    }
+  ]
+}

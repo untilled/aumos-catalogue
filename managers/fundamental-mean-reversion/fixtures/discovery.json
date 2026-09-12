@@ -1,0 +1,199 @@
+{
+  "note": "The mechanical properties of the discovery-run record (#305 §7.1), one scenario per rule. `base` is a complete, well-formed sweep; each scenario shallow-merges its `overrides` onto it, so a scenario's diff is exactly the thing being tested. ⛔ Every figure is illustrative — these are not any listed company's prices and no row here is evidence about a market. What is asserted is that a given shape of run reaches a given status, because the four statuses are the whole point: a zero-candidate run that screened a roster and a zero-candidate run that read nothing are opposite facts that read identically in prose.",
+  "asOf": "2026-06-30T07:00:00Z",
+  "base": {
+    "runId": "run_fixture_0630",
+    "universe": { "declared": true, "source": "toss:/api/v1/stocks/all", "count": 942 },
+    "attempted": 120,
+    "succeeded": 120,
+    "failed": [],
+    "rangeComplete": true,
+    "laneStatuses": { "price": "open", "filing": "open", "web": "open" },
+    "gateResults": [
+      { "symbol": "011070", "market": "XKRX", "researchOpen": true, "rankBasis": "decomposable-cause", "drawdown": -0.34, "researchCompleted": true },
+      { "symbol": "005930", "market": "XKRX", "researchOpen": true, "rankBasis": "filing-reachable", "drawdown": -0.41, "resumed": true },
+      { "symbol": "068270", "market": "XKRX", "researchOpen": true, "rankBasis": "decomposable-cause", "drawdown": -0.31 },
+      { "symbol": "051910", "market": "XKRX", "researchOpen": false, "drawdown": -0.12 }
+    ],
+    "previousCursor": { "kind": "symbol-index", "value": "000660", "atEpochMs": "2026-06-23T07:00:00Z" },
+    "proposedCursor": { "kind": "symbol-index", "value": "011070" },
+    "config": { "researchShortlistSize": 3, "discoveryBudgetSymbols": 120, "researchCompletionFloor": 1 }
+  },
+  "scenarios": [
+    {
+      "name": "a-complete-sweep-produces-candidates",
+      "why": "The control. Without it a scenario that fails for an unrelated reason reads as the rule working, and the cursor would appear pinned everywhere because it never moved anywhere.",
+      "overrides": {},
+      "expect": {
+        "status": "candidates_produced",
+        "shortlistLength": 3,
+        "cursorAfterValue": "011070",
+        "cursorPinned": false,
+        "blocked": false,
+        "diagnosticCodes": [],
+        "absentDiagnosticCodes": ["shortlist_truncated", "shortlist_ranked_by_depth", "discovery_not_run"]
+      }
+    },
+    {
+      "name": "a-screen-that-ran-and-qualified-nobody",
+      "why": "The only run allowed to say that nothing qualified: a declared universe, every required lane open, no failed symbol. This is the fact the other three statuses exist to stop being claimed.",
+      "overrides": { "gateResults": [{ "symbol": "051910", "market": "XKRX", "researchOpen": false, "drawdown": -0.12 }] },
+      "expect": {
+        "status": "no_candidate_qualified",
+        "shortlistLength": 0,
+        "cursorAfterValue": "011070",
+        "cursorPinned": false,
+        "blocked": false,
+        "diagnosticCodes": []
+      }
+    },
+    {
+      "name": "an-undeclared-universe-is-not-a-screen-that-found-nothing",
+      "why": "The failure #305 asks for by name. Nothing was read, so nothing can be said to have failed the gate — and the run is still not blocked, because the holdings this desk owns still have to be watched on the sell side.",
+      "overrides": { "proposedCursor": null, "universe": null, "gateResults": [] },
+      "expect": {
+        "status": "discovery_not_run",
+        "shortlistLength": 0,
+        "cursorPinned": true,
+        "blocked": false,
+        "diagnosticCodes": ["universe_undeclared", "discovery_not_run"],
+        "severityOf": { "universe_undeclared": "unevaluated" }
+      }
+    },
+    {
+      "name": "a-budget-spent-on-holdings-is-discovery-not-run",
+      "why": "#305: 보유 검토가 탐색 예산을 소진했다면 신규 후보를 못 찾았다고 쓰지 말고 discovery_not_run으로 보고한다. The universe was declared and the lanes were open; the run simply never got there.",
+      "overrides": { "proposedCursor": null, "budgetSpentOnHoldings": true, "gateResults": [], "attempted": 0, "succeeded": 0 },
+      "expect": { "status": "discovery_not_run", "cursorPinned": true, "blocked": false, "diagnosticCodes": ["discovery_not_run"] }
+    },
+    {
+      "name": "both-required-lanes-dark-is-discovery-not-run",
+      "why": "The connection was down and the filing cache was never fetched. A run with no lane open has zero discovery capacity, and reporting that as a screen result is the #140 mechanism in a new package.",
+      "overrides": { "proposedCursor": null, "laneStatuses": { "price": "dark", "filing": "dark", "web": "unstated" }, "gateResults": [], "attempted": 0, "succeeded": 0 },
+      "expect": { "status": "discovery_not_run", "cursorPinned": true, "blocked": false, "diagnosticCodes": ["discovery_not_run"] }
+    },
+    {
+      "name": "the-token-is-carried-verbatim-or-the-proposal-is-refused",
+      "why": "The prose around it is written in the invocation's language, so a matcher looking for English words would pass every Korean run for the wrong reason. The token is the whole disclosure.",
+      "overrides": { "proposedCursor": null, "universe": null, "gateResults": [], "uncertainty": ["가격 시계열을 읽지 못했다"] },
+      "expect": { "status": "discovery_not_run", "blocked": true, "diagnosticCodes": ["discovery_not_run_undisclosed"] }
+    },
+    {
+      "name": "and-a-run-that-carries-it-is-not-refused",
+      "why": "The other half of the same rule, so the refusal above is about the disclosure and not about the status.",
+      "overrides": { "proposedCursor": null, "universe": null, "gateResults": [], "uncertainty": ["discovery_not_run — 이번 실행은 유니버스를 선언하지 않았고 보유 검토만 수행했다"] },
+      "expect": { "status": "discovery_not_run", "blocked": false, "absentDiagnosticCodes": ["discovery_not_run_undisclosed"] }
+    },
+    {
+      "name": "a-failed-symbol-leaves-the-sweep-incomplete",
+      "why": "Part of the roster was not read. The cursor stays where it started, because a cursor that steps over an unread range deletes that range permanently — nothing later ever looks at it again.",
+      "overrides": { "failed": ["068270", "051910"], "succeeded": 118 },
+      "expect": {
+        "status": "discovery_incomplete",
+        "shortlistLength": 3,
+        "cursorAfterValue": "000660",
+        "cursorPinned": true,
+        "blocked": true,
+        "diagnosticCodes": ["cursor_advanced_past_failed_range", "candidates_produced_within_incomplete_sweep"]
+      }
+    },
+    {
+      "name": "a-partial-filing-lane-leaves-the-sweep-incomplete",
+      "why": "OpenDART answered for some names and failed for others. Nothing failed in the price sweep, so the counts balance and only the lane says the run is unfinished.",
+      "overrides": { "laneStatuses": { "price": "open", "filing": "partial", "web": "unstated" }, "proposedCursor": null },
+      "expect": { "status": "discovery_incomplete", "cursorPinned": true, "blocked": false }
+    },
+    {
+      "name": "the-optional-lane-being-dark-does-not-stop-the-run",
+      "why": "Web is corroboration for this package and not an entrance. A run with price and filing open and no web reading still produces candidates — the inverse of catalyst-turnaround, where the web is required.",
+      "overrides": { "laneStatuses": { "price": "open", "filing": "open", "web": "dark" } },
+      "expect": { "status": "candidates_produced", "shortlistLength": 3, "blocked": false }
+    },
+    {
+      "name": "the-shortlist-is-a-hard-cut-and-not-an-intention",
+      "why": "Five names passed and the configured shortlist is two. The other three are not rejections and the diagnostic names them, so the next run resumes on a list rather than re-deriving one.",
+      "overrides": {
+        "config": { "researchShortlistSize": 2, "discoveryBudgetSymbols": 120, "researchCompletionFloor": 1 },
+        "gateResults": [
+          { "symbol": "011070", "researchOpen": true, "rankBasis": "decomposable-cause", "drawdown": -0.34, "researchCompleted": true },
+          { "symbol": "005930", "researchOpen": true, "rankBasis": "filing-reachable", "drawdown": -0.41 },
+          { "symbol": "068270", "researchOpen": true, "rankBasis": "decomposable-cause", "drawdown": -0.31 },
+          { "symbol": "000270", "researchOpen": true, "rankBasis": "filing-reachable", "drawdown": -0.38 },
+          { "symbol": "034020", "researchOpen": true, "rankBasis": "decomposable-cause", "drawdown": -0.52 }
+        ]
+      },
+      "expect": { "status": "candidates_produced", "shortlistLength": 2, "diagnosticCodes": ["shortlist_truncated"], "blocked": false }
+    },
+    {
+      "name": "the-default-shortlist-is-three-when-no-config-arrived",
+      "why": "An invocation may carry no config block at all, and a package whose cut only exists in a setting has no cut.",
+      "overrides": {
+        "config": {},
+        "gateResults": [
+          { "symbol": "011070", "researchOpen": true, "rankBasis": "decomposable-cause", "drawdown": -0.34, "researchCompleted": true },
+          { "symbol": "005930", "researchOpen": true, "rankBasis": "filing-reachable", "drawdown": -0.41 },
+          { "symbol": "068270", "researchOpen": true, "rankBasis": "decomposable-cause", "drawdown": -0.31 },
+          { "symbol": "000270", "researchOpen": true, "rankBasis": "filing-reachable", "drawdown": -0.38 }
+        ]
+      },
+      "expect": { "status": "candidates_produced", "shortlistLength": 3, "diagnosticCodes": ["shortlist_truncated"] }
+    },
+    {
+      "name": "a-shortlist-may-not-be-ranked-by-depth-of-fall",
+      "why": "The deepest faller is the name most likely to have fallen for a reason, so this ordering ranks by the probability of the fall being correct. Stated outright, it is refused.",
+      "overrides": {
+        "gateResults": [
+          { "symbol": "034020", "researchOpen": true, "rankBasis": "drawdown-depth", "drawdown": -0.52 },
+          { "symbol": "005930", "researchOpen": true, "rankBasis": "drawdown-depth", "drawdown": -0.41 }
+        ]
+      },
+      "expect": { "status": "candidates_produced", "blocked": true, "diagnosticCodes": ["shortlist_ranked_by_depth"] }
+    },
+    {
+      "name": "and-it-may-not-be-ranked-by-depth-without-saying-so",
+      "why": "The same ordering with no rankBasis at all. Three names in strictly deepening order is a depth ranking whatever it is called, and two would have been a coincidence.",
+      "overrides": {
+        "gateResults": [
+          { "symbol": "034020", "researchOpen": true, "drawdown": -0.52 },
+          { "symbol": "005930", "researchOpen": true, "drawdown": -0.41 },
+          { "symbol": "011070", "researchOpen": true, "drawdown": -0.34 }
+        ]
+      },
+      "expect": { "status": "candidates_produced", "blocked": true, "diagnosticCodes": ["shortlist_ranked_by_depth"] }
+    },
+    {
+      "name": "an-unstated-rank-basis-is-unevaluated-and-not-passed",
+      "why": "Two names in an order nobody explained. The forbidden ordering cannot be ruled out, and «cannot be ruled out» is not «checked».",
+      "overrides": {
+        "gateResults": [
+          { "symbol": "011070", "researchOpen": true, "drawdown": -0.34, "researchCompleted": true },
+          { "symbol": "005930", "researchOpen": true, "drawdown": -0.41 }
+        ]
+      },
+      "expect": { "status": "candidates_produced", "blocked": false, "diagnosticCodes": ["shortlist_rank_basis_unstated"], "severityOf": { "shortlist_rank_basis_unstated": "unevaluated" } }
+    },
+    {
+      "name": "finishing-none-of-what-was-carried-forward-is-reported",
+      "why": "#256's failure mode: five interesting names and no completed thesis. The floor is a setting and the report is not.",
+      "overrides": {
+        "gateResults": [
+          { "symbol": "011070", "researchOpen": true, "rankBasis": "decomposable-cause", "drawdown": -0.34 },
+          { "symbol": "005930", "researchOpen": true, "rankBasis": "filing-reachable", "drawdown": -0.41 }
+        ]
+      },
+      "expect": { "status": "candidates_produced", "blocked": false, "diagnosticCodes": ["research_completion_floor_unmet"] }
+    },
+    {
+      "name": "the-counts-have-to-add-up",
+      "why": "A run that cannot say which part of the roster it read cannot say what it screened either, and the arithmetic is the only thing that catches it.",
+      "overrides": { "attempted": 120, "succeeded": 100, "failed": [] },
+      "expect": { "diagnosticCodes": ["sweep_counts_inconsistent"], "blocked": false }
+    },
+    {
+      "name": "a-lane-nobody-asked-about-is-unstated",
+      "why": "From evidence-gated's discoveryCapacity, unchanged: defaulting the unasked half to open is exactly how a run with no capacity reports a considered no-change.",
+      "overrides": { "laneStatuses": {}, "gateResults": [], "proposedCursor": null },
+      "expect": { "status": "discovery_not_run", "diagnosticCodes": ["discovery_lane_unstated"], "blocked": false }
+    }
+  ]
+}

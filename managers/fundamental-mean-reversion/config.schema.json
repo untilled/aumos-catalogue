@@ -31,7 +31,21 @@
       "minimum": 1,
       "maximum": 10,
       "default": 3,
-      "description": "How many candidates a discovery pass carries forward. Deliberately small: #256 forbids ending a run with a shallow pass over many promising names, so the shortlist is sized to what one run can finish rather than to what the screen returned."
+      "description": "How many candidates a discovery pass carries forward. Deliberately small: #256 forbids ending a run with a shallow pass over many promising names, so the shortlist is sized to what one run can finish rather than to what the screen returned. ⚠️ This is a hard cut in `discoveryRun` and not an intention: names past it are reported as truncated with their open questions, never as rejections."
+    },
+    "discoveryBudgetSymbols": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500,
+      "default": 120,
+      "description": "How many symbols of the declared universe one run reads adjusted daily bars for. It bounds the sweep rather than the methodology: the roster is swept incrementally from the last successful cursor, so a smaller budget reaches the whole market more slowly and never reaches less of it. ⚠️ A budget that consumes the run before any candidate is researched is the failure #256 names, which is why `researchCompletionFloor` sits beside it."
+    },
+    "researchCompletionFloor": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3,
+      "default": 1,
+      "description": "How many shortlisted candidates a run must research to a finished answer before it may end. ⛔ Reading many names shallowly and stopping is forbidden by #256 outright; this is the floor that makes it reportable. A run that reaches the end with fewer says so in its own record rather than presenting the shortlist as work done."
     }
   }
 }

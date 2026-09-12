@@ -1,0 +1,573 @@
+{
+  "note": "The mechanical properties of the candidate ledger (#305 §7.2), one scenario per rule. `base` is a well-formed call; each scenario shallow-merges its `overrides` onto it. ⚠️ `previous` carries one marker JSON cannot: the string \"<undefined>\" means the argument is passed as `undefined` — nobody read the ledger — and `null` means it was read and is empty. Those are the two readings this whole file exists to keep apart, so the fixture has to be able to say both. ⛔ Every figure is illustrative; no row here is evidence about a company.",
+  "asOf": "2026-06-30T07:00:00Z",
+  "asOfEpochMs": 1782802800000,
+  "base": {
+    "previous": null,
+    "ruleVersion": "fmr-gate-1",
+    "observations": [
+      {
+        "symbol": "011070",
+        "market": "XKRX",
+        "discoveryPath": [
+          "price-sweep"
+        ],
+        "hypothesis": "2024년 일회성 손상차손이 영업 훼손으로 오독됐고 3분기 수주잔고가 그것을 반증한다.",
+        "sectionsComplete": [
+          "fall-decomposition"
+        ],
+        "openQuestions": [
+          "개선된 단가가 3분기 매출에 반영된 시점"
+        ],
+        "evidenceIds": [
+          "ev_0601"
+        ],
+        "nextReviewAtEpochMs": 1786752000000,
+        "nextReviewCondition": "3분기 보고서 접수"
+      }
+    ],
+    "transitions": [],
+    "failedRanges": [],
+    "resolvedRanges": [],
+    "cursor": {
+      "kind": "symbol-index",
+      "value": "011070"
+    }
+  },
+  "scenarios": [
+    {
+      "name": "nobody-read-the-ledger-is-data-missing",
+      "why": "`undefined` is a files_read that was never made or failed. Creating a candidate on it is how the same name is discovered again every week, so nothing is created and nothing is advanced.",
+      "overrides": {
+        "previous": "<undefined>"
+      },
+      "expect": {
+        "causeCodes": [
+          "data_missing"
+        ],
+        "diagnosticCodes": [
+          "candidate_ledger_unread"
+        ],
+        "rows": 0,
+        "nextLedgerNull": true,
+        "previousRead": "unread"
+      }
+    },
+    {
+      "name": "a-read-and-empty-ledger-seeds",
+      "why": "The other half of the discriminator. `null` is an ordinary first run and it re-seeds — the key can never self-lock, because the empty reading is always writable.",
+      "overrides": {},
+      "expect": {
+        "causeCodes": [],
+        "diagnosticCodes": [],
+        "rows": 1,
+        "nextLedgerNull": false,
+        "previousRead": "absent",
+        "byState": {
+          "discovered": 1
+        },
+        "historyLength": 1,
+        "cursorValue": "011070"
+      }
+    },
+    {
+      "name": "an-unknown-schema-version-is-refused",
+      "why": "A writer this code does not know. Its rows may be shaped in a way this code would misread or silently drop, and dropping research history is the failure the file exists to avoid.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 2,
+          "candidates": []
+        }
+      },
+      "expect": {
+        "diagnosticCodes": [
+          "candidate_ledger_version_unknown"
+        ],
+        "rows": 0,
+        "nextLedgerNull": true
+      }
+    },
+    {
+      "name": "a-ledger-written-after-as-of-is-refused",
+      "why": "It can hold only past-dated rows and still leak a later run's judgement backwards. The per-row check does not catch this and nothing else would.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "updatedAtEpochMs": 1782864000000,
+          "candidates": []
+        }
+      },
+      "expect": {
+        "diagnosticCodes": [
+          "candidate_ledger_from_the_future"
+        ],
+        "rows": 0,
+        "nextLedgerNull": true
+      }
+    },
+    {
+      "name": "a-ledger-with-no-schema-version-degrades-rather-than-locking-the-key",
+      "why": "The hand-written blob a run wrote before this contract existed. Refusing it would make the first malformed write permanent, so it reads as an empty ledger and its unknown siblings are reported by name and not carried.",
+      "overrides": {
+        "previous": {
+          "note": "written by hand before the contract",
+          "candidates": [
+            {
+              "symbol": "005930",
+              "market": "XKRX",
+              "state": "researching",
+              "ruleVersion": "fmr-gate-1",
+              "discoveryPath": [
+                "price-sweep"
+              ],
+              "evidenceIds": [
+                "ev_0510"
+              ],
+              "nextReviewCondition": "2분기 보고서 접수",
+              "history": []
+            }
+          ]
+        }
+      },
+      "expect": {
+        "previousRead": "degraded",
+        "previousExtraKeys": [
+          "note"
+        ],
+        "rows": 2,
+        "nextLedgerNull": false,
+        "diagnosticCodes": []
+      }
+    },
+    {
+      "name": "a-duplicate-discovery-folds-into-one-row",
+      "why": "Two sweeps reached the same name in one run. One row, lastSeen moves, the paths fold into a set, and the new path appends exactly one history entry — appending on every sighting would grow the record forever and idempotency is what #305 asks for by name.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "fundamental-mean-reversion",
+          "ruleVersion": "fmr-gate-1",
+          "updatedAtEpochMs": 1782198000000,
+          "cursor": null,
+          "failedRanges": [],
+          "candidates": [
+            {
+              "symbol": "011070",
+              "market": "XKRX",
+              "state": "discovered",
+              "ruleVersion": "fmr-gate-1",
+              "discoveredAtEpochMs": 1780272000000,
+              "lastSeenAtEpochMs": 1782198000000,
+              "discoveryPath": [
+                "price-sweep"
+              ],
+              "evidenceIds": [
+                "ev_0601"
+              ],
+              "history": [
+                {
+                  "atEpochMs": 1780272000000,
+                  "from": null,
+                  "to": "discovered",
+                  "ruleVersion": "fmr-gate-1"
+                }
+              ]
+            }
+          ]
+        },
+        "observations": [
+          {
+            "symbol": "011070",
+            "market": "XKRX",
+            "discoveryPath": [
+              "price-sweep"
+            ],
+            "evidenceIds": [
+              "ev_0601"
+            ]
+          },
+          {
+            "symbol": "011070",
+            "market": "XKRX",
+            "discoveryPath": [
+              "filing-sweep"
+            ],
+            "evidenceIds": [
+              "ev_0601",
+              "ev_0628"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "rows": 1,
+        "nextLedgerNull": false,
+        "discoveryPath": [
+          "price-sweep",
+          "filing-sweep"
+        ],
+        "historyLength": 2,
+        "evidenceIdsInclude": [
+          "ev_0601",
+          "ev_0628"
+        ],
+        "lastSeenIsAsOf": true
+      }
+    },
+    {
+      "name": "an-excluded-candidate-may-not-be-re-entered-silently",
+      "why": "The name this desk researched and put down is the name the next run picks up again on the same chart. Re-entry with nothing new is how a rejected thesis becomes a position by attrition.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "ruleVersion": "fmr-gate-1",
+          "candidates": [
+            {
+              "symbol": "009150",
+              "market": "XKRX",
+              "state": "excluded",
+              "ruleVersion": "fmr-gate-1",
+              "discoveryPath": [
+                "price-sweep"
+              ],
+              "excludedReasonCode": "structural-earnings-damage",
+              "evidenceIds": [
+                "ev_0405"
+              ],
+              "history": []
+            }
+          ]
+        },
+        "observations": [],
+        "transitions": [
+          {
+            "symbol": "009150",
+            "market": "XKRX",
+            "to": "researching",
+            "atEpochMs": 1782198000000
+          }
+        ]
+      },
+      "expect": {
+        "diagnosticCodes": [
+          "candidate_state_regressed"
+        ],
+        "nextLedgerNull": true,
+        "stateOf": {
+          "009150": "excluded"
+        }
+      }
+    },
+    {
+      "name": "and-re-entry-with-a-reason-and-new-evidence-is-accepted",
+      "why": "The other half of the same rule, so the refusal above is about what re-entry costs and not about re-entry being forbidden.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "ruleVersion": "fmr-gate-1",
+          "candidates": [
+            {
+              "symbol": "009150",
+              "market": "XKRX",
+              "state": "excluded",
+              "ruleVersion": "fmr-gate-1",
+              "discoveryPath": [
+                "price-sweep"
+              ],
+              "excludedReasonCode": "structural-earnings-damage",
+              "evidenceIds": [
+                "ev_0405"
+              ],
+              "nextReviewCondition": "3분기 보고서 접수",
+              "history": []
+            }
+          ]
+        },
+        "observations": [],
+        "transitions": [
+          {
+            "symbol": "009150",
+            "market": "XKRX",
+            "to": "researching",
+            "atEpochMs": 1782198000000,
+            "evidenceIds": [
+              "ev_0622"
+            ],
+            "reentryReason": "2분기 보고서가 손상차손을 반복하지 않았고 영업이익률이 회복됐다"
+          }
+        ]
+      },
+      "expect": {
+        "diagnosticCodes": [],
+        "nextLedgerNull": false,
+        "stateOf": {
+          "009150": "researching"
+        },
+        "historyLength": 1
+      }
+    },
+    {
+      "name": "a-changed-rule-version-is-returned-for-re-evaluation-and-never-migrated",
+      "why": "A gate that moved is a candidate that was never tested against the gate it is now carried under. Silently stamping it with the new version would make that untestable forever.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "ruleVersion": "fmr-gate-0",
+          "candidates": [
+            {
+              "symbol": "005930",
+              "market": "XKRX",
+              "state": "researching",
+              "ruleVersion": "fmr-gate-0",
+              "discoveryPath": [
+                "price-sweep"
+              ],
+              "evidenceIds": [
+                "ev_0510"
+              ],
+              "nextReviewCondition": "2분기 보고서 접수",
+              "history": []
+            }
+          ]
+        }
+      },
+      "expect": {
+        "diagnosticCodes": [
+          "rule_version_changed"
+        ],
+        "nextLedgerNull": false,
+        "requiresReevaluation": [
+          "005930"
+        ],
+        "ruleVersionOf": {
+          "005930": "fmr-gate-0"
+        },
+        "severityOf": {
+          "rule_version_changed": "unevaluated"
+        }
+      }
+    },
+    {
+      "name": "the-ledger-may-not-hold-vendor-payload",
+      "why": "#305's out-of-scope list by name: no second price database in the private folder. A copied bar array is stale the moment it is written and it answers anyway.",
+      "overrides": {
+        "observations": [
+          {
+            "symbol": "011070",
+            "market": "XKRX",
+            "discoveryPath": [
+              "price-sweep"
+            ],
+            "bars": [
+              {
+                "close": 41200,
+                "volume": 812000
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "diagnosticCodes": [
+          "memory_holds_vendor_payload"
+        ],
+        "nextLedgerNull": true
+      }
+    },
+    {
+      "name": "and-it-may-not-hold-account-state",
+      "why": "The same prohibition on the other side. Holdings, cash and open proposals are portfolio_get's and are re-read every run; a copy here is an account nobody reconciles.",
+      "overrides": {
+        "observations": [
+          {
+            "symbol": "011070",
+            "market": "XKRX",
+            "discoveryPath": [
+              "price-sweep"
+            ],
+            "quantity": 120,
+            "averageCost": 38400
+          }
+        ]
+      },
+      "expect": {
+        "diagnosticCodes": [
+          "memory_holds_vendor_payload"
+        ],
+        "nextLedgerNull": true
+      }
+    },
+    {
+      "name": "evidence-cannot-be-dropped-on-restatement",
+      "why": "The row came back clean. The carried ids are reinstated and the run stops, because a laundered record is worse than a missing one: it reads as complete.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "ruleVersion": "fmr-gate-1",
+          "candidates": [
+            {
+              "symbol": "011070",
+              "market": "XKRX",
+              "state": "triaged",
+              "ruleVersion": "fmr-gate-1",
+              "discoveryPath": [
+                "price-sweep"
+              ],
+              "evidenceIds": [
+                "ev_0601",
+                "ev_0612"
+              ],
+              "history": []
+            }
+          ]
+        }
+      },
+      "expect": {
+        "diagnosticCodes": [
+          "candidate_evidence_dropped"
+        ],
+        "nextLedgerNull": true,
+        "evidenceIdsInclude": [
+          "ev_0601",
+          "ev_0612"
+        ]
+      }
+    },
+    {
+      "name": "a-failed-range-is-retried-and-the-attempt-is-counted",
+      "why": "A retry that failed again is the same range with one more attempt, never a second row. Without the count, a range that has failed four times reads as a first failure.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "ruleVersion": "fmr-gate-1",
+          "cursor": null,
+          "failedRanges": [
+            {
+              "kind": "symbol-index",
+              "from": "005930",
+              "to": "005935",
+              "reasonCode": "lane_query_failed",
+              "firstFailedAtEpochMs": 1780272000000,
+              "attempts": 1
+            }
+          ],
+          "candidates": []
+        },
+        "observations": [],
+        "cursor": null,
+        "failedRanges": [
+          {
+            "kind": "symbol-index",
+            "from": "005930",
+            "to": "005935",
+            "reasonCode": "lane_query_failed"
+          }
+        ]
+      },
+      "expect": {
+        "diagnosticCodes": [
+          "failed_range_retried"
+        ],
+        "nextLedgerNull": false,
+        "failedRangeAttempts": {
+          "005930→005935": 2
+        }
+      }
+    },
+    {
+      "name": "the-cursor-never-steps-over-an-unread-range",
+      "why": "A cursor past an unread range deletes that range permanently — nothing later ever looks at it again. The write is refused rather than the range being quietly forgotten.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "ruleVersion": "fmr-gate-1",
+          "cursor": null,
+          "failedRanges": [
+            {
+              "kind": "symbol-index",
+              "from": "005930",
+              "to": "005935",
+              "reasonCode": "lane_query_failed",
+              "firstFailedAtEpochMs": 1780272000000,
+              "attempts": 1
+            }
+          ],
+          "candidates": []
+        },
+        "observations": [],
+        "cursor": {
+          "kind": "symbol-index",
+          "value": "011070"
+        }
+      },
+      "expect": {
+        "diagnosticCodes": [
+          "cursor_advanced_past_failed_range"
+        ],
+        "nextLedgerNull": true
+      }
+    },
+    {
+      "name": "a-hypothesis-is-one-sentence",
+      "why": "A research note that outgrows the cap belongs in the proposal's rationale. A ledger that grows to hold prose has started to hold the research instead of pointing at it.",
+      "overrides": {
+        "observations": [
+          {
+            "symbol": "011070",
+            "market": "XKRX",
+            "discoveryPath": [
+              "price-sweep"
+            ],
+            "hypothesis": "이 문장은 가설이 아니라 조사 노트다. 가설 한 문장이 감당해야 하는 길이를 넘어서면 그것은 이미 제안서의 논거이고, 장부는 조사를 가리키는 대신 조사를 담기 시작한다. 그래서 이 필드에는 상한이 있고 상한을 넘은 값은 조용히 잘리지 않고 거절된다. 잘린 가설은 읽는 사람에게 완결된 문장처럼 보이기 때문이다. 이 문장은 그 상한을 넘기기 위해 의도적으로 길게 쓰였으며 어떤 기업에 대한 주장도 담고 있지 않다. 여기까지 오면 이백팔십자를 넘는다. 장부는 이름과 한 문장과 증거 참조만 들고 있으며, 나머지는 모두 다시 읽어 온다."
+          }
+        ]
+      },
+      "expect": {
+        "diagnosticCodes": [
+          "candidate_field_too_long"
+        ],
+        "nextLedgerNull": true
+      }
+    },
+    {
+      "name": "a-candidate-left-researching-with-no-way-back-is-research-incomplete",
+      "why": "Nothing will ever bring a run back to it. That is not a blocked write — it is the #254 word for «you could have answered and did not get there».",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "ruleVersion": "fmr-gate-1",
+          "candidates": [
+            {
+              "symbol": "005930",
+              "market": "XKRX",
+              "state": "researching",
+              "ruleVersion": "fmr-gate-1",
+              "discoveryPath": [
+                "price-sweep"
+              ],
+              "evidenceIds": [
+                "ev_0510"
+              ],
+              "history": []
+            }
+          ]
+        }
+      },
+      "expect": {
+        "causeCodes": [
+          "research_incomplete"
+        ],
+        "nextLedgerNull": false
+      }
+    },
+    {
+      "name": "a-rerun-over-the-same-input-writes-the-same-ledger",
+      "why": "The idempotency #305 asks for: the answer is fed back as `previous` with the same observations and has to be byte-identical. A record that grows on a re-run is a record that cannot be re-run after a failure, which is the only time it matters.",
+      "overrides": {},
+      "expect": {
+        "idempotent": true,
+        "nextLedgerNull": false
+      }
+    }
+  ]
+}

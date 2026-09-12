@@ -1,0 +1,126 @@
+{
+  "note": "The web-reading record of `lib/attestation.mjs`. `base` is one issuer value-up page, read, filed through observation_file on a previous run, and therefore citable now; each scenario shallow-merges its `overrides`. Every URL is on `example.invalid` so nothing here can be fetched, and no company named is a recommendation.",
+  "asOf": "2026-07-01T00:00:00Z",
+  "base": {
+    "asOf": "2026-07-01T00:00:00Z",
+    "url": "https://ir.example.invalid/ko/value-up/2026-01-05-shareholder-return-plan.pdf",
+    "publisher": "316140 Investor Relations",
+    "publishedAt": "2026-01-05T00:00:00Z",
+    "observedAt": "2026-01-06T02:30:00Z",
+    "claim": "이사회가 2026~2028년 총주주환원율 50%를 목표로 결의했다고 회사가 스스로 밝힌다.",
+    "sourceType": "company-announcement",
+    "excerptChars": 1840,
+    "readingChars": 420,
+    "evidenceId": "ev_policy_2601",
+    "issuedThisRun": false
+  },
+  "scenarios": [
+    {
+      "name": "a-document-read-and-filed-round-trips",
+      "why": "The control. Five fields plus the id the host returned, and the grade that travels with it says whose word this is.",
+      "overrides": {},
+      "expect": {
+        "recordWritten": true,
+        "attestation": "manager",
+        "citable": true,
+        "carryForward": true,
+        "evidenceKind": "observation",
+        "evidenceSource": "manager:web-research",
+        "diagnosticCodes": [],
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-search-result-summary-never-makes-a-candidate",
+      "why": "#305 in as many words: 검색 결과 제목이나 요약만으로 후보를 확정하지 않는다. Without the document's URL, its publication date and the instant this desk read it, what is recorded is a summary of a document nobody here opened.",
+      "overrides": { "url": null, "publishedAt": null, "observedAt": null, "evidenceId": null },
+      "expect": {
+        "recordWritten": false,
+        "diagnosticCodes": ["web_reading_is_a_summary"],
+        "diagnosticSeverities": { "web_reading_is_a_summary": "blocked" },
+        "blocked": true
+      }
+    },
+    {
+      "name": "a-publication-date-nobody-has-is-the-same-refusal",
+      "why": "The half of the rule that catches the plausible case: a real URL, opened, with no date on it. Korean policy and IR pages recur annually with near-identical wording, so an undated one is last year's plan as often as this year's.",
+      "overrides": { "publishedAt": null },
+      "expect": { "recordWritten": false, "diagnosticCodes": ["web_reading_is_a_summary"], "blocked": true }
+    },
+    {
+      "name": "an-excerpt-over-the-cap-is-refused-and-never-trimmed",
+      "why": "A hash taken over a fragment filed as a whole document leaves an auditor who fetched the URL unable to tell a trimmed row from a fabricated one. The host refuses it; checking here buys the run a sentence before the round trip rather than after it.",
+      "overrides": { "excerptChars": 64001 },
+      "expect": { "recordWritten": false, "diagnosticCodes": ["observation_excerpt_over_limit"], "blocked": true }
+    },
+    {
+      "name": "an-excerpt-exactly-at-the-cap-is-accepted",
+      "why": "So that what is refused above is the overrun and not the cap being read one character short.",
+      "overrides": { "excerptChars": 64000 },
+      "expect": { "recordWritten": true, "blocked": false }
+    },
+    {
+      "name": "a-search-results-page-is-not-a-document",
+      "why": "A page whose content changes with the query is a URL an auditor cannot go back to.",
+      "overrides": { "url": "https://search.example.invalid/search?q=316140+%EC%9E%90%EC%82%AC%EC%A3%BC" },
+      "expect": { "recordWritten": false, "diagnosticCodes": ["web_reading_url_is_not_a_document"], "blocked": true }
+    },
+    {
+      "name": "a-homepage-is-not-a-document-either",
+      "why": "The same failure at the other end: a page whose content changes with the day.",
+      "overrides": { "url": "https://ir.example.invalid/" },
+      "expect": { "recordWritten": false, "diagnosticCodes": ["web_reading_url_is_not_a_document"], "blocked": true }
+    },
+    {
+      "name": "a-source-type-outside-the-four-is-refused",
+      "why": "An issuer's own words, a newspaper's summary of them and this desk's interpretation of that summary are three different weights, and a record that cannot say which lets an interpretation be filed at a filing's weight.",
+      "overrides": { "sourceType": "analysis" },
+      "expect": { "recordWritten": false, "diagnosticCodes": ["web_reading_source_type_unknown"], "blocked": true }
+    },
+    {
+      "name": "this-desks-own-reading-has-a-type-of-its-own",
+      "why": "`manager-interpretation` is in the closed set precisely so that an interpretation can be filed honestly rather than dressed as a company announcement.",
+      "overrides": { "sourceType": "manager-interpretation" },
+      "expect": { "recordWritten": true, "sourceType": "manager-interpretation", "blocked": false }
+    },
+    {
+      "name": "a-document-published-after-as-of-is-not-evidence-for-it",
+      "why": "The point-in-time rule, and `observation_file` refuses it on the host side too.",
+      "overrides": { "publishedAt": "2026-08-01T00:00:00Z" },
+      "expect": { "recordWritten": false, "diagnosticCodes": ["observation_post_as_of"], "blocked": true }
+    },
+    {
+      "name": "an-id-minted-this-run-is-carried-and-not-cited",
+      "why": "Host gap H-4: evidence filed during a run that has not ended is not committed to the Kernel until the run finishes, so an id from observation_file is citable in run N+1. That is why candidate.evidenceIds is a carried field.",
+      "overrides": { "issuedThisRun": true },
+      "expect": {
+        "recordWritten": true,
+        "citable": false,
+        "carryForward": true,
+        "diagnosticCodes": ["evidence_not_citable_until_next_run"],
+        "diagnosticSeverities": { "evidence_not_citable_until_next_run": "unevaluated" },
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-reading-nobody-filed-is-an-absence-and-not-a-refusal",
+      "why": "It is a well-formed reading that has not been through the round trip yet. `unevaluated`, so the run is told to file it rather than being stopped.",
+      "overrides": { "evidenceId": null },
+      "expect": {
+        "recordWritten": true,
+        "attestation": "uncited",
+        "citable": false,
+        "carryForward": false,
+        "diagnosticCodes": ["web_reading_not_yet_filed"],
+        "diagnosticSeverities": { "web_reading_not_yet_filed": "unevaluated" },
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-reading-that-says-nothing-is-refused",
+      "why": "A reading is filed for something. Without the claim it supports, a later run has a URL and no idea what this desk took from it.",
+      "overrides": { "claim": null },
+      "expect": { "recordWritten": false, "diagnosticCodes": ["web_reading_states_no_claim"], "blocked": true }
+    }
+  ]
+}

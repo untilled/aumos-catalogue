@@ -57,6 +57,16 @@ import {
   sectorConcentration,
   stabilisation,
   technicalState,
+  OPERATIONS,
+  DISCOVERY_STATUSES,
+  DISCOVERY_VOCABULARY,
+  REQUIRED_LANES,
+  DEFAULT_SHORTLIST_SIZE,
+  DEFAULT_DISCOVERY_BUDGET_SYMBOLS,
+  DEFAULT_RESEARCH_COMPLETION_FLOOR,
+  discoveryRun,
+  candidateLedger,
+  FORBIDDEN_KEYS,
 } from '../managers/fundamental-mean-reversion/lib/index.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -2239,6 +2249,252 @@ check('the replay records the RSI the excluded thesis does not reproduce', () =>
   for (const row of replay.cases) assert.ok(row.measured.rsi14 > 35, `${row.name}: RSI ${row.measured.rsi14}`)
 })
 
+
+// ── ⑮ the discovery run: three statuses, three different answers (#305) ───
+//
+// The whole of #305's fifth question is here. A run that screened a declared
+// roster and qualified nobody, a run that read nothing at all, and a run that
+// read part of the roster and stopped are three different facts — and in prose
+// all three come out as "no candidates this week". So the fixture asserts that
+// they reach three *different* tokens, that the fourth is reachable, and that
+// the cursor moves on exactly two of them.
+const discoveryFixture = read('discovery.json')
+
+const runDiscovery = (scenario) =>
+  discoveryRun({ ...discoveryFixture.base, ...scenario.overrides, asOf: discoveryFixture.asOf })
+
+const statusesReached = new Set()
+
+for (const scenario of discoveryFixture.scenarios) {
+  const answer = runDiscovery(scenario)
+  const codes = answer.diagnostics.map((row) => row.code)
+  const expect = scenario.expect ?? {}
+  statusesReached.add(answer.data.discoveryStatus)
+
+  check(`discovery/${scenario.name}`, () => {
+    assert.ok(typeof scenario.why === 'string' && scenario.why.length > 24, `${scenario.name}: a scenario states the argument it is making`)
+    if (expect.status !== undefined) assert.equal(answer.data.discoveryStatus, expect.status, `${scenario.name}: discoveryStatus`)
+    assert.ok(DISCOVERY_STATUSES.includes(answer.data.discoveryStatus), `${scenario.name}: ${answer.data.discoveryStatus} is outside the closed set`)
+    if (expect.shortlistLength !== undefined) assert.equal(answer.data.shortlist.length, expect.shortlistLength, `${scenario.name}: shortlist length`)
+    for (const code of expect.diagnosticCodes ?? []) assert.ok(codes.includes(code), `${scenario.name}: expected diagnostic ${code}, saw ${codes.join(', ') || 'none'}`)
+    for (const code of expect.absentDiagnosticCodes ?? []) assert.ok(!codes.includes(code), `${scenario.name}: did not expect diagnostic ${code}`)
+    if (Array.isArray(expect.diagnosticCodes) && expect.diagnosticCodes.length === 0) {
+      assert.deepEqual(codes, [], `${scenario.name}: expected a clean answer, saw ${codes.join(', ')}`)
+    }
+    for (const [code, severity] of Object.entries(expect.severityOf ?? {})) {
+      const row = answer.diagnostics.find((entry) => entry.code === code)
+      assert.ok(row !== undefined, `${scenario.name}: ${code} was not raised`)
+      assert.equal(row.severity, severity, `${scenario.name}: ${code} severity`)
+    }
+    for (const row of answer.diagnostics) {
+      assert.ok(['info', 'unevaluated', 'blocked'].includes(row.severity), `${scenario.name}: ${row.code} uses a severity word this package does not publish`)
+    }
+    if (expect.blocked !== undefined) {
+      assert.equal(codes.some((code) => answer.diagnostics.find((row) => row.code === code).severity === 'blocked'), expect.blocked, `${scenario.name}: blocked`)
+    }
+    if (expect.cursorAfterValue !== undefined) assert.equal(answer.data.cursorAfter?.value ?? null, expect.cursorAfterValue, `${scenario.name}: cursorAfter`)
+    if (expect.cursorPinned !== undefined) {
+      const pinned = JSON.stringify(answer.data.cursorAfter) === JSON.stringify(answer.data.cursorBefore)
+      assert.equal(pinned, expect.cursorPinned, `${scenario.name}: the cursor ${pinned ? 'stayed' : 'moved'} and the fixture says otherwise`)
+    }
+    /**
+     * ⛔ The rule restated at every scenario rather than at one: a status outside
+     * `candidates_produced` / `no_candidate_qualified` may never move the cursor,
+     * because a cursor past an unread range deletes it permanently.
+     */
+    if (!['candidates_produced', 'no_candidate_qualified'].includes(answer.data.discoveryStatus)) {
+      assert.deepEqual(answer.data.cursorAfter, answer.data.cursorBefore, `${scenario.name}: ${answer.data.discoveryStatus} moved the cursor`)
+    }
+    /** And the guard on the one status that claims a completed screen. */
+    if (answer.data.discoveryStatus === 'no_candidate_qualified') {
+      assert.equal(answer.data.universeDeclared, true, `${scenario.name}: no_candidate_qualified without a declared universe`)
+      assert.deepEqual(answer.data.symbolsFailed, [], `${scenario.name}: no_candidate_qualified with a failed symbol`)
+      for (const lane of REQUIRED_LANES) {
+        assert.equal(answer.data[`${lane}LaneStatus`], 'open', `${scenario.name}: no_candidate_qualified with the ${lane} lane not open`)
+      }
+    }
+  })
+}
+
+check('the four discovery statuses are all reachable and all different', () => {
+  for (const status of DISCOVERY_STATUSES) {
+    assert.ok(statusesReached.has(status), `no fixture reaches ${status}; an unreachable status is a distinction nothing enforces`)
+  }
+  assert.equal(statusesReached.size, DISCOVERY_STATUSES.length, 'the fixtures reach fewer distinct statuses than the vocabulary publishes')
+})
+
+check('an undeclared universe is unevaluated and never blocks the run', () => {
+  const answer = discoveryRun({ ...discoveryFixture.base, universe: null, gateResults: [], proposedCursor: null, asOf: discoveryFixture.asOf })
+  const row = answer.diagnostics.find((entry) => entry.code === 'universe_undeclared')
+  assert.equal(row.severity, 'unevaluated', 'an undeclared universe blocked the run; the sell side still has to be watched')
+  assert.ok(!answer.diagnostics.some((entry) => entry.severity === 'blocked'), 'a run with no universe was blocked outright')
+})
+
+check('this package requires the price and filing lanes and treats the web as optional', () => {
+  assert.deepEqual([...REQUIRED_LANES], ['price', 'filing'], 'the required lanes moved; catalyst-turnaround is the package where the web is required')
+  assert.deepEqual([...DISCOVERY_VOCABULARY.optionalLanes], ['web'])
+  assert.equal(DISCOVERY_VOCABULARY.cursorKind, 'symbol-index', 'FMR sweeps a roster in symbol order; dart-receipt is the sibling packages’ cursor')
+})
+
+// ── ⑯ the candidate ledger (#305 §7.2) ────────────────────────────────────
+const memoryFixture = read('candidate-memory.json')
+
+/**
+ * ⚠️ JSON cannot say `undefined`, and `undefined` versus `null` is the entire
+ * subject of the file being tested. The fixture says it with a marker.
+ */
+const previousOf = (value) => (value === '<undefined>' ? undefined : value)
+
+const runLedger = (scenario) => {
+  const call = { ...memoryFixture.base, ...scenario.overrides, asOf: memoryFixture.asOf }
+  return candidateLedger({ ...call, previous: previousOf(call.previous) })
+}
+
+for (const scenario of memoryFixture.scenarios) {
+  const answer = runLedger(scenario)
+  const codes = answer.diagnostics.map((row) => row.code)
+  const causeCodes = (answer.causes ?? []).map((row) => row.code)
+  const expect = scenario.expect ?? {}
+
+  check(`candidate-memory/${scenario.name}`, () => {
+    assert.ok(typeof scenario.why === 'string' && scenario.why.length > 24, `${scenario.name}: a scenario states the argument it is making`)
+    for (const code of expect.diagnosticCodes ?? []) assert.ok(codes.includes(code), `${scenario.name}: expected diagnostic ${code}, saw ${codes.join(', ') || 'none'}`)
+    if (Array.isArray(expect.diagnosticCodes) && expect.diagnosticCodes.length === 0) {
+      assert.deepEqual(codes, [], `${scenario.name}: expected a clean answer, saw ${codes.join(', ')}`)
+    }
+    for (const code of expect.causeCodes ?? []) assert.ok(causeCodes.includes(code), `${scenario.name}: expected cause ${code}, saw ${causeCodes.join(', ') || 'none'}`)
+    if (Array.isArray(expect.causeCodes) && expect.causeCodes.length === 0) assert.deepEqual(causeCodes, [], `${scenario.name}: expected no cause, saw ${causeCodes.join(', ')}`)
+    for (const row of answer.causes ?? []) assert.ok(DIAGNOSIS_CODES.includes(row.code), `${scenario.name}: ${row.code} is a fifth diagnosis word`)
+    for (const row of answer.diagnostics) {
+      assert.ok(['info', 'unevaluated', 'blocked'].includes(row.severity), `${scenario.name}: ${row.code} uses a severity word this package does not publish`)
+    }
+    for (const [code, severity] of Object.entries(expect.severityOf ?? {})) {
+      assert.equal(answer.diagnostics.find((entry) => entry.code === code)?.severity, severity, `${scenario.name}: ${code} severity`)
+    }
+    if (expect.rows !== undefined) assert.equal(answer.data.rows.length, expect.rows, `${scenario.name}: row count`)
+    if (expect.nextLedgerNull !== undefined) assert.equal(answer.data.nextLedger === null, expect.nextLedgerNull, `${scenario.name}: nextLedger`)
+    if (expect.previousRead !== undefined) assert.equal(answer.data.summary?.previousRead, expect.previousRead, `${scenario.name}: previousRead`)
+    if (expect.previousExtraKeys !== undefined) assert.deepEqual(answer.data.summary?.previousExtraKeys, expect.previousExtraKeys, `${scenario.name}: previousExtraKeys`)
+    if (expect.byState !== undefined) {
+      for (const [state, count] of Object.entries(expect.byState)) assert.equal(answer.data.summary.byState[state], count, `${scenario.name}: byState.${state}`)
+    }
+    if (expect.historyLength !== undefined) assert.equal(answer.data.rows[0].history.length, expect.historyLength, `${scenario.name}: history length`)
+    if (expect.discoveryPath !== undefined) assert.deepEqual(answer.data.rows[0].discoveryPath, expect.discoveryPath, `${scenario.name}: discoveryPath folded`)
+    if (expect.lastSeenIsAsOf === true) assert.equal(answer.data.rows[0].lastSeenAtEpochMs, Date.parse(memoryFixture.asOf), `${scenario.name}: lastSeenAtEpochMs`)
+    if (expect.cursorValue !== undefined) assert.equal(answer.data.nextLedger?.cursor?.value ?? null, expect.cursorValue, `${scenario.name}: cursor`)
+    for (const id of expect.evidenceIdsInclude ?? []) {
+      assert.ok(answer.data.rows.some((row) => row.evidenceIds.includes(id)), `${scenario.name}: ${id} was dropped from the record`)
+    }
+    for (const [symbol, state] of Object.entries(expect.stateOf ?? {})) {
+      assert.equal(answer.data.rows.find((row) => row.symbol === symbol)?.state, state, `${scenario.name}: ${symbol} state`)
+    }
+    for (const [symbol, version] of Object.entries(expect.ruleVersionOf ?? {})) {
+      assert.equal(answer.data.rows.find((row) => row.symbol === symbol)?.ruleVersion, version, `${scenario.name}: ${symbol} was silently migrated to the current rule version`)
+    }
+    if (expect.requiresReevaluation !== undefined) assert.deepEqual(answer.data.summary.requiresReevaluation, expect.requiresReevaluation, `${scenario.name}: requiresReevaluation`)
+    for (const [id, attempts] of Object.entries(expect.failedRangeAttempts ?? {})) {
+      const [from, to] = id.split('→')
+      const range = answer.data.nextLedger.failedRanges.find((row) => row.from === from && row.to === to)
+      assert.equal(range?.attempts, attempts, `${scenario.name}: ${id} attempts`)
+    }
+    /**
+     * ⛔ The record only grows, and a re-run after a failure is the only time
+     * that matters. The answer is fed back as `previous` and has to be identical.
+     */
+    if (expect.idempotent === true) {
+      const call = { ...memoryFixture.base, ...scenario.overrides, asOf: memoryFixture.asOf }
+      const again = candidateLedger({ ...call, previous: answer.data.nextLedger })
+      assert.deepEqual(again.data.nextLedger, answer.data.nextLedger, `${scenario.name}: a re-run over the same input produced a different ledger`)
+    }
+    /** ⛔ And nothing written back is ever a copy of a vendor payload or an account. */
+    if (answer.data.nextLedger !== null) {
+      const serialised = JSON.stringify(answer.data.nextLedger)
+      for (const key of FORBIDDEN_KEYS) {
+        assert.ok(!serialised.includes(`"${key}":`), `${scenario.name}: the ledger written back holds a ${key} field`)
+      }
+      assert.ok(!/"[a-zA-Z]+At":\s*"20\d\d-/.test(serialised), `${scenario.name}: an instant was written back as a string; the host refuses a payload holding post-asOf string timestamps`)
+    }
+  })
+}
+
+check('the ledger names the content it may never hold, and the verifier agrees', () => {
+  for (const key of ['close', 'volume', 'bars', 'excerpt', 'quantity', 'cash', 'averageCost', 'targetWeight', 'pending', 'proposals']) {
+    assert.ok(FORBIDDEN_KEYS.includes(key), `${key} left the prohibition list; #305 puts a second price database and a second account in its out-of-scope list`)
+  }
+  const offending = candidateLedger({
+    previous: null,
+    ruleVersion: 'fmr-gate-1',
+    asOf: memoryFixture.asOf,
+    observations: [{ symbol: '011070', discoveryPath: ['price-sweep'], filing: { excerpt: 'the filing’s own words' } }],
+  })
+  assert.ok(offending.diagnostics.some((row) => row.code === 'memory_holds_vendor_payload' && row.severity === 'blocked'), 'a filing body reached the ledger')
+  assert.equal(offending.data.nextLedger, null, 'a refused ledger was still written back')
+})
+
+check('an unread ledger creates and advances nothing', () => {
+  const answer = candidateLedger({ ...memoryFixture.base, previous: undefined, asOf: memoryFixture.asOf })
+  assert.equal(answer.data.rows.length, 0, 'a candidate was created on a ledger nobody read')
+  assert.equal(answer.data.nextLedger, null)
+  assert.ok(answer.causes.some((row) => row.code === 'data_missing'))
+  /** ⚠️ And the same call with `null` is an ordinary first run. */
+  const seeded = candidateLedger({ ...memoryFixture.base, previous: null, asOf: memoryFixture.asOf })
+  assert.equal(seeded.data.rows.length, 1, 'a read-and-empty ledger refused to seed; the key would self-lock')
+})
+
+// ── ⑰ the two operations are published, and the settings are in the prompt ─
+check('discoveryRun and candidateLedger are reachable through execute()', () => {
+  for (const operation of ['discoveryRun', 'candidateLedger']) {
+    assert.ok(OPERATIONS.includes(operation), `${operation} is not published in OPERATIONS`)
+    const refused = execute({ operation, input: {} })
+    assert.equal(refused.status, 'refused', `${operation} without asOf`)
+    assert.equal(refused.diagnostics[0].code, 'as_of_missing')
+  }
+  const run = execute({ operation: 'discoveryRun', asOf: discoveryFixture.asOf, input: discoveryFixture.base })
+  assert.equal(run.status, 'ok')
+  assert.equal(run.discoveryStatus, 'candidates_produced')
+  const ledger = execute({ operation: 'candidateLedger', asOf: memoryFixture.asOf, input: { ...memoryFixture.base } })
+  assert.equal(ledger.status, 'ok')
+  assert.ok(Array.isArray(ledger.rows))
+})
+
+const PROMPT = readFileSync(join(ROOT, 'managers', 'fundamental-mean-reversion', 'PROMPT.md'), 'utf8')
+const CONFIG_SCHEMA = JSON.parse(readFileSync(join(ROOT, 'managers', 'fundamental-mean-reversion', 'config.schema.json'), 'utf8'))
+
+check('PROMPT.md names every discovery status and every discovery setting', () => {
+  for (const token of [...DISCOVERY_STATUSES, 'researchShortlistSize', 'discoveryBudgetSymbols', 'researchCompletionFloor']) {
+    assert.ok(PROMPT.includes(token), `PROMPT.md does not name ${token}; a run cannot report a status the prompt never taught it`)
+  }
+  /**
+   * ⛔ The verbatim-token rule, which is the one thing a translated prompt can
+   * silently lose: the marker is a token rather than a phrase, because the prose
+   * around it is written in the invocation's `language`.
+   */
+  assert.ok(/verbatim/i.test(PROMPT), 'PROMPT.md no longer states that the discovery_not_run token is carried verbatim')
+})
+
+check('the config schema and the prompt agree on every default', () => {
+  const properties = CONFIG_SCHEMA.properties
+  assert.equal(CONFIG_SCHEMA.additionalProperties, false, 'the config schema stopped refusing unknown keys')
+  assert.equal(properties.discoveryBudgetSymbols.default, 120)
+  assert.equal(properties.discoveryBudgetSymbols.minimum, 1)
+  assert.equal(properties.discoveryBudgetSymbols.maximum, 500)
+  assert.equal(properties.researchCompletionFloor.default, 1)
+  assert.equal(properties.researchCompletionFloor.minimum, 1)
+  assert.equal(properties.researchCompletionFloor.maximum, 3)
+  assert.equal(properties.researchShortlistSize.default, DEFAULT_SHORTLIST_SIZE)
+  for (const [name, property] of Object.entries(properties)) {
+    assert.ok(PROMPT.includes(name), `PROMPT.md does not name config.${name}; an invocation may carry no config block at all`)
+    assert.ok(PROMPT.includes(`**${property.default}**`), `PROMPT.md does not state the default for ${name}`)
+  }
+  /** And the library's fallbacks are the schema's, so a missing block behaves as documented. */
+  assert.equal(DEFAULT_SHORTLIST_SIZE, properties.researchShortlistSize.default)
+  assert.equal(DEFAULT_DISCOVERY_BUDGET_SYMBOLS, properties.discoveryBudgetSymbols.default)
+  assert.equal(DEFAULT_RESEARCH_COMPLETION_FLOOR, properties.researchCompletionFloor.default)
+})
+
 console.log(`✓ fundamental-mean-reversion — ${checks} check(s) over ${cases.cases.length} classification, ${sizing.cases.length} sizing, ${staged.cases.length} staged-plan, ${reversion.cases.length} target fixtures and ${replay.cases.length} reference-replay runs (${replay.replayEligibility})`)
 console.log('   ⛔ synthetic bars everywhere but the replay, and no host: proposal storage, WATCH re-arming, decision-to-fill linkage and')
 console.log('      cross-manager exposure attribution are #256 criteria this checker cannot reach.')
+console.log(`   ✓ #305 discovery: ${discoveryFixture.scenarios.length} run scenarios over ${DISCOVERY_STATUSES.length} statuses, ${memoryFixture.scenarios.length} candidate-ledger scenarios`)
+console.log('   ⛔ no host here either: the manager-memory CAS round trip, the Toss roster call and the observation→evidenceId carry across two runs are')
+console.log('      #305 criteria this checker cannot reach, and they are named in the pull request as H-1…H-7 rather than reported as passing.')

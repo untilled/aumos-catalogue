@@ -26,7 +26,16 @@ Say which one in `uncertainty`, by name. «Data unavailable» covers all three a
 | **filings** (`open-dart`) | reading a catalyst from a policy notice; carrying the register forward | every recovery indicator, every survivability number, and therefore every entry decision → `data_missing` |
 | **price history** | the whole catalyst ledger, every indicator comparison, the classification | the distance to invalidation, and so the target weight and the trim test → `data_missing` for anything that sizes |
 | **the register** (`manager-memory`) | this run's own reading of every catalyst | ⛔ the delay count. Without it a repeated delay is invisible and the position looks like a first slip — treat every open catalyst as **unadjudicable** this run rather than as fresh |
+| **the candidate ledger** (`manager-memory`, the *second* document) | reviewing everything already held; registering a catalyst on a name you were handed | ⛔ the resume point. Without it the sweep cannot tell a name it has never seen from one it has been researching for a month, every candidate reads as new, and the failed ranges from last run are invisible — so **no candidate is created or advanced**, the cursor is not moved, and the run reports `discovery_not_run` |
+| **the source cache** (`source-cache:read` / `:write`) | the register, the book, every held position's review | the filing lane. A store that was **never fetched** and a store whose **refresh failed** are two different findings — `unstated` and `dark` — and neither of them is an empty market |
 | **the book** (`portfolio`) | research, classification, the thesis chain | the whole-account exposure, and therefore any proposal at all → `data_missing` |
+
+⚠️ **The two `manager-memory` rows are the dangerous ones, and the second is dangerous in the
+opposite direction.** Losing the *register* produces a confident judgement about a position that has
+slipped three times. Losing the *candidate ledger* produces a confident **screen**: every name reads
+as newly discovered, last run's failed ranges vanish, and a month of research questions is quietly
+re-asked from scratch. Both are reported by name, per document — «the register was read and is
+empty» and «the candidate ledger could not be read» are different sentences and must stay different.
 
 ⚠️ **The register row is the dangerous one and it is worth saying why.** Losing a delay count does not
 look like a failure: the run produces a clean, complete, first-slip judgement about a position that

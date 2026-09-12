@@ -1,0 +1,466 @@
+{
+  "note": "The mechanical properties of one discovery run, one scenario per rule. `base` is a complete, well-formed run over two receipt ranges; each scenario shallow-merges its `overrides` onto it, so a scenario's diff is exactly the thing being tested. Every figure is illustrative and every symbol is a shape rather than a recommendation. The shape is `fixtures/ledger.json`'s: base + scenarios[{name, why, overrides, expect}].",
+  "asOf": "2026-06-30T07:00:00Z",
+  "ruleVersion": "ct-event-1",
+  "base": {
+    "runId": "run_ct_0630",
+    "previous": {
+      "schemaVersion": 1,
+      "strategy": "catalyst-turnaround",
+      "ruleVersion": "ct-event-1",
+      "updatedAtEpochMs": 1771891200000,
+      "cursor": { "kind": "dart-receipt", "value": "20260501000101", "atEpochMs": 1771891200000 },
+      "failedRanges": [],
+      "candidates": []
+    },
+    "universe": { "declared": true, "source": "toss:/api/v1/stocks/all", "count": 942 },
+    "lanes": { "filing": "fresh", "web": "observed", "price": "stale" },
+    "researchCompleted": 1,
+    "filingsSpentOnHoldings": 12,
+    "uncertainty": ["The Q3 effective date is estimated from the ministry's stated review schedule."],
+    "ranges": [
+      {
+        "cursor": { "kind": "dart-receipt", "value": "20260602000411" },
+        "from": "20260501000101",
+        "to": "20260602000411",
+        "dartStatus": "000",
+        "symbols": ["036460"],
+        "events": [
+          {
+            "eventId": "ev-tariff-0602",
+            "symbol": "036460",
+            "market": "XKRX",
+            "kind": "tariff-or-price-normalisation",
+            "publishedAt": "2026-06-02T00:30:00Z",
+            "hypothesis": "억눌려 있던 규제 단가가 정상화되면서 미수금 잔액이 3분기부터 감소로 돌아선다.",
+            "tracedPath": {
+              "event": "The ministry's 2026-06-02 gazette raises the regulated unit price from Q3",
+              "revenueOrCost": "The revised unit price is billed on the same delivered volume, so quarterly revenue rises without a volume assumption",
+              "cashFlow": "The receivable balance in the Q3 note stops accruing and begins to draw down, which is the cash-flow line"
+            },
+            "confirmablePeriod": "2026 Q3 report, receivable note",
+            "evidenceIds": ["ev_gazette_0602"]
+          }
+        ]
+      },
+      {
+        "cursor": { "kind": "dart-receipt", "value": "20260626000377" },
+        "from": "20260602000411",
+        "to": "20260626000377",
+        "dartStatus": "013",
+        "symbols": ["001570"],
+        "events": []
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "name": "a-traced-path-makes-a-candidate",
+      "why": "The control. A sweep that read both ranges, found one event with the event→revenue→cash-flow chain written down, and can say which report would confirm it. Without this scenario every refusal below reads as the rule working when it may be an unrelated break.",
+      "overrides": {},
+      "expect": {
+        "discoveryStatus": "candidates_produced",
+        "gatePassed": 1,
+        "newCandidates": 1,
+        "resumedCandidates": 0,
+        "filingLaneStatus": "open",
+        "webLaneStatus": "open",
+        "priceLaneStatus": "partial",
+        "cursorAfterValue": "20260626000377",
+        "cursorMoved": true,
+        "symbolsAttempted": 2,
+        "symbolsFailed": [],
+        "diagnosticCodes": [],
+        "observationSymbols": ["036460"]
+      }
+    },
+    {
+      "name": "an-untraced-policy-story-is-watched-and-not-refused",
+      "why": "The programme is real, funded and announced, and it reaches this issuer through an assumption nobody has written down. That is unfinished work rather than a finding against the company, so the name is watched, keeps its evidence, and is not a position candidate. Calling it a refutation would close the very case class this desk exists for on the grounds that the research stopped early.",
+      "overrides": {
+        "ranges": [
+          {
+            "cursor": { "kind": "dart-receipt", "value": "20260602000411" },
+            "dartStatus": "000",
+            "symbols": ["036460"],
+            "events": [
+              {
+                "eventId": "ev-policy-0602",
+                "symbol": "036460",
+                "market": "XKRX",
+                "kind": "tariff-or-price-normalisation",
+                "publishedAt": "2026-06-02T00:30:00Z",
+                "tracedPath": { "event": "A national energy programme was announced" },
+                "evidenceIds": ["ev_press_0602"]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "discoveryStatus": "no_candidate_qualified",
+        "gatePassed": 0,
+        "newCandidates": 0,
+        "diagnosticCodes": ["candidate_lacks_traced_path"],
+        "diagnosticSeverities": { "candidate_lacks_traced_path": "unevaluated" },
+        "watchingSymbols": ["036460"],
+        "observationSymbols": []
+      }
+    },
+    {
+      "name": "last-years-gazette-makes-no-candidate-at-all",
+      "why": "Korean policy stories recur annually in near-identical language. A notice past priorYearStaleDays has had a full reporting year to appear in results; if it has not, the thing to record is that absence. It does not even become a watch — a watch dated today on a document from last May is last year's story with a fresh discovery date on it.",
+      "overrides": {
+        "ranges": [
+          {
+            "cursor": { "kind": "dart-receipt", "value": "20260602000411" },
+            "dartStatus": "000",
+            "symbols": ["036460"],
+            "events": [
+              {
+                "eventId": "ev-gazette-2025",
+                "symbol": "036460",
+                "market": "XKRX",
+                "kind": "tariff-or-price-normalisation",
+                "publishedAt": "2025-05-01T00:30:00Z",
+                "tracedPath": {
+                  "event": "The 2025 gazette raised the regulated unit price",
+                  "revenueOrCost": "The revised price is billed on the same delivered volume",
+                  "cashFlow": "The receivable balance draws down in the quarterly note"
+                },
+                "confirmablePeriod": "2025 Q3 report",
+                "evidenceIds": ["ev_gazette_2025"]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "discoveryStatus": "no_candidate_qualified",
+        "gatePassed": 0,
+        "newCandidates": 0,
+        "diagnosticCodes": ["discovery_source_stale"],
+        "watchingSymbols": [],
+        "observationSymbols": []
+      }
+    },
+    {
+      "name": "013-is-an-empty-range-and-not-a-failed-one",
+      "why": "OpenDART answers 013 when the query matched no document. The range was read to the end and holds nothing. Treating it as a failure parks the cursor on it forever and reports an incomplete sweep on a complete one.",
+      "overrides": {
+        "ranges": [
+          { "cursor": { "kind": "dart-receipt", "value": "20260626000377" }, "dartStatus": "013", "symbols": ["001570"], "events": [] }
+        ],
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "no_candidate_qualified",
+        "filingLaneStatus": "open",
+        "cursorAfterValue": "20260626000377",
+        "cursorMoved": true,
+        "symbolsFailed": [],
+        "diagnosticCodes": []
+      }
+    },
+    {
+      "name": "020-is-a-failed-range-and-the-cursor-does-not-move",
+      "why": "The key's daily quota is spent. That range was not read, so it is a hole in the record and not an empty stretch of it — the sibling of the 013 scenario above, and the pair is the whole point. The cursor stays where it was found and the range is what the next run retries first.",
+      "overrides": {
+        "ranges": [
+          { "cursor": { "kind": "dart-receipt", "value": "20260626000377" }, "from": "20260602000411", "to": "20260626000377", "dartStatus": "020", "symbols": ["001570"], "events": [] }
+        ],
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "filingLaneStatus": "dark",
+        "cursorAfterValue": "20260501000101",
+        "cursorMoved": false,
+        "symbolsFailed": ["001570"],
+        "failedRangeCount": 1,
+        "failedRangeReason": "vendor_quota_exhausted",
+        "diagnosticCodes": ["vendor_quota_exhausted"]
+      }
+    },
+    {
+      "name": "three-failed-receipts-leave-the-cursor-exactly-where-it-was",
+      "why": "#305's own acceptance criterion: 일부 종목/페이지 실패 시 성공 범위만 기록되고 실패 범위는 다음 실행에서 재시도된다. Every range failed, so nothing succeeded, so cursorAfter is cursorBefore — identical, not merely close.",
+      "overrides": {
+        "ranges": [
+          { "cursor": { "kind": "dart-receipt", "value": "20260610000101" }, "dartStatus": "800", "symbols": ["036460"], "events": [] },
+          { "cursor": { "kind": "dart-receipt", "value": "20260618000202" }, "dartStatus": "800", "symbols": ["001570"], "events": [] },
+          { "cursor": { "kind": "dart-receipt", "value": "20260626000377" }, "dartStatus": "020", "symbols": ["005490"], "events": [] }
+        ],
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "cursorAfterEqualsBefore": true,
+        "cursorMoved": false,
+        "filingLaneStatus": "dark",
+        "symbolsFailed": ["001570", "005490", "036460"],
+        "failedRangeCount": 3
+      }
+    },
+    {
+      "name": "a-partial-sweep-does-not-advance-past-the-hole",
+      "why": "The first range succeeded and the second did not. A cursor is a low-water mark, and a high-water mark with a hole in it is a record nothing would ever report. The status is incomplete, so the cursor rule pins cursorAfter to cursorBefore even though one range really did succeed.",
+      "overrides": {
+        "ranges": [
+          {
+            "cursor": { "kind": "dart-receipt", "value": "20260602000411" },
+            "dartStatus": "000",
+            "symbols": ["036460"],
+            "events": []
+          },
+          { "cursor": { "kind": "dart-receipt", "value": "20260626000377" }, "dartStatus": "020", "symbols": ["001570"], "events": [] }
+        ],
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "filingLaneStatus": "partial",
+        "cursorAfterEqualsBefore": true,
+        "symbolsFailed": ["001570"],
+        "failedRangeCount": 1
+      }
+    },
+    {
+      "name": "no-universe-is-unevaluated-and-reports-discovery-not-run",
+      "why": "There is no denominator, so 'nothing qualified' is not a sentence this run may write. It is reported and it never blocks: the book whose universe is undeclared is exactly the book that still has to be watched on the sell side.",
+      "overrides": {
+        "uncertainty": ["이번 실행의 발굴 상태는 discovery_not_run 입니다."],
+      "universe": { "declared": false }
+      },
+      "expect": {
+        "discoveryStatus": "discovery_not_run",
+        "cursorAfterEqualsBefore": true,
+        "diagnosticCodes": ["universe_undeclared"],
+        "diagnosticSeverities": { "universe_undeclared": "unevaluated" },
+        "noBlockedDiagnostic": true
+      }
+    },
+    {
+      "name": "the-budget-spent-on-held-names-is-discovery-not-run",
+      "why": "The run reviewed the book, the filings budget went on it, and no range was swept. #305 says this is reported as discovery_not_run and never as «no new candidate was found» — the two are indistinguishable in the answer and opposite in meaning.",
+      "overrides": {
+        "uncertainty": ["이번 실행의 발굴 상태는 discovery_not_run 입니다."],
+      "ranges": [],
+        "filingsSpentOnHoldings": 100,
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "discovery_not_run",
+        "cursorAfterEqualsBefore": true,
+        "diagnosticCodes": ["discovery_budget_spent_on_holdings"],
+        "noBlockedDiagnostic": true
+      }
+    },
+    {
+      "name": "a-required-lane-nobody-asked-about-is-not-an-open-one",
+      "why": "The web lane is required by this strategy and nothing said what it did. Defaulting it to open is how a run with no reach reports a clean screen, so it is unstated, and with the filing lane the only thing that ran the answer is not no_candidate_qualified.",
+      "overrides": {
+        "lanes": { "filing": "fresh" },
+        "ranges": [
+          { "cursor": { "kind": "dart-receipt", "value": "20260626000377" }, "dartStatus": "013", "symbols": ["001570"], "events": [] }
+        ],
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "webLaneStatus": "unstated",
+        "priceLaneStatus": "unstated",
+        "cursorAfterEqualsBefore": true,
+        "diagnosticCodes": ["discovery_lane_unstated"]
+      }
+    },
+    {
+      "name": "a-partial-required-lane-outranks-a-produced-candidate",
+      "why": "The precedence is part of the contract — discovery_not_run > discovery_incomplete > candidates_produced > no_candidate_qualified — and a required lane that is not `open` outranks a produced candidate exactly as a failed range does. Here the filing sweep read both ranges to the end and one event came through the traced-path gate, but the web lane answered `stale`, which is `partial`: half of this desk's entrance — the policy gazettes and ministry notices — was read against an older freshness than this run asked for. ⚠️ The filing lane cannot be `partial` here without a failed range, because CT measures that lane off the ranges it actually swept; the web lane is the stated one, and it is the half that is partial. The candidate is not lost and not hidden — it is still counted in newCandidates and still reaches the ledger — but the word is discovery_incomplete and the cursor does not move, because the part of the entrance that was not fully read is re-attempted before anything after it.",
+      "overrides": {
+        "lanes": { "filing": "fresh", "web": "stale", "price": "stale" }
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "gatePassed": 1,
+        "newCandidates": 1,
+        "resumedCandidates": 0,
+        "filingLaneStatus": "open",
+        "webLaneStatus": "partial",
+        "cursorAfterEqualsBefore": true,
+        "cursorMoved": false,
+        "symbolsFailed": [],
+        "failedRangeCount": 0,
+        "diagnosticCodes": ["candidates_produced_within_incomplete_sweep"],
+        "diagnosticSeverities": { "candidates_produced_within_incomplete_sweep": "note" },
+        "noBlockedDiagnostic": true,
+        "observationSymbols": ["036460"]
+      }
+    },
+    {
+      "name": "both-required-lanes-dark-is-discovery-not-run",
+      "why": "The cache could not be refreshed and nobody read the web. There was no discovery capacity at all, and the word for that is not «nothing qualified».",
+      "overrides": {
+        "uncertainty": ["이번 실행의 발굴 상태는 discovery_not_run 입니다."],
+      "lanes": { "filing": "refresh-failed", "web": "refresh-failed" },
+        "ranges": [],
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "discovery_not_run",
+        "filingLaneStatus": "dark",
+        "webLaneStatus": "dark",
+        "cursorAfterEqualsBefore": true
+      }
+    },
+    {
+      "name": "a-dark-run-that-does-not-say-so-is-refused",
+      "why": "What is blocked is not the run — a run with no reach still watches the book — but a proposal that had no discovery capacity and does not disclose it, because that output is indistinguishable from a considered no-change. The marker is the token itself, because the prose around it is written in the invocation's language.",
+      "overrides": {
+        "universe": { "declared": false },
+        "uncertainty": ["공시 창을 읽지 못했습니다."],
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "discovery_not_run",
+        "diagnosticCodes": ["discovery_not_run_undisclosed"],
+        "diagnosticSeverities": { "discovery_not_run_undisclosed": "blocked" }
+      }
+    },
+    {
+      "name": "the-same-run-disclosing-the-token-is-accepted",
+      "why": "The other half of the rule above, so that what is being asserted is the disclosure and not the status. The prose is Korean and the token is the six-word code, unchanged.",
+      "overrides": {
+        "universe": { "declared": false },
+        "uncertainty": ["이번 실행은 유니버스를 선언하지 못해 discovery_not_run 입니다."],
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "discovery_not_run",
+        "noBlockedDiagnostic": true,
+        "disclosed": true
+      }
+    },
+    {
+      "name": "an-unread-candidate-ledger-writes-nothing-down",
+      "why": "`undefined` is nobody having read the key. The counts would be a guess — every name would read as new, including the three this desk has been researching for a month — and a guess written into a durable record is worse than an empty run.",
+      "overrides": {
+        "uncertainty": ["이번 실행의 발굴 상태는 discovery_not_run 입니다."],
+      "previous": "__undefined__"
+      },
+      "expect": {
+        "discoveryStatus": "discovery_not_run",
+        "newCandidates": 0,
+        "resumedCandidates": 0,
+        "observationSymbols": [],
+        "causeCodes": ["data_missing"]
+      }
+    },
+    {
+      "name": "a-name-already-in-the-ledger-is-resumed-and-not-rediscovered",
+      "why": "Duplicate discovery is one row with two discovery paths, never a second row and never a second proposal. The key is (market, symbol) and this run is the second one to see it.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "catalyst-turnaround",
+          "ruleVersion": "ct-event-1",
+          "updatedAtEpochMs": 1771891200000,
+          "cursor": { "kind": "dart-receipt", "value": "20260501000101", "atEpochMs": 1771891200000 },
+          "failedRanges": [],
+          "candidates": [
+            {
+              "symbol": "036460",
+              "market": "XKRX",
+              "state": "researching",
+              "discoveredAtEpochMs": 1769817600000,
+              "lastSeenAtEpochMs": 1771891200000,
+              "discoveryPath": ["dart:working-capital-normalisation"],
+              "ruleVersion": "ct-event-1",
+              "evidenceIds": ["ev_prior"],
+              "history": []
+            }
+          ]
+        }
+      },
+      "expect": {
+        "discoveryStatus": "candidates_produced",
+        "newCandidates": 0,
+        "resumedCandidates": 1,
+        "gatePassed": 1
+      }
+    },
+    {
+      "name": "a-run-that-finishes-nothing-says-which-research-is-unfinished",
+      "why": "Reading five names shallowly and stopping is the behaviour #305 forbids by name. The candidate is still produced and still recorded — what is reported is that the floor was not met, as an absence and never as a refutation.",
+      "overrides": { "researchCompleted": 0 },
+      "expect": {
+        "discoveryStatus": "candidates_produced",
+        "newCandidates": 1,
+        "causeCodes": ["research_incomplete"],
+        "noBlockedDiagnostic": true
+      }
+    },
+    {
+      "name": "an-unclassifiable-report-name-is-looked-at-again",
+      "why": "The filings index carries report_nm and no type filter, so the classification is ours. An event this run could not place is left as something to look at again and never as something that qualified.",
+      "overrides": {
+        "ranges": [
+          {
+            "cursor": { "kind": "dart-receipt", "value": "20260602000411" },
+            "dartStatus": "000",
+            "symbols": ["036460"],
+            "events": [
+              {
+                "eventId": "ev-unknown-0602",
+                "symbol": "036460",
+                "market": "XKRX",
+                "kind": "기타경영사항",
+                "publishedAt": "2026-06-02T00:30:00Z",
+                "evidenceIds": ["ev_filing_0602"]
+              }
+            ]
+          }
+        ],
+        "researchCompleted": 0
+      },
+      "expect": {
+        "discoveryStatus": "no_candidate_qualified",
+        "gatePassed": 0,
+        "diagnosticCodes": ["event_kind_unclassified"],
+        "watchingSymbols": ["036460"],
+        "observationSymbols": []
+      }
+    },
+    {
+      "name": "a-document-published-after-as-of-is-refused",
+      "why": "This package's whole subject is when something becomes known. A filing that did not exist at asOf is not available to this run even if it describes a period that had already ended.",
+      "overrides": {
+        "ranges": [
+          {
+            "cursor": { "kind": "dart-receipt", "value": "20260702000411" },
+            "dartStatus": "000",
+            "symbols": ["036460"],
+            "events": [
+              {
+                "eventId": "ev-future",
+                "symbol": "036460",
+                "market": "XKRX",
+                "kind": "tariff-or-price-normalisation",
+                "publishedAt": "2026-07-02T00:30:00Z",
+                "tracedPath": { "event": "a", "revenueOrCost": "b", "cashFlow": "c" },
+                "confirmablePeriod": "2026 Q3",
+                "evidenceIds": ["ev_future"]
+              }
+            ]
+          }
+        ],
+        "researchCompleted": 0
+      },
+      "expect": { "diagnosticCodes": ["event_after_as_of"], "gatePassed": 0, "observationSymbols": [] }
+    }
+  ],
+  "idempotency": {
+    "why": "A rerun of the same inputs is the same answer. #305 asks that a repeated run produce no duplicate ledger row and no duplicate proposal; the mechanical half of that is that this operation is a pure function of its inputs, and the verifier runs every scenario twice and compares.",
+    "runs": 2
+  }
+}

@@ -41,6 +41,49 @@ broker connection. Read the policy from the issuer and **file it as an observati
 and publication date: a policy target you remember is not evidence, and the observation route is
 the only way a reading reaches `evidenceIds` at all.
 
+## The programme record, and the key that joins its two halves
+
+`lib/programme.mjs` writes one row per programme, and the row is the announcement and its receipts
+in one place:
+
+```json
+{
+  "symbol": "316140",
+  "programmeId": "prog-2026-buyback-1",
+  "announcedAmount": 200000000000,
+  "announcedKind": "amount",
+  "windowStartEpochMs": 1767571200000,
+  "windowEndEpochMs": 1799107200000,
+  "executedAmount": 110000000000,
+  "retiredAmount": 110000000000,
+  "cancelledAmount": 0,
+  "executionRate": 0.55,
+  "elapsedShare": 0.48,
+  "pace": 1.14,
+  "status": "on-pace",
+  "announcementRceptNo": "20260105000111",
+  "executionReceipts": ["20260630000742"],
+  "evidenceIds": ["ev_decision_2601", "ev_result_2606"]
+}
+```
+
+```text
+programmeId = the rcept_no of the 취득 결정 that opened the programme
+key         = (symbol, programmeId)
+```
+
+Every 결과보고서, every 소각 결정 and every 철회 is joined back to the decision it descends from by
+that pair. ⛔ **A receipt whose programme has no decision behind it is not a new programme.** Its
+announced amount and its window would both be invented, and every pace measured afterwards would be
+against a schedule nobody published — so `execution_without_announcement` is an instruction to walk
+the disclosure cursor back and read the 결정 공시. That is a different finding from
+`announcement_without_execution_receipt`, which says the company has filed nothing, and the two ask
+for different repairs.
+
+⛔ **Bought, retired and cancelled are three counters and a sum of them is a number about nothing.**
+`announcedKind` says whether the promise was an amount or a ratio; a ratio has no execution rate to
+divide into, and saying so is the answer rather than producing a pace out of a percentage.
+
 ## The traps, in the order they catch people
 
 1. **A cancellation is not a buyback.** Shares bought and held in treasury can be sold again, used

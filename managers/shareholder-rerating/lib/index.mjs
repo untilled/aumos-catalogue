@@ -41,7 +41,7 @@
  * requires the concentration answer to be **explicitly** `true`.
  */
 
-export { finite, round, diagnostic, isBlocked, isUnevaluated } from './numbers.mjs'
+export { finite, round, diagnostic, instantOf, isBlocked, isUnevaluated } from './numbers.mjs'
 export { THRESHOLDS, SIZING_POLICY } from './thresholds.mjs'
 export { returnComposition } from './return-composition.mjs'
 export { capitalHeadroom, ISSUER_KINDS } from './capital-headroom.mjs'
@@ -50,6 +50,38 @@ export { lossToInvalidation, targetWeight } from './sizing.mjs'
 export { sizingPolicy } from './policy.mjs'
 export { stagedIncrement } from './staged-plan.mjs'
 export { concentration, heldAttribution } from './concentration.mjs'
+
+/**
+ * ── The discovery half (#305) ──────────────────────────────────────────────
+ *
+ * Everything above answers a question about one company that is already in front of
+ * the run. These four answer the step before that: which names this run looked at,
+ * what it carries between runs, which return programme each announcement and each
+ * receipt belongs to, and whose word a web reading is.
+ *
+ * ⛔ They are deliberately **not** folded into `evaluateCase`. That function is one
+ * company's arithmetic and a discovery sweep is the run's, and a single entry point
+ * over both would make a run that never swept anything indistinguishable from one that
+ * swept and found nothing — which is the exact defect #305 exists to refuse.
+ */
+export { discoveryRun, screenCandidate, LANE_STATUSES, DISCOVERY_STATUSES, REQUIRED_LANES, OPTIONAL_LANES, CURSOR_KIND, CANDIDATE_AXES, DISCOVERY_DEFAULTS } from './discovery.mjs'
+export { candidateLedger, CANDIDATE_STATES, CANDIDATE_TRANSITIONS, CANDIDATE_CAPS, CANDIDATE_SCHEMA_VERSION, FORBIDDEN_KEYS, STRATEGY } from './candidate-memory.mjs'
+export { returnProgramme, programmeKey, ANNOUNCED_KINDS, PROGRAMME_SCHEMA_VERSION } from './programme.mjs'
+export {
+  attestationOf,
+  attestationAnswers,
+  attestationCounts,
+  weakerAttestation,
+  strongestAttestation,
+  webReadingRecord,
+  ATTESTATION_GRADES,
+  WEB_READING_SOURCE_TYPES,
+  MANAGER_ATTESTED_SOURCE_PREFIX,
+  MANAGER_OBSERVATION_KIND,
+  MANAGER_OBSERVATION_SOURCE,
+  OBSERVATION_EXCERPT_LIMIT,
+  OBSERVATION_READING_LIMIT,
+} from './attestation.mjs'
 
 import { diagnostic, finite, round } from './numbers.mjs'
 import { THRESHOLDS } from './thresholds.mjs'

@@ -21,6 +21,10 @@ rather than well argued, and each module is one of those conditions:
 | `sizing.mjs` | the loss to invalidation, and the weight under every cap | it decides how much of somebody's book moves |
 | `staged-plan.mjs` | what a stage proposes given what is already held and proposed | the re-run property is arithmetic; a promise not to double up is not |
 | `concentration.mjs` | the account-wide fold, and the minimum-not-sum rule | three managers can each show correct working and hold 30% of one name |
+| `discovery.mjs` | which names this run looked at, the three lane statuses, the cursor rule, and which of four `discoveryStatus` words the run ended on — in the contract's precedence, `discovery_not_run` > `discovery_incomplete` > `candidates_produced` > `no_candidate_qualified`, so a range that failed outranks a name that qualified | «zero candidates» and «zero reads» are the same output and opposite facts, and only a label a fixture can assert keeps them apart (#305) |
+| `candidate-memory.mjs` | the roster carried between runs: read, migrate, fold, cap, and refuse what may never be stored | four reruns must not create a second row, and «nobody read the key» is not «the key is empty» |
+| `programme.mjs` | the join from 취득 결정 to 결과보고서 to 소각 to 철회, and the three counters that are never one | an announcement and an execution are two documents, and a model reading a headline gets the first and reports the second |
+| `attestation.mjs` | whose word a web reading is, and what makes one citable at all | a search-result snippet and a document somebody opened are indistinguishable once either is written down |
 | `thresholds.mjs` | every fixed number, with formula, unit and rationale | so the whole of the package's discretion is one screen |
 | `index.mjs` | `evaluateCase`, which runs them in the methodology's order | the fixtures need one entry point to assert against |
 
@@ -39,6 +43,10 @@ package did not add one.
 | re-check promises | Aumos WATCH | arms them every run, including on a WAIT |
 | decisions and forward outcomes | Aumos Decision / Forward Track Record | proposes; measures nothing itself |
 | staged-plan ledger, unfinished-research notes, the armed review | this instance's private folder | aggregates and progress only |
+| the candidate roster and the disclosure cursor | this instance's private folder, one document | pointers and questions: symbol, state, one sentence of hypothesis, host evidence ids, `programmeIds`, the next review condition. ⛔ `memory_holds_vendor_payload` refuses anything else (#305) |
+| the return-programme state | this instance's private folder, a **second** document | announced / executed / retired / cancelled per `(symbol, programmeId)`, with the receipt numbers already counted. ⛔ Never merged with the roster: a programme outlives the candidate that found it |
+| the stored copy of OpenDART | Aumos source cache | reads it, refreshes it when it is behind, and keeps **no** second copy. The four `state` words are the host's and this package maps its lane statuses onto them rather than inventing a fifth |
+| a web reading's evidence id | Aumos Evidence | files the passage through `observation_file` and carries the id it is given. ⚠️ An id minted this run is citable next run, which is why the roster carries it across the boundary |
 
 ⚠️ **The private folder is progress, never positions.** A ledger that starts trying to mirror the
 account is wrong the first time a fill is partial. It records which stage was proposed, under which
@@ -151,6 +159,20 @@ risk budget; a stage that does not fit the remaining budget waits rather than be
 `fixtures/return-composition.json` — the two legs, the three double counts, the unreceivable
 dividend and the untaxed one. `fixtures/staged-plans.json` — eleven states of one plan, including
 both re-run cases, the price-only stage, the exhausted budget and the expired stage.
+
+`fixtures/discovery.json` — eighteen scenarios over `discoveryRun`: each of the four `discoveryStatus`
+words, the required/optional lane split, one axis never making a candidate, the token a
+`discovery_not_run` proposal has to carry verbatim, the precedence
+`discovery_not_run` > `discovery_incomplete` > `candidates_produced` > `no_candidate_qualified`
+reached from both halves of the incomplete condition, and four ways the cursor may not move.
+`fixtures/candidate-memory.json` — nineteen over `candidateLedger`: `undefined` vs `null`, the two
+refused reads and the two degraded ones, the four reruns that must not create a second anything, the
+two shapes of forbidden payload, and an idempotency assertion that feeds the run's own output back
+in. `fixtures/programme.json` — thirteen over `returnProgramme`: the announcement→execution join, an
+announcement below the observable elapsed share, one behind its pace, a cancellation that is not an
+execution, an orphan receipt, a ratio-kind promise, and a receipt counted twice.
+`fixtures/attestation.json` — thirteen over `webReadingRecord`: the round trip, the summary-only
+refusal, the over-cap excerpt, the result list and the homepage, and an id minted this run.
 
 `fixtures/boundaries.json` — the review regressions. Each names a base fixture and the mutations
 to apply to a **copy** of it, so the cases above keep passing for the reasons they already passed
@@ -557,6 +579,16 @@ left behind:
 | `lib/sizing.mjs` (`concentration`) | positions + proposed folded against a cap table, headroom per axis | sleeve budgets, currency conversion, the theme axis |
 | `lib/sizing.mjs` (`entryTranchePlan`), `lib/schedule.mjs` (`trancheIntent`) | a plan carrying its originating decision id, expiries, a wake per stage | the 40/35/25 ladder, price and time fallbacks, the lens vocabulary |
 | `lib/valuation.mjs` | the habit of a `units` block beside every number | its valuation policy |
+| `lib/observation.mjs` | the two attestation markers, the excerpt cap, the four grades and their ordering, `attestationOf` / `attestationAnswers` / `weakerAttestation` / `strongestAttestation` | `observationLedger` and its claim-to-receipt join, which belong to that package's own `evidenceIds` discipline |
+| `lib/coverage.mjs` (`discoveryCapacity`) | lanes as a vocabulary, `unstated` as a fourth word, and the rule that zero discovery is never `blocked` | the theme radar, the boundary streak and the `screenedUniverseCount` fold |
+| `lib/research-state.mjs` | the read/migrate table: degrade for this operation's own bookkeeping, refuse for correctness, and `previousExtraKeys` reported rather than carried | its row shape and its market seeding |
+
+⚠️ **`lib/discovery.mjs` and `lib/candidate-memory.mjs` are also vendored *sideways*.**
+`fundamental-mean-reversion` and `catalyst-turnaround` carry the same two files under the same
+contract, and the three copies are deliberate: `docs/contracts/discovery-run.md` shares the **field
+names and status words**, and each package keeps its own severities, diagnostic codes, required
+lanes and cursor kind. `tools/verify-discovery-contract.mjs` asserts the shared half across the
+three; nothing imports across a package directory.
 
 There is no shared library in this repository and this pull request did not create one; #256's
 follow-up owns that question, and this table is its inventory.
@@ -599,6 +631,19 @@ reported ~10% result is **not** re-audited here or anywhere in this package; #25
 was never audited and is not a validated edge.
 
 ## What has not been verified here
+
+⚠️ **Three host properties this package now depends on are unmeasured, and they are named rather
+than assumed:**
+
+| | gap | what this package does **instead** of faking it |
+|---|---|---|
+| H-3 | Whether the `source-cache:read` / `source-cache:write` grant actually reaches this package is **unverified**. The capabilities are declared and no run has confirmed the tools appear | ⛔ No second cache in `manager-memory` as a workaround. A grant that is absent makes the filing lane `dark`, which makes the run `discovery_not_run` — a reported absence, not a silent fallback |
+| H-4 | The observation → `evidenceId` round trip **spans two runs**: evidence filed during a run that has not ended is not committed to the Kernel until it finishes | ⛔ No same-run citation. The id goes onto the candidate and the proposal that cites it is the next run's, which is why `candidate.evidenceIds` is a carried field. `evidence_not_citable_until_next_run` says so out loud |
+| H-6 | There is **no atomic multi-file write** — `manager-memory` is six file tools and an `expectedHash` compare-and-swap | The roster is a single document with the cursor **inside** it. Two files would let a crash between two writes leave a cursor claiming a sweep the candidate list does not contain |
+
+⚠️ Nothing here has been measured against a real OpenDART answer either: whether the filings index
+actually lets this package populate `programme.executedAmount` for a given issuer is untested, and
+where it cannot, `execution_progress_unknown` is the honest answer rather than an estimate.
 
 The host-side half. Nothing in this repository can run an Aumos session, so proposal storage, WATCH
 re-arming, the link from a decision to an actual fill, and how the host attributes a position held

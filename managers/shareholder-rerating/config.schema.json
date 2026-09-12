@@ -46,6 +46,22 @@
       "default": 0.01,
       "description": "Share of the whole book this methodology is willing to lose on ONE idea reaching the price at which its thesis is no longer true; it is the numerator of the position size and never a position size. The pre-registered 0.01 is derived from maxActiveTheses being 6 — a fully committed instance risks 6% of the book if every open thesis invalidates on the same day — and this is the one setting the investor's Mandate has no field for, which is why the package carries it at all. It may only be NARROWED: a larger value is refused, reported, and the pre-registered number governs. Every ceiling the investor did declare still cuts the result."
     },
+    "discoveryBudgetFilings": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 1000,
+      "default": 100,
+      "description": "How many OpenDART filing-index rows one run walks past the last succeeded receipt cursor before it stops collecting and starts researching. It is a run-cost ceiling and never a rule about the market: exceeding it is reported, not refused, and what it buys is the guarantee that the next run still has a turn. 100 because the host's filings index is requested a page of 100 at a time, so one page is the smallest unit at which a cursor can honestly say a range fully succeeded. \u26d4 Spending the budget on the review of what is already held is `discovery_not_run` and never «no new candidates» — the run did not look.",
+      "examples": [100, 300]
+    },
+    "researchCompletionFloor": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3,
+      "default": 1,
+      "description": "How many candidates a run has to carry to a COMPLETED thesis rather than leave part-read. \u26d4 It is a floor on depth and there is deliberately no ceiling on breadth here, because the behaviour this refuses is the one that looks productive in a log: reading six names shallowly, concluding nothing, and ending as a `WAIT` indistinguishable from a considered one. 1 by default because a completed thesis in this methodology is six linked claims and the filings behind them, and a run that promises two and delivers two halves has delivered nothing. The maximum is 3 for the same reason `maxActiveTheses` is small: depth beats breadth in a method whose evidence arrives monthly.",
+      "examples": [1, 2]
+    },
     "dividendWithholdingTaxRate": {
       "type": "number",
       "minimum": 0,

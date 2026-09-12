@@ -27,6 +27,7 @@
     "check:amp-price-levels": "node tools/verify-amp-price-levels.mjs",
     "check:shareholder-rerating": "node tools/verify-shareholder-rerating.mjs",
     "check:shared-scenarios": "node tools/verify-shared-scenarios.mjs",
+    "check:discovery-contract": "node tools/verify-discovery-contract.mjs",
     "check:legacy-parity": "node tools/legacy-parity.mjs"
   },
   "dependencies": {

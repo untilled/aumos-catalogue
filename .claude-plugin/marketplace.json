@@ -197,11 +197,11 @@
       "name": "catalyst-turnaround",
       "source": "./managers/catalyst-turnaround",
       "description": "Korea-listed companies with an identifiable event that would repair the business and its balance sheet, held for as long as the event's own window and no longer. Keeps a catalyst ledger — scheduled, in progress, realised, delayed, failed — and never records a rising share price as a catalyst that worked.",
-      "version": "0.6.7",
+      "version": "0.7.0",
       "metadata": {
         "name": "Catalyst Turnaround",
         "publisher": "aumos",
-        "methodology": "Registers a catalyst as a record with a primary source, a publication time, a confirmed or estimated window, the indicator that will confirm it, and the conditions that count as success and failure — all written before the window opens. Sizes from the distance to the price invalidation rather than from a cap, enters in stages that cannot be added twice on a re-run, and adjudicates success, delay or failure when the window arrives. A policy expectation with no traced path to this issuer's earnings stays a research candidate; a low valuation multiple is never a qualifying condition.",
+        "methodology": "Registers a catalyst as a record with a primary source, a publication time, a confirmed or estimated window, the indicator that will confirm it, and the conditions that count as success and failure — all written before the window opens. Sizes from the distance to the price invalidation rather than from a cap, enters in stages that cannot be added twice on a re-run, and adjudicates success, delay or failure when the window arrives. Events are found by an incremental OpenDART sweep through the host’s own source cache, joined by corp_code and resumed from the last receipt it finished, with policy originals filed from the web as evidence rather than cited as search summaries. A policy expectation with no traced path to this issuer's earnings stays a research candidate; a low valuation multiple is never a qualifying condition.",
         "assetClasses": [
           "equity"
         ],
@@ -221,7 +221,10 @@
           "manager-memory:read",
           "manager-memory:write",
           "source:passthrough",
-          "connection:passthrough"
+          "connection:passthrough",
+          "observation:file",
+          "source-cache:read",
+          "source-cache:write"
         ],
         "requiresSkills": [
           "source_request",
@@ -328,11 +331,11 @@
       "name": "fundamental-mean-reversion",
       "source": "./managers/fundamental-mean-reversion",
       "description": "Korea-listed single names whose price has fallen further than the damage to the business justifies. Researches the fall's causes before the chart, takes the recovery only after pre-registered stabilisation evidence, and names a target range that says whether it is a price band, a moving average or a valuation.",
-      "version": "0.6.5",
+      "version": "0.7.0",
       "metadata": {
         "name": "Fundamental Mean Reversion",
         "publisher": "aumos",
-        "methodology": "Finds Korea-listed companies whose share price has fallen further than the damage to the business justifies, and takes the recovery toward a normal range only after stabilisation is confirmed. The technical state sets the order of research and is never the buy case; the buy case is a filing-level separation of a one-off charge from operating deterioration. Entry requires pre-registered stabilisation evidence, sizing carries a gap-and-halt haircut because a stop price is not a fill, staged additions never fire on price or elapsed time alone, and every position has a deadline it cannot be quietly reclassified out of.",
+        "methodology": "Finds Korea-listed companies whose share price has fallen further than the damage to the business justifies, and takes the recovery toward a normal range only after stabilisation is confirmed. The technical state sets the order of research and is never the buy case; the buy case is a filing-level separation of a one-off charge from operating deterioration. The candidate queue is its own: a declared XKRX roster is swept through that same price gate, the fall is decomposed against OpenDART and against web readings filed as evidence, and the unfinished research resumes next run from this manager’s own ledger rather than starting again. Entry requires pre-registered stabilisation evidence, sizing carries a gap-and-halt haircut because a stop price is not a fill, staged additions never fire on price or elapsed time alone, and every position has a deadline it cannot be quietly reclassified out of.",
         "assetClasses": [
           "equity"
         ],
@@ -351,6 +354,9 @@
           "evidence:read",
           "source:passthrough",
           "connection:passthrough",
+          "observation:file",
+          "source-cache:read",
+          "source-cache:write",
           "manager-memory:read",
           "manager-memory:write"
         ],
@@ -413,11 +419,11 @@
       "name": "shareholder-rerating",
       "source": "./managers/shareholder-rerating",
       "description": "Korea-listed single equities whose earnings and capital headroom support a shareholder return programme that is actually being executed, held for the discount that closing it should close. Separates re-rating from dividends in every number, and never counts a company's buyback as the investor's income.",
-      "version": "0.5.7",
+      "version": "0.6.0",
       "metadata": {
         "name": "Shareholder Rerating",
         "publisher": "aumos",
-        "methodology": "Judges whether a Korea-listed company's profit and capital support a shareholder return programme it is actually executing, and whether executing it closes the discount the shares trade at. Financials are read on capital above their own policy CET1 target, non-financials on cash after required investment. Announced and executed programmes are different facts; a company's buyback is never added to the investor's cash dividend.",
+        "methodology": "Judges whether a Korea-listed company's profit and capital support a shareholder return programme it is actually executing, and whether executing it closes the discount the shares trade at. Financials are read on capital above their own policy CET1 target, non-financials on cash after required investment. Return disclosures are swept incrementally from the host’s OpenDART cache and an announcement is linked to its own later execution receipts as one programme, so a run resumes from the last receipt rather than re-reading the same filings. Announced and executed programmes are different facts; a company's buyback is never added to the investor's cash dividend.",
         "assetClasses": [
           "equity"
         ],
@@ -437,6 +443,8 @@
           "source:passthrough",
           "connection:passthrough",
           "observation:file",
+          "source-cache:read",
+          "source-cache:write",
           "manager-memory:read",
           "manager-memory:write"
         ],

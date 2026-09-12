@@ -3,7 +3,7 @@
   "id": "catalyst-turnaround",
   "publisher": "aumos",
   "name": "Catalyst Turnaround",
-  "version": "0.6.7",
+  "version": "0.7.0",
   "description": "Korea-listed companies with an identifiable event that would repair the business and its balance sheet, held for as long as the event's own window and no longer. Keeps a catalyst ledger — scheduled, in progress, realised, delayed, failed — and never records a rising share price as a catalyst that worked.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
@@ -67,11 +67,34 @@
     },
     {
       "kind": "connection:passthrough",
-      "reason": "Adjusted won price history, for two numbers only — the distance to the price invalidation, which sizes the position, and the progress toward the target, which trims it."
+      "reason": "Adjusted won price history, for two numbers only — the distance to the price invalidation, which sizes the position, and the progress toward the target, which trims it. The same login is what enumerates the Korea-listed universe this desk declares before it sweeps, because nothing else in the host can list a market.",
+      "connectors": ["toss"]
+    },
+    {
+      "kind": "observation:file",
+      "reason": "Half of these cases begin in a policy gazette or a ministry notice rather than in a filing. A search result's title is not a source, so the original is filed with its url, publisher, publication date and observation date, and what is cited afterwards is the evidence id the host issued for it — never the summary."
+    },
+    {
+      "kind": "source-cache:read",
+      "reason": "The OpenDART corporate-code list and the filings index are read from the host's own source cache rather than re-fetched, so that a run resumes from the last receipt it finished instead of re-reading five years of documents every time it wakes."
+    },
+    {
+      "kind": "source-cache:write",
+      "reason": "Refreshing that cache is what makes the next run incremental. Its four states are also this manager's honest answer about a lane: a store that was never fetched and a store whose refresh failed are two different findings, and neither is an empty market."
     }
   ],
   "requires": {
-    "skills": ["source_request", "connection_request"]
+    "skills": ["source_request", "connection_request"],
+    "optionalSkills": [
+      "observation_file",
+      "files_list",
+      "files_read",
+      "files_write",
+      "files_mkdir",
+      "evidence_get",
+      "source_cache_read",
+      "source_cache_refresh"
+    ]
   },
   "config": {
     "schema": "./config.schema.json"

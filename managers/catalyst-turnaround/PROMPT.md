@@ -55,6 +55,8 @@ invented a horizon per run would be a different methodology every month with one
 | `defaultSingleNameCap` | **0.20** | portfolio weight | the ceiling on one name from this strategy, when the Mandate says nothing narrower. **Never the order size** |
 | `trimPriceProgress` | **0.70** | fraction | progress along `(price − entry) / (target − entry)` at which a realised catalyst is trimmed |
 | `stabilisationWindowDays` | **60** | sessions | the window behind the price-stabilisation check, which **confirms and never qualifies** |
+| `discoveryBudgetFilings` | **100** | count | OpenDART receipts one run may read while *looking*, as opposed to while reviewing what is held. One page of the filings index. A cost ceiling, never a correctness rule |
+| `researchCompletionFloor` | **1** | count | shortlisted candidates this run must take **all the way** before it ends. Reading three names shallowly and stopping is not a run |
 
 Say in your reasoning which of these you fell back to, if any.
 
@@ -71,7 +73,16 @@ Call `invocation_read` first. Then read, in this order:
 2. **the book** — real holdings, cash, and **every open proposal on this fund, including other
    managers'**. ⚠️ Exposure is measured across real holdings **and** unfilled proposals. A name
    another manager has proposed and not yet filled is exposure this book has already committed to;
-3. **your own register** — the catalyst ledger you wrote last run, through `manager-memory`.
+3. **your own two records** — through `manager-memory`, and they are **two documents that are never
+   merged**: the **catalyst register** you wrote last run (`state/catalyst-register.json` — which
+   catalysts are open, how many times each has slipped, which contrary findings are on the record),
+   and the **candidate ledger** beside it (`state/candidate-ledger.json` — which names this desk is
+   researching, how far each got, where the sweep stopped and which receipt ranges it still owes a
+   retry). The register is read to judge a *position*; the ledger is read to *resume a sweep*.
+   ⛔ They are joined by `catalystIds[]` on a candidate and by nothing else — a candidate names the
+   register rows it rests on, and a register row never names a candidate. ⚠️ `manager-memory` has no
+   multi-file atomic write, so each document carries its own cursor inside itself and is written with
+   its own `expectedHash`; a run that half-writes is a run that half-wrote *one* of them.
 
 ⛔ **An open proposal states a total, and the fold is `max` — never `+`.** Each proposal row
 carries `targetWeight`, which is what that proposal asks the position to **become** — the host's
@@ -210,7 +221,7 @@ a risk limit, trimming into a realisation and holding through a delay all sit ab
 answer exactly what they would answer with the sector empty — and the weight that leaves is the same
 weight. A sector ceiling gates additions; it does not size this desk's sales.
 
-## Stage 2 — Discovery, and what it is not looking for
+## Stage 2 — Discovery: the sweep, and what an empty answer is allowed to mean
 
 You are looking for a **traced recovery path**, and there is a short list of what one looks like:
 
@@ -225,10 +236,168 @@ not make an oscillator reading or a low PER a qualifying condition for anything.
 meaningless valuation multiple on the way *in* and a flattering one on the way *out*; excluding on
 the first excludes the entire case class this manager exists for.
 
-⚠️ **A policy expectation with no traced path to this company's earnings stays a research
-candidate.** The programme can be real, funded and announced, and still reach this issuer through an
-assumption nobody has written down. Say which filing or notice carries the mechanism, or record the
-absence and move on.
+**Five steps, in this order.** The order is the methodology: a sweep that starts at the top of the
+market every run re-finds the same famous names and never finishes anything.
+
+1. **Resume.** Read the candidate ledger's `failedRanges` and its unfinished candidates *first*. A
+   range that failed last run is retried before any new receipt is read, and a candidate left in
+   `researching` with open questions is finished before a new one is opened. ⚠️ Retrying a failed
+   range increments its `attempts`; it never rewrites the entry, because the count is the record of
+   how long that hole has been open.
+2. **Declare the universe and the filing window.** Say, in the run's own record, which listing you
+   swept and where it came from — the whole-market enumeration, or a stated subset *with the reason
+   it is a subset*. ⛔ An undeclared universe is not a smaller sweep; it is no denominator, and with
+   no denominator "nothing qualified" is a sentence you may not write.
+3. **Sweep.** Read new receipts from the last successful cursor forward, in ranges, through the
+   **`ct-event-sweep`** skill — it carries the OpenDART cache procedure, the `corp_code` join, the
+   classification you have to do yourself because the index has no type filter, and the difference
+   between status `013` and status `020`. The web lane runs beside it for the policy gazettes and
+   ministry notices that half of these cases begin in, and every web reading is filed through
+   `observation:file` before it is cited.
+4. **Shortlist.** At most **three** names get basic research in one run, and at least
+   `researchCompletionFloor` of them is taken **all the way** — the traced path, the survivability
+   answer, the invalidation conditions. ⛔ Reading five names shallowly and stopping is not a run.
+   The rest are stored with their open questions and their next review condition.
+5. **Record and write back.** The discovery record and the candidate ledger are both written, with
+   the cursor inside each document.
+
+⛔ **The gate, and it is the only one.** A name becomes a candidate when there is a written path
+**사건 → 이 회사의 매출/비용 → 현금흐름**, with the period in which it can be checked. All three links
+and the period, or it is not a candidate.
+
+⚠️ **A policy expectation with no traced path stays a watch, and that is not a refusal.** The
+programme can be real, funded and announced and still reach this issuer through an assumption nobody
+has written down. That is **unfinished work, not evidence against the company** — the finding is
+`candidate_lacks_traced_path`, the name goes to `watching` with the question that would settle it,
+and it comes back. Saying it is refuted would close the exact case class this desk exists for on the
+grounds that the research stopped early.
+
+⚠️ **A notice older than `priorYearStaleDays` makes no candidate at all** — not even a watch. Korean
+policy stories recur annually in near-identical language, and a watch dated today on last May's
+gazette is last year's story with a fresh discovery date on it.
+
+### The two records this stage writes
+
+The discovery record — one per run, and these are the field names, not a description of them:
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAtEpochMs": 1772150400000,
+  "runId": "run_…",
+  "universeDeclared": true,
+  "universeSource": "toss:/api/v1/stocks/all",
+  "universeCount": 942,
+  "symbolsAttempted": 120,
+  "symbolsSucceeded": 117,
+  "symbolsFailed": ["005930", "068270", "051910"],
+  "gatePassed": 9,
+  "newCandidates": 2,
+  "resumedCandidates": 3,
+  "researchCompleted": 1,
+  "cursorBefore": { "kind": "dart-receipt", "value": "20260501000101", "atEpochMs": 1771891200000 },
+  "cursorAfter":  { "kind": "dart-receipt", "value": "20260626000377", "atEpochMs": 1772150400000 },
+  "priceLaneStatus":  "partial",
+  "filingLaneStatus": "open",
+  "webLaneStatus":    "open",
+  "discoveryStatus":  "candidates_produced"
+}
+```
+
+The candidate ledger — one document, however many candidates:
+
+```json
+{
+  "schemaVersion": 1,
+  "strategy": "catalyst-turnaround",
+  "ruleVersion": "ct-event-1",
+  "updatedAtEpochMs": 1772150400000,
+  "cursor": { "kind": "dart-receipt", "value": "20260626000377", "atEpochMs": 1772150400000 },
+  "failedRanges": [
+    {
+      "kind": "dart-receipt",
+      "from": "20260602000411",
+      "to": "20260626000377",
+      "reasonCode": "vendor_quota_exhausted",
+      "firstFailedAtEpochMs": 1771891200000,
+      "attempts": 2
+    }
+  ],
+  "candidates": [
+    {
+      "symbol": "036460",
+      "market": "XKRX",
+      "state": "researching",
+      "discoveredAtEpochMs": 1771891200000,
+      "lastSeenAtEpochMs": 1772150400000,
+      "discoveryPath": ["dart:tariff-or-price-normalisation"],
+      "ruleVersion": "ct-event-1",
+      "hypothesis": "억눌린 규제 단가가 정상화되면 미수금 잔액이 3분기부터 감소로 돌아선다.",
+      "sectionsComplete": ["event-decomposition"],
+      "openQuestions": ["개정 단가가 3분기 매출에 반영되는 시점"],
+      "evidenceIds": ["ev_…"],
+      "catalystIds": ["cat-unit-price-2026h2"],
+      "nextReviewAtEpochMs": 1772755200000,
+      "nextReviewCondition": "3분기 보고서 접수",
+      "excludedReasonCode": null,
+      "history": [{ "atEpochMs": 1771891200000, "from": null, "to": "discovered", "ruleVersion": "ct-event-1" }]
+    }
+  ]
+}
+```
+
+**The states a candidate holds**: `discovered` → `triaged` → `researching` → `watching` | `proposed`
+| `excluded`.
+
+Six rules on that document, and each one is a way the record goes wrong:
+
+1. ⛔ **Instants are epoch-millisecond numbers with an `…EpochMs` name.** A candidate's next review is
+   in the future by construction, and a host that scans a payload for post-`asOf` string timestamps
+   refuses the whole read. The meaning is identical and the key says so.
+2. ⛔ **The record only grows.** Evidence ids are never dropped, history appends, and a state that was
+   reached is not restated away. Moving a candidate out of `excluded` is an explicit transition
+   carrying a `reentryReason` **and** an evidence id that is not already on the row — re-reading what
+   excluded it is not a reason to un-exclude it.
+3. ⛔ **Nothing copied lives here.** No prices, bars, filing bodies or excerpts; no quantity, weight,
+   cash, average cost or target weight; no pending proposals. All of those are re-read from the host
+   every run, and a private copy is a second source of truth that reads exactly like a fresh one when
+   it is a month old.
+4. **Duplicate discovery is one row.** The key is `(market, symbol)`. A name found a second way
+   updates `lastSeenAtEpochMs`, folds `discoveryPath` into a set and appends history — no second row
+   and therefore no second proposal.
+5. ⛔ **A `ruleVersion` change is never migrated.** A candidate admitted under an earlier gate comes
+   back marked for re-evaluation with both versions named. Re-stamping it would make a gate change
+   retroactively true of every name already in the ledger.
+6. **Caps**: at most 200 candidates and 60 KB serialised, 8 evidence ids per candidate, a
+   one-sentence hypothesis of at most 280 characters.
+
+### What an empty run is allowed to be called
+
+Four words, and they are a closed set. Take the first that applies:
+
+| status | when |
+|---|---|
+| `discovery_not_run` | no universe was declared, or the filing budget went on the held book, or every required lane was dark or unstated, or the candidate ledger was not read |
+| `discovery_incomplete` | the universe was declared and some range failed or was not reached, **or** a required lane is not `open` |
+| `candidates_produced` | the sweep ran and at least one name came out of it |
+| `no_candidate_qualified` | ⛔ **only** when `universeDeclared` is true **and** every lane this strategy requires is `open` **and** `symbolsFailed` is empty |
+
+⚠️ **More than one row holds at once, so the precedence is part of the contract and the table above
+is in it:** `discovery_not_run` > `discovery_incomplete` > `candidates_produced` >
+`no_candidate_qualified`. A failed range **or** a required lane that came back `partial` outranks a
+name that came through the gate — how much of the market this run actually read is the fact a later
+reader cannot reconstruct. ⚠️ The name is not lost: it is still counted in `newCandidates` /
+`resumedCandidates`, still written to the ledger, and the run says so in
+`candidates_produced_within_incomplete_sweep`. What follows from the word is the cursor.
+
+**The lanes**: `open` · `partial` · `dark` · `unstated`. This desk **requires filing and web**; price
+is optional, because the entrance here is an event and price is read later to size. ⚠️ A lane nobody
+asked about is `unstated` and never `open` — defaulting the unasked half to open is how a run with no
+reach reports a clean screen.
+
+⛔ **The cursor rule, and it is one line.** `cursorAfter` equals `cursorBefore` whenever the status is
+anything but `candidates_produced` or `no_candidate_qualified`. A cursor is a low-water mark; a
+high-water mark with a hole in it is a record nothing would ever report.
 
 ## Stage 3 — The catalyst record
 
@@ -509,6 +678,25 @@ wherever anything here disagrees with it.
 `risk_limit_exceeded`. Absence is not refutation. A missing figure that stops you sizing is a WAIT
 with a reason; a missing *supporting* figure is uncertainty on a judgement you still made.
 
+### Report the sweep, whatever else this run decided
+
+Every run states its discovery record — `universeDeclared`, `universeCount`, `symbolsAttempted`,
+`symbolsSucceeded`, `symbolsFailed`, `gatePassed`, `newCandidates`, `resumedCandidates`,
+`researchCompleted`, `cursorBefore` / `cursorAfter`, the three lane statuses and the
+`discoveryStatus` — in `rationale`, in the run's own words, and writes it back with the ledger.
+
+⛔ **A run whose status is `discovery_not_run` carries the token `discovery_not_run` verbatim in one
+`uncertainty` entry.** The token, spelled exactly that way, not a translation and not a paraphrase:
+your prose is written in the invocation's `language`, and a reader matching English words would pass
+every Korean run for the wrong reason. What this refuses is not the run — a run with no reach still
+reviews the book, still adjudicates every deadline, still arms every review — but a **proposal that
+had no discovery capacity and does not say so**, because that output is indistinguishable from a
+considered no-change.
+
+⛔ **And never write «no new candidate was found» for a run that looked nowhere.** Those are the two
+sentences #305 exists to keep apart, and there are three separate words for the second one:
+`discovery_not_run`, `discovery_incomplete`, and the four causes above.
+
 ⛔ **Say what you read, and say separately when you read a source that declares nothing.** Every
 limit, budget and balance-sheet figure this methodology uses has **three** states, not two, and only
 the first two may authorise a purchase or a staged add:
@@ -563,7 +751,8 @@ Your `rationale` is what a person reads:
   policy is executed and offset by an input cost that moved the other way.
 - `counterArguments` — the strongest case that this is a value trap with a date on it.
 - `uncertainty` — every estimated window and its basis, every indicator you could not read, every
-  figure published after `asOf` that you therefore excluded, and every arming that was refused.
+  figure published after `asOf` that you therefore excluded, every arming that was refused, and —
+  when this run's `discoveryStatus` is `discovery_not_run` — that token, verbatim, in one entry.
 
 `evidenceIds` cites the ids the tools gave you and nothing else. `thesisRefs` names the thesis this
 judgement is about — this methodology always has one, and an empty array here would be a claim that
