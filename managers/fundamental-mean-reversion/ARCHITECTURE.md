@@ -20,6 +20,8 @@ silently when a model does it by eye?**
 | `positionSizing` | the weight, the effective loss, the binding constraint | a stop price treated as a fill; per-strategy limits summed into an account limit |
 | `stagedPlan` | the ledger of what has already been proposed under a plan | a re-run adding the same rung twice |
 | `classifyCase` | one outcome, one verdict, one diagnosis code | an absence recorded as a refutation |
+| `discoveryRun` | which names this run looked at, and one of four `discoveryStatus` words | a run that read nothing reported as a screen that found nothing |
+| `candidateLedger` | the candidate rows, the migration reading, and the ledger written back | a ledger nobody read treated as a ledger that is empty |
 
 Everything is pure: no clock, no network, no filesystem, no `process`. `asOf` is an argument of
 every call and a call without one is refused.
@@ -571,6 +573,80 @@ classified the candidate is. The `#269 —` checks in `tools/verify-fundamental-
 build that case explicitly, with a positive control that reaches BUY, because a run that looked only
 at the candidate passes every other one.
 
+## The discovery run and the candidate ledger (#305)
+
+Two files, `lib/discovery.mjs` and `lib/candidate-memory.mjs`, and both are **vendored**. The
+identical record lives in `catalyst-turnaround` and `shareholder-rerating`; the three are
+siblings and not imports, because a published ManagerPackage is installed on its own and an
+import across that boundary is a dependency the host never resolves. `docs/contracts/discovery-run.md`
+is the one document all three are read against, and each file's header names the other two.
+
+What differs between the three, and nothing else does:
+
+| | here | catalyst-turnaround | shareholder-rerating |
+|---|---|---|---|
+| required lanes | **price, filing** | filing, web | filing, web |
+| optional lane | web | price | price |
+| cursor kind | **`symbol-index`** | `dart-receipt` | `dart-receipt` |
+| `strategy` | `fundamental-mean-reversion` | its own | its own |
+| severity words | **`info` / `unevaluated` / `blocked`** | `blocked` / `unevaluated` / `note` | its own |
+
+### The contract, restated
+
+**Lane vocabulary** — `open | partial | dark | unstated`, from `evidence-gated`'s
+`discoveryCapacity` unchanged. ⚠️ A lane nobody asked about is `unstated`, never `open`.
+
+**Status vocabulary** — a closed set of four, and the guards on two of them are the point:
+
+- `no_candidate_qualified` requires `universeDeclared === true` **and** every required lane
+  `open` **and** `symbolsFailed` empty. It is never reached by fallthrough; the branch restates
+  all three conditions rather than inheriting them.
+- `discovery_not_run` is no universe declared, or the budget spent on holdings review, or every
+  required lane dark/unstated. The proposal carries the token `discovery_not_run` **verbatim**
+  in one `uncertainty` entry or `discovery_not_run_undisclosed` blocks it — the same round trip
+  `evidence-gated`'s `discovery_lane_dark_undisclosed` makes, and for the same reason: the prose
+  around the token is written in the invocation's `language`.
+- ⛔ **`cursorAfter === cursorBefore` whenever the status is neither `candidates_produced` nor
+  `no_candidate_qualified`.** A cursor past an unread range deletes that range permanently.
+- ⚠️ An undeclared universe is `unevaluated` and never `blocked`. The book whose universe nobody
+  declared is exactly the book that still has to be watched on the sell side.
+- ⛔ `researchShortlistSize` is a **hard cut in code**, and the shortlist may not be ordered by
+  depth of fall — stated outright, or inferred from an order monotone in drawdown with no basis
+  given (`shortlist_ranked_by_depth`, blocked).
+
+**The ledger's read/migration table** is published as `LEDGER_MIGRATIONS` so this document and
+the verifier read it rather than restate it. Its first row is the whole file:
+`previous === undefined` is nobody having read the ledger — `data_missing`, nothing created,
+nothing advanced — and `previous === null` is the ledger read and empty, which re-seeds. The key
+can therefore never self-lock.
+
+**Idempotency**, in the four shapes #305 names: a rule-version change returns the row with
+`requiresReevaluation` and never migrates it; a duplicate discovery folds into one row and
+appends history only on a genuinely new discovery path; dropping `excluded` without a
+`reentryReason` and new evidence is `candidate_state_regressed` (blocked); a failed range that
+fails again is the same row with `attempts + 1`.
+
+**Caps and prohibitions** — ≤200 candidates, ≤60 KB serialised, ≤8 `evidenceIds` per candidate,
+hypothesis ≤280 characters, symbol ≤32. `FORBIDDEN_KEYS` refuses copied bars, closes, volumes,
+filing bodies, `excerpt`, quantity, weight, cash, `averageCost`, `targetWeight`, `pending` and
+`proposals` with `memory_holds_vendor_payload` (blocked), and the verifier asserts it again over
+the bytes actually written back.
+
+### What is unverified against the host
+
+⛔ Every one of these is a measured *absence* in the host as of 2026-09-12, not a thing this
+package has confirmed working. They are named in the pull request as host issues rather than
+faked here.
+
+| | what is missing |
+|---|---|
+| **H-1** | no point-in-time XKRX universe. `/api/v1/stocks/all` is the only whole-market route and the accepted **values** of its four filters (`market`, `status`, `securityType`, `commonShare`) are unmeasured. Survivorship is uncorrectable from it |
+| **H-2** | ≥300 completed bars. The `prices/daily` source cache defaults to 400 calendar days ≈ **270 sessions, below 300**, and `market_bars` caps at 250. Only manager-paged `/api/v1/candles` via `nextBefore` reaches it, and `adjusted` must be passed explicitly on every page |
+| **H-3** | whether `source-cache:read` / `source-cache:write` are actually granted to this package is unverified; the manifest declares them and no run has exercised them |
+| **H-4** | `observation_file` mints an `evidenceId`, but evidence filed during a run is not committed until the run ends. The round trip **spans two runs**, which is why the id goes into the candidate's `evidenceIds` to be cited next time |
+| **H-6** | `manager-memory` has no atomic multi-file write. The cursor therefore lives *inside* the candidate document, and concurrency is `expectedHash` compare-and-swap with a `revision-conflict` retry |
+| **H-7** | adjustment basis, halt state, corporate actions, turnover and the calendar shapes are unmeasured or not modelled. `priceState` refuses an undeclared basis (`adjustment_basis_undeclared`) rather than assuming one |
+
 ## Fixtures
 
 Synthetic bars, generated once and committed. ⛔ **They are shapes, not prices**, and no assertion
@@ -598,6 +674,12 @@ name.
 | `uptrend-pullback` | `uptrend-pullback-not-this-strategy` |
 | `reference-plan-shape` | `stabilization-unconfirmed` → WATCH |
 | `target-reached-staged-trim` | `target-reached-trim` → TRIM |
+
+`fixtures/discovery.json` and `fixtures/candidate-memory.json` follow `catalyst-turnaround`'s
+`ledger.json` shape — a `base` call plus `scenarios[{ name, why, overrides, expect }]`, where
+`why` is written as an argument rather than a label. ⚠️ `candidate-memory.json` carries one
+marker JSON cannot express: `"previous": "<undefined>"` means the argument is passed as
+`undefined`, which is the reading the whole file exists to keep apart from `null`.
 | `invalidation-triggered` | `invalidated-re-adjudicate` → RESIZE/SELL only |
 | `deadline-elapsed` | `deadline-elapsed-re-adjudicate` → RESIZE/SELL only |
 | `risk-limit-exceeded` | `risk-limit-exceeded` → WAIT |
@@ -681,6 +763,14 @@ These are #256's host-integration criteria and every one of them needs a running
 - that the Toss connection's daily candles arrive with a stated adjustment basis, which this
   package requires and refuses without;
 - benchmark comparison against a Korean equity index over the same holding period.
+
+And #305's, which are the six host gaps tabled above: that `/api/v1/stocks/all` returns a usable
+roster under filters nobody has measured; that `/api/v1/candles` pages to 300 completed bars with
+a stated adjustment basis; that the source cache is granted and answers; that an
+`observation_file` id filed in one run is citable in the next; that `files_write` with
+`expectedHash` round-trips the ledger; and that a resumed run continues rather than
+re-discovering. The fixtures establish that a given shape of run reaches a given status. They
+establish nothing about a market and nothing about a host.
 
 The third of those is verified. untilled/aumos#789 ran this package's real `lib` on inputs built by
 the host's real kernel and pushed the answers back through it to a venue: the host reports every

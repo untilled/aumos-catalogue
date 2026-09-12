@@ -48,6 +48,8 @@ An invocation may arrive with no `config` block at all.
 | `maxWaitDays` | **120** | the ceiling on the deadline a thesis may name |
 | `maxOpenTheses` | **6** | how many theses this manager carries at once |
 | `researchShortlistSize` | **3** | how many candidates one discovery pass carries forward |
+| `discoveryBudgetSymbols` | **120** | how many symbols of the declared universe one sweep reads |
+| `researchCompletionFloor` | **1** | how many shortlisted names a run finishes before it may end |
 
 ⚠️ **A setting may narrow this methodology and may never widen it.** The entry gate reads no
 setting at all, and `perThesisRiskBudget` handed in above 0.0075 is refused, reported, and the
@@ -70,8 +72,9 @@ enough to act on.
 `invocation_read`, then the fund's own state. Holdings and cash come from Aumos Portfolio
 (`portfolio_read`); **open proposals, and who runs each holding, come from `portfolio_get`** —
 the older door answers the mark this run started from and carries neither. Your own private folder
-holds two things and nothing else — your staged-plan ledgers and how far an unfinished
-research pass got.
+holds three things and nothing else — your staged-plan ledgers, how far an unfinished research
+pass got, and the candidate ledger at `state/candidates.json` with its discovery cursor. ⛔ It is
+not a price database, not a filing archive and not a second copy of the account.
 
 ⛔ **An open proposal states a total, and the fold is `max` — never `+`.** The weight on an
 open-proposal row is what that proposal asks the position to **become**, not an amount to add to
@@ -152,11 +155,38 @@ Before any new work. For each open thesis, in this order:
 
 **Invoke the `fmr-position-review` skill** when any of ⑴–⑷ fires.
 
-## Stage 2 — Discovery: what to research first
+## Stage 2 — Discovery: which names this run actually looked at
 
-Ask for adjusted daily bars through the Toss connection — at least 300 completed sessions —
-and put them through `priceState`. It answers with the technical state and with whether the
-discovery gate opened.
+⛔ **A run that read nothing may not report that nothing qualified.** Those are opposite facts
+and in prose they come out as the same sentence. The sequence below is what keeps them apart,
+and it is a sequence: resume, declare, sweep, cut, record, write back.
+
+### ⑴ Resume before you discover
+
+Read your own ledger first — one document, at `state/candidates.json`, through `files_read`.
+Hand what came back to `candidateLedger` **as it came back**:
+
+- the document → `previous`;
+- `null` if the file exists and is empty;
+- ⛔ **nothing at all** — leave `previous` out — if you did not read it or the read failed.
+  That is not the same as `null`. `null` says the ledger was read and holds nothing, which is
+  an ordinary first run; an absent `previous` says nobody looked, and then no candidate may be
+  created or advanced on this run at all. Defaulting one to the other is how the same name is
+  discovered again every single week.
+
+Its `failedRanges` are retried **before** anything after them, and its `cursor` is where the
+sweep resumes. **Invoke the `fmr-universe-sweep` skill** for the exact calls.
+
+### ⑵ Declare the universe, or say you did not
+
+The roster comes from the Toss connection. A universe is a *positive claim* — where the roster
+came from and how many names were in it — and an absent one is not a declaration of an empty
+market.
+
+### ⑶ Sweep it through `priceState`
+
+Ask for adjusted daily bars — at least 300 completed sessions — and put them through
+`priceState`, which answers the technical state and whether the discovery gate opened.
 
 The gate, pre-registered and not configurable:
 
@@ -172,9 +202,11 @@ Three things about it that are the methodology rather than the arithmetic:
 - **It is a queue, not a case.** Passing it means this name is worth a day's research. It has
   never meant buy, and a run that reports the gate as a reason is reporting the order it did
   its work in.
-- **Rank candidates on their own terms.** Do not sort a shortlist by depth of fall: the deepest
-  faller is the one most likely to have fallen for a reason, which is the opposite of what the
-  ranking implies.
+- **Rank candidates on their own terms.** ⛔ Do not sort a shortlist by depth of fall: the
+  deepest faller is the one most likely to have fallen for a reason, which is the opposite of
+  what the ranking implies. `discoveryRun` refuses it — stated outright, and inferred from an
+  order that is monotone in drawdown with no basis given. Say what you ranked on: whose fall
+  this desk can actually decompose, and whose filing is reachable.
 - **Being below the 200-bar average excludes nothing, permanently or otherwise.** What the
   package does distinguish is a fall from a **pullback inside an uptrend** — price above a
   *rising* 200-bar average. That is a real trade and it is not this one, and `classifyCase`
@@ -186,8 +218,121 @@ a factor. Those refusals are `data-missing`, never a finding about the company. 
 `fmr-price-integrity` skill** when one of them fires — it says what to ask the vendor for and
 why the ex-dividend case cannot be seen in the bars at all.
 
-Carry at most `config.researchShortlistSize` names forward. Fewer, finished, beats more,
-sampled.
+### ⑷ Cut to `config.researchShortlistSize`
+
+At most that many names go to Stage 3, and `discoveryRun` enforces it rather than trusting the
+intention. Fewer, finished, beats more, sampled. The names past the cut are **not rejections**:
+each keeps its open question and its re-review condition in the ledger.
+
+`config.discoveryBudgetSymbols` bounds how much of the roster one run reads;
+`config.researchCompletionFloor` is how many shortlisted names you finish before the run may
+end.
+
+### ⑸ Record the run through `discoveryRun`
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAtEpochMs": 1772150400000,
+  "runId": "run_…",
+  "universeDeclared": true,
+  "universeSource": "toss:/api/v1/stocks/all",
+  "universeCount": 942,
+  "symbolsAttempted": 120,
+  "symbolsSucceeded": 117,
+  "symbolsFailed": ["005930", "068270", "051910"],
+  "gatePassed": 9,
+  "newCandidates": 2,
+  "resumedCandidates": 3,
+  "researchCompleted": 1,
+  "cursorBefore": { "kind": "symbol-index", "value": "000660", "atEpochMs": 1771891200000 },
+  "cursorAfter":  { "kind": "symbol-index", "value": "011070", "atEpochMs": 1772150400000 },
+  "priceLaneStatus":  "open",
+  "filingLaneStatus": "partial",
+  "webLaneStatus":    "unstated",
+  "discoveryStatus":  "discovery_incomplete"
+}
+```
+
+Each lane is `open`, `partial`, `dark` or `unstated`. ⚠️ **A lane nobody asked about is
+`unstated`, never `open`.** For this desk **price and filing are required and web is
+optional** — the inverse of the event-driven desks.
+
+`discoveryStatus` is one of four and they are not interchangeable:
+
+| | when |
+|---|---|
+| `candidates_produced` | the sweep finished and names went to Stage 3 |
+| `no_candidate_qualified` | ⛔ **only** with a declared universe, every required lane `open`, and no failed symbol. This is the only run allowed to say the screen found nothing |
+| `discovery_not_run` | no universe was declared, or the budget went on reviewing holdings, or every required lane was dark. **Not** «no candidates» |
+| `discovery_incomplete` | a range failed or was never reached, or a required lane was `partial` |
+
+⛔ **`cursorAfter` equals `cursorBefore` on anything but the first two.** A cursor that steps
+over an unread range deletes that range permanently: nothing later ever looks at it again.
+
+### ⑹ Write the ledger back
+
+One document, written with `files_write` and its `expectedHash`, holding this and nothing else:
+
+```json
+{
+  "schemaVersion": 1,
+  "strategy": "fundamental-mean-reversion",
+  "ruleVersion": "fmr-gate-1",
+  "updatedAtEpochMs": 1772150400000,
+  "cursor": { "kind": "symbol-index", "value": "011070", "atEpochMs": 1772150400000 },
+  "failedRanges": [
+    { "kind": "symbol-index", "from": "005930", "to": "005935", "reasonCode": "lane_query_failed", "firstFailedAtEpochMs": 1771891200000, "attempts": 2 }
+  ],
+  "candidates": [
+    {
+      "symbol": "011070",
+      "market": "XKRX",
+      "state": "researching",
+      "discoveredAtEpochMs": 1771891200000,
+      "lastSeenAtEpochMs": 1772150400000,
+      "discoveryPath": ["price-sweep"],
+      "ruleVersion": "fmr-gate-1",
+      "hypothesis": "2024년 일회성 손상차손이 영업 훼손으로 오독됐고 3분기 수주잔고가 그것을 반증한다.",
+      "sectionsComplete": ["fall-decomposition"],
+      "openQuestions": ["개선된 단가가 3분기 매출에 반영된 시점"],
+      "evidenceIds": ["ev_…"],
+      "nextReviewAtEpochMs": 1772755200000,
+      "nextReviewCondition": "3분기 보고서 접수",
+      "excludedReasonCode": null,
+      "history": [{ "atEpochMs": 1771891200000, "from": null, "to": "discovered", "ruleVersion": "fmr-gate-1" }]
+    }
+  ]
+}
+```
+
+`state` moves `discovered → triaged → researching → watching | proposed | excluded`, and
+`candidateLedger` applies every move. Four rules it enforces rather than asks for:
+
+- ⛔ **Nothing raw goes in here.** No bars, no closes, no volumes, no filing text, no holding,
+  no cash, no open proposal. Prices come back from Toss, filings from the source cache and the
+  account from `portfolio_get` on **every** run; a second copy here is stale the moment it is
+  written and it answers anyway.
+- ⛔ **Leaving `excluded` costs a `reentryReason` and a new `evidenceId`.** A name this desk put
+  down is the name the next run picks up again on the same chart.
+- ⚠️ **A changed `ruleVersion` is returned for re-evaluation and never migrated.** The candidate
+  comes back with `requiresReevaluation`, and you judge it under the current gate or you leave
+  it where it is.
+- ⚠️ **Every persisted instant is a number ending `…EpochMs`.** A `nextReviewAtEpochMs` is in
+  the future by construction, and a host scanning for post-`asOf` string timestamps would refuse
+  the whole read.
+
+### ⑺ Where a web reading fits, and how it becomes citable
+
+The web does two things here and neither is a substitute for a filing: it finds causes a
+disclosure never states, and it fills a blank on a name you are already researching. ⛔ A search
+result's title or snippet never makes a candidate.
+
+File the reading through `observation_file` — the source's **own words** as `excerpt`, its
+`url`, its `publishedAt`, and your own reading in `reading`. It answers an `evidenceId`. ⚠️
+**An observation filed in this run is citable in the *next* one**: evidence filed during a run
+that has not ended is not committed until the run is over. So put the id in the candidate's
+`evidenceIds` and cite it next time, rather than waiting for it inside this run.
 
 ## Stage 3 — Why did it fall, and is the damage permanent?
 
@@ -497,6 +642,15 @@ methodology has.
 
 `uncertainty` is a list, and it carries every reading you could not take: a refused price
 basis, a filing you could not reach, a stabilisation condition you measured on short history.
+
+⛔ **And it carries `discovery_not_run` verbatim when the run screened nothing.** A proposal
+produced by a run with zero discovery capacity — no universe declared, the budget spent on
+holdings, or every required lane dark — is indistinguishable on screen from a considered
+no-change unless it says so. The marker is the **token**, spelled exactly `discovery_not_run`,
+inside one `uncertainty` entry; the sentence around it is yours and is written in the
+invocation's `language`, which is precisely why the token and not the sentence is what is
+checked. ⚠️ Never write "no candidates were found" on such a run: nothing was looked at, so
+nothing failed.
 
 `evidenceIds` cites what the tools handed you. Do not invent one, and do not cite a number you
 computed yourself as though a source had given it to you.

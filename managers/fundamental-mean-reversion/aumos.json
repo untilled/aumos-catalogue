@@ -3,7 +3,7 @@
   "id": "fundamental-mean-reversion",
   "publisher": "aumos",
   "name": "Fundamental Mean Reversion",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "description": "Korea-listed single names whose price has fallen further than the damage to the business justifies. Researches the fall's causes before the chart, takes the recovery only after pre-registered stabilisation evidence, and names a target range that says whether it is a price band, a moving average or a valuation.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
@@ -14,7 +14,9 @@
       "label": "post-close-review"
     }
   ],
-  "runtimes": ["claude"],
+  "runtimes": [
+    "claude"
+  ],
   "license": "MIT",
   "provenance": {
     "sourceRepo": "https://github.com/morethanmin/trading-harness",
@@ -33,9 +35,18 @@
         "id": "fundamental-mean-reversion",
         "name": "Fundamental Mean Reversion",
         "description": "Finds Korea-listed companies whose share price has fallen further than the damage to the business justifies, and takes the recovery toward a normal range only after stabilisation is confirmed. The technical state sets the order of work; the buy case is the business.",
-        "tasks": ["PORTFOLIO_REVIEW", "ASSET_REVIEW", "THESIS_REVIEW", "EVENT_REVIEW"],
-        "assetClasses": ["equity"],
-        "markets": ["XKRX"]
+        "tasks": [
+          "PORTFOLIO_REVIEW",
+          "ASSET_REVIEW",
+          "THESIS_REVIEW",
+          "EVENT_REVIEW"
+        ],
+        "assetClasses": [
+          "equity"
+        ],
+        "markets": [
+          "XKRX"
+        ]
       }
     ]
   },
@@ -54,13 +65,29 @@
     },
     {
       "kind": "source:passthrough",
-      "sources": ["open-dart"],
+      "sources": [
+        "open-dart"
+      ],
       "reason": "OpenDART receipts and statements are how a one-off impairment is separated from operating deterioration, and rising investment from failed monetisation. That separation is the whole of this methodology's buy case."
     },
     {
       "kind": "connection:passthrough",
-      "connectors": ["toss"],
+      "connectors": [
+        "toss"
+      ],
       "reason": "The adjusted daily bars every reading here is taken over, plus the market calendar that says which session is complete. This package refuses an undeclared or unadjusted price basis, so it needs a vendor that states one."
+    },
+    {
+      "kind": "observation:file",
+      "reason": "The cause of a fall is very often stated nowhere in a filing — a tariff decision, a customer's own guidance, an issuer's IR note — and this desk's entire buy case is that decomposition. Filing the reading with the source's own words, its URL and its publication date is the only route by which a web document reaches evidenceIds at all, and every proposal resting on one says on screen that it is this manager's testimony rather than an Aumos observation."
+    },
+    {
+      "kind": "source-cache:read",
+      "reason": "The filing lane of the discovery sweep. A price sweep produces a research queue and a filing decides whether the fall is damage, so the queue is useless without the OpenDART join — and the host's own cache is where it lives. Reading it is also how this package reports a lane as open, partial or dark instead of inventing a parallel word for the same four states."
+    },
+    {
+      "kind": "source-cache:write",
+      "reason": "The same cache, refreshed when its state says never-fetched or stale. ⛔ It is the host's store and not a second one: #305 forbids this package keeping its own copy of prices or filings, so the refresh happens where the host already holds the bytes rather than in this manager's private folder."
     },
     {
       "kind": "manager-memory:read",
@@ -72,17 +99,25 @@
     }
   ],
   "requires": {
-    "skills": ["source_request", "connection_request"],
+    "skills": [
+      "source_request",
+      "connection_request"
+    ],
     "optionalSkills": [
       "portfolio_read",
       "thesis_list",
       "thesis_get",
       "evidence_get",
       "evidence_search",
+      "observation_file",
+      "source_cache_read",
+      "source_cache_refresh",
       "files_list",
       "files_read",
       "files_write",
-      "files_mkdir"
+      "files_mkdir",
+      "files_move",
+      "files_remove"
     ]
   },
   "network": {

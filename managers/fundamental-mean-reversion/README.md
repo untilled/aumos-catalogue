@@ -107,9 +107,16 @@ flowchart TB
     subgraph IN["What it reads"]
         direction TB
         BOOK["Your holdings, cash and<br/>proposals still awaiting approval"]:::reads
+        LEDG["Its own candidate ledger:<br/>unfinished research and where the last sweep stopped"]:::reads
+        ROSTER["The Korea-listed roster,<br/>from the Toss connection"]:::reads
         PRICE["Adjusted daily price history"]:::reads
         FILE["Company filings from OpenDART"]:::reads
     end
+
+    RESUME["Resume: retry the ranges that failed,<br/>pick the unfinished names back up"]:::judges
+    SWEEP["Sweep the roster through the gate,<br/>and say which lanes were actually open"]:::judges
+    CUT["Cut to a shortlist small enough<br/>to finish — never ranked by depth of fall"]:::judges
+    WRITE["Write the ledger and the cursor back,<br/>so the next run resumes instead of restarting"]:::proposes
 
     HELD{"Does the fund already<br/>hold this name?"}:::judges
     REVIEW["Review the thesis it was bought on:<br/>invalidation, target, deadline, business"]:::judges
@@ -138,11 +145,13 @@ flowchart TB
         ORD["Only then does an order exist"]:::person
     end
 
-    WAKE --> IN --> HELD
+    WAKE --> IN --> RESUME --> HELD
     HELD -- yes --> REVIEW
     REVIEW --> TRIM
     REVIEW --> REJUDGE
-    HELD -- no --> INTEG
+    HELD -- no --> SWEEP
+    SWEEP --> CUT
+    CUT --> INTEG
     INTEG -- "cannot be read" --> CANT
     INTEG -- ok --> GATE
     GATE --> WHY
@@ -157,7 +166,8 @@ flowchart TB
     BUY --> ARM
     TRIM --> ARM
     REJUDGE --> ARM
-    ARM --> MAND --> YOU --> ORD
+    ARM --> WRITE
+    WRITE --> MAND --> YOU --> ORD
 ```
 
 **Legend** — 🟦 what it reads · ⬜ what it works out on its own · 🟩 what it hands back ·
@@ -175,11 +185,11 @@ on the install screen.
 | | |
 |---|---|
 | **Market** | Korea-listed individual shares, in won. No ETFs, no baskets, no other market |
-| **Connection** | a Toss login linked to this fund, for adjusted daily bars and the market calendar. A market-data-only login is sufficient; no brokerage account has to be attached |
-| **Data source** | `open-dart` for company filings — the separation of a one-time charge from a genuine decline is made there and nowhere else |
+| **Connection** | a Toss login linked to this fund. It reads three things there: the Korea-listed **roster** it sweeps, the **adjusted daily bars** for each name on it — paged, because the readings need at least 300 completed sessions — and the market calendar. A market-data-only login is sufficient; no brokerage account has to be attached |
+| **Data source** | `open-dart` for company filings, joined to every name the price sweep turns up — the separation of a one-time charge from a genuine decline is made there and nowhere else. It reads them through Aumos's own **source cache** rather than keeping a copy of its own |
 | **What a key costs** | an OpenDART key is free with automatic approval from Korea's Financial Supervisory Service portal |
 | **Settings** | how much of the fund one thesis may risk, how long a thesis may wait, how many it carries at once, and how many candidates one pass researches. ⚠️ Each of these can only be made **stricter**: the entry conditions themselves are not settings, and a value looser than the built-in one is refused and reported |
-| **Memory** | it keeps its own staged-entry ledgers and unfinished research notes in its private folder. Your holdings, cash and fills stay with Aumos and are never copied there |
+| **Memory** | it keeps its staged-entry ledgers, its candidate ledger and the cursor its next sweep resumes from in its private folder. Prices, filings, your holdings, cash and fills are re-read from their owners on every run and are never copied there |
 | **Your approval** | **it proposes and never trades.** Every buy, trim and exit is a proposal your Aumos judges against your Mandate and you approve or refuse |
 
 ## What it is bad at
@@ -194,6 +204,15 @@ on the install screen.
 - **Falls that are correct and look temporary.** Structural decline arrives disguised as a
   one-off charge for two or three quarters. This is the failure it is most exposed to, and the
   one its damage test exists to slow down rather than eliminate.
+- **Survivorship, and it cannot be corrected here.** The roster it sweeps is today's list. A
+  company that was delisted is not on it — and companies whose price fell a very long way are
+  exactly the population delisting selects from. Any pass rate it reports is a fact about
+  today's survivors and never a historical base rate.
+- **Reading nothing, said plainly.** A run whose universe was never declared, whose connection
+  was down, or whose budget went on reviewing what you already hold reports
+  `discovery_not_run` — **not** "no candidates". The two are opposite facts, and in prose they
+  come out as the same sentence, which is why the distinction is arithmetic rather than a
+  sentence. Expect to see it: it is a working run reporting honestly, not a broken one.
 - **The quiet one: it is least comfortable when it is working.** Refusing to buy something that
   is still falling looks like timidity right up until the last leg down.
 

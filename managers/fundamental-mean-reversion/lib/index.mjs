@@ -31,6 +31,8 @@ import { reversionTarget } from './reversion.mjs'
 import { positionSizing } from './sizing.mjs'
 import { applyStage, stagedPlanState } from './staged-plan.mjs'
 import { classifyCase } from './classify.mjs'
+import { discoveryRun } from './discovery.mjs'
+import { candidateLedger } from './candidate-memory.mjs'
 
 export { THRESHOLDS, DIAGNOSIS_CODES, OUTCOMES, VERDICT_ACTIONS, OUTCOME_WEIGHT_ROLES, WEIGHT_ROLES, diagnostic, finite, round } from './core.mjs'
 export * from './prices.mjs'
@@ -39,6 +41,8 @@ export * from './reversion.mjs'
 export * from './sizing.mjs'
 export * from './staged-plan.mjs'
 export * from './classify.mjs'
+export * from './discovery.mjs'
+export * from './candidate-memory.mjs'
 
 export const OPERATIONS = Object.freeze([
   'priceState',
@@ -47,6 +51,20 @@ export const OPERATIONS = Object.freeze([
   'positionSizing',
   'stagedPlan',
   'classifyCase',
+  /**
+   * ── The two #305 added, and why they are arithmetic ──────────────────────
+   *
+   * `discoveryRun` answers *which names this run actually looked at*, and the
+   * four-word status that says whether a zero is a screen that found nothing or
+   * a run that read nothing. `candidateLedger` is the only durable state this
+   * manager owns — the candidate, its hypothesis, how far the research got, and
+   * the cursor the next run resumes from. Both are here rather than in prose
+   * because both fail silently: an unread universe reported as «no candidates»
+   * reads exactly like a considered screen, and a ledger read as empty when it
+   * was never read re-discovers the same name every week.
+   */
+  'discoveryRun',
+  'candidateLedger',
 ])
 
 export function execute(call = {}) {
@@ -95,6 +113,25 @@ export function execute(call = {}) {
   if (operation === 'positionSizing') {
     const normalised = normalizeBars(input.series?.rows ?? input.rows ?? input.bars, asOf)
     return wrap(positionSizing({ ...input, bars: normalised.bars }))
+  }
+
+  if (operation === 'discoveryRun') {
+    const result = discoveryRun({ ...input, asOf })
+    return wrap({
+      status: result.diagnostics.some((row) => row.severity === 'blocked') ? 'refused' : 'ok',
+      ...(result.data ?? {}),
+      diagnostics: result.diagnostics,
+    })
+  }
+
+  if (operation === 'candidateLedger') {
+    const result = candidateLedger({ ...input, asOf })
+    return wrap({
+      status: result.diagnostics.some((row) => row.severity === 'blocked') ? 'refused' : 'ok',
+      ...result.data,
+      diagnostics: result.diagnostics,
+      causes: result.causes ?? [],
+    })
   }
 
   if (operation === 'stagedPlan') {
