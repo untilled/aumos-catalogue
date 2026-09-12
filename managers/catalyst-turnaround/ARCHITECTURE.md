@@ -763,6 +763,12 @@ half-written *one* of them.
 - **Status set**: `candidates_produced` · `no_candidate_qualified` · `discovery_not_run` ·
   `discovery_incomplete`. `no_candidate_qualified` needs all three of a declared universe, every
   required lane `open`, and an empty `symbolsFailed`.
+- **Precedence**: `discovery_not_run` > `discovery_incomplete` > `candidates_produced` >
+  `no_candidate_qualified`, because more than one row of the table holds at once. `discovery_incomplete`
+  covers a failed or unreached range **and** a required lane that is not `open` — a `partial` lane
+  outranks a produced candidate, and the candidate is still counted in `newCandidates` /
+  `resumedCandidates` and still reaches the ledger, reported beside the word by
+  `candidates_produced_within_incomplete_sweep` at `note`.
 - **Cursor rule**: `cursorAfter === cursorBefore` whenever the status is neither of the two complete
   ones; the cursor kind is `dart-receipt` and its value is an `rcept_no`.
 - **Severities**: this package's own three — `blocked`, `unevaluated`, `note`. ⛔ No fifth cause code:

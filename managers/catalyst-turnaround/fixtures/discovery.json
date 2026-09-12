@@ -275,6 +275,29 @@
       }
     },
     {
+      "name": "a-partial-required-lane-outranks-a-produced-candidate",
+      "why": "The precedence is part of the contract — discovery_not_run > discovery_incomplete > candidates_produced > no_candidate_qualified — and a required lane that is not `open` outranks a produced candidate exactly as a failed range does. Here the filing sweep read both ranges to the end and one event came through the traced-path gate, but the web lane answered `stale`, which is `partial`: half of this desk's entrance — the policy gazettes and ministry notices — was read against an older freshness than this run asked for. ⚠️ The filing lane cannot be `partial` here without a failed range, because CT measures that lane off the ranges it actually swept; the web lane is the stated one, and it is the half that is partial. The candidate is not lost and not hidden — it is still counted in newCandidates and still reaches the ledger — but the word is discovery_incomplete and the cursor does not move, because the part of the entrance that was not fully read is re-attempted before anything after it.",
+      "overrides": {
+        "lanes": { "filing": "fresh", "web": "stale", "price": "stale" }
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "gatePassed": 1,
+        "newCandidates": 1,
+        "resumedCandidates": 0,
+        "filingLaneStatus": "open",
+        "webLaneStatus": "partial",
+        "cursorAfterEqualsBefore": true,
+        "cursorMoved": false,
+        "symbolsFailed": [],
+        "failedRangeCount": 0,
+        "diagnosticCodes": ["candidates_produced_within_incomplete_sweep"],
+        "diagnosticSeverities": { "candidates_produced_within_incomplete_sweep": "note" },
+        "noBlockedDiagnostic": true,
+        "observationSymbols": ["036460"]
+      }
+    },
+    {
       "name": "both-required-lanes-dark-is-discovery-not-run",
       "why": "The cache could not be refreshed and nobody read the web. There was no discovery capacity at all, and the word for that is not «nothing qualified».",
       "overrides": {

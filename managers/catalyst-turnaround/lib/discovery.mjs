@@ -28,7 +28,13 @@ import { LEDGER_VOCABULARY } from './ledger.mjs'
  * | `candidates_produced` | the sweep ran and at least one name came out of it |
  * | `no_candidate_qualified` | the sweep ran **completely** and nothing qualified |
  * | `discovery_not_run` | no universe, no budget left, or every required lane shut |
- * | `discovery_incomplete` | the sweep ran and some range failed or was not reached |
+ * | `discovery_incomplete` | the sweep ran and some range failed, was not reached, or a required lane is not `open` |
+ *
+ * ⚠️ **More than one row holds at once, so the precedence is part of the contract:**
+ * `discovery_not_run` > `discovery_incomplete` > `candidates_produced` >
+ * `no_candidate_qualified`. A failed range **or** a required lane that is not `open`
+ * outranks a produced candidate; the candidate is still counted and still reaches
+ * the ledger, and what follows from the word is the cursor, which does not move.
  *
  * ⛔ **`no_candidate_qualified` is the expensive one and it has three guards.**
  * It may be reported only when the universe was declared, every lane this
@@ -526,13 +532,58 @@ export function discoveryRun({
   }
 
   // ── ⑤ the decision table, in this order, first match wins ────────────────
+  /**
+   * ⛔ **The precedence is part of the contract, and this is the order it states:**
+   *
+   *   `discovery_not_run` > `discovery_incomplete` > `candidates_produced` > `no_candidate_qualified`
+   *
+   * ⚠️ **A required lane that is not `open` outranks a produced candidate, exactly
+   * as a failed range does.** More than one row of the table holds at once whenever
+   * a sweep put a name through the gate and a lane it requires answered for only
+   * part of the range, and reporting that run by the candidate is #140 one step
+   * over: how much of the market this run actually read is the fact a later reader
+   * cannot reconstruct. The name is not lost — it is still counted in
+   * `newCandidates` / `resumedCandidates`, still handed to the ledger, and
+   * `candidates_produced_within_incomplete_sweep` below says so out loud. What
+   * follows from the word is the cursor, which stays where it was found.
+   *
+   * ⚠️ **`dark` and `unstated` are not `open` either**, so they reach this branch
+   * too — but only after `requiredLanesShut` has had its say above, because a run
+   * whose every required lane was shut swept nothing at all and the word for that
+   * is `discovery_not_run`.
+   */
   const anyRangeFailed = swept.some((row) => row.status !== 'succeeded')
+  const produced = newCandidates + resumedCandidates > 0
   let discoveryStatus
   if (!ledgerRead || !universeDeclared || budgetSpentOnHoldings || requiredLanesShut) discoveryStatus = 'discovery_not_run'
-  else if (anyRangeFailed) discoveryStatus = 'discovery_incomplete'
-  else if (newCandidates + resumedCandidates > 0) discoveryStatus = 'candidates_produced'
-  else if (universeDeclared && requiredLanesOpen && symbolsFailed.size === 0) discoveryStatus = 'no_candidate_qualified'
-  else discoveryStatus = 'discovery_incomplete'
+  else if (anyRangeFailed || symbolsFailed.size > 0 || !requiredLanesOpen) discoveryStatus = 'discovery_incomplete'
+  else if (produced) discoveryStatus = 'candidates_produced'
+  else discoveryStatus = 'no_candidate_qualified'
+
+  if (discoveryStatus === 'discovery_incomplete' && produced) {
+    /**
+     * ⚠️ **`note`, and never `unevaluated`.** Nothing here is unread and nothing
+     * here is a warning about the names: each one carries the written path from the
+     * event to this issuer's own cash flow and they stand. What the entry records is
+     * the *shape* of the run — candidates beside an unfinished sweep — so that a
+     * reader who sees `discovery_incomplete` beside a non-zero `newCandidates` does
+     * not read the pair as a contradiction.
+     */
+    diagnostics.push(
+      diagnostic(
+        'candidates_produced_within_incomplete_sweep',
+        'note',
+        `${newCandidates + resumedCandidates} name(s) came through the traced-path gate while part of this sweep was still unread. The candidates stand and are counted; the run is reported as discovery_incomplete and the cursor does not move, because the unread part is re-attempted before anything after it`,
+        'discoveryStatus',
+        {
+          newCandidates,
+          resumedCandidates,
+          symbolsFailed: [...symbolsFailed].sort(),
+          requiredLanes: Object.fromEntries(REQUIRED_LANES.map((name) => [name, laneByName[name]])),
+        },
+      ),
+    )
+  }
 
   /**
    * ⛔ **The cursor rule, and it is one line.** `cursorAfter === cursorBefore`

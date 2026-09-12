@@ -378,9 +378,17 @@ Four words, and they are a closed set. Take the first that applies:
 | status | when |
 |---|---|
 | `discovery_not_run` | no universe was declared, or the filing budget went on the held book, or every required lane was dark or unstated, or the candidate ledger was not read |
-| `discovery_incomplete` | the universe was declared and some range failed or was not reached |
+| `discovery_incomplete` | the universe was declared and some range failed or was not reached, **or** a required lane is not `open` |
 | `candidates_produced` | the sweep ran and at least one name came out of it |
 | `no_candidate_qualified` | ⛔ **only** when `universeDeclared` is true **and** every lane this strategy requires is `open` **and** `symbolsFailed` is empty |
+
+⚠️ **More than one row holds at once, so the precedence is part of the contract and the table above
+is in it:** `discovery_not_run` > `discovery_incomplete` > `candidates_produced` >
+`no_candidate_qualified`. A failed range **or** a required lane that came back `partial` outranks a
+name that came through the gate — how much of the market this run actually read is the fact a later
+reader cannot reconstruct. ⚠️ The name is not lost: it is still counted in `newCandidates` /
+`resumedCandidates`, still written to the ledger, and the run says so in
+`candidates_produced_within_incomplete_sweep`. What follows from the word is the cursor.
 
 **The lanes**: `open` · `partial` · `dark` · `unstated`. This desk **requires filing and web**; price
 is optional, because the entrance here is an event and price is read later to size. ⚠️ A lane nobody

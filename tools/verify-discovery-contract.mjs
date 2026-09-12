@@ -342,6 +342,21 @@ const PRECEDENCE_CASES = [
     why: '⚠️ The one #305 names: a partially unprocessed range is left as its own distinct status, and the candidate is reported by the counts rather than by the word.',
   },
   {
+    id: 'a-partial-required-lane-outranks-a-produced-candidate',
+    higher: 'discovery_incomplete',
+    lower: 'candidates_produced',
+    situation: {
+      id: 'a-required-lane-partial',
+      universe: 'declared',
+      requiredLanes: 'partial',
+      optionalLane: 'unstated',
+      rangeFailed: false,
+      qualifying: 1,
+      proposeAdvance: false,
+    },
+    why: '⚠️ The other half of the row above, and the one the packages disagreed on: the contract says `discovery_incomplete` covers **a required lane that is not `open`** as well as a failed range, so a name that came through the gate beside a lane that answered for only part of its range is reported by the unfinished sweep and not by the candidate. No range failed here, which is exactly what makes it a separate case — a package that reached the word through `symbolsFailed` alone answers `candidates_produced` to this one.',
+  },
+  {
     id: 'a-produced-candidate-outranks-an-empty-screen',
     higher: 'candidates_produced',
     lower: 'no_candidate_qualified',
@@ -529,10 +544,20 @@ const ctAdapter = {
     /**
      * ⚠️ **CT measures its filing lane off the ranges it actually swept** and
      * honours a stated one only when it swept none. So a situation whose required
-     * lanes are anything but `open` is put to it as a run that swept no range —
-     * which is what that situation is: a run whose lane did not answer.
+     * lanes are `dark` or `unstated` is put to it as a run that swept no range —
+     * which is what that situation is: a run whose lanes did not answer at all.
+     *
+     * ⚠️ **`partial` is the one that does sweep.** A lane that answered for some of
+     * the range is a lane that answered, so the receipt ranges are handed over and
+     * they succeed — which makes CT's *measured* filing lane `open` — and the
+     * situation's `partial` lands on `web`, the required lane this package states
+     * rather than measures. ⛔ Translating `partial` as «swept nothing» instead
+     * would make the situation easier: it would delete the candidate the situation
+     * asks for, and the whole point of the case is a required lane that is not
+     * `open` standing beside a name that came through the gate.
      */
-    const sweeps = situation.requiredLanes === 'open' && situation.budgetSpentOnHoldings !== true
+    const sweeps =
+      (situation.requiredLanes === 'open' || situation.requiredLanes === 'partial') && situation.budgetSpentOnHoldings !== true
     const event = {
       eventId: 'ev-tariff',
       symbol: '036460',
@@ -859,16 +884,25 @@ for (const entry of PRECEDENCE_CASES) {
  * would pass every check above.
  */
 console.log('\n══ ⑨ a candidate reported as an incomplete sweep is still counted ══')
+/** Both ways of reaching the word over a productive run: a failed range, and a lane that is not `open`. */
+const COUNTED_SITUATIONS = [
+  SITUATIONS.find((row) => row.id === 'a-range-failed-while-a-name-qualified'),
+  PRECEDENCE_CASES.find((row) => row.id === 'a-partial-required-lane-outranks-a-produced-candidate').situation,
+]
 for (const adapter of ADAPTERS) {
-  const run = adapter.discovery(SITUATIONS.find((row) => row.id === 'a-range-failed-while-a-name-qualified'))
   const problems = []
-  checks += 1
-  if (run.newCandidates + run.resumedCandidates < 1) {
-    problems.push(
-      `reported ${run.discoveryStatus} with newCandidates=${run.newCandidates} resumedCandidates=${run.resumedCandidates} — the name that came through the gate was dropped along with the word`,
-    )
+  const shown = []
+  for (const situation of COUNTED_SITUATIONS) {
+    const run = adapter.discovery(situation)
+    checks += 1
+    if (run.newCandidates + run.resumedCandidates < 1) {
+      problems.push(
+        `${situation.id}: reported ${run.discoveryStatus} with newCandidates=${run.newCandidates} resumedCandidates=${run.resumedCandidates} — the name that came through the gate was dropped along with the word`,
+      )
+    }
+    shown.push(`${situation.id}: new=${run.newCandidates} resumed=${run.resumedCandidates} gatePassed=${run.gatePassed}`)
   }
-  record({ id: 'the-name-survives-the-precedence' }, adapter.PACKAGE, problems, null, null, `new=${run.newCandidates} resumed=${run.resumedCandidates} gatePassed=${run.gatePassed}`)
+  record({ id: 'the-name-survives-the-precedence' }, adapter.PACKAGE, problems, null, null, shown.join('  '))
 }
 
 console.log('\n══ ③ no_candidate_qualified is reported only under its full condition ══')

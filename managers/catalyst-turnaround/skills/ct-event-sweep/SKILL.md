@@ -165,6 +165,11 @@ rather than advice is that a stale private copy reads exactly like a fresh one.
 - the **discovery record**, always, with the four-status verdict and both cursors;
 - ⛔ `no_candidate_qualified` only when the universe was declared, every required lane is `open` and
   no symbol failed. Otherwise the answer is `discovery_not_run` or `discovery_incomplete`;
+- ⚠️ and when two of the four hold at once, the precedence decides:
+  `discovery_not_run` > `discovery_incomplete` > `candidates_produced` > `no_candidate_qualified`.
+  A failed range **or** a required lane that came back `partial` outranks a name that came through
+  the gate — the name is still counted and still written to the ledger, but the run is reported as
+  `discovery_incomplete` and the cursor stays where it was found;
 - the failed ranges, so the next run starts by retrying them;
 - and if the status is `discovery_not_run`, the token `discovery_not_run` verbatim in one
   `uncertainty` entry of the proposal.
