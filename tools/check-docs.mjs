@@ -87,6 +87,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const TRANSLATED = [
   { source: 'README.md', translations: ['docs/readme/README.ko.md'] },
   { source: 'CONTRIBUTING.md', translations: ['docs/contributing/CONTRIBUTING.ko.md'] },
+  { source: 'docs/contracts/discovery-run.md', translations: ['docs/contracts/discovery-run.ko.md'] },
   ...packageTranslationPairs(),
 ]
 

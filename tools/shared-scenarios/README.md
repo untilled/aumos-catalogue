@@ -143,6 +143,11 @@ not recorded as a `knownDefect`.
   classification, so nothing here judges a route, an intent or an outcome code.
 - ⬜ **No prose.** `PROMPT.md` and `skills/` are the methodologies and are meant
   to differ.
+- ⬜ **No field names, so no discovery contract.** #305 asks the three to spell one
+  discovery-run record and one candidate ledger the *same way* — which is an assertion
+  over field names and status words, the one thing the table above says is never
+  asserted here. It therefore lives in `tools/verify-discovery-contract.mjs`, and what
+  it holds is [`docs/contracts/discovery-run.md`](../../docs/contracts/discovery-run.md).
 - ⬜ **No staged plans, no exits, no re-arming.** Three different sources of truth
   (the book, a carried register, the plan's own ledger), which is a difference in
   mechanism rather than in answer, and #256 assigns each to its package.
