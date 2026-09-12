@@ -26,7 +26,7 @@
 
 ## 1. 패키지 선택 — `shareholder-rerating`
 
-셋 중 **shareholder-rerating (SR, 0.5.7)** 을 쓴다. 근거 넷:
+셋 중 **shareholder-rerating (SR, 0.6.0)** 을 쓴다. 근거 넷:
 
 1. **종목이 망가져 있을 것을 요구하지 않는 유일한 패키지다.**
    - FMR은 Stage 2 발굴 게이트가 **설정 불가로 박혀 있다**: `drawdown = close/max(high, 최근 252봉) − 1 ≤ −0.30` **그리고** (`rsi14 ≤ 35` 또는 `ma200Distance ≤ −0.15`). 건강한 대형주는 `uptrend-pullback-not-this-strategy`로 끝난다.
@@ -641,6 +641,139 @@ echo '{"id":1,"query":{"kind":"performance","portfolioId":"pf_…"}}' | $HOST
 
 ---
 
+## 9-D. 후보 발굴 한 사이클 관측 (#305)
+
+> **무엇을 닫는 절인가.** `aumos-catalogue#305`의 마지막 완료 조건 — *「게시된 세 패키지의 설치·실행으로
+> `Toss/OpenDART → 후보 → manager-memory → 다음 실행 재개 → 완결 조사` 한 사이클을 관측한다」* — 은
+> 이 저장소에서 닫을 수 없다. fixture는 계약을 잡지만 **벤더의 실제 응답으로 유니버스가 선언되는지**는
+> 잡지 못한다. 그래서 절차만 여기 적는다.
+>
+> ⛔ **이 절은 주문을 내지 않는다.** 후보 발굴은 `PORTFOLIO_REVIEW`의 2단계이고, 관측 대상은 판단이
+> 아니라 **장부와 커서**다. ③·⑤와 달리 돈이 움직이지 않으므로 §9-A 없이 돌려도 된다.
+
+**한 사이클은 런 하나가 아니라 둘이다.** `observation_file`이 발급한 `evidenceId`는 런이 끝나야
+커널에 커밋되므로(**H-4**) 같은 런에서 인용할 수 없다. 그래서 런 1이 증거를 걸어 두고 런 2가 그것을
+되읽는다. 이 왕복이 곧 «재개»의 실물이다.
+
+### 9-D.1 런 1 — 유니버스 선언 · 스윕 · 장부 쓰기
+
+패키지마다 유니버스를 여는 경로가 다르다. 무엇을 선언했는지가 나머지 전부를 결정한다.
+
+| 패키지 | 유니버스를 여는 경로 | `universeSource`에 서야 할 값 |
+|---|---|---|
+| FMR | `connection_request` → 토스 `/api/v1/stocks/all` (⚠️ 허용 필터 **값**은 미실측 — **H-1**) | `toss:/api/v1/stocks/all` |
+| CT | `source_cache_refresh` → OpenDART 공시 인덱스(+ `corp-codes` 조인) | `toss:/api/v1/stocks/all` 또는 공시 인덱스 — **런이 실제로 받은 것** |
+| SR | `source_cache_refresh` → OpenDART 환원 공시 | `open-dart:/api/list.json via source-cache` |
+
+```bash
+ask '{"id":1,"command":{"kind":"start-run","packageId":"fundamental-mean-reversion","managerInstanceId":"agt_…","live":true}}' 900
+RUN1=$(ls -t "$AUMOS_HOME/runs" | head -1); echo "$RUN1"
+```
+
+⚠️ **`live: true`가 없으면 픽스처 세계로 돈다** — 그러면 이 절이 재려는 것을 하나도 재지 못한다(§7.3).
+
+### 9-D.2 무엇을 볼 것인가 — `mcp-audit.jsonl`
+
+런 디렉토리의 `mcp-audit.jsonl`이 **매니저가 실제로 부른 툴 전부**다(§7.4). 세 줄만 찾으면 된다.
+
+```bash
+A="$AUMOS_HOME/runs/$RUN1/mcp-audit.jsonl"
+grep -c 'source_cache_refresh' "$A"   # ≥1 — 공시 레인이 실제로 열렸는가
+grep -c 'observation_file'     "$A"   # ≥1 — 웹 원문 하나가 증거가 됐는가
+grep -c 'files_write'          "$A"   # ≥1 — 장부가 실제로 쓰였는가
+jq -r 'select(.tool=="observation_file") | {url:.args.url, publishedAt:.args.publishedAt, evidenceId:.result.evidenceId}' "$A"
+```
+
+| 보이는 것 | 뜻 |
+|---|---|
+| `source_cache_refresh` 없음 | 공시 레인을 **연 적이 없다**. `filingLaneStatus`가 `unstated`여야 하고, 그러면 판단은 `discovery_not_run`이다 |
+| `observation_file` 없음 | 웹 레인이 안 돌았다. FMR은 web이 선택 레인이라 정상일 수 있고, **CT·SR은 필수 레인이라 결함**이다 |
+| `files_write` 없음 | 스윕 결과가 **어디에도 남지 않았다**. 다음 런은 처음부터 다시 훑는다 — 그 자체가 이 절의 실패다 |
+| `files_write`가 `expectedHash` 없이 | CAS를 건너뛴 것이다. 동시 런이 서로를 덮어쓴다(**H-6**) |
+
+⚠️ **`claude`의 대화 기록은 런 디렉토리에 없다**(§7.4). `mcp-audit.jsonl`로 부족하면
+`~/.claude/projects/<enc>/<uuid>/`를 `claude --resume <uuid>`로 열어 같은 세 이름을 찾는다.
+
+### 9-D.3 무엇을 볼 것인가 — 장부
+
+장부는 **문서 하나**이고 커서가 그 **안에** 있다(**H-6** — 다중 파일 원자적 쓰기가 없다). 경로는
+패키지마다 자기 것이다.
+
+| 패키지 | 장부 경로 (`files_read`의 `path`) |
+|---|---|
+| FMR | `state/candidates.json` |
+| CT | `state/candidate-ledger.json` (+ `state/catalyst-register.json` — ⛔ **합치지 않는다**) |
+| SR | `state/candidates/shareholder-rerating.json` |
+
+```bash
+jq -r '.args.path' <(grep 'files_write' "$A")          # 위 표의 경로가 나와야 한다
+jq -r '.args.content' <(grep 'files_write' "$A") | jq '{cursor, n:(.candidates|length), states:[.candidates[].state]}'
+```
+
+✅ 런 1이 성립한 모습:
+- `cursor.value`가 **널이 아니고**, `failedRanges[]`에 실패한 범위만 남아 있다.
+- 후보 하나가 `state: "researching"`이고 `evidenceIds[]`에 방금 발급된 `ev_…`를 들고 있다.
+- `openQuestions[]`가 비어 있지 **않다** — 비었는데 `researching`이면 상태가 거짓이다.
+
+⛔ **장부에 있으면 안 되는 것**(#305 범위 밖, 검증기가 `memory_holds_vendor_payload`로 막는다):
+`open`/`high`/`low`/`close`/`volume` 배열, 공시 본문이나 `excerpt`, `quantity`/`cash`/`averageCost`,
+미결 제안. 손으로도 한 번 본다:
+```bash
+jq -r '.args.content' <(grep 'files_write' "$A") | grep -E '"(close|volume|excerpt|quantity|cash|averageCost)"' && echo "⛔ 결함"
+```
+
+### 9-D.4 `discoveryStatus` — rationale에서 읽는 법
+
+발굴 통계는 **판단의 근거 산문에 실린다**. `decision.json`에서 네 단어 중 하나를 찾는다.
+
+```bash
+jq -r '.decision.rationale' "$AUMOS_HOME/runs/$RUN1/decision.json" | grep -oE 'candidates_produced|no_candidate_qualified|discovery_not_run|discovery_incomplete'
+```
+
+| 나온 값 | 그때 같이 서 있어야 하는 것 |
+|---|---|
+| `candidates_produced` | `newCandidates + resumedCandidates ≥ 1`, `cursorAfter ≠ cursorBefore` |
+| `no_candidate_qualified` | `universeDeclared: true` **그리고** 필요한 레인 전부 `open` **그리고** `symbolsFailed: []`. ⛔ **셋 중 하나라도 아닌데 이 단어가 나오면 그것이 #305가 막으려던 바로 그 오독이다** |
+| `discovery_incomplete` | `symbolsFailed[]`가 비지 않았고 `cursorAfter == cursorBefore` |
+| `discovery_not_run` | 유니버스 미선언이거나 예산을 보유 검토가 다 썼다. 이 단어는 `uncertainty` 항목에 **그대로** 실려야 한다 |
+
+⚠️ **후보 0건은 기본값이 아니다.** 네 단어 중 아무것도 안 나오면 그것은 «후보 없음»이 아니라
+**관측 실패**다 — 그대로 기록한다.
+
+### 9-D.5 런 2 — 재개 · `evidenceId` 왕복 · 완결 조사
+
+같은 인스턴스로 한 번 더 띄운다. ⚠️ 유니버스를 다시 선언하지 **않아도** 된다 — 재개가 먼저다.
+
+```bash
+ask '{"id":1,"command":{"kind":"start-run","packageId":"fundamental-mean-reversion","managerInstanceId":"agt_…","live":true}}' 900
+RUN2=$(ls -t "$AUMOS_HOME/runs" | head -1)
+B="$AUMOS_HOME/runs/$RUN2/mcp-audit.jsonl"
+grep -c 'files_read'   "$B"    # ≥1 — 장부를 먼저 읽었는가
+grep -c 'evidence_get' "$B"    # ≥1 — 런 1의 ev_… 를 되읽었는가
+jq -r 'select(.tool=="evidence_get") | .args.evidenceId' "$B"
+```
+
+✅ 체크포인트 — 한 사이클이 닫힌 모습:
+- 런 2의 `evidence_get`이 든 `ev_…`가 **런 1의 `observation_file`이 발급한 그 id**다(**H-4**의 왕복).
+- 그 후보의 `state`가 `researching` → `watching | proposed | excluded` 중 하나로 **전이**했고,
+  `history[]`에 그 전이가 한 줄 붙었다.
+- 같은 종목의 **두 번째 행이 생기지 않았다** — 키는 `(market, symbol)`이고 재발견은
+  `lastSeenAtEpochMs`만 갱신한다. 행이 둘이면 멱등성 결함이다.
+- 런 1이 실패한 범위를 남겼다면 런 2가 그것을 **먼저** 재시도했고 `attempts`가 올랐다.
+
+⛔ **여기서 BUY가 나오는 것은 이 절의 성공 조건이 아니다.** 웹 요약만으로 만든 제안을 #305가 범위
+밖으로 못박았으므로, 완결 조사가 `watching`으로 끝나는 것도 정답이다. 볼 것은 **장부가 자랐는가**다.
+
+### ⬜ 이 절이 재지 못하는 것
+
+- **세 패키지 동시 관측.** 같은 종목이 두 데스크에 동시에 서는 모습은 #268의 것이고, 이 절차는 한
+  인스턴스만 돌린다(**H-8**).
+- **종목 지목.** `start-run`에 `subject`가 없다(⚠️-3 / **H-5**) — 어느 종목이 후보가 되는지 고를 수 없다.
+- **300봉.** `prices/daily` 캐시가 ~270 세션이라 FMR의 게이트가 실제로 계산되는지는 매니저가 직접
+  `/api/v1/candles`를 `nextBefore`로 페이지해야만 확인된다(**H-2**).
+
+---
+
 ## 10. 정리 — 연습이 포지션보다 오래 살지 않게
 
 ```bash
@@ -726,6 +859,14 @@ cp -R "$AUMOS_HOME/runs" /tmp/256-runs
 | ⚠️-15 | **`AUMOS_WAKE`를 끌 것인가** | 이 런북은 Wake Engine을 켠 채로 돈다(스케줄 발화를 보려면 필요). ⚠️ 켜 두면 SR의 `30 16 * * 1-5`가 **저녁에 스스로 런을 띄워 구독을 쓴다**. 통제된 관측만 원하면 `AUMOS_WAKE=0`으로 띄운다 — **타이머 하나만** 꺼지고 `wake-tick`·`mark-books`·`start-run`은 그대로 돈다. 정확히 `'0'`이어야 하고, 없는 것은 켜진 것이다 |
 | ⚠️-16 | **동시 런 상한** | `MAX_LIVE_RUNS = 4`, 틱 간격 60초, 누락된 스케줄은 **따라잡지 않는다**(#642 strict skip, `CADENCE_GRACE_MS = 5분`). 노트북이 자고 있었다면 밀린 런은 **0건**이고 `CadenceGap` 행으로만 남는다 |
 | ⚠️-17 | **`run_…` id 형식** | 런 디렉토리 이름은 워커가 민팅한 run id다. 프로덕션 저장소에서의 정확한 형식을 확정하지 못했다 — 이 런북은 전부 `ls -t "$AUMOS_HOME/runs" \| head -1`로 집는다 |
+| ⚠️-18 | **H-1 · 시점 고정 XKRX 유니버스가 없다** | `/api/v1/stocks/all`이 유일한 전체 시장 경로이고 네 필터(`market`·`status`·`securityType`·`commonShare`)의 **허용 값이 미실측**이다. 목록은 오늘의 것이라 생존편향을 싣고 보정할 길이 없다. 세 패키지는 필터 값을 지어내지 않고 받은 행 수를 그대로 `universeCount`로 적는다 → 열거가 거절되면 `universeDeclared: false` · `discovery_not_run`. **호스트 이슈 필요** |
+| ⚠️-19 | **H-2 · 완료봉 300개에 닿는 경로가 하나뿐이다** | `market_bars`는 250에서 잘리고 `prices/daily` 캐시는 400 캘린더일 ≈ **270 세션**으로 300 미만이다. 매니저가 `connection_request /api/v1/candles`를 `nextBefore`로 직접 페이지해야만 닿고, `adjusted`를 **매 페이지 명시**해야 한다. 짧은 시계열을 채우거나 두 수정 기준을 섞는 것은 금지 |
+| ⚠️-20 | **H-3 · source-cache 권한이 세 패키지에 실제로 닿는지 미확인** | 매니페스트가 `source-cache:read`/`write`를 선언했을 뿐 어떤 런도 그 툴이 실제로 서는지 보지 못했다. ⛔ 대체책으로 `manager-memory`에 두 번째 캐시를 만들지 않는다 — 권한이 없으면 레인이 `dark`이고 런은 `discovery_not_run`이다 |
+| ⚠️-21 | **H-4 · 관측 → `evidenceId` 왕복이 런 둘에 걸친다** | `observation_file`이 id를 발급해도 런이 끝나기 전에는 커널에 커밋되지 않아 **같은 런에서 인용할 수 없다.** 그래서 id가 후보의 `evidenceIds[]`에 실려 다음 런으로 넘어간다(§9-D.5가 재는 것이 이것이다) |
+| ⚠️-22 | **H-5 · `start-run`에 종목 subject가 없다** | ⚠️-3과 같은 사실의 발굴 쪽 얼굴이다. 수동 런은 언제나 `PORTFOLIO_REVIEW`이므로 «이 종목을 조사해라»를 지시할 수 없고, `ASSET_REVIEW`인 척하지도 않는다. 남은 손잡이는 맨데이트 `objective` 자유 텍스트뿐 |
+| ⚠️-23 | **H-6 · 다중 파일 원자적 쓰기가 없다** | `manager-memory`는 파일 툴 여섯 개와 `expectedHash` CAS뿐이다. 그래서 장부는 **문서 하나**이고 커서가 그 안에 있다 — 파일 둘로 나누면 사이에서 죽은 런이 «장부에 없는 스윕을 주장하는 커서»를 남긴다 |
+| ⚠️-24 | **H-7 · 수정 기준·거래정지·기업행동·거래대금·시장달력의 모양이 미실측** | 캔들은 주식 수 기준 거래량만 싣고 기업행동은 아예 없다. FMR은 기준이 선언되지 않으면 `adjustment_basis_undeclared`로 **거절**하지 가정하지 않고, 거래대금을 거래량×가격으로 유도하지 않는다 |
+| ⚠️-25 | **H-8 · 한 펀드의 두 매니저가 같은 종목을 발견할 수 있다** | 발굴 단계에서 중복 제거를 하는 곳은 어디에도 없고, 그것이 설계다 — 같은 종목이라도 세 전략에는 세 개의 가설이다. 계좌 차원에서 노출이 두 번 들어오는 문제는 **#268**의 것이지 이 파이프라인의 것이 아니다 |
 
 ---
 

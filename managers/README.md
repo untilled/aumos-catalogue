@@ -67,6 +67,19 @@ Two ways to live with that, and the catalogue does not choose for you:
 
 Crypto overlaps with neither.
 
+**The three equity packages overlap differently, and on purpose.** `fundamental-mean-reversion`,
+`catalyst-turnaround` and `shareholder-rerating` each sweep a declared XKRX universe of their own,
+so two of them finding the same name is expected rather than a fault — the same ticker under three
+methodologies is three different hypotheses, with three different invalidation conditions and three
+different deadlines. Each keeps its **own candidate ledger in its own `manager-memory`**, and
+[#305](https://github.com/untilled/aumos-catalogue/issues/305) puts a shared ledger and a central
+ranking out of scope: a ledger one package could read from another would make one desk's research
+state an input to a second desk's judgement, which is the commonisation the packages exist to
+avoid. What that leaves unsolved is the account-level one — the same name arriving twice at a size
+neither package chose — and that is the same-fund multi-manager boundary tracked in
+[#268](https://github.com/untilled/aumos-catalogue/issues/268), not something a discovery sweep
+deduplicates. The two ways to live with it are the two above.
+
 ## What they are all bad at
 
 The three share three failure modes, and the differences are of degree.
