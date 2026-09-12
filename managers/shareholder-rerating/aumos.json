@@ -3,7 +3,7 @@
   "id": "shareholder-rerating",
   "publisher": "aumos",
   "name": "Shareholder Rerating",
-  "version": "0.5.7",
+  "version": "0.6.0",
   "description": "Korea-listed single equities whose earnings and capital headroom support a shareholder return programme that is actually being executed, held for the discount that closing it should close. Separates re-rating from dividends in every number, and never counts a company's buyback as the investor's income.",
   "readme": "./README.md",
   "prompt": "./PROMPT.md",
@@ -90,6 +90,20 @@
       "reason": "An issuer's investor-relations statement of its return policy, and the broker consensus this desk has to differ from in specific terms, exist on the web and in no filing. Filing the reading — its words, its URL, its publication date — is the only route by which it reaches evidenceIds at all, and every proposal that rests on one says on screen that it is this manager's testimony rather than an Aumos observation."
     },
     {
+      "kind": "source-cache:read",
+      "sources": [
+        "open-dart"
+      ],
+      "reason": "The disclosure sweep this desk enters on is incremental or it is the same hundred filings re-read every run. Aumos already keeps the OpenDART filing index per filer, with a four-valued freshness state, so this package reads that store rather than building a second cache in its own folder \u2014 which the private-memory contract forbids and which would be a copy of somebody else's copy."
+    },
+    {
+      "kind": "source-cache:write",
+      "sources": [
+        "open-dart"
+      ],
+      "reason": "Reading a store nobody refreshes answers `never-fetched` forever. The refresh is what turns \u00abthis desk has not looked\u00bb into \u00abthe vendor has nothing\u00bb, and those are the two facts this package's discovery status exists to keep apart. It writes cached vendor documents and nothing else: no judgement, no position and no manager state goes through this route."
+    },
+    {
       "kind": "manager-memory:read",
       "reason": "This instance reads back its own staged-plan ledger, its research progress on candidates it did not finish, and the review it armed last time — so a run that resumes after a failed one continues instead of starting the same research again."
     },
@@ -105,9 +119,13 @@
     ],
     "optionalSkills": [
       "observation_file",
+      "source_cache_read",
+      "source_cache_refresh",
+      "evidence_get",
       "files_list",
       "files_read",
-      "files_write"
+      "files_write",
+      "files_mkdir"
     ]
   },
   "memory": {

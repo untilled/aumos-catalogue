@@ -1,0 +1,320 @@
+{
+  "note": "The candidate roster of `lib/candidate-memory.mjs`. `base` is one well-formed run against a ledger that was read and holds one name; each scenario shallow-merges its `overrides` onto it. ⚠️ `previous` is deliberately present in `base` — a scenario that wants «nobody read the key» overrides it to the string \"__undefined__\", because JSON has no way to spell an absent value and the difference between absent and null is the whole first rule of this file.",
+  "asOf": "2026-02-27T00:00:00Z",
+  "base": {
+    "asOf": "2026-02-27T00:00:00Z",
+    "ruleVersion": "sr-gate-1",
+    "advanceCursor": true,
+    "cursor": { "kind": "dart-receipt", "value": "20260226000742", "atEpochMs": 1772150400000 },
+    "previous": {
+      "schemaVersion": 1,
+      "strategy": "shareholder-rerating",
+      "ruleVersion": "sr-gate-1",
+      "updatedAtEpochMs": 1767398400000,
+      "cursor": { "kind": "dart-receipt", "value": "20260105000111", "atEpochMs": 1767398400000 },
+      "failedRanges": [],
+      "candidates": [
+        {
+          "symbol": "316140",
+          "market": "XKRX",
+          "state": "researching",
+          "discoveredAtEpochMs": 1767398400000,
+          "lastSeenAtEpochMs": 1767398400000,
+          "discoveryPath": ["disclosure-sweep"],
+          "ruleVersion": "sr-gate-1",
+          "hypothesis": "자기주식 취득 결정이 결과보고서로 이어지고 있고, 그 집행이 은행 자본 여력 안에서 지속 가능하다.",
+          "sectionsComplete": ["return-policy-evidence"],
+          "openQuestions": ["2025년 4분기 소각 결정이 실제 주식수 감소로 이어졌는가"],
+          "evidenceIds": ["ev_policy_2512"],
+          "programmeIds": ["prog-2025-buyback-1"],
+          "nextReviewAtEpochMs": 1774742400000,
+          "nextReviewCondition": "다음 자기주식 취득 결과보고서 접수",
+          "excludedReasonCode": null,
+          "history": [{ "atEpochMs": 1767398400000, "from": null, "to": "researching", "ruleVersion": "sr-gate-1" }]
+        }
+      ]
+    },
+    "discovered": [
+      {
+        "symbol": "316140",
+        "market": "XKRX",
+        "state": "researching",
+        "discoveryPath": ["disclosure-sweep", "web-ir"],
+        "evidenceIds": ["ev_result_2602"],
+        "programmeIds": ["prog-2025-buyback-1"],
+        "openQuestions": ["2025년 4분기 소각 결정이 실제 주식수 감소로 이어졌는가"],
+        "nextReviewCondition": "다음 자기주식 취득 결과보고서 접수"
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "name": "a-read-ledger-folds-one-run-onto-the-carried-row",
+      "why": "The control, and it is also the duplicate-discovery rule: the same name found twice is one row with a later lastSeen, a folded discoveryPath and a longer history.",
+      "overrides": {},
+      "expect": {
+        "ledgerRead": true,
+        "nextLedgerWritten": true,
+        "candidateCount": 1,
+        "discoveryPath": ["disclosure-sweep", "web-ir"],
+        "evidenceIds": ["ev_policy_2512", "ev_result_2602"],
+        "programmeIds": ["prog-2025-buyback-1"],
+        "cursorValue": "20260226000742",
+        "diagnosticCodes": [],
+        "blocked": false
+      }
+    },
+    {
+      "name": "undefined-is-nobody-having-read-the-key",
+      "why": "Seeding a fresh roster over an unread one loses every hypothesis this desk has, and the loss is invisible on the next run — it reads as a market nobody has looked at.",
+      "overrides": { "previous": "__undefined__" },
+      "expect": {
+        "ledgerRead": false,
+        "nextLedgerWritten": false,
+        "candidateCount": 0,
+        "outcomeCode": "data_missing",
+        "diagnosticCodes": ["candidate_ledger_unread"],
+        "diagnosticSeverities": { "candidate_ledger_unread": "unevaluated" },
+        "blocked": false
+      }
+    },
+    {
+      "name": "null-is-read-and-empty-and-seeds",
+      "why": "The key can therefore never self-lock: a malformed write is always recoverable by reading it and finding nothing this code can carry.",
+      "overrides": { "previous": null },
+      "expect": { "ledgerRead": true, "seeded": true, "nextLedgerWritten": true, "candidateCount": 1, "diagnosticCodes": [], "blocked": false }
+    },
+    {
+      "name": "a-schema-version-this-code-does-not-know-is-refused",
+      "why": "A writer this code does not know may shape its rows in a way this code silently drops, and dropping history is the failure the document exists to prevent.",
+      "overrides": { "previous": { "schemaVersion": 2, "strategy": "shareholder-rerating", "updatedAtEpochMs": 1767398400000, "candidates": [] } },
+      "expect": { "nextLedgerWritten": false, "diagnosticCodes": ["candidate_ledger_schema_unknown"], "blocked": true }
+    },
+    {
+      "name": "a-ledger-written-after-as-of-is-refused",
+      "why": "Its rows can all be past-dated and still leak a later run's judgement backwards, which no per-row check catches.",
+      "overrides": { "previous": { "schemaVersion": 1, "strategy": "shareholder-rerating", "updatedAtEpochMs": 1790000000000, "candidates": [] } },
+      "expect": { "nextLedgerWritten": false, "diagnosticCodes": ["candidate_ledger_from_the_future"], "blocked": true }
+    },
+    {
+      "name": "a-ledger-with-no-schema-version-degrades-rather-than-refusing",
+      "why": "The hand-written blobs that existed before this contract carry none. There is nothing to misread, so it degrades and this run writes a versioned document over it.",
+      "overrides": { "previous": { "strategy": "shareholder-rerating", "candidates": [] } },
+      "expect": { "seeded": true, "nextLedgerWritten": true, "diagnosticCodes": ["candidate_ledger_schema_absent"], "blocked": false }
+    },
+    {
+      "name": "sibling-keys-this-contract-does-not-define-are-named-and-not-carried",
+      "why": "The size cap measures `candidates`, so carrying arbitrary caller fields is a hole in the cap and in the rule that this document is a roster and not a source cache.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "shareholder-rerating",
+          "updatedAtEpochMs": 1767398400000,
+          "candidates": [],
+          "scratchpad": { "anything": true },
+          "lastPriceSnapshot": {}
+        }
+      },
+      "expect": {
+        "previousExtraKeys": ["lastPriceSnapshot", "scratchpad"],
+        "nextLedgerWritten": true,
+        "diagnosticCodes": ["candidate_ledger_extra_keys"],
+        "blocked": false
+      }
+    },
+    {
+      "name": "the-same-name-twice-in-one-run-is-still-one-row",
+      "why": "Duplicate discovery keyed by (market, symbol): no second row, no second proposal, and the paths fold into a set.",
+      "overrides": {
+        "discovered": [
+          { "symbol": "316140", "market": "XKRX", "state": "researching", "discoveryPath": ["disclosure-sweep"] },
+          { "symbol": "316140", "market": "XKRX", "state": "researching", "discoveryPath": ["web-ir"] }
+        ]
+      },
+      "expect": { "candidateCount": 1, "discoveryPath": ["disclosure-sweep", "web-ir"], "blocked": false }
+    },
+    {
+      "name": "an-excluded-name-cannot-quietly-become-a-candidate-again",
+      "why": "A rejection that becomes a candidate with nothing recording that it ever was one is how a ledger of findings turns into a ledger of moods.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "shareholder-rerating",
+          "ruleVersion": "sr-gate-1",
+          "updatedAtEpochMs": 1767398400000,
+          "cursor": { "kind": "dart-receipt", "value": "20260105000111", "atEpochMs": 1767398400000 },
+          "failedRanges": [],
+          "candidates": [
+            {
+              "symbol": "316140",
+              "market": "XKRX",
+              "state": "excluded",
+              "excludedReasonCode": "payout_rests_on_non_recurring_profit",
+              "ruleVersion": "sr-gate-1",
+              "evidenceIds": ["ev_policy_2512"],
+              "discoveredAtEpochMs": 1767398400000,
+              "history": []
+            }
+          ]
+        }
+      },
+      "expect": {
+        "state": "excluded",
+        "nextLedgerWritten": false,
+        "diagnosticCodes": ["candidate_state_regressed"],
+        "blocked": true
+      }
+    },
+    {
+      "name": "re-entry-with-a-reason-and-new-evidence-is-allowed",
+      "why": "The other half of the rule, so that what is refused above is the silent drop and not re-entry itself.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "shareholder-rerating",
+          "ruleVersion": "sr-gate-1",
+          "updatedAtEpochMs": 1767398400000,
+          "cursor": { "kind": "dart-receipt", "value": "20260105000111", "atEpochMs": 1767398400000 },
+          "failedRanges": [],
+          "candidates": [
+            {
+              "symbol": "316140",
+              "market": "XKRX",
+              "state": "excluded",
+              "excludedReasonCode": "payout_rests_on_non_recurring_profit",
+              "ruleVersion": "sr-gate-1",
+              "evidenceIds": ["ev_policy_2512"],
+              "discoveredAtEpochMs": 1767398400000,
+              "history": []
+            }
+          ]
+        },
+        "discovered": [
+          {
+            "symbol": "316140",
+            "market": "XKRX",
+            "state": "researching",
+            "reentryReason": "2026년 1분기 실적에서 일회성 이익을 제외한 경상 EPS가 배당을 덮는다",
+            "evidenceIds": ["ev_q1_2026"]
+          }
+        ]
+      },
+      "expect": { "state": "researching", "nextLedgerWritten": true, "diagnosticCodes": [], "blocked": false }
+    },
+    {
+      "name": "a-rule-version-change-is-flagged-and-never-migrated",
+      "why": "A gate that changed is a judgement to redo. A row rewritten to the new version is a judgement nobody made.",
+      "overrides": { "ruleVersion": "sr-gate-2" },
+      "expect": {
+        "requiresReevaluation": ["316140"],
+        "candidateRuleVersion": "sr-gate-1",
+        "diagnosticCodes": ["rule_version_changed"],
+        "diagnosticSeverities": { "rule_version_changed": "warn" },
+        "nextLedgerWritten": true,
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-vendor-payload-in-the-roster-is-refused",
+      "why": "manager-memory is not a source cache and not an account database. Prices come from the broker connection, filings from the host source cache, holdings from portfolio_get — every run, from the source.",
+      "overrides": {
+        "discovered": [
+          { "symbol": "316140", "market": "XKRX", "state": "researching", "close": 17250, "volume": 812344 }
+        ]
+      },
+      "expect": { "nextLedgerWritten": false, "diagnosticCodes": ["memory_holds_vendor_payload"], "blocked": true }
+    },
+    {
+      "name": "a-copied-filing-excerpt-is-the-same-refusal",
+      "why": "The other shape the same mistake takes: the roster starts holding the documents instead of pointing at them.",
+      "overrides": {
+        "discovered": [
+          { "symbol": "316140", "market": "XKRX", "state": "researching", "excerpt": "자기주식 취득 결과보고서 전문 …" }
+        ]
+      },
+      "expect": { "nextLedgerWritten": false, "diagnosticCodes": ["memory_holds_vendor_payload"], "blocked": true }
+    },
+    {
+      "name": "a-failed-range-is-retried-and-its-attempts-go-up",
+      "why": "The rerun-after-failure rule: the record only grows, the first failure keeps its instant, and the count is what tells a later run that this range is not merely unlucky.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "shareholder-rerating",
+          "ruleVersion": "sr-gate-1",
+          "updatedAtEpochMs": 1767398400000,
+          "cursor": { "kind": "dart-receipt", "value": "20260105000111", "atEpochMs": 1767398400000 },
+          "failedRanges": [
+            { "kind": "dart-receipt", "from": "20260110000001", "to": "20260110000099", "reasonCode": "lane_query_failed", "firstFailedAtEpochMs": 1767398400000, "attempts": 1 }
+          ],
+          "candidates": []
+        },
+        "failedRanges": [
+          { "kind": "dart-receipt", "from": "20260110000001", "to": "20260110000099", "reasonCode": "lane_query_failed" }
+        ]
+      },
+      "expect": {
+        "failedRangeCount": 1,
+        "failedRangeAttempts": 2,
+        "failedRangeFirstFailedAtEpochMs": 1767398400000,
+        "cursorValue": "20260105000111",
+        "diagnosticCodes": ["cursor_advance_refused"],
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-range-that-finally-succeeded-leaves-the-list",
+      "why": "Otherwise the retry list is append-only and a run that fixed its own gap still reports one forever.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "strategy": "shareholder-rerating",
+          "ruleVersion": "sr-gate-1",
+          "updatedAtEpochMs": 1767398400000,
+          "cursor": { "kind": "dart-receipt", "value": "20260105000111", "atEpochMs": 1767398400000 },
+          "failedRanges": [
+            { "kind": "dart-receipt", "from": "20260110000001", "to": "20260110000099", "reasonCode": "lane_query_failed", "firstFailedAtEpochMs": 1767398400000, "attempts": 1 }
+          ],
+          "candidates": []
+        },
+        "resolvedRanges": [{ "kind": "dart-receipt", "from": "20260110000001", "to": "20260110000099" }]
+      },
+      "expect": { "failedRangeCount": 0, "cursorValue": "20260226000742", "blocked": false }
+    },
+    {
+      "name": "the-cursor-does-not-move-when-the-run-did-not-say-it-may",
+      "why": "The cursor lives inside this document precisely so that it cannot claim a sweep the candidate list does not contain.",
+      "overrides": { "advanceCursor": false },
+      "expect": { "cursorValue": "20260105000111", "diagnosticCodes": ["cursor_advance_refused"], "blocked": false }
+    },
+    {
+      "name": "a-hypothesis-longer-than-one-sentence-is-refused",
+      "why": "Past the cap the roster is becoming the research file, and the research file is not this document.",
+      "overrides": {
+        "discovered": [
+          {
+            "symbol": "316140",
+            "market": "XKRX",
+            "state": "researching",
+            "hypothesis": "자기주식 취득 결정이 결과보고서로 이어지고 있고 그 집행이 은행 자본 여력 안에서 지속 가능하며, 배당은 경상이익으로 덮이고 소각까지 이어지며, 밸류업 공시의 목표 비율이 이사회 결의로 확정되어 있고, 분기마다 진행 상황이 공시되며, 신용비용은 가이던스 안에 있고, 부동산 PF 익스포저는 축소되고 있으며, 자사주 소각 이후의 주식수 감소가 분기보고서에서 확인되고, 배당 기준일과 지급일 사이의 간격도 확인되었으며, 이 모든 것이 지난 네 분기 동안 한 번도 빠짐없이 반복되었고 다음 분기에도 같은 방식으로 반복될 것이다."
+          }
+        ]
+      },
+      "expect": { "nextLedgerWritten": false, "diagnosticCodes": ["candidate_hypothesis_over_cap"], "blocked": true }
+    },
+    {
+      "name": "a-state-that-walks-backwards-is-refused",
+      "why": "`researching → discovered` is a finished piece of work being restated away, and it is the same mistake as the excluded drop wearing different clothes.",
+      "overrides": {
+        "discovered": [{ "symbol": "316140", "market": "XKRX", "state": "discovered" }]
+      },
+      "expect": { "state": "researching", "nextLedgerWritten": false, "diagnosticCodes": ["candidate_state_regressed"], "blocked": true }
+    },
+    {
+      "name": "running-the-same-run-twice-writes-the-same-document",
+      "why": "The idempotency claim, asserted rather than described: the verifier feeds this scenario's own nextLedger back in as `previous` and compares. A second row, a second history entry or a doubled evidence id all fail here.",
+      "overrides": {},
+      "expect": { "idempotentRerun": true, "candidateCount": 1, "blocked": false }
+    }
+  ]
+}

@@ -42,17 +42,29 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 import {
+  ATTESTATION_GRADES,
+  CANDIDATE_CAPS,
+  CANDIDATE_STATES,
+  DISCOVERY_STATUSES,
+  FORBIDDEN_KEYS,
+  LANE_STATUSES,
+  REQUIRED_LANES,
   REQUIRED_OUTPUTS,
   ISSUER_KINDS,
   ROUTES,
   THRESHOLDS,
+  WEB_READING_SOURCE_TYPES,
+  candidateLedger,
   capitalHeadroom,
   concentration,
+  discoveryRun,
   evaluateCase,
+  returnProgramme,
   round,
   returnComposition,
   stagedIncrement,
   targetWeight,
+  webReadingRecord,
 } from '../managers/shareholder-rerating/lib/index.mjs'
 
 const fixtureRoot = new URL('../managers/shareholder-rerating/fixtures/', import.meta.url)
@@ -62,6 +74,10 @@ const cases = await read('cases.json')
 const composition = await read('return-composition.json')
 const staged = await read('staged-plans.json')
 const boundaries = await read('boundaries.json')
+const discoveryFixture = await read('discovery.json')
+const memoryFixture = await read('candidate-memory.json')
+const programmeFixture = await read('programme.json')
+const attestationFixture = await read('attestation.json')
 const manifest = JSON.parse(await readFile(new URL('../managers/shareholder-rerating/aumos.json', import.meta.url), 'utf8'))
 
 let checked = 0
@@ -2293,6 +2309,402 @@ const byId = (id) => {
     }
   }
   ok('#845 — the won book this package was written for answers exactly what it answered')
+}
+
+/**
+ * ── ⑹ the discovery half (#305) ───────────────────────────────────────────
+ *
+ * Four fixtures, four sections, and the property each one exists for is the same
+ * property in four places: **a run that read nothing and a run that read a market and
+ * found nothing must not produce the same output.** That is not a statement a
+ * paragraph can hold — both end as a `WAIT` with no new name in it — so it is asserted
+ * against labels a scenario can fail on.
+ *
+ * ⚠️ `previous` is the one input JSON cannot spell. `undefined` means *nobody read the
+ * key* and `null` means *read, and empty*, and the difference is the first rule of
+ * `lib/candidate-memory.mjs`; a fixture says `"__undefined__"` and this file deletes
+ * the property, which is the only way a committed file can express the absent one.
+ */
+
+/** Shallow-merge, the shape `fixtures/ledger.json` established in `catalyst-turnaround`. */
+const scenarioInput = (base, overrides) => {
+  const merged = { ...base, ...overrides }
+  if (merged.previous === '__undefined__') delete merged.previous
+  return merged
+}
+
+const severityOf = (diagnostics, code) => diagnostics.find((row) => row.code === code)?.severity ?? null
+
+const assertScenario = (where, answer, expect) => {
+  for (const code of expect.diagnosticCodes ?? []) {
+    assert.ok(codesOf(answer.diagnostics).includes(code), `${where}: expected diagnostic ${code}, got ${codesOf(answer.diagnostics).join(', ') || 'nothing'}`)
+  }
+  for (const [code, severity] of Object.entries(expect.diagnosticSeverities ?? {})) {
+    assert.equal(severityOf(answer.diagnostics, code), severity, `${where}: ${code} carries the wrong severity — an absence recorded as a refusal is the defect this whole file exists to refuse`)
+  }
+  if (expect.blocked !== undefined) {
+    assert.equal(
+      answer.diagnostics.some((row) => row.severity === 'blocked'),
+      expect.blocked,
+      `${where}: expected blocked=${expect.blocked}, diagnostics were ${answer.diagnostics.map((row) => `${row.code}/${row.severity}`).join(', ') || 'none'}`,
+    )
+  }
+}
+
+/**
+ * ── the discovery run ─────────────────────────────────────────────────────
+ */
+{
+  const reachedStatuses = new Set()
+  for (const scenario of discoveryFixture.scenarios) {
+    const where = `discovery/${scenario.name}`
+    const answer = discoveryRun(scenarioInput(discoveryFixture.base, scenario.overrides))
+    const expect = scenario.expect
+    assert.ok(typeof scenario.why === 'string' && scenario.why.length > 20, `${where}: a scenario states the argument it makes`)
+    assertScenario(where, answer, expect)
+
+    const record = answer.data.record
+    reachedStatuses.add(record.discoveryStatus)
+    for (const key of ['discoveryStatus', 'universeDeclared', 'gatePassed', 'newCandidates', 'resumedCandidates', 'priceLaneStatus', 'filingLaneStatus', 'webLaneStatus']) {
+      if (key in expect) assert.equal(record[key], expect[key], `${where}: ${key}`)
+    }
+    if ('cursorAfterValue' in expect) {
+      assert.equal(record.cursorAfter?.value ?? null, expect.cursorAfterValue, `${where}: the cursor moved somewhere this run could not stand behind`)
+    }
+    if ('watching' in expect) assert.deepEqual(answer.data.watching, expect.watching, `${where}: watching`)
+    if ('notRunDisclosed' in expect) assert.equal(answer.data.notRunDisclosed, expect.notRunDisclosed, `${where}: notRunDisclosed`)
+    if ('screenedState' in expect) assert.equal(answer.data.screened[0].state, expect.screenedState, `${where}: a row short of the three axes is \`watching\` and never \`excluded\``)
+    if ('missingAxes' in expect) {
+      assert.deepEqual(answer.data.screened[0].missingAxes, expect.missingAxes, `${where}: the run has to name which axes it never read`)
+    }
+
+    /** ⛔ Every record carries the contract's own field names, on every path. */
+    for (const key of [
+      'schemaVersion',
+      'updatedAtEpochMs',
+      'runId',
+      'universeDeclared',
+      'universeSource',
+      'universeCount',
+      'symbolsAttempted',
+      'symbolsSucceeded',
+      'symbolsFailed',
+      'gatePassed',
+      'newCandidates',
+      'resumedCandidates',
+      'researchCompleted',
+      'cursorBefore',
+      'cursorAfter',
+      'priceLaneStatus',
+      'filingLaneStatus',
+      'webLaneStatus',
+      'discoveryStatus',
+    ]) {
+      assert.ok(key in record, `${where}: the discovery-run record is missing ${key}, and the three packages spell it identically or the contract is prose`)
+    }
+    assert.ok(DISCOVERY_STATUSES.includes(record.discoveryStatus), `${where}: ${record.discoveryStatus} is outside the closed set`)
+    for (const lane of ['priceLaneStatus', 'filingLaneStatus', 'webLaneStatus']) {
+      assert.ok(LANE_STATUSES.includes(record[lane]), `${where}: ${lane} is ${record[lane]}, outside ${LANE_STATUSES.join('/')}`)
+    }
+
+    /**
+     * ⛔ **The cursor rule, asserted on every scenario rather than on the one that
+     * tests it.** A cursor that moved on a status that is a claim about the *run*
+     * turns a transient failure into a permanently unread slice of the market.
+     */
+    if (record.discoveryStatus !== 'candidates_produced' && record.discoveryStatus !== 'no_candidate_qualified') {
+      assert.deepEqual(record.cursorAfter, record.cursorBefore, `${where}: cursorAfter moved on ${record.discoveryStatus}`)
+    }
+    if (record.symbolsFailed.length > 0) {
+      assert.deepEqual(record.cursorAfter, record.cursorBefore, `${where}: the cursor stepped over ${record.symbolsFailed.length} failed symbol(s)`)
+    }
+
+    /**
+     * ⛔ **`no_candidate_qualified` is the only one of the four that is a claim about
+     * the market.** This is the #140 defect stated as an assertion.
+     */
+    if (record.discoveryStatus === 'no_candidate_qualified') {
+      assert.equal(record.universeDeclared, true, `${where}: nothing qualified over an undeclared universe`)
+      assert.equal(record.symbolsFailed.length, 0, `${where}: nothing qualified with a range unread`)
+      for (const lane of REQUIRED_LANES) {
+        assert.equal(record[`${lane}LaneStatus`], 'open', `${where}: nothing qualified with the ${lane} lane at ${record[`${lane}LaneStatus`]}`)
+      }
+    }
+    ok(`${where} — ${scenario.why.slice(0, 78)}`)
+  }
+
+  /** The three statuses #305 names, and the fourth, each reached by a committed scenario. */
+  for (const status of DISCOVERY_STATUSES) {
+    assert.ok(reachedStatuses.has(status), `no discovery fixture reaches ${status}, so the distinction is a paragraph rather than a behaviour`)
+  }
+  ok(`candidates_produced, no_candidate_qualified, discovery_not_run and discovery_incomplete are each reached by a fixture`)
+
+  /**
+   * ⚠️ **The three answers the run gives an investor are three, and the fixtures prove
+   * it on the record rather than on the prose.** «Nothing qualified», «the run did not
+   * look» and «part of the market is unread» arrive as different `discoveryStatus`
+   * values from three inputs that are otherwise the same run.
+   */
+  const swept = discoveryRun(scenarioInput(discoveryFixture.base, { screened: [{ symbol: '000000', market: 'XKRX', axes: { discount: true, earningsQuality: false, execution: true } }], researchCompleted: 0 }))
+  const unlooked = discoveryRun(scenarioInput(discoveryFixture.base, { universe: null, screened: [], researchCompleted: 0, cursorAfter: null, uncertainty: null }))
+  const partial = discoveryRun(scenarioInput(discoveryFixture.base, { symbolsSucceeded: 57, symbolsFailed: ['005930'], lanes: { price: 'unstated', filing: 'partial', web: 'open' }, screened: [], researchCompleted: 0, cursorAfter: null }))
+  const answers = [swept, unlooked, partial].map((row) => row.data.record.discoveryStatus)
+  assert.equal(new Set(answers).size, 3, `three runs that produced no candidate for three different reasons answered ${answers.join(', ')}`)
+  assert.equal(unlooked.diagnostics.some((row) => row.severity === 'blocked'), false, 'an undeclared universe blocked the run; the sell side still has to be watched')
+  ok('a swept market, a run that never looked and a half-read range reach three different answers, and none of them blocks the run')
+}
+
+/**
+ * ── the candidate roster ──────────────────────────────────────────────────
+ */
+{
+  for (const scenario of memoryFixture.scenarios) {
+    const where = `candidate-memory/${scenario.name}`
+    const input = scenarioInput(memoryFixture.base, scenario.overrides)
+    const answer = candidateLedger(input)
+    const expect = scenario.expect
+    assert.ok(typeof scenario.why === 'string' && scenario.why.length > 20, `${where}: a scenario states the argument it makes`)
+    assertScenario(where, answer, expect)
+
+    for (const key of ['ledgerRead', 'seeded', 'outcomeCode']) {
+      if (key in expect) assert.equal(answer.data[key], expect[key], `${where}: ${key}`)
+    }
+    if ('nextLedgerWritten' in expect) {
+      assert.equal(answer.data.nextLedger !== null, expect.nextLedgerWritten, `${where}: a diagnostic beside a written ledger is a refusal by another name that still wrote`)
+    }
+    if ('candidateCount' in expect) assert.equal(answer.data.candidates.length, expect.candidateCount, `${where}: candidateCount`)
+    if ('previousExtraKeys' in expect) assert.deepEqual(answer.data.previousExtraKeys, expect.previousExtraKeys, `${where}: previousExtraKeys`)
+    if ('requiresReevaluation' in expect) assert.deepEqual(answer.data.requiresReevaluation, expect.requiresReevaluation, `${where}: requiresReevaluation`)
+    if ('cursorValue' in expect) assert.equal(answer.data.cursor?.value ?? null, expect.cursorValue, `${where}: cursor`)
+    if ('failedRangeCount' in expect) assert.equal(answer.data.failedRanges.length, expect.failedRangeCount, `${where}: failedRanges`)
+    if ('failedRangeAttempts' in expect) assert.equal(answer.data.failedRanges[0].attempts, expect.failedRangeAttempts, `${where}: a retry has to count`)
+    if ('failedRangeFirstFailedAtEpochMs' in expect) {
+      assert.equal(answer.data.failedRanges[0].firstFailedAtEpochMs, expect.failedRangeFirstFailedAtEpochMs, `${where}: a retry moved the instant of the first failure`)
+    }
+    const row = answer.data.candidates[0]
+    if ('state' in expect) assert.equal(row.state, expect.state, `${where}: state`)
+    if ('discoveryPath' in expect) assert.deepEqual(row.discoveryPath, expect.discoveryPath, `${where}: discoveryPath folds into a set`)
+    if ('evidenceIds' in expect) assert.deepEqual(row.evidenceIds, expect.evidenceIds, `${where}: evidenceIds are monotonic — a candidate cannot lose one`)
+    if ('programmeIds' in expect) assert.deepEqual(row.programmeIds, expect.programmeIds, `${where}: programmeIds`)
+    if ('candidateRuleVersion' in expect) assert.equal(row.ruleVersion, expect.candidateRuleVersion, `${where}: a rule change was auto-migrated, which is a judgement nobody made`)
+
+    /**
+     * ⛔ **Nothing this contract forbids may reach a written document, on any path.**
+     * Asserted over every scenario rather than over the two that test it, because the
+     * failure this refuses is a field somebody adds later for a good reason.
+     */
+    if (answer.data.nextLedger !== null) {
+      const serialised = JSON.stringify(answer.data.nextLedger)
+      for (const key of FORBIDDEN_KEYS) {
+        assert.ok(!serialised.includes(`"${key}":`), `${where}: the written roster carries \`${key}\` — manager-memory is not a source cache and not an account database`)
+      }
+      assert.ok(answer.data.serialisedBytes <= CANDIDATE_CAPS.serialisedBytes, `${where}: the written roster is over the ${CANDIDATE_CAPS.serialisedBytes}-byte cap`)
+      for (const candidate of answer.data.nextLedger.candidates) {
+        assert.ok(CANDIDATE_STATES.includes(candidate.state), `${where}: ${candidate.symbol} is in state ${candidate.state}, outside the six`)
+        assert.ok(candidate.evidenceIds.length <= CANDIDATE_CAPS.evidenceIdsPerCandidate, `${where}: ${candidate.symbol} carries more than ${CANDIDATE_CAPS.evidenceIdsPerCandidate} evidence ids`)
+        for (const key of ['discoveredAtEpochMs', 'lastSeenAtEpochMs', 'nextReviewAtEpochMs']) {
+          assert.ok(
+            candidate[key] === null || typeof candidate[key] === 'number',
+            `${where}: ${candidate.symbol}.${key} is not a number — the gateway scans a stored answer for string timestamps after asOf and refuses the whole read`,
+          )
+        }
+      }
+    }
+
+    /**
+     * ── the idempotency claim, run rather than described ──────────────────
+     *
+     * The run's own output handed straight back as `previous`. A second row, a second
+     * history entry or a doubled evidence id all fail here, and each of those is a
+     * duplicate proposal one level up.
+     */
+    if (expect.idempotentRerun === true) {
+      const again = candidateLedger({ ...input, previous: answer.data.nextLedger })
+      assert.equal(
+        JSON.stringify(again.data.nextLedger),
+        JSON.stringify(answer.data.nextLedger),
+        `${where}: re-running the same run over its own output changed the document`,
+      )
+      assert.equal(again.data.candidates.length, answer.data.candidates.length, `${where}: a rerun created a second row for the same (market, symbol)`)
+    }
+    ok(`${where} — ${scenario.why.slice(0, 78)}`)
+  }
+
+  /**
+   * ⛔ **`undefined` and `null` are not the same read, and this is the assertion that
+   * says so.** One seeds and one refuses to touch anything.
+   */
+  const unread = candidateLedger(scenarioInput(memoryFixture.base, { previous: '__undefined__' }))
+  const empty = candidateLedger(scenarioInput(memoryFixture.base, { previous: null }))
+  assert.equal(unread.data.ledgerRead, false)
+  assert.equal(unread.data.nextLedger, null, 'an unread key was seeded over, which loses every hypothesis this desk has')
+  assert.equal(empty.data.ledgerRead, true)
+  assert.ok(empty.data.nextLedger !== null, 'a key that was read and is empty must seed; otherwise a malformed write locks it forever')
+  ok('an unread roster and an empty one are two different reads, and only one of them writes')
+}
+
+/**
+ * ── the return programme: 발표와 집행을 구분한다 ────────────────────────────
+ */
+{
+  for (const scenario of programmeFixture.scenarios) {
+    const where = `programme/${scenario.name}`
+    const answer = returnProgramme(scenarioInput(programmeFixture.base, scenario.overrides))
+    const expect = scenario.expect
+    assert.ok(typeof scenario.why === 'string' && scenario.why.length > 20, `${where}: a scenario states the argument it makes`)
+    assertScenario(where, answer, expect)
+
+    if ('programmeCount' in expect) assert.equal(answer.data.programmes.length, expect.programmeCount, `${where}: programmeCount`)
+    if ('cursorWalkBackRequired' in expect) assert.equal(answer.data.cursorWalkBackRequired, expect.cursorWalkBackRequired, `${where}: cursorWalkBackRequired`)
+    if ('cursorWalkBackTo' in expect) assert.equal(answer.data.cursorWalkBackTo, expect.cursorWalkBackTo, `${where}: an orphan receipt names the point to resume from`)
+    const row = answer.data.programmes[0]
+    for (const key of ['executedAmount', 'retiredAmount', 'cancelledAmount', 'executionRate', 'elapsedShare', 'pace', 'status', 'retirementRate', 'announcedKind']) {
+      if (key in expect) assert.equal(row[key], expect[key], `${where}: ${key}`)
+    }
+
+    /**
+     * ⛔ **Three counters, never a sum.** Folding a cancelled amount into the executed
+     * one makes an abandoned programme read as a completed one, and it is the most
+     * flattering error available in this package.
+     */
+    if (expect.countersNotFolded === true) {
+      assert.notEqual(row.executedAmount, row.executedAmount + row.cancelledAmount, `${where}: the cancelled amount is inside the executed one`)
+      assert.equal(row.executionRate, round(row.executedAmount / row.announcedAmount), `${where}: the execution rate is computed over something other than what was bought`)
+    }
+
+    /**
+     * The programme's measurement and the case label agree, because the label is
+     * computed from the measurement rather than from a second one written by hand.
+     */
+    if (expect.feedsCase !== undefined) {
+      const classified = evaluateCase({
+        programme: { ...row.classifyInput, policyRatio: 0.5, priorPolicyRatio: 0.5 },
+        capital: { data: {}, diagnostics: [] },
+        composition: { data: { discountToBase: 0.3 }, diagnostics: [] },
+      })
+      assert.equal(classified.data.case, expect.feedsCase, `${where}: the programme measurement did not reach ${expect.feedsCase}`)
+      assert.equal(classified.data.route, ROUTES[expect.feedsCase], `${where}: the route behind ${expect.feedsCase} moved`)
+    }
+    ok(`${where} — ${scenario.why.slice(0, 78)}`)
+  }
+
+  /**
+   * ⛔ **The two orphan diagnostics are two things.** One says the company has filed
+   * nothing; the other says this desk's sweep started after the decision. They are
+   * produced by different inputs and they ask for different repairs.
+   */
+  const silent = returnProgramme(scenarioInput(programmeFixture.base, { executions: [] }))
+  const orphan = returnProgramme(scenarioInput(programmeFixture.base, { announcements: [] }))
+  assert.ok(codesOf(silent.diagnostics).includes('announcement_without_execution_receipt'))
+  assert.ok(!codesOf(silent.diagnostics).includes('execution_without_announcement'))
+  assert.ok(codesOf(orphan.diagnostics).includes('execution_without_announcement'))
+  assert.ok(!codesOf(orphan.diagnostics).includes('announcement_without_execution_receipt'))
+  assert.equal(orphan.data.programmes.length, 0, 'a programme was invented around an orphan receipt, so its window and announced amount are both fabricated')
+  ok('an announcement with no receipt and a receipt with no announcement are two findings asking for two different repairs')
+
+  /**
+   * ⛔ **No threshold is restated in this module.** The pace floor and the observable
+   * share are `thresholds.mjs`'s, and the assertion is that moving one moves the
+   * answer — which a literal copied into `programme.mjs` would not.
+   */
+  const behind = returnProgramme(
+    scenarioInput(programmeFixture.base, {
+      executions: [{ symbol: '316140', programmeId: 'prog-2026-buyback-1', executedAmount: 200000000000 * THRESHOLDS.executionPaceFloor * 0.5 * 0.5, observedAtEpochMs: 1782864000000, rceptNo: '20260630000742' }],
+    }),
+  )
+  assert.equal(behind.data.programmes[0].status, 'behind', 'a programme at a quarter of the published floor is not behind, so the floor being read is not the published one')
+  ok('the pace floor and the observable-elapsed share are read from lib/thresholds.mjs and not restated')
+}
+
+/**
+ * ── the web reading, and whose word it is ─────────────────────────────────
+ */
+{
+  for (const scenario of attestationFixture.scenarios) {
+    const where = `attestation/${scenario.name}`
+    const answer = webReadingRecord(scenarioInput(attestationFixture.base, scenario.overrides))
+    const expect = scenario.expect
+    assert.ok(typeof scenario.why === 'string' && scenario.why.length > 20, `${where}: a scenario states the argument it makes`)
+    assertScenario(where, answer, expect)
+
+    if ('recordWritten' in expect) assert.equal(answer.data.record !== null, expect.recordWritten, `${where}: recordWritten`)
+    for (const key of ['attestation', 'citable', 'carryForward']) {
+      if (key in expect) assert.equal(answer.data[key], expect[key], `${where}: ${key}`)
+    }
+    if (answer.data.record !== null) {
+      for (const key of ['evidenceKind', 'evidenceSource', 'sourceType']) {
+        if (key in expect) assert.equal(answer.data.record[key], expect[key], `${where}: record.${key}`)
+      }
+      assert.ok(WEB_READING_SOURCE_TYPES.includes(answer.data.record.sourceType), `${where}: ${answer.data.record.sourceType} is outside the four`)
+      for (const key of ['publishedAtEpochMs', 'observedAtEpochMs']) {
+        assert.equal(typeof answer.data.record[key], 'number', `${where}: record.${key} is not a number, and a string instant in a stored document can make the document unreadable`)
+      }
+    }
+    assert.ok(ATTESTATION_GRADES.includes(answer.data.attestation), `${where}: ${answer.data.attestation} is outside the four grades`)
+    ok(`${where} — ${scenario.why.slice(0, 78)}`)
+  }
+
+  /**
+   * ⚠️ **A filed reading is the manager's testimony and never a vendor fact**, on both
+   * channels, so a reader holding only one of them can still tell.
+   */
+  const filed = webReadingRecord(scenarioInput(attestationFixture.base, {}))
+  assert.equal(filed.data.record.evidenceKind, 'observation')
+  assert.ok(filed.data.record.evidenceSource.startsWith('manager:'))
+  assert.equal(filed.data.attestation, 'manager', 'a reading this desk filed came back graded as something Aumos obtained')
+  ok('a filed web reading is graded as this manager\'s testimony on both channels')
+}
+
+/**
+ * ── the prompt names the new vocabulary (#305) ─────────────────────────────
+ *
+ * The deterministic half computes the record; the prose half is what produces it. A
+ * status word only this file knows is a status word no run is ever asked for — which
+ * is how `no_candidate_qualified` ends up on a run that read nothing.
+ */
+{
+  const prompt = await readFile(new URL('../managers/shareholder-rerating/PROMPT.md', import.meta.url), 'utf8')
+  for (const status of DISCOVERY_STATUSES) {
+    assert.ok(prompt.includes(status), `PROMPT.md never names ${status}, and the run is what has to choose between them`)
+  }
+  for (const lane of LANE_STATUSES) {
+    assert.ok(prompt.includes(lane), `PROMPT.md never names the lane status ${lane}`)
+  }
+  const schema = JSON.parse(await readFile(new URL('../managers/shareholder-rerating/config.schema.json', import.meta.url), 'utf8'))
+  for (const key of ['discoveryBudgetFilings', 'researchCompletionFloor']) {
+    assert.ok(Object.hasOwn(schema.properties, key), `config.schema.json has no ${key}`)
+    assert.ok(prompt.includes(key), `PROMPT.md never names ${key}, and an invocation may carry no config block at all`)
+  }
+  assert.equal(schema.properties.researchCompletionFloor.minimum, 1)
+  assert.equal(schema.properties.researchCompletionFloor.maximum, 3)
+  assert.equal(schema.properties.researchCompletionFloor.default, 1)
+  assert.equal(schema.properties.discoveryBudgetFilings.default, 100)
+  for (const key of Object.keys(schema.properties)) {
+    assert.ok(prompt.includes(key), `PROMPT.md never names the setting ${key}`)
+  }
+  ok('PROMPT.md names the four discovery statuses, the four lane words and every setting in config.schema.json')
+}
+
+/**
+ * ── what the roster may never hold, asserted against the prompt too ────────
+ *
+ * ⛔ The prohibition is a rule about a document, and the run is what writes it. A rule
+ * only `lib/` enforces is a rule the run learns by being refused.
+ */
+{
+  const prompt = await readFile(new URL('../managers/shareholder-rerating/PROMPT.md', import.meta.url), 'utf8')
+  assert.ok(prompt.includes('memory_holds_vendor_payload'), 'PROMPT.md never names the refusal a run gets for copying vendor payload into its own folder')
+  assert.ok(prompt.includes('discovery_not_run'), 'PROMPT.md never names the token a run with no discovery capacity carries verbatim')
+  const manifest2 = JSON.parse(await readFile(new URL('../managers/shareholder-rerating/aumos.json', import.meta.url), 'utf8'))
+  const kinds = manifest2.capabilities.map((row) => row.kind)
+  for (const kind of ['source-cache:read', 'source-cache:write', 'observation:file', 'manager-memory:read', 'manager-memory:write']) {
+    assert.ok(kinds.includes(kind), `aumos.json does not request ${kind}, and an ungranted tool is a nonexistent tool`)
+  }
+  for (const skill of ['source_cache_read', 'source_cache_refresh', 'files_mkdir', 'evidence_get']) {
+    assert.ok(manifest2.requires.optionalSkills.includes(skill), `aumos.json does not list ${skill} among the optional skills`)
+  }
+  assert.equal(manifest2.version, '0.6.0')
+  ok('the manifest requests the source cache and the observation route, and the prompt carries the two tokens a proposal has to survive on')
 }
 
 console.log(`\nshareholder-rerating ok — ${checked} check(s)`)

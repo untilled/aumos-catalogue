@@ -76,6 +76,8 @@
           "openProposals": []
         },
         "completedOutputs": [
+          "discoveryRun",
+          "candidateLedger",
           "valuationBasis",
           "returnPolicyEvidence",
           "returnComposition",
@@ -185,6 +187,8 @@
           "openProposals": []
         },
         "completedOutputs": [
+          "discoveryRun",
+          "candidateLedger",
           "valuationBasis",
           "returnPolicyEvidence",
           "returnComposition",
@@ -786,6 +790,8 @@
           "openProposals": []
         },
         "completedOutputs": [
+          "discoveryRun",
+          "candidateLedger",
           "valuationBasis",
           "returnPolicyEvidence",
           "returnComposition",
@@ -892,6 +898,8 @@
           ]
         },
         "completedOutputs": [
+          "discoveryRun",
+          "candidateLedger",
           "valuationBasis",
           "returnPolicyEvidence",
           "returnComposition",
@@ -1001,6 +1009,8 @@
           ]
         },
         "completedOutputs": [
+          "discoveryRun",
+          "candidateLedger",
           "valuationBasis",
           "returnPolicyEvidence",
           "returnComposition",
@@ -1091,6 +1101,8 @@
           "openProposals": []
         },
         "completedOutputs": [
+          "discoveryRun",
+          "candidateLedger",
           "valuationBasis",
           "returnPolicyEvidence",
           "returnComposition",
@@ -1173,6 +1185,8 @@
           "openProposals": []
         },
         "completedOutputs": [
+          "discoveryRun",
+          "candidateLedger",
           "valuationBasis",
           "returnPolicyEvidence",
           "returnComposition",

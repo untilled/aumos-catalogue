@@ -1,0 +1,291 @@
+{
+  "note": "The announcement → execution → cancellation link of `lib/programme.mjs`. `base` is one programme announced on 2026-01-05 with a twelve-month window and one acquisition result against it; each scenario shallow-merges its `overrides`. ⚠️ Every amount is illustrative won and no symbol here is a recommendation. The two thresholds the scenarios turn on are `lib/thresholds.mjs`'s and are never restated in this file.",
+  "asOf": "2026-07-01T00:00:00Z",
+  "base": {
+    "asOf": "2026-07-01T00:00:00Z",
+    "previous": null,
+    "announcements": [
+      {
+        "symbol": "316140",
+        "programmeId": "prog-2026-buyback-1",
+        "announcedAmount": 200000000000,
+        "announcedKind": "amount",
+        "announcedAtEpochMs": 1767571200000,
+        "windowStartEpochMs": 1767571200000,
+        "windowEndEpochMs": 1799107200000,
+        "rceptNo": "20260105000111",
+        "evidenceIds": ["ev_decision_2601"]
+      }
+    ],
+    "executions": [
+      {
+        "symbol": "316140",
+        "programmeId": "prog-2026-buyback-1",
+        "executedAmount": 110000000000,
+        "retiredAmount": 110000000000,
+        "observedAtEpochMs": 1782864000000,
+        "rceptNo": "20260630000742",
+        "evidenceIds": ["ev_result_2606"]
+      }
+    ],
+    "cancellations": []
+  },
+  "scenarios": [
+    {
+      "name": "an-announcement-and-its-receipt-are-one-programme",
+      "why": "The control, and #305's own completion condition: 신규 환원 공시와 후속 집행 공시를 같은 프로그램으로 연결한다.",
+      "overrides": {},
+      "expect": {
+        "programmeCount": 1,
+        "executedAmount": 110000000000,
+        "retiredAmount": 110000000000,
+        "cancelledAmount": 0,
+        "status": "on-pace",
+        "diagnosticCodes": [],
+        "blocked": false
+      }
+    },
+    {
+      "name": "an-announcement-three-weeks-old-concludes-nothing",
+      "why": "A programme three days into a year has bought nothing and is not behind. Below the observable share of its own window the pace is arithmetic, not a fact.",
+      "overrides": {
+        "asOf": "2026-01-26T00:00:00Z",
+        "executions": []
+      },
+      "expect": {
+        "status": "unevaluated",
+        "executedAmount": 0,
+        "executionRate": 0,
+        "pace": null,
+        "diagnosticCodes": ["execution_not_yet_observable"],
+        "diagnosticSeverities": { "execution_not_yet_observable": "unevaluated" },
+        "blocked": false
+      }
+    },
+    {
+      "name": "half-a-window-gone-and-almost-nothing-bought-is-behind",
+      "why": "This is the measurement `classifyCase` turns into `announced-not-executed`. The module reports it; the refusal belongs to the case label.",
+      "overrides": {
+        "executions": [
+          {
+            "symbol": "316140",
+            "programmeId": "prog-2026-buyback-1",
+            "executedAmount": 20000000000,
+            "retiredAmount": 0,
+            "observedAtEpochMs": 1782864000000,
+            "rceptNo": "20260630000742",
+            "evidenceIds": ["ev_result_2606"]
+          }
+        ]
+      },
+      "expect": {
+        "status": "behind",
+        "executionRate": 0.1,
+        "diagnosticCodes": ["programme_behind_pace", "bought_but_not_retired"],
+        "feedsCase": "announced-not-executed",
+        "blocked": false
+      }
+    },
+    {
+      "name": "an-announcement-with-no-receipt-past-the-observable-share",
+      "why": "Distinct from `execution_without_announcement`: that one says the sweep started too late, this one says the company has filed nothing. An announcement is the evidence for the announcement and for nothing else.",
+      "overrides": { "executions": [] },
+      "expect": {
+        "executedAmount": 0,
+        "diagnosticCodes": ["announcement_without_execution_receipt"],
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-receipt-with-no-decision-behind-it-walks-the-cursor-back",
+      "why": "Inventing a programme around an orphan receipt fabricates both the announced amount and the window, and every pace computed afterwards is against a schedule nobody published.",
+      "overrides": {
+        "announcements": [],
+        "executions": [
+          {
+            "symbol": "051910",
+            "programmeId": "prog-2025-buyback-9",
+            "executedAmount": 40000000000,
+            "observedAtEpochMs": 1782864000000,
+            "rceptNo": "20260630000901"
+          }
+        ]
+      },
+      "expect": {
+        "programmeCount": 0,
+        "diagnosticCodes": ["execution_without_announcement"],
+        "cursorWalkBackRequired": true,
+        "cursorWalkBackTo": "20260630000901",
+        "blocked": true
+      }
+    },
+    {
+      "name": "a-withdrawal-is-not-a-purchase",
+      "why": "Folding a cancelled amount into the executed one makes an abandoned programme read as a completed one — the most flattering error available here.",
+      "overrides": {
+        "cancellations": [
+          {
+            "symbol": "316140",
+            "programmeId": "prog-2026-buyback-1",
+            "cancelledAmount": 90000000000,
+            "observedAtEpochMs": 1782864000000,
+            "rceptNo": "20260630000888"
+          }
+        ]
+      },
+      "expect": {
+        "executedAmount": 110000000000,
+        "cancelledAmount": 90000000000,
+        "countersNotFolded": true,
+        "diagnosticCodes": [],
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-withdrawal-row-carrying-an-executed-amount-is-refused",
+      "why": "The same rule enforced at the input rather than trusted at the output.",
+      "overrides": {
+        "cancellations": [
+          {
+            "symbol": "316140",
+            "programmeId": "prog-2026-buyback-1",
+            "cancelledAmount": 90000000000,
+            "executedAmount": 90000000000,
+            "observedAtEpochMs": 1782864000000,
+            "rceptNo": "20260630000888"
+          }
+        ]
+      },
+      "expect": { "diagnosticCodes": ["cancellation_counted_as_execution"], "blocked": true }
+    },
+    {
+      "name": "bought-and-never-retired-is-a-weaker-thesis-than-the-headline",
+      "why": "Treasury stock can be sold again, used in a merger or handed out as compensation, so the per-share figures move only until it comes back out.",
+      "overrides": {
+        "executions": [
+          {
+            "symbol": "316140",
+            "programmeId": "prog-2026-buyback-1",
+            "executedAmount": 110000000000,
+            "retiredAmount": 0,
+            "observedAtEpochMs": 1782864000000,
+            "rceptNo": "20260630000742"
+          }
+        ]
+      },
+      "expect": { "retiredAmount": 0, "retirementRate": 0, "diagnosticCodes": ["bought_but_not_retired"], "blocked": false }
+    },
+    {
+      "name": "a-ratio-promise-has-no-execution-rate-to-divide-into",
+      "why": "«35% of consolidated profit» falls with profit and «300 billion won» does not. A pace produced out of a percentage is a number about nothing.",
+      "overrides": {
+        "announcements": [
+          {
+            "symbol": "316140",
+            "programmeId": "prog-2026-ratio-1",
+            "announcedAmount": 0.35,
+            "announcedKind": "ratio",
+            "announcedAtEpochMs": 1767571200000,
+            "windowStartEpochMs": 1767571200000,
+            "windowEndEpochMs": 1799107200000,
+            "rceptNo": "20260105000112"
+          }
+        ],
+        "executions": []
+      },
+      "expect": {
+        "announcedKind": "ratio",
+        "executionRate": null,
+        "pace": null,
+        "status": "unevaluated",
+        "diagnosticCodes": ["announced_ratio_not_an_amount"],
+        "diagnosticSeverities": { "announced_ratio_not_an_amount": "unevaluated" },
+        "blocked": false
+      }
+    },
+    {
+      "name": "an-announcement-whose-kind-nobody-stated",
+      "why": "Which promise this issuer made is what the bear case turns on, and a run that did not read it says so rather than assuming money.",
+      "overrides": {
+        "announcements": [
+          {
+            "symbol": "316140",
+            "programmeId": "prog-2026-buyback-1",
+            "announcedAmount": 200000000000,
+            "announcedAtEpochMs": 1767571200000,
+            "windowStartEpochMs": 1767571200000,
+            "windowEndEpochMs": 1799107200000,
+            "rceptNo": "20260105000111"
+          }
+        ]
+      },
+      "expect": { "diagnosticCodes": ["announced_kind_unstated"], "blocked": false }
+    },
+    {
+      "name": "a-window-nobody-can-read-measures-no-pace",
+      "why": "A window this package chose would be this package judging the issuer against a deadline the issuer never set.",
+      "overrides": {
+        "announcements": [
+          {
+            "symbol": "316140",
+            "programmeId": "prog-2026-buyback-1",
+            "announcedAmount": 200000000000,
+            "announcedKind": "amount",
+            "announcedAtEpochMs": 1767571200000,
+            "rceptNo": "20260105000111"
+          }
+        ]
+      },
+      "expect": { "elapsedShare": null, "pace": null, "status": "unevaluated", "diagnosticCodes": ["programme_window_unreadable"], "blocked": false }
+    },
+    {
+      "name": "a-decision-disclosed-after-as-of-does-not-exist-for-this-run",
+      "why": "Every fact this package may use existed at the instant asOf names, and a disclosure receipt is exactly where that bites.",
+      "overrides": {
+        "announcements": [
+          {
+            "symbol": "316140",
+            "programmeId": "prog-2026-buyback-2",
+            "announcedAmount": 100000000000,
+            "announcedKind": "amount",
+            "announcedAtEpochMs": 1790000000000,
+            "windowStartEpochMs": 1790000000000,
+            "windowEndEpochMs": 1799107200000,
+            "rceptNo": "20260901000001"
+          }
+        ],
+        "executions": []
+      },
+      "expect": { "programmeCount": 0, "diagnosticCodes": ["programme_announced_after_as_of"], "blocked": true }
+    },
+    {
+      "name": "the-same-receipt-twice-is-counted-once",
+      "why": "A rerun after a failed run hands back receipts the previous run already counted. Counting them again doubles the execution rate, which is the direction that flatters.",
+      "overrides": {
+        "previous": {
+          "schemaVersion": 1,
+          "updatedAtEpochMs": 1782864000000,
+          "programmes": [
+            {
+              "symbol": "316140",
+              "programmeId": "prog-2026-buyback-1",
+              "announcedAmount": 200000000000,
+              "announcedKind": "amount",
+              "announcedAtEpochMs": 1767571200000,
+              "windowStartEpochMs": 1767571200000,
+              "windowEndEpochMs": 1799107200000,
+              "executedAmount": 110000000000,
+              "retiredAmount": 110000000000,
+              "cancelledAmount": 0,
+              "executionReceipts": ["20260630000742"],
+              "announcementRceptNo": "20260105000111",
+              "evidenceIds": ["ev_decision_2601", "ev_result_2606"]
+            }
+          ]
+        },
+        "announcements": []
+      },
+      "expect": { "executedAmount": 110000000000, "retiredAmount": 110000000000, "programmeCount": 1, "blocked": false }
+    }
+  ]
+}

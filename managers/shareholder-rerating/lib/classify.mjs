@@ -39,11 +39,29 @@ import { diagnostic, finite, isBlocked, isUnevaluated, round } from './numbers.m
 import { THRESHOLDS } from './thresholds.mjs'
 
 /**
- * The nine things #257 says a completed run produces, plus the Evidence references.
+ * The nine things #257 says a completed run produces, plus the Evidence references —
+ * and, since #305, the two that say where the run *looked*.
  * A run missing any of them is `research_incomplete` — which is a statement about the
  * run and never about the company.
+ *
+ * ⚠️ **`discoveryRun` and `candidateLedger` are required outputs and not bookkeeping.**
+ * A run that completed a thesis and wrote neither cannot say whether it swept a market
+ * or read nothing, and the next run cannot resume where this one stopped. Both defects
+ * end as the same `WAIT` an adequately evidenced no-change ends as, which is the
+ * distinction #305 exists to keep open.
+ *
+ * ⛔ **The programme record is not a twelfth row.** What was announced, what has been
+ * executed and what was retired belong to `returnPolicyEvidence`, which already owes
+ * them; `lib/programme.mjs` is where that row's arithmetic comes from, not a separate
+ * output a run could produce instead of it.
+ *
+ * ⚠️ This list and `PROMPT.md`'s required-outputs table move together — the verifier
+ * asserts that the prompt names every member, because the prose half is what produces
+ * them and a name only this file knows is a name no run is ever asked for.
  */
 export const REQUIRED_OUTPUTS = [
+  'discoveryRun',
+  'candidateLedger',
   'valuationBasis',
   'returnPolicyEvidence',
   'returnComposition',

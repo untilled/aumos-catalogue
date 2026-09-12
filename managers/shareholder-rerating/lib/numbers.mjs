@@ -60,3 +60,20 @@ export function isUnevaluated(diagnostics = []) {
 export function absentFields(object, names) {
   return names.filter((name) => !finite(object?.[name]))
 }
+
+/**
+ * An instant as epoch milliseconds, from a number or from anything `Date.parse`
+ * reads; `null` when it is neither.
+ *
+ * ⚠️ **Instants that are persisted go back as numbers.** The gateway walks a stored
+ * answer for timestamps later than `asOf` and refuses **the whole read** on a hit, so a
+ * string instant in a document this package writes is a document that can make itself
+ * unreadable. Every persisted field is therefore `…EpochMs`, and this is the one place
+ * the conversion happens. (#305)
+ */
+export function instantOf(value) {
+  if (finite(value)) return value
+  if (typeof value !== 'string' || value.trim() === '') return null
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
+}

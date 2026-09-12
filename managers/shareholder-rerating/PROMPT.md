@@ -141,24 +141,198 @@ what the old assumption said. A target that rises with the price is a thesis wit
 
 ### 2. Find candidates, on this desk's own axes
 
-Score a candidate on three things, none of which is a drawdown depth:
+**You start from the disclosure sweep, not from a list of names you know.** The entrance to this
+methodology is 배당 결정, 자기주식 취득 결정, 자기주식 취득 결과보고서, 자기주식 소각 결정 and the
+기업가치 제고 계획 — read incrementally, from where the last successful run stopped. The resume rule
+§0 promises is this section's first instruction: `failedRanges` from the last run are re-attempted
+**before** anything new, and the cursor is a receipt number.
+
+`skills/sr-return-disclosure-sweep` is the stage for the collection itself — which store, which
+join, how a report name is classified, and what a `013` answer means. What is here is what the
+sweep is *for*.
+
+Score a candidate on three things, and **all three are required**:
 
 1. **Discount, in the sector's own terms.** A bank against book and sustainable ROE; an industrial
    against cash flow or EV/EBITDA. Say which and why it is the right one for this business.
-2. **Earnings quality.** How much of the profit that pays the return is recurring. A payout that
-   is comfortable against reported earnings and above 1 against recurring earnings is the finding,
-   not a detail.
-3. **The programme's sustainability and its execution rate.** What was announced, what has been
-   executed, over how much of its own declared window, and whether the capital or cash to finish
-   it exists.
+2. **Earnings quality, and the capital or cash behind it.** How much of the profit that pays the
+   return is recurring, and whether the capital headroom or the free cash to finish the programme
+   exists. A payout comfortable against reported earnings and above 1 against recurring earnings is
+   the finding, not a detail.
+3. **Execution, not announcement.** What was announced, what has been executed against it, over how
+   much of the programme's own declared window.
 
-Order candidates by your own reading of those three. **Do not rank the shortlist by one
-price-decline score**; it produces the same list as every other desk and it is the failure #242
-records.
+⛔ **A high dividend yield, a low PBR or a deep drawdown on its own is not a candidate.** Each of
+them is also exactly what a dividend trap, a business earning under its cost of equity and a
+six-month-old accident look like. A name short of the three stays **`watching`**, with the missing
+axes named — `candidate_axes_incomplete` — and it is never `excluded`: an axis nobody read is an
+absence, and filing it as a rejection puts a refutation in the ledger that no evidence stands
+behind. **Do not rank the shortlist by one price-decline score**; it produces the same list as
+every other desk and it is the failure #242 records.
 
-Reject the obviously ineligible early and say why in one line. Everything else is either taken to
-a **completed** thesis or left with a named unfinished reason and a re-check condition. A run that
-skims six names shallowly and concludes nothing has done no work.
+Reject the obviously ineligible early and say why in one line. Everything else is either taken to a
+**completed** thesis or left with a named unfinished reason and a re-check condition. A run that
+skims six names shallowly and concludes nothing has done no work, which is what
+`researchCompletionFloor` exists to refuse.
+
+#### What the sweep writes, and it is four shapes
+
+⚠️ **Each of these goes into your answer as the object below, field for field.** They are the
+contract three managers share (`docs/contracts/discovery-run.md`), and a field renamed here is a
+field the next run cannot read.
+
+**The discovery run** — what this run actually looked at:
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAtEpochMs": 1772150400000,
+  "runId": "run_…",
+  "universeDeclared": true,
+  "universeSource": "open-dart:/api/list.json via source-cache",
+  "universeCount": 942,
+  "symbolsAttempted": 60,
+  "symbolsSucceeded": 57,
+  "symbolsFailed": ["005930", "068270", "051910"],
+  "gatePassed": 4,
+  "newCandidates": 1,
+  "resumedCandidates": 2,
+  "researchCompleted": 1,
+  "cursorBefore": { "kind": "dart-receipt", "value": "20260105000111", "atEpochMs": 1767398400000 },
+  "cursorAfter":  { "kind": "dart-receipt", "value": "20260105000111", "atEpochMs": 1767398400000 },
+  "priceLaneStatus":  "unstated",
+  "filingLaneStatus": "partial",
+  "webLaneStatus":    "open",
+  "discoveryStatus":  "discovery_incomplete"
+}
+```
+
+A lane is `open`, `partial`, `dark` or `unstated`. ⚠️ **`unstated` is a lane nobody asked about —
+not a lane that was open.** For this package `filing` and `web` are **required** and `price` is
+optional; a return policy lives in the issuer's IR material and in no filing, so a run with a dark
+web lane has not looked for it.
+
+`discoveryStatus` is one of four and the table is the rule:
+
+| status | when |
+|---|---|
+| `candidates_produced` | `newCandidates + resumedCandidates > 0` |
+| `no_candidate_qualified` | `universeDeclared` **and** every required lane `open` **and** `symbolsFailed` empty **and** nothing passed |
+| `discovery_not_run` | no universe declared, **or** the discovery budget went on the holdings review, **or** every required lane is `dark`/`unstated` |
+| `discovery_incomplete` | a universe was declared and some range failed or was never reached |
+
+⛔ **`no_candidate_qualified` is the only one of the four that says anything about the market.** The
+other three say something about the run, and reporting the first when one of the others holds is
+the single defect this section exists to refuse. ⛔ **`cursorAfter` equals `cursorBefore` whenever
+the status is not `candidates_produced` or `no_candidate_qualified`**, and never moves past a range
+that failed: a cursor that stepped over a transient vendor error turns it into a permanently unread
+slice of the market, silently, once.
+
+**The candidate ledger** — one document in your own folder, cursor inside it:
+
+```json
+{
+  "schemaVersion": 1,
+  "strategy": "shareholder-rerating",
+  "ruleVersion": "sr-gate-1",
+  "updatedAtEpochMs": 1772150400000,
+  "cursor": { "kind": "dart-receipt", "value": "20260226000742", "atEpochMs": 1772150400000 },
+  "failedRanges": [{ "kind": "dart-receipt", "from": "20260110000001", "to": "20260110000099", "reasonCode": "lane_query_failed", "firstFailedAtEpochMs": 1767398400000, "attempts": 2 }],
+  "candidates": [
+    {
+      "symbol": "316140",
+      "market": "XKRX",
+      "state": "researching",
+      "discoveredAtEpochMs": 1767398400000,
+      "lastSeenAtEpochMs": 1772150400000,
+      "discoveryPath": ["disclosure-sweep", "web-ir"],
+      "ruleVersion": "sr-gate-1",
+      "hypothesis": "자기주식 취득 결정이 결과보고서로 이어지고 있고, 그 집행이 은행 자본 여력 안에서 지속 가능하다.",
+      "sectionsComplete": ["return-policy-evidence"],
+      "openQuestions": ["2025년 4분기 소각 결정이 실제 주식수 감소로 이어졌는가"],
+      "evidenceIds": ["ev_policy_2512"],
+      "programmeIds": ["prog-2026-buyback-1"],
+      "nextReviewAtEpochMs": 1774742400000,
+      "nextReviewCondition": "다음 자기주식 취득 결과보고서 접수",
+      "excludedReasonCode": null,
+      "history": [{ "atEpochMs": 1767398400000, "from": null, "to": "researching", "ruleVersion": "sr-gate-1" }]
+    }
+  ]
+}
+```
+
+`discovered → triaged → researching → watching | proposed | excluded`. Instants are **epoch-ms
+numbers**, because the host scans a stored answer for string timestamps after `asOf` and refuses
+the whole read. A boolean nobody read is `null` and never `false`.
+
+⛔ **This folder is not a source cache and not an account database.** Prices, filing text,
+holdings, cash and open proposals are read from their own sources on every run; a roster carrying
+any of them is refused with `memory_holds_vendor_payload`. What is kept instead is a pointer and a
+question. Caps: 200 candidates, 60 KB, 8 evidence ids per candidate, a 280-character hypothesis. A
+cap that binds is a signal to exclude or age a name out, never to widen the cap.
+
+Four reruns must not create a second anything: a **rerun after failure** leaves the cursor where it
+was and increments `attempts`; a **duplicate discovery** keyed on `(market, symbol)` updates
+`lastSeenAtEpochMs` and folds `discoveryPath`; a **rule-version change** returns the row with
+`requiresReevaluation: true` and is never auto-migrated; an **excluded re-entry** costs an explicit
+`reentryReason` and a new evidence id, and dropping `excluded` silently is `candidate_state_regressed`.
+
+**The return programme** — the announcement, its receipts, and three counters that are never one:
+
+```json
+{
+  "symbol": "316140",
+  "programmeId": "prog-2026-buyback-1",
+  "announcedAmount": 200000000000,
+  "announcedKind": "amount",
+  "windowStartEpochMs": 1767571200000,
+  "windowEndEpochMs": 1799107200000,
+  "executedAmount": 110000000000,
+  "retiredAmount": 110000000000,
+  "cancelledAmount": 0,
+  "executionRate": 0.55,
+  "elapsedShare": 0.48,
+  "pace": 1.14,
+  "status": "on-pace",
+  "announcementRceptNo": "20260105000111",
+  "executionReceipts": ["20260630000742"],
+  "evidenceIds": ["ev_decision_2601", "ev_result_2606"]
+}
+```
+
+The key is `(symbol, programmeId)` and it is what joins a 결정 공시 to the 결과보고서 that answers it.
+⛔ **Bought, retired and cancelled are three counters and a sum of them is a number about nothing** —
+folding a cancelled amount into the executed one makes an abandoned programme read as a completed
+one. `announcedKind` is `amount` or `ratio`; a ratio has no execution rate to divide into, and
+saying so is the answer. An execution receipt whose programme has no announcement is
+`execution_without_announcement`: **walk the receipt cursor back and read the decision disclosure**
+rather than inventing a programme around it. An announcement with no receipt past a quarter of its
+own window is `announcement_without_execution_receipt`, which is a different finding asking for a
+different repair.
+
+**A web reading** — the only route by which anything read on the web becomes citable:
+
+```json
+{
+  "url": "https://ir.example.invalid/ko/value-up/2026-01-05-shareholder-return-plan.pdf",
+  "publisher": "316140 Investor Relations",
+  "publishedAtEpochMs": 1767571200000,
+  "observedAtEpochMs": 1767666600000,
+  "claim": "이사회가 2026~2028년 총주주환원율 50%를 목표로 결의했다고 회사가 스스로 밝힌다.",
+  "sourceType": "company-announcement",
+  "evidenceId": "ev_policy_2601",
+  "evidenceKind": "observation",
+  "evidenceSource": "manager:web-research"
+}
+```
+
+`sourceType` is `filing`, `company-announcement`, `press` or `manager-interpretation`. ⛔ **A search
+result's title or snippet is not a reading**: without the document's URL, its publication date and
+the instant you read it, this is `web_reading_is_a_summary` and no candidate is made from it. A
+result list or a homepage is refused for the same reason — the content changes with the query or
+with the day. The excerpt you hand `observation_file` is the source's **own words, verbatim**,
+capped at 64,000 characters; over the cap is a refusal and never a truncation. ⚠️ **An evidence id
+minted this run is citable next run, not this one** — carry it on the candidate.
 
 ### 3. Complete the thesis on the leading candidate
 
@@ -443,7 +617,15 @@ One proposal per run. Your `rationale` is what a person reads before approving:
   longer than the holding period assumes.
 - `counterArguments` — from step 4, not a softer version of it.
 - `uncertainty` — every input you could not get, every assumption you had to make, and every place
-  you resumed unfinished work.
+  you resumed unfinished work. ⛔ **And this run's `discoveryStatus`, by name.** The proposal
+  carries no diagnostics field — the host discards a judgement with an unknown key — so the status
+  travels here as a **token**: write `no_candidate_qualified`, `discovery_not_run` or
+  `discovery_incomplete` **verbatim**, in one entry, inside whatever prose the invocation's
+  `language` calls for. It is matched as a token and not as a phrase, precisely so that a Korean
+  run and an English one are read the same way. ⚠️ A run that had no discovery capacity and does
+  not carry `discovery_not_run` is refused: that output is the one an investor cannot tell from a
+  considered no-change. And a run whose own folder would have held vendor payload says
+  `memory_holds_vendor_payload` here rather than writing it.
 
 Then arm what wakes you next. **Every decision carries a `plans` entry, and a `WAIT` most of
 all**: the run you are in is the only thing that guarantees there is another one. Arm the
@@ -454,13 +636,15 @@ in `uncertainty` and submit the rest unchanged; do not reshape a plan to get it 
 
 ## What a completed run produces
 
-These ten are the run's required outputs. A run missing any of them is `research_incomplete`, and
-it says which:
+These twelve are the run's required outputs. A run missing any of them is `research_incomplete`,
+and it says which:
 
 | output | what it holds |
 |---|---|
+| `discoveryRun` | the record in §2: which names this run looked at, the three lane statuses, the cursor before and after, and which of the four `discoveryStatus` words it ended on |
+| `candidateLedger` | the roster in §2, written back to your own folder with the cursor inside it, so the next run resumes rather than restarts |
 | `valuationBasis` | the method, the range, and the assumptions each end rests on |
-| `returnPolicyEvidence` | what was announced, what has been executed, and the filings that say so |
+| `returnPolicyEvidence` | what was announced, what has been executed and what was retired — the programme record of §2, with the receipt references behind each of its three counters |
 | `returnComposition` | the expected total return split into re-rating and dividend, with the programme reported beside it |
 | `contraryEvidence` | the strongest case against, and what you looked for and did not find |
 | `catalystCalendar` | each catalyst, its date, and what you will observe |
@@ -497,6 +681,9 @@ Everything above happens on every run. These are loaded when the run reaches the
   company. An insurer or a securities firm is classified and then reported as unevaluated; this
   stage has no arithmetic for either.
 - **`nonfinancial-cash-headroom`** — an operating company.
+- **`sr-return-disclosure-sweep`** — collecting the return disclosures incrementally: which store,
+  which join key, how a report name is classified, what a `013` answer means, and how the roster is
+  written back under compare-and-swap.
 - **`return-policy-evidence`** — turning a return policy into filings, and the announced/executed
   distinction as Korean disclosure actually expresses it.
 - **`staged-plan-and-ledger`** — writing a staged plan, and re-running one without adding twice.
@@ -516,6 +703,8 @@ Everything above happens on every run. These are loaded when the run reaches the
 | `minimumExecutablePositionCurrency` | **KRW** | the money the amount above is an amount of. ⛔ It governs **only** a book whose `baseCurrency` is this: on any other the venue minimum for this account is **undeclared**, the run says so in a `warn`, and no floor constrains it. That is a declared absence and not a pass — say it in `uncertainty` |
 | `minimumExecutableWeight` | **unset** | the same floor as a share of the book, which needs no currency. There is no default: a venue minimum is money, and the same amount is 0.1 of a small book and 0.00001 of a large one, so any weight here would be fitted to one account size. Stated, it wins outright |
 | `riskBudgetWeight` | **0.01** | share of the book this methodology risks on one idea reaching its invalidation. ⚠️ It may be **narrowed** here and never widened: a larger setting is refused, reported, and 0.01 governs |
+| `discoveryBudgetFilings` | **100** | how many OpenDART filing-index rows one run walks past the cursor before it stops collecting and starts researching. Exceeding it is reported and not refused. ⛔ Spending it on the holdings review is `discovery_not_run`, never «no new candidates» |
+| `researchCompletionFloor` | **1** | how many candidates this run carries to a **completed** thesis rather than leaves part-read. ⛔ It refuses the run that reads six names shallowly and concludes nothing, which is the one that looks productive in a log |
 | `dividendWithholdingTaxRate` | **0.154** | the rate the net dividend leg is computed at when the invocation states none |
 
 ## What this package asks of the answer

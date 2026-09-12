@@ -92,7 +92,12 @@ flowchart TD
   C --> D[Review existing theses first]
   D --> E{Case?}
   E -->|re-rated / policy retreat| F[Stage down, or re-argue]
-  E -->|intact| G[Find candidates: discount, earnings quality, execution rate]
+  E -->|intact| G1[Resume unfinished research and retry failed ranges]
+  G1 --> G2[Sweep new return disclosures from the last receipt read]
+  G2 --> G3{Did this run look at anything?}
+  G3 -->|no universe, no lane, budget gone| G4[Report discovery_not_run — not 'no candidates']
+  G3 -->|yes| G[Score on all three axes: discount, earnings quality, execution rate]
+  G --> G5[Short of three axes: keep as watching with the missing axis named]
   G --> H[Complete one thesis: cause, evidence, difference, catalysts, scenarios, refutation]
   H --> I[Argue against it]
   I --> J[Two-leg total return: re-rating + net dividend, buyback reported apart]
@@ -107,7 +112,16 @@ flowchart TD
   Q -->|room| S[One proposal: BUY, RESIZE or the next stage]
   F --> S
   S --> T[Arm the next review and the disclosure watches]
+  T --> U[Write the roster and the receipt cursor back, so the next run resumes]
+  G4 --> T
+  G5 --> U
 ```
+
+**Where a run starts looking.** Not from a list of names it already knows: from the disclosures
+companies filed since the last run finished — dividend resolutions, decisions to buy treasury stock,
+the reports saying how much was actually bought, decisions to retire it, and the value-up plans that
+claim all of it is policy. It records where it stopped, so a run that failed halfway is resumed
+rather than restarted, and a range it could not read is retried before anything new is collected.
 
 **Cadence.** A price and risk review after the Korean close on weekdays, a deeper re-argument of
 each held thesis about monthly, and a watch on results, return-policy and cancellation
@@ -122,13 +136,20 @@ wakes the manager next, so a failed run has a defined way back.
   and traded value through your own broker connection. A company's stated return policy usually
   lives in its investor-relations material rather than in a filing, so it is filed as a dated,
   cited reading rather than treated as a fact from a vendor.
+- **How it reads them.** Filings come out of Aumos's own stored copy of OpenDART rather than being
+  re-fetched every run — it reads that store, refreshes it when it is behind, and never keeps a
+  second copy of its own. The issuer's IR statement is read on the web and filed through the one
+  route that gives a web reading a receipt Aumos can show you; what it keeps in its own folder is a
+  pointer and a question, never the documents.
 - **What a key costs.** OpenDART is free and requires registration. The broker connection is one
   you already have; Aumos relays the vendor's answer and never exposes the credential to this
   package.
-- **Settings.** Seven, all optional: how often a held thesis is fully re-argued, how many theses this
+- **Settings.** Nine, all optional: how often a held thesis is fully re-argued, how many theses this
   instance carries at once, the smallest position worth opening — as an amount, in a currency you
-  name, or as a share of the book — your dividend withholding rate, and the share of the book risked
-  on one idea. Nothing in them can loosen your Mandate, and the last may only be lowered.
+  name, or as a share of the book — your dividend withholding rate, the share of the book risked
+  on one idea, how many filings one run reads before it stops collecting and starts researching, and
+  how many candidates it has to finish rather than leave half-read. Nothing in them can loosen your
+  Mandate, and the risk budget may only be lowered.
 - **If your account is not in won.** The smallest position worth opening is an *amount of money*,
   and the 500,000 KRW this package publishes is a fact about a Korean venue. On a book denominated
   in anything else that floor simply does not apply: the run says so and nothing else changes. Give
@@ -153,6 +174,16 @@ wakes the manager next, so a failed run has a defined way back.
   coverage, ratio-versus-amount policies — and it is still the shape most likely to fool it.
 - **Fast markets.** A six-to-twelve-month holding period with a monthly deep review learns about a
   sharp deterioration late. It is not a trading system and it will not behave like one.
+- **A run that could not read the disclosure window.** If the filing route is down, or no universe
+  of companies was declared, or reviewing what you already hold used up the run's budget, it reports
+  **that** — in as many words — rather than "no candidates found". The two look identical on the
+  screen and they are opposite facts, and this is the failure it spends the most machinery
+  refusing. A "nothing qualified" from this manager means it swept a declared list, read every lane
+  it needs, and nothing passed.
+- **Announcements, which it will not accept as results.** A company that announces a buyback and
+  buys nothing is a company this manager keeps on a watch list, not a position. That means it is
+  slow by construction on a programme that is genuinely about to start, and it will say so rather
+  than anticipate.
 - **Companies with little disclosure.** Its evidence is filings. A company that discloses little
   gives it little, and the honest answer it produces is "I could not tell", repeatedly.
 - **Insurers, securities firms and mixed groups.** It can tell them apart from a bank and it cannot
