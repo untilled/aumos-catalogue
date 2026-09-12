@@ -246,6 +246,32 @@ jobs:
       # written at the end of this file.
       - run: npm run check:shared-scenarios
 
+      # The complement to the step above, and the boundary between the two is
+      # written down in both directions. `check:shared-scenarios` asserts
+      # behaviour and deliberately asserts **no field names**, because on the
+      # four boundaries it covers the shape of each answer is each package's own.
+      # The discovery run is the one place where the names **are** the contract:
+      # `docs/contracts/discovery-run.md` exists because zero candidates and zero
+      # reads are the same output and are opposite facts (#140, #305), and a
+      # reader can only tell them apart across three packages if all three spell
+      # the record the same way and mean the same thing by each word.
+      #
+      # So this checks what that one may not: the nineteen field names of §7.1 in
+      # order, the two closed vocabularies as sets, that a complete screen, a run
+      # with no universe and a failed range reach three **different** statuses in
+      # each package, that the cursor never steps over a failed range, and the
+      # candidate ledger's read rules — `undefined` is `data_missing` and `null`
+      # seeds, vendor payload and account state are refused, a rerun is a fixed
+      # point. ⛔ Severity words and diagnostic codes stay each package's own; the
+      # only codes named here are the two the contract itself names.
+      #
+      # Same reporting as the step above — a policy difference is recorded and
+      # green, a wrong answer is a loud `knownDefect` and green, and the job goes
+      # red for exactly one thing: a contract violation nobody recorded. Plain
+      # Node over the three `lib/` directories, no install, no network, and
+      # before `check:pins` for the reason written at the end of this file.
+      - run: npm run check:discovery-contract
+
       # ── Last, and that position is the point ──────────────────────────────
       #
       # The pair to `check:index`, and a different question: `check:index` asks
