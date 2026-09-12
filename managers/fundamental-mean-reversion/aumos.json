@@ -128,5 +128,9 @@
   },
   "memory": {
     "persistent": true
+  },
+  "character": {
+    "generator": "aumos-pixel-v1",
+    "seed": "fundamental-mean-reversion"
   }
 }

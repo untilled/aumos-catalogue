@@ -68,6 +68,23 @@ function unsafeHostReason(host: string): string | undefined {
   if (a === 192 && b === 168) return 'a private range'
   if (a === 172 && b >= 16 && b <= 31) return 'a private range'
   if (a === 169 && b === 254) return 'the link-local range, which holds cloud metadata'
+  // ── The four IANA ranges this list was missing (#872) ──────────────────────
+  //
+  // Every row above is "not the public internet", and these four are the same
+  // sentence for addresses the list simply had not enumerated. The first is the
+  // one that matters in practice: `100.64.0.0/10` is carrier-grade NAT, which is
+  // *somebody's* network — a CPE admin page, a neighbour's router — reachable
+  // from a great many consumer connections and never a vendor.
+  //
+  // ⚠️ **This is a floor rather than a proof, exactly as the header says.** A
+  // name still resolves wherever the investor's resolver says it does; what
+  // these rows buy is that a public pull request cannot *ask* for them in the
+  // open, which is the property a reviewer relies on.
+  if (a === 100 && b >= 64 && b <= 127) return 'the carrier-grade NAT range'
+  if (a === 198 && (b === 18 || b === 19)) return 'the benchmarking range'
+  if (a >= 224 && a <= 239) return 'the multicast range'
+  // Includes `255.255.255.255`, the broadcast address, which is in 240/4.
+  if (a >= 240) return 'a reserved range'
   return undefined
 }
 

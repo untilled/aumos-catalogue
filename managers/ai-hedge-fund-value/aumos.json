@@ -54,5 +54,9 @@
   },
   "memory": {
     "persistent": false
+  },
+  "character": {
+    "generator": "aumos-pixel-v1",
+    "seed": "ai-hedge-fund-value"
   }
 }
