@@ -374,6 +374,24 @@
         "required": ["id", "version", "entrypoint"],
         "additionalProperties": false
       }
+    },
+    "character": {
+      "type": "object",
+      "properties": {
+        "generator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "seed": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[\\x20-\\x7E]+$"
+        }
+      },
+      "required": ["generator", "seed"],
+      "additionalProperties": false
     }
   },
   "required": [

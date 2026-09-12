@@ -79,6 +79,21 @@ export interface Problem {
   /** Stable id, so a contributor can be pointed at the paragraph that argues it. */
   readonly rule: string
   readonly message: string
+  /**
+   * `'warning'` when the finding must not fail a build. (#938)
+   *
+   * ⚠️ **Absent is the default and it is a refusal.** Every rule written before
+   * this one is about something a package must fix before it is published, and
+   * a severity field that had to be filled in to keep that meaning would be a
+   * rule change disguised as a type change.
+   *
+   * There is exactly one warning today and its subject is why the level exists:
+   * a `character.generator` this lint has never heard of is a **decoration**
+   * Aumos falls back from rather than fails on, so a catalogue refusing the
+   * submission would be stricter than the app that reads it. A lint that
+   * refuses what the product accepts teaches the wrong rule.
+   */
+  readonly severity?: 'warning'
 }
 
 /**
@@ -115,6 +130,17 @@ export const DEFAULT_PROMPT_PATH = 'PROMPT.md'
  * is one regex, and `rules.test.ts` asserts both directions of it.
  */
 const LOCALE_TAG = /^[a-z]{2}(-[A-Z]{2})?$/
+
+/**
+ * Character generators this copy of the rules knows about. (#938)
+ *
+ * A list rather than one literal because a generator version is never retired —
+ * `aumos-pixel-v1` keeps rendering the faces it already rendered when
+ * `aumos-pixel-v2` arrives, which is what «이미 발행된 seed는 바꾸지 않는다»
+ * means in practice. Spelled here rather than imported for `LOCALE_TAG`'s
+ * reason: this file is copied verbatim into a public repository.
+ */
+const KNOWN_CHARACTER_GENERATORS: readonly string[] = ['aumos-pixel-v1']
 
 interface ManifestView {
   readonly capabilities: readonly string[]
@@ -223,6 +249,10 @@ export function lintManagerPackage(files: PackageFiles): readonly Problem[] {
   const problem = (rule: string, message: string): void => {
     problems.push({ rule, message })
   }
+  /** A finding a contributor should read and no build may fail over. (#938) */
+  const warning = (rule: string, message: string): void => {
+    problems.push({ rule, message, severity: 'warning' })
+  }
 
   // ── the manifest exists and is JSON ──────────────────────────────────────
   const manifestText = files[MANIFEST_FILENAME]
@@ -261,8 +291,6 @@ export function lintManagerPackage(files: PackageFiles): readonly Problem[] {
   } else if (bundle.trim().length === 0) {
     problem('prompt-present', `the prompt file ${promptPath} is empty`)
   }
-  const jsonBlocks = ((bundle ?? '').match(/```json\n[\s\S]*?```/g) ?? []).join('\n')
-
   // ── the paths the manifest names lead somewhere ──────────────────────────
   //
   // `loadManagerPackage` refuses a dead path at load, and refuses one that escapes
@@ -736,6 +764,34 @@ export function lintManagerPackage(files: PackageFiles): readonly Problem[] {
   // replaced because it has nothing left to say: `readManifest` below already
   // reports an unparseable manifest, and a cadence outside range is now a
   // `manifest-present` problem rather than a silent drop.
+
+  /**
+   * ── the face, which is decoration and is checked as such (#938) ──────────
+   *
+   * The manifest schema owns the *shape* of `character` — two strings, bounded,
+   * printable ASCII — and this rule is the one thing the schema deliberately
+   * cannot say: `generator` is an open string there, because a closed enum would
+   * make a package naming a newer generator **unreadable** on an older binary,
+   * and a picture must never cost an install.
+   *
+   * What that buys is a typo nobody notices. `aumos-pixel-vl` parses, travels,
+   * reaches the app and falls back to the face derived from the package id —
+   * silently, and looking exactly like a package that declared nothing. So the
+   * check is here, where an author is listening, and it is a **warning**: this
+   * lint is a contributor's fast feedback, the value may legitimately name a
+   * generator newer than this copy of the rules, and refusing would make the
+   * catalogue stricter than the product.
+   */
+  const generator = text(field(field(raw, 'character'), 'generator'))
+  if (generator !== undefined && !KNOWN_CHARACTER_GENERATORS.includes(generator)) {
+    warning(
+      'character-unknown-generator',
+      `character.generator ${JSON.stringify(generator)} is not one this build knows ` +
+        `(${KNOWN_CHARACTER_GENERATORS.join(', ')}). The package installs and runs either way — ` +
+        'the face falls back to the one derived from the package id — so check the spelling if ' +
+        'you meant to declare one',
+    )
+  }
 
   return problems
 }

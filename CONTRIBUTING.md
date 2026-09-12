@@ -223,6 +223,33 @@ Three things to keep off that page:
 Every file in your directory is UTF-8 text. No binaries, no symlinks. The published
 format is a map of path to file contents, and it cannot carry anything else.
 
+### Your face is a seed, and it does not move
+
+`aumos.json` carries a `character`, and it is two strings:
+
+```json
+"character": { "generator": "aumos-pixel-v1", "seed": "your-package-id" }
+```
+
+The generator hashes the seed into a pixel character — skin, face, eyes, hair, an
+accessory, clothes — and that one appearance is what an investor sees everywhere: the
+catalogue card before installing, the mark beside your manager in the sidebar
+afterwards, and the figure walking around the office view. No image file is involved
+and none is asked for.
+
+Write the seed **explicitly**, even though a package with no `character` derives the
+same face from its id. The default rule is allowed to change; a published face is not.
+
+⚠️ **A merged seed is permanent.** Renaming a package, republishing it or reinstalling
+it never changes its face, because people recognise a manager by it. The one time a
+seed is chosen rather than copied is a collision: `npm run check:characters` draws
+every manager in this repository and refuses two that come out with the same face, and
+the fix is a suffix — `"seed": "your-package-id#2"` — on the **later** submission. The
+package that was published first keeps what it had.
+
+`icon.svg` is still read and still optional. Where both exist the character wins, so
+keep yours if you have one and do not add one for the sake of it.
+
 ### Another language, if you have one
 
 `aumos.app` is read in English and in Korean, and until now the *chrome* was

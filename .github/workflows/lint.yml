@@ -85,6 +85,33 @@ jobs:
       # one-line diff in a file whose only subject is whose packages these are.
       - run: npm run check:publisher
 
+      # A manager's face, and whether two of them are the same one
+      # (untilled/aumos#938). `character` is `{generator, seed}` in the manifest
+      # and a face is what the generator hashes it into, so the lint can say the
+      # field is well formed and can say nothing at all about the thing a person
+      # sees. Uniqueness is not a property of one package.
+      #
+      # ⚠️ **The pixels, not the appearance.** Two appearances that differ only
+      # in clothing draw the same sixteen-pixel face, so this fails on a
+      # duplicate `portraitFingerprint` and only warns on a duplicate
+      # `appearanceSignature`. A collision is fixed by suffixing the
+      # **later-published** package's seed — the earlier one keeps the face
+      # people know it by, and a published seed never moves.
+      #
+      # Plain Node over `tools/characters/characters.ts`, a vendored copy of
+      # `@aumos/characters` with no imports — no install, no network, like every
+      # `check:*` below it. It also prints the hair/face/accessory table the
+      # contact-sheet reviewer reads alongside the rendered sheet.
+      - run: npm run check:characters
+
+      # The other half: the index is what a browsing installation reads **before**
+      # it downloads anything, so the face on a catalogue card comes from
+      # `metadata.character` and the face of the installed manager comes from the
+      # manifest. This asks whether they are still the same two strings.
+      # `tools/project-character.mjs` says why the projection is a program rather
+      # than a field a submitter fills in.
+      - run: npm run check:character-index
+
       # A ported package and the `harness.json` beside it have to agree — one
       # commit, one licence, one notice, one capability list, and a graph whose
       # roles are actually in the prompt in that order.

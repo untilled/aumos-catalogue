@@ -47,6 +47,11 @@ if (packages.length === 0) {
 
 for (const name of packages) {
   const problems: string[] = []
+  // Findings that are printed and do not fail the build. `Problem.severity` in
+  // `rules.ts` argues why the level exists: a package's face is decoration the
+  // app falls back from, so refusing it here would make this checker stricter
+  // than the product a contributor is publishing for. (#938)
+  const warnings: string[] = []
   let files: Record<string, string> = {}
 
   try {
@@ -83,17 +88,21 @@ for (const name of packages) {
     }
 
     for (const problem of lintManagerPackage(files)) {
-      problems.push(problem.rule + ': ' + problem.message)
+      const line = problem.rule + ': ' + problem.message
+      if (problem.severity === 'warning') warnings.push(line)
+      else problems.push(line)
     }
   }
 
   if (problems.length === 0) {
     console.log('  ok  ' + name)
+    for (const warning of warnings) console.log('        warning ' + warning)
     continue
   }
   failed += 1
   console.log('FAIL  ' + name)
   for (const problem of problems) console.log('        ' + problem)
+  for (const warning of warnings) console.log('        warning ' + warning)
 }
 
 if (failed > 0) {

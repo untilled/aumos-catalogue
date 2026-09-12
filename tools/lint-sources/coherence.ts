@@ -43,6 +43,13 @@ export interface CoherentDocument {
   readonly id: string
   readonly local?: boolean | undefined
   readonly hosts: readonly string[]
+  /**
+   * ⚠️ **Optional here and defaulted in the schema**, which is deliberate: the
+   * vendored linter over in the catalogue repository reads the document *as
+   * authored* (the generated JSON Schema describes it that way), so the key is
+   * genuinely absent there. Every reader below treats absent as `{}`.
+   */
+  readonly headers?: Readonly<Record<string, string>> | undefined
   readonly credentials: readonly {
     readonly name: string
     readonly required?: boolean
@@ -54,6 +61,8 @@ export interface CoherentDocument {
         readonly tokenUrl: string
         readonly clientId: string
         readonly clientSecret: string
+        /** Defaulted to `authorization` by the schema; absent in an authored document. */
+        readonly header?: string | undefined
       }
     | undefined
   readonly endpoints: readonly {
@@ -82,6 +91,50 @@ export function assertCoherent(spec: CoherentDocument): void {
     }
     protectedQueryNames.add(parameter)
   }
+
+  // ── The same rule one axis over: an outbound *header* has one owner too ────
+  //
+  // The query rule above has been here since #232 D; headers had nothing, and
+  // that asymmetry was not a decision — it was the half nobody wrote. Three
+  // writers reach one outbound header map and the last one wins: the static
+  // `headers` block, a credential's injection (`header`, or
+  // `inject.location: 'header'`), and `auth.header` carrying the bearer. So a
+  // document that spells `authorization` in `headers` *and* declares a session
+  // has said two things about one header, and which one leaves the machine is a
+  // fact about the interpreter's spread order rather than about the document.
+  // The fix is that it cannot be said.
+  //
+  // ⚠️ **Lower-cased, because HTTP header names are case-insensitive.**
+  // `headerName` admits either spelling, so `Authorization` and `authorization`
+  // are the same header and comparing the text as written would let the
+  // collision through by capitalisation.
+  //
+  // ⚠️ **`auth.header` defaults to `authorization` and the default collides
+  // too.** `spec.ts` applies that default, so an authored document that omits
+  // the field still signs that header — and an authored document read by the
+  // catalogue's linter has the key absent. Both readers have to reach the same
+  // verdict, so the default is spelled here as well.
+  const headerOwners = new Map<string, string>()
+  const claimHeader = (name: string, owner: string): void => {
+    const key = name.toLowerCase()
+    const held = headerOwners.get(key)
+    if (held !== undefined) {
+      throw new SourceSpecError(
+        'unresolved-reference',
+        `${spec.id} writes the header "${name}" from two places (${held} and ${owner}). One outbound header can have one owner — whichever won would be a fact about the interpreter rather than about this document.`,
+        { id: spec.id, header: key, owners: [held, owner] },
+      )
+    }
+    headerOwners.set(key, owner)
+  }
+  for (const credential of spec.credentials) {
+    const injected =
+      credential.header ??
+      (credential.inject?.location === 'header' ? credential.inject.name : undefined)
+    if (injected !== undefined) claimHeader(injected, `credentials["${credential.name}"]`)
+  }
+  if (spec.auth !== undefined) claimHeader(spec.auth.header ?? 'authorization', 'auth.header')
+  for (const name of Object.keys(spec.headers ?? {})) claimHeader(name, 'headers')
 
   for (const host of spec.hosts) assertDeclarableHost(host, `hosts[] of ${spec.id}`, local)
 

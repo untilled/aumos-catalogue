@@ -43,7 +43,11 @@
         },
         "homepage": null,
         "publishedAt": "2026-08-21T11:35:08.441Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBSSBIZWRnZSBGdW5kIOKAlCBEZWVwIFZhbHVlIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0iI0UwOUEzNCIvPjxjaXJjbGUgY3g9IjI5IiBjeT0iMjkiIHI9IjEyIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIvPjxwYXRoIGQ9Ik0zOCAzOGw5IDkiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNMjQgMzJsNC02IDQgNCA0LTciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4K"
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBSSBIZWRnZSBGdW5kIOKAlCBEZWVwIFZhbHVlIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0iI0UwOUEzNCIvPjxjaXJjbGUgY3g9IjI5IiBjeT0iMjkiIHI9IjEyIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIvPjxwYXRoIGQ9Ik0zOCAzOGw5IDkiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNMjQgMzJsNC02IDQgNCA0LTciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4K",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "ai-hedge-fund-value"
+        }
       }
     },
     {
@@ -78,7 +82,11 @@
         "provenance": null,
         "homepage": null,
         "publishedAt": "2026-08-29T00:00:00.000Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBdGxhcyBUcmVuZCBDcnlwdG8iPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMkExQjRBIi8+PHBhdGggZD0iTTEwIDQ2bDEyLTEwIDkgNiAxMC0xNiA2IDQgNy0xMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjU0IiBjeT0iMTgiIHI9IjQiIGZpbGw9IiNDOUE2RkYiLz48L3N2Zz4K"
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBdGxhcyBUcmVuZCBDcnlwdG8iPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMkExQjRBIi8+PHBhdGggZD0iTTEwIDQ2bDEyLTEwIDkgNiAxMC0xNiA2IDQgNy0xMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjU0IiBjeT0iMTgiIHI9IjQiIGZpbGw9IiNDOUE2RkYiLz48L3N2Zz4K",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "atlas-trend-crypto"
+        }
       }
     },
     {
@@ -116,7 +124,11 @@
         "provenance": null,
         "homepage": null,
         "publishedAt": "2026-08-27T00:00:00.000Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBdGxhcyBUcmVuZCBLUiI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwRjNEMkUiLz48cGF0aCBkPSJNMTAgNDVsMTAtNyA4IDUgOS0xMyA3IDQgMTAtMTUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSI1NCIgY3k9IjE5IiByPSI0IiBmaWxsPSIjNUJFOEE4Ii8+PC9zdmc+Cg=="
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBdGxhcyBUcmVuZCBLUiI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwRjNEMkUiLz48cGF0aCBkPSJNMTAgNDVsMTAtNyA4IDUgOS0xMyA3IDQgMTAtMTUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSI1NCIgY3k9IjE5IiByPSI0IiBmaWxsPSIjNUJFOEE4Ii8+PC9zdmc+Cg==",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "atlas-trend-kr"
+        }
       }
     },
     {
@@ -154,7 +166,11 @@
         "provenance": null,
         "homepage": null,
         "publishedAt": "2026-08-23T08:41:17.204Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBdGxhcyBUcmVuZCBVUyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxMjUwN0YiLz48cGF0aCBkPSJNMTAgNDRsMTEtOSA4IDYgOS0xNCA3IDUgOS0xNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjU0IiBjeT0iMTYiIHI9IjQiIGZpbGw9IiM3RkQxRkYiLz48L3N2Zz4K"
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBdGxhcyBUcmVuZCBVUyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxMjUwN0YiLz48cGF0aCBkPSJNMTAgNDRsMTEtOSA4IDYgOS0xNCA3IDUgOS0xNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjU0IiBjeT0iMTYiIHI9IjQiIGZpbGw9IiM3RkQxRkYiLz48L3N2Zz4K",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "atlas-trend-us"
+        }
       }
     },
     {
@@ -190,7 +206,11 @@
         "provenance": null,
         "homepage": null,
         "publishedAt": "2026-08-21T11:35:08.439Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJCYXNpYyBJbnZlc3RvciI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiM0RjZCRkYiLz48ZyBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNMjAgNDRWMjgiLz48cGF0aCBkPSJNMzIgNDRWMjAiLz48cGF0aCBkPSJNNDQgNDRWMzQiLz48L2c+PHBhdGggZD0iTTE2IDQ4aDMyIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuNTUiLz48L3N2Zz4K"
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJCYXNpYyBJbnZlc3RvciI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiM0RjZCRkYiLz48ZyBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNMjAgNDRWMjgiLz48cGF0aCBkPSJNMzIgNDRWMjAiLz48cGF0aCBkPSJNNDQgNDRWMzQiLz48L2c+PHBhdGggZD0iTTE2IDQ4aDMyIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuNTUiLz48L3N2Zz4K",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "basic-investor"
+        }
       }
     },
     {
@@ -239,7 +259,11 @@
         },
         "homepage": null,
         "publishedAt": "2026-09-10T00:00:00.000Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJDYXRhbHlzdCBUdXJuYXJvdW5kIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0iIzNCMkE1QSIvPjxwYXRoIGQ9Ik0xMiA0NGM2LTIgMTAtOCAxNC0xNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iLjQ1Ii8+PHBhdGggZD0iTTI2IDI4YzQtOCAxMC0xMiAxOC0xMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0zOCAxMmg4djgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSIyNiIgY3k9IjI4IiByPSI1IiBmaWxsPSIjRjJCNDQxIi8+PC9zdmc+Cg=="
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJDYXRhbHlzdCBUdXJuYXJvdW5kIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0iIzNCMkE1QSIvPjxwYXRoIGQ9Ik0xMiA0NGM2LTIgMTAtOCAxNC0xNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iLjQ1Ii8+PHBhdGggZD0iTTI2IDI4YzQtOCAxMC0xMiAxOC0xMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0zOCAxMmg4djgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSIyNiIgY3k9IjI4IiByPSI1IiBmaWxsPSIjRjJCNDQxIi8+PC9zdmc+Cg==",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "catalyst-turnaround"
+        }
       }
     },
     {
@@ -272,7 +296,11 @@
         "enginesAumos": ">=0.2.4",
         "provenance": null,
         "homepage": null,
-        "publishedAt": "2026-08-21T11:36:50.670Z"
+        "publishedAt": "2026-08-21T11:36:50.670Z",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "earnings-drift-watcher"
+        }
       }
     },
     {
@@ -324,7 +352,11 @@
         },
         "homepage": null,
         "publishedAt": "2026-08-25T12:00:00.000Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJFdmlkZW5jZS1HYXRlZCBBbGxvY2F0b3IiPgogIDxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMzE1QzRBIi8+CiAgPHBhdGggZD0iTTE0IDE4aDM2djhIMTR6TTE5IDMwaDI2djhIMTl6TTI1IDQyaDE0djhIMjV6IiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuOTIiLz4KICA8Y2lyY2xlIGN4PSI0OCIgY3k9IjQ2IiByPSI3IiBmaWxsPSIjRTdCODRCIi8+CiAgPHBhdGggZD0ibTQ1IDQ2IDIgMiA0LTUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMxNUM0QSIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4K"
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJFdmlkZW5jZS1HYXRlZCBBbGxvY2F0b3IiPgogIDxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMzE1QzRBIi8+CiAgPHBhdGggZD0iTTE0IDE4aDM2djhIMTR6TTE5IDMwaDI2djhIMTl6TTI1IDQyaDE0djhIMjV6IiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuOTIiLz4KICA8Y2lyY2xlIGN4PSI0OCIgY3k9IjQ2IiByPSI3IiBmaWxsPSIjRTdCODRCIi8+CiAgPHBhdGggZD0ibTQ1IDQ2IDIgMiA0LTUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMxNUM0QSIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4K",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "evidence-gated"
+        }
       }
     },
     {
@@ -373,7 +405,11 @@
         },
         "homepage": null,
         "publishedAt": "2026-09-10T00:00:00.000Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJGdW5kYW1lbnRhbCBNZWFuIFJldmVyc2lvbiI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMyQzNFNjMiLz48cGF0aCBkPSJNOCAyNGg0OCIgc3Ryb2tlPSIjOEZBNkQ4IiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWRhc2hhcnJheT0iNCA0IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNOSAxN2w5IDggOCAxNSA4IDEwIDgtOSA4LTYgNS00IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMzQiIGN5PSI1MCIgcj0iNC41IiBmaWxsPSIjRjJCNDQxIi8+PC9zdmc+Cg=="
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJGdW5kYW1lbnRhbCBNZWFuIFJldmVyc2lvbiI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMyQzNFNjMiLz48cGF0aCBkPSJNOCAyNGg0OCIgc3Ryb2tlPSIjOEZBNkQ4IiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWRhc2hhcnJheT0iNCA0IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNOSAxN2w5IDggOCAxNSA4IDEwIDgtOSA4LTYgNS00IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMzQiIGN5PSI1MCIgcj0iNC41IiBmaWxsPSIjRjJCNDQxIi8+PC9zdmc+Cg==",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "fundamental-mean-reversion"
+        }
       }
     },
     {
@@ -412,7 +448,11 @@
         "provenance": null,
         "homepage": null,
         "publishedAt": "2026-08-21T11:35:08.440Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJQcnVkZW50IEFsbG9jYXRvciI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxRkE5N0EiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjYiIG9wYWNpdHk9Ii40NSIvPjxwYXRoIGQ9Ik0zMiAxOGExNCAxNCAwIDAgMSAxNCAxNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMiIGZpbGw9IiNmZmYiLz48L3N2Zz4K"
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJQcnVkZW50IEFsbG9jYXRvciI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxRkE5N0EiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjYiIG9wYWNpdHk9Ii40NSIvPjxwYXRoIGQ9Ik0zMiAxOGExNCAxNCAwIDAgMSAxNCAxNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMiIGZpbGw9IiNmZmYiLz48L3N2Zz4K",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "prudent-allocator"
+        }
       }
     },
     {
@@ -461,7 +501,11 @@
         },
         "homepage": null,
         "publishedAt": "2026-09-10T00:00:00.000Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJTaGFyZWhvbGRlciBSZXJhdGluZyI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxRjNBNUYiLz4KICA8cGF0aCBkPSJNMTQgNDRoMzYiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9Ii41Ii8+CiAgPHJlY3QgeD0iMTciIHk9IjMwIiB3aWR0aD0iOCIgaGVpZ2h0PSIxNCIgcng9IjIiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9Ii44NSIvPgogIDxyZWN0IHg9IjMwIiB5PSIyNCIgd2lkdGg9IjgiIGhlaWdodD0iMjAiIHJ4PSIyIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIuODUiLz4KICA8cmVjdCB4PSI0MyIgeT0iMTYiIHdpZHRoPSI4IiBoZWlnaHQ9IjI4IiByeD0iMiIgZmlsbD0iIzdGRDFBOCIvPgogIDxjaXJjbGUgY3g9IjQ3IiBjeT0iMTIiIHI9IjQiIGZpbGw9IiNFN0I4NEIiLz4KPC9zdmc+Cg=="
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJTaGFyZWhvbGRlciBSZXJhdGluZyI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxRjNBNUYiLz4KICA8cGF0aCBkPSJNMTQgNDRoMzYiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9Ii41Ii8+CiAgPHJlY3QgeD0iMTciIHk9IjMwIiB3aWR0aD0iOCIgaGVpZ2h0PSIxNCIgcng9IjIiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9Ii44NSIvPgogIDxyZWN0IHg9IjMwIiB5PSIyNCIgd2lkdGg9IjgiIGhlaWdodD0iMjAiIHJ4PSIyIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIuODUiLz4KICA8cmVjdCB4PSI0MyIgeT0iMTYiIHdpZHRoPSI4IiBoZWlnaHQ9IjI4IiByeD0iMiIgZmlsbD0iIzdGRDFBOCIvPgogIDxjaXJjbGUgY3g9IjQ3IiBjeT0iMTIiIHI9IjQiIGZpbGw9IiNFN0I4NEIiLz4KPC9zdmc+Cg==",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "shareholder-rerating"
+        }
       }
     },
     {
@@ -492,7 +536,11 @@
         "provenance": null,
         "homepage": null,
         "publishedAt": "2026-08-21T11:35:08.441Z",
-        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJVbmRlcnZhbHVlZCBOb3ciPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjN0M1Q0Y2Ii8+PHBhdGggZD0iTTMyIDE2djI0IiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHBhdGggZD0iTTIyIDMybDEwIDEwIDEwLTEwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTE4IDQ4aDI4IiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuNTUiLz48L3N2Zz4K"
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJVbmRlcnZhbHVlZCBOb3ciPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjN0M1Q0Y2Ii8+PHBhdGggZD0iTTMyIDE2djI0IiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHBhdGggZD0iTTIyIDMybDEwIDEwIDEwLTEwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTE4IDQ4aDI4IiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuNTUiLz48L3N2Zz4K",
+        "character": {
+          "generator": "aumos-pixel-v1",
+          "seed": "undervalued-now"
+        }
       }
     }
   ]

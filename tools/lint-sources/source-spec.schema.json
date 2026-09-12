@@ -46,7 +46,8 @@
       },
       "additionalProperties": {
         "type": "string",
-        "maxLength": 200
+        "maxLength": 200,
+        "pattern": "^[\\x20-\\x7e]*$"
       }
     },
     "credentials": {
@@ -68,7 +69,8 @@
               },
               "default": {
                 "type": "string",
-                "maxLength": 200
+                "maxLength": 200,
+                "pattern": "^[\\x20-\\x7e]*$"
               },
               "required": {
                 "default": true,
@@ -122,7 +124,8 @@
               },
               "default": {
                 "type": "string",
-                "maxLength": 200
+                "maxLength": 200,
+                "pattern": "^[\\x20-\\x7e]*$"
               },
               "required": {
                 "default": true,
