@@ -1,7 +1,7 @@
 // ── Vendored into aumos-catalogue ───────────────────────────────────────────
 //
 // Copied byte-for-byte from `untilled/aumos`,
-// `apps/web/landing/lib/characters.ts` @ 9a16a6f8cae2b45b4a0736a1e2fa19221b1c85c9
+// `apps/web/landing/lib/characters.ts` @ f6f59a5f (regenerated after the art redraw, 84c56bbb)
 // (untilled/aumos#938, PR5), which is itself generated from
 // `packages/characters/` by `apps/web/site/characters-vendor.ts`.
 //
@@ -13,7 +13,6 @@
 // It has no imports and no dependencies on purpose — that is what lets
 // `tools/check-characters.ts` run it under `node --experimental-strip-types`
 // with nothing installed.
-
 /**
  * **Vendored from `@aumos/characters` — do not edit.** (#938)
  *
@@ -172,40 +171,130 @@ export type Role =
   | '.' // transparent
   | 'S' // skin, lit
   | 's' // skin, shaded
-  | 'L' // skin outline
+  | 'L' // skin, dark — the brow line, the nostril, and the skin's share of the outline
+  | 'G' // hair, highlight
   | 'H' // hair, lit
   | 'h' // hair, shaded
+  | 'g' // hair, dark — strand partings, and the hair's share of the outline
   | 'T' // top, lit
   | 't' // top, shaded
+  | 'u' // top, dark — collars, plackets, and the top's share of the outline
   | 'B' // bottom, lit
   | 'b' // bottom, shaded
+  | 'v' // bottom, dark
   | 'K' // shoes, lit
   | 'k' // shoes, shaded
-  | 'E' // eye ink
-  | 'W' // eye highlight
+  | 'j' // shoes, dark
+  | 'E' // eye pupil
+  | 'W' // eye white
   | 'M' // mouth
   | 'A' // accessory, lit
   | 'a' // accessory, shaded
+  | 'n' // accessory, dark
+  | 'P' // prop, lit — the pages of the book the reading frames hold
+  | 'p' // prop, dark — its cover
 
 const ROLES = new Set<string>([
   '.',
   'S',
   's',
   'L',
+  'G',
   'H',
   'h',
+  'g',
   'T',
   't',
+  'u',
   'B',
   'b',
+  'v',
   'K',
   'k',
+  'j',
   'E',
   'W',
   'M',
   'A',
   'a',
+  'n',
+  'P',
+  'p',
 ])
+
+/**
+ * The dark step of the material a role belongs to — the whole of the outline rule.
+ *
+ * `render.ts` walks the finished grid and fills every transparent cell that
+ * touches a drawn one with *this* role, which is why the figure is ringed in a
+ * darker tone of whatever it is made of rather than in black: hair is outlined in
+ * hair, a sleeve in its own cloth, a shoe in leather. Three tones and a black line
+ * is what made the upstream sprites read as drawings rather than as blobs, and a
+ * derived ring is the only version of it that cannot fall out of step with art
+ * somebody edits later — every part below is authored as its *filled* shape and
+ * nothing in `parts/` spells an outline at all.
+ */
+export const OUTLINE_OF: Readonly<Record<Role, Role>> = {
+  '.': '.',
+  S: 'L',
+  s: 'L',
+  L: 'L',
+  G: 'g',
+  H: 'g',
+  h: 'g',
+  g: 'g',
+  T: 'u',
+  t: 'u',
+  u: 'u',
+  B: 'v',
+  b: 'v',
+  v: 'v',
+  K: 'j',
+  k: 'j',
+  j: 'j',
+  E: 'L',
+  W: 'L',
+  M: 'L',
+  A: 'n',
+  a: 'n',
+  n: 'n',
+  P: 'p',
+  p: 'p',
+}
+
+/**
+ * How a material shades. A garment mask lands on a body cell that is already
+ * lit or already shaded (`render.ts`), and the cloth has to keep the body's
+ * modelling rather than flatten it — so the mask's own role is stepped down here
+ * when it covers shaded skin.
+ */
+export const SHADE_OF: Readonly<Record<Role, Role>> = {
+  '.': '.',
+  S: 's',
+  s: 's',
+  L: 'L',
+  G: 'H',
+  H: 'h',
+  h: 'h',
+  g: 'g',
+  T: 't',
+  t: 't',
+  u: 'u',
+  B: 'b',
+  b: 'b',
+  v: 'v',
+  K: 'k',
+  k: 'k',
+  j: 'j',
+  E: 'E',
+  W: 'W',
+  M: 'M',
+  A: 'a',
+  a: 'a',
+  n: 'n',
+  P: 'p',
+  p: 'p',
+}
 
 /** Art as authored: one string per row, every row `FRAME_WIDTH` characters wide. */
 export type ArtRows = readonly string[]
@@ -262,9 +351,11 @@ export const checkDirectional = (name: string, art: DirectionalArt): Directional
 /**
  * The colour ramps, and the table that turns a role character into `#RRGGBB`.
  *
- * Every ramp is at least two steps — lit and shaded — because a 16×32 figure with
- * one flat colour per material reads as a silhouette rather than a body. Skin
- * carries a third, the outline, for parts that need to close a shape.
+ * Every ramp carries at least three steps — lit, shaded, and the **dark** the
+ * derived outline is drawn in (`render.ts`) — because a 16×32 figure with one flat
+ * colour per material reads as a silhouette rather than a body, and a figure ringed
+ * in black reads as a sticker. Hair carries a fourth, the highlight, because it is
+ * the attribute the portrait is read at and four tones is what gives a mass volume.
  *
  * ⚠️ **These values are part of `aumos-pixel-v1`.** Nudging one changes every
  * published face, so a new palette is a new generator id, not an edit here.
@@ -277,9 +368,18 @@ export interface SkinRamp {
   readonly shade: string
   readonly line: string
 }
+/** A hair ramp is four steps: the strand lit by the room, the mass, its shadow, and the line. */
+export interface HairRamp {
+  readonly light: string
+  readonly base: string
+  readonly shade: string
+  readonly line: string
+}
+/** Cloth and leather: lit, shaded, and the dark a collar or an outline is drawn in. */
 export interface Ramp {
   readonly base: string
   readonly shade: string
+  readonly line: string
 }
 
 /** Six skin tones, light to dark. Ordering is authored, not derived. */
@@ -294,50 +394,58 @@ export const SKIN_RAMPS = {
 
 /** Eight hair colours. `slate` and `plum` are here so the row is not six browns. */
 export const HAIR_RAMPS = {
-  ink: { base: '#1E1B1A', shade: '#0E0D0C' },
-  espresso: { base: '#3E2A20', shade: '#261811' },
-  chestnut: { base: '#6B4226', shade: '#482A17' },
-  amber: { base: '#A9662E', shade: '#7A451D' },
-  wheat: { base: '#D8A85B', shade: '#A87C3A' },
-  flax: { base: '#E8D9A8', shade: '#B8A878' },
-  slate: { base: '#6B6F76', shade: '#474B51' },
-  plum: { base: '#6E3A5E', shade: '#4A2440' },
-} as const satisfies Record<string, Ramp>
+  ink: { light: '#4A4442', base: '#2B2624', shade: '#1A1615', line: '#0B0A0A' },
+  espresso: { light: '#6B4A36', base: '#4A3124', shade: '#301E15', line: '#1A0F0A' },
+  chestnut: { light: '#9A6438', base: '#6B4226', shade: '#4A2C18', line: '#2B180D' },
+  amber: { light: '#D08A42', base: '#A9662E', shade: '#7A451D', line: '#4C2910' },
+  wheat: { light: '#F0CC84', base: '#D8A85B', shade: '#A87C3A', line: '#6E4C1F' },
+  flax: { light: '#F8EFC8', base: '#E2CF9A', shade: '#B49F6C', line: '#7A6840' },
+  slate: { light: '#9BA0A8', base: '#6B6F76', shade: '#474B51', line: '#2A2D31' },
+  plum: { light: '#96548A', base: '#6E3A5E', shade: '#4A2440', line: '#2A1424' },
+} as const satisfies Record<string, HairRamp>
 
 /** Eight garment colours for the top. */
 export const TOP_RAMPS = {
-  navy: { base: '#2E4A6E', shade: '#1F3450' },
-  wine: { base: '#7E2B36', shade: '#5A1C25' },
-  pine: { base: '#2F6B52', shade: '#1F4A38' },
-  ochre: { base: '#C8802F', shade: '#97601F' },
-  chalk: { base: '#E4E1DA', shade: '#BAB6AE' },
-  graphite: { base: '#3A3D44', shade: '#26282D' },
-  iris: { base: '#8A6FB0', shade: '#63508A' },
-  lagoon: { base: '#4C8FA8', shade: '#35687C' },
+  navy: { base: '#2E4A6E', shade: '#1F3450', line: '#122034' },
+  wine: { base: '#7E2B36', shade: '#5A1C25', line: '#3A1018' },
+  pine: { base: '#2F6B52', shade: '#1F4A38', line: '#123024' },
+  ochre: { base: '#C8802F', shade: '#97601F', line: '#653D11' },
+  chalk: { base: '#E4E1DA', shade: '#BAB6AE', line: '#807C74' },
+  graphite: { base: '#3A3D44', shade: '#26282D', line: '#15171A' },
+  iris: { base: '#8A6FB0', shade: '#63508A', line: '#3E305A' },
+  lagoon: { base: '#4C8FA8', shade: '#35687C', line: '#1F4251' },
 } as const satisfies Record<string, Ramp>
 
 /** Six garment colours for the bottom. Deliberately duller than the tops. */
 export const BOTTOM_RAMPS = {
-  charcoal: { base: '#33383F', shade: '#22262B' },
-  denim: { base: '#3C5A85', shade: '#2A3F60' },
-  khaki: { base: '#6B5C48', shade: '#4C4133' },
-  mulberry: { base: '#5A4250', shade: '#3E2D38' },
-  stone: { base: '#8C8F96', shade: '#666A70' },
-  midnight: { base: '#24303C', shade: '#16202A' },
+  charcoal: { base: '#33383F', shade: '#22262B', line: '#131619' },
+  denim: { base: '#3C5A85', shade: '#2A3F60', line: '#18263C' },
+  khaki: { base: '#6B5C48', shade: '#4C4133', line: '#2D261D' },
+  mulberry: { base: '#5A4250', shade: '#3E2D38', line: '#241921' },
+  stone: { base: '#8C8F96', shade: '#666A70', line: '#3F4247' },
+  midnight: { base: '#24303C', shade: '#16202A', line: '#0B1118' },
 } as const satisfies Record<string, Ramp>
 
 /** Four shoe colours. Shoes carry no shape attribute — the body draws the foot. */
 export const SHOE_RAMPS = {
-  ink: { base: '#2A2A2E', shade: '#17171A' },
-  leather: { base: '#6A4630', shade: '#49301F' },
-  canvas: { base: '#DAD7D0', shade: '#A9A69F' },
-  brick: { base: '#8C2F3A', shade: '#63202A' },
+  ink: { base: '#2A2A2E', shade: '#17171A', line: '#0A0A0C' },
+  leather: { base: '#6A4630', shade: '#49301F', line: '#2A1B10' },
+  canvas: { base: '#DAD7D0', shade: '#A9A69F', line: '#6E6B65' },
+  brick: { base: '#8C2F3A', shade: '#63202A', line: '#3A1118' },
 } as const satisfies Record<string, Ramp>
 
 /** Eye ink is one colour for every face: a near-black that is not the hair's. */
 export const EYE_INK = '#1E2228'
 /** The highlight inside an eye, and the white of a wide one. */
 export const EYE_LIGHT = '#F6F7F8'
+/**
+ * The book the reading frames hold. Two fixed colours and not a seeded ramp: the
+ * prop is the same object in everyone's hands, and a thirteenth attribute for the
+ * cover of a book the office never draws (`readingTools: []`) would spend a hash
+ * stream on nothing.
+ */
+export const PROP_LIGHT = '#E8E6E0'
+export const PROP_DARK = '#4A3140'
 
 export type SkinId = keyof typeof SKIN_RAMPS
 export type HairColourId = keyof typeof HAIR_RAMPS
@@ -366,19 +474,27 @@ export const roleColours = (
     S: skin.base,
     s: skin.shade,
     L: skin.line,
+    G: hair.light,
     H: hair.base,
     h: hair.shade,
+    g: hair.line,
     T: top.base,
     t: top.shade,
+    u: top.line,
     B: bottom.base,
     b: bottom.shade,
+    v: bottom.line,
     K: shoes.base,
     k: shoes.shade,
+    j: shoes.line,
     E: EYE_INK,
     W: EYE_LIGHT,
     M: skin.line,
     A: accessory.base,
     a: accessory.shade,
+    n: accessory.line,
+    P: PROP_LIGHT,
+    p: PROP_DARK,
   }
 }
 
@@ -387,10 +503,44 @@ export const roleColours = (
 /**
  * Heads, eyes and mouths — the three parts the 16px portrait lives or dies on.
  *
- * The head occupies rows 3–14 of a 32-row frame. The portrait crop is rows 2–17
- * (`render.ts`), so a whole head plus two rows of shoulder is exactly what an
- * investor sees in a sidebar row, and nothing here may drift outside that band:
- * a hat that starts at row 0 is a hat nobody sees.
+ * ── The band, and what sits where in it ────────────────────────────────────
+ *
+ * ```
+ *  rows 3–10   skull      hair covers all of this on every style but `bald`
+ *  row  11     brow       the fringe's last row, or the brows the eyes carry
+ *  rows 12–13  eyes       two pixels wide, two tall: a white and a pupil
+ *  rows 14–16  cheeks     the widest part of the face; the mouth sits at 15–16
+ *  row  17     chin
+ * ```
+ *
+ * **Six rows of skin below the fringe**, inside a crop that starts at row 2. That
+ * is the measurement, off the office's own sprites, and the row the eyes land on
+ * is the whole of what decides it: a face whose eyes sit on the last row of the
+ * window is a face nobody can read.
+ *
+ * The skin is also authored **narrower than the hair that covers it** — ten
+ * columns against twelve — so a hairstyle frames a head rather than sitting on a
+ * block wider than itself.
+ *
+ * ⚠️ **Rows 3 and 4 are the same two rows on all four faces**, four and eight
+ * columns wide, and that is not tidiness: every hairstyle's crown is authored to
+ * cover exactly those, so a skull can never poke out past the hair on top of it.
+ * When it did, the two pixels of skin at the corners came back ringed by the
+ * outline pass and read as **ears** — on every style at once.
+ *
+ * The portrait crop is rows 2–17 (`render.ts`) — row 2 is where the derived
+ * outline lands above the crown — so a whole head is exactly what an investor
+ * sees in a sidebar row, and nothing here may drift outside that band: a hat that
+ * starts at row 0 is a hat nobody sees.
+ *
+ * Eyes sit in the **lower half** of the face rather than the middle. That is the
+ * single strongest chibi cue and it is what the office's own sprites do: a face
+ * with eyes at its centre reads as an adult at any size, and this figure is
+ * fifteen rows of head on fourteen of body.
+ *
+ * ⛔ Nothing here draws an outline; `render.ts` derives it from the composed
+ * grid. Every silhouette below is therefore the *filled* face, one pixel inside
+ * the shape it finishes as.
  *
  * `up` draws the back of the skull — the same silhouette, no features. The eyes
  * and mouth tables answer `NO_ART` there rather than being skipped by a branch,
@@ -405,13 +555,23 @@ const face = (name: string, down: readonly string[], right: readonly string[]): 
     right: { top: 3, rows: right },
   })
 
-/** Four jaw silhouettes. These are the only shapes that survive being 10px wide. */
+/**
+ * Four jaw silhouettes.
+ *
+ * All four are eight to twelve pixels wide, and **narrower than the hair that
+ * covers them** — that gap is what lets a hairstyle frame a face instead of
+ * replacing it, and it is why the hair below is authored two columns wider than
+ * anything here. What differs between the four is the taper: where the cheek comes
+ * in, and how much chin is left at row 17. In profile each one also carries the
+ * nose — one pixel past the face, which the outline turns into a visible bump.
+ */
 export const FACES = {
   round: face(
     'round',
     [
-      '.....SSSSSS.....',
+      '......SSSS......',
       '....SSSSSSSS....',
+      '...SSSSSSSSSS...',
       '...SSSSSSSSSs...',
       '...SSSSSSSSSs...',
       '...SSSSSSSSSs...',
@@ -419,29 +579,37 @@ export const FACES = {
       '...SSSSSSSSSs...',
       '...SSSSSSSSSs...',
       '...SSSSSSSSSs...',
-      '....SSSSSSSs....',
+      '...SSSSSSSSSs...',
+      '...SSSSSSSSSs...',
+      '...SSSSSSSSSs...',
       '....SSSSSSSs....',
       '.....SSSSSs.....',
     ],
     [
-      '.....SSSSS......',
-      '....SSSSSSS.....',
-      '....SSSSSSSs....',
-      '....SSSSSSSs....',
+      '......SSSS......',
+      '....SSSSSSSS....',
+      '...SSSSSSSSSSS..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSSs.',
+      '...SSSSSSSSSSs..',
       '....SSSSSSSSs...',
-      '....SSSSSSSSs...',
-      '....SSSSSSSs....',
-      '....SSSSSSSs....',
-      '....SSSSSSs.....',
       '.....SSSSSs.....',
-      '.....SSSSs......',
-      '......SSs.......',
     ],
   ),
   square: face(
     'square',
     [
+      '......SSSS......',
       '....SSSSSSSS....',
+      '...SSSSSSSSSS...',
+      '...SSSSSSSSSs...',
       '...SSSSSSSSSs...',
       '...SSSSSSSSSs...',
       '...SSSSSSSSSs...',
@@ -455,25 +623,29 @@ export const FACES = {
       '....SSSSSSSs....',
     ],
     [
-      '....SSSSSSS.....',
-      '....SSSSSSSs....',
-      '....SSSSSSSs....',
-      '....SSSSSSSs....',
+      '......SSSS......',
+      '....SSSSSSSS....',
+      '...SSSSSSSSSSS..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSs..',
+      '...SSSSSSSSSSSs.',
+      '...SSSSSSSSSSs..',
       '....SSSSSSSSs...',
-      '....SSSSSSSSs...',
       '....SSSSSSSs....',
-      '....SSSSSSSs....',
-      '....SSSSSSSs....',
-      '....SSSSSSSs....',
-      '....SSSSSSs.....',
-      '.....SSSs.......',
     ],
   ),
   narrow: face(
     'narrow',
     [
-      '.....SSSSS......',
-      '....SSSSSSS.....',
+      '......SSSS......',
+      '....SSSSSSSS....',
+      '....SSSSSSSS....',
       '....SSSSSSSs....',
       '....SSSSSSSs....',
       '....SSSSSSSs....',
@@ -481,28 +653,34 @@ export const FACES = {
       '....SSSSSSSs....',
       '....SSSSSSSs....',
       '....SSSSSSSs....',
-      '.....SSSSSs.....',
+      '....SSSSSSSs....',
+      '....SSSSSSSs....',
+      '....SSSSSSSs....',
       '.....SSSSSs.....',
       '......SSSs......',
     ],
     [
-      '.....SSSS.......',
-      '.....SSSSS......',
-      '.....SSSSSs.....',
-      '.....SSSSSs.....',
+      '......SSSS......',
+      '....SSSSSSSS....',
+      '....SSSSSSSSS...',
+      '....SSSSSSSSs...',
+      '....SSSSSSSSs...',
+      '....SSSSSSSSs...',
+      '....SSSSSSSSs...',
+      '....SSSSSSSSs...',
+      '....SSSSSSSSs...',
+      '....SSSSSSSSs...',
+      '....SSSSSSSSs...',
+      '....SSSSSSSSSs..',
+      '....SSSSSSSSs...',
       '.....SSSSSSs....',
-      '.....SSSSSSs....',
-      '.....SSSSSs.....',
-      '.....SSSSSs.....',
-      '.....SSSSs......',
-      '.....SSSSs......',
-      '......SSSs......',
-      '......SSs.......',
+      '......SSSSs.....',
     ],
   ),
   wide: face(
     'wide',
     [
+      '......SSSS......',
       '....SSSSSSSS....',
       '..SSSSSSSSSSSS..',
       '..SSSSSSSSSSSs..',
@@ -511,24 +689,29 @@ export const FACES = {
       '..SSSSSSSSSSSs..',
       '..SSSSSSSSSSSs..',
       '..SSSSSSSSSSSs..',
-      '...SSSSSSSSSs...',
+      '..SSSSSSSSSSSs..',
+      '..SSSSSSSSSSSs..',
+      '..SSSSSSSSSSSs..',
+      '..SSSSSSSSSSSs..',
       '...SSSSSSSSSs...',
       '....SSSSSSSs....',
-      '.....SSSSSs.....',
     ],
     [
-      '....SSSSSS......',
-      '...SSSSSSSS.....',
-      '...SSSSSSSSs....',
-      '...SSSSSSSSs....',
-      '...SSSSSSSSSs...',
-      '...SSSSSSSSSs...',
-      '...SSSSSSSSs....',
-      '...SSSSSSSSs....',
-      '...SSSSSSSs.....',
-      '....SSSSSSs.....',
-      '....SSSSSs......',
-      '.....SSSs.......',
+      '......SSSS......',
+      '....SSSSSSSS....',
+      '..SSSSSSSSSSSSS.',
+      '..SSSSSSSSSSSSs.',
+      '..SSSSSSSSSSSSs.',
+      '..SSSSSSSSSSSSs.',
+      '..SSSSSSSSSSSSs.',
+      '..SSSSSSSSSSSSs.',
+      '..SSSSSSSSSSSSs.',
+      '..SSSSSSSSSSSSs.',
+      '..SSSSSSSSSSSSs.',
+      '..SSSSSSSSSSSSSs',
+      '..SSSSSSSSSSSSs.',
+      '...SSSSSSSSSSs..',
+      '....SSSSSSSs....',
     ],
   ),
 } as const satisfies Record<string, DirectionalArt>
@@ -545,41 +728,74 @@ const features = (
     right: { top, rows: right },
   })
 
-/** Six pairs of eyes, at rows 8–9. In profile only the near eye is drawn. */
+/**
+ * Six pairs of eyes, on rows 12–13, two pixels wide, each under a brow at row 11.
+ *
+ * Every pair is a **white and a pupil** rather than a dot of ink: the white is
+ * what makes two pixels read as an eye instead of as a freckle, and it is the one
+ * thing the upstream sprites do at this size that the first draft of this package
+ * did not. The white is always the *outer* pixel, so both eyes look forward.
+ *
+ * The brow belongs to the eyes rather than to the face because it is the half of
+ * an expression a pupil cannot carry, and because a fringe has to be able to cover
+ * it: hair is drawn after the features, so a blunt fringe hides the brows the way
+ * a blunt fringe does. On a bald or close-cropped head they are what stops a face
+ * reading as an egg with two dots in it.
+ *
+ * The six differ in how much of the 2×2 the pupil takes and where it sits, which
+ * is all the expression there is room for. Columns 4–11 are the whole budget:
+ * every face above is at least that wide at rows 12–13, and no accessory may
+ * draw between them (`render.test.ts`).
+ */
 export const EYES = {
-  dot: features('eyes.dot', 9, ['.....EE..EE.....'], ['........EE......']),
+  dot: features(
+    'eyes.dot',
+    11,
+    ['.....LL..LL.....', '.....WW..WW.....', '.....WE..EW.....'],
+    ['.........LL.....', '................', '..........WE....'],
+  ),
   wide: features(
     'eyes.wide',
-    8,
-    ['.....EE..EE.....', '.....EE..EE.....'],
-    ['........EE......', '........EE......'],
+    11,
+    ['....LLL..LLL....', '.....WE..EW.....', '.....WE..EW.....'],
+    ['........LLL.....', '..........WE....', '..........WE....'],
   ),
   slant: features(
     'eyes.slant',
-    8,
-    ['.....E....E.....', '.....EE..EE.....'],
-    ['........E.......', '........EE......'],
+    11,
+    ['....LL....LL....', '.....EE..EE.....', '.....WE..EW.....'],
+    ['........LL......', '..........EE....', '..........WE....'],
   ),
-  closed: features('eyes.closed', 9, ['....EEE..EEE....'], ['.......EEE......']),
+  closed: features(
+    'eyes.closed',
+    11,
+    ['....LLL..LLL....', '................', '....EEE..EEE....'],
+    ['........LLL.....', '................', '.........EEE....'],
+  ),
   bright: features(
     'eyes.bright',
-    8,
-    ['.....EW..WE.....', '.....EE..EE.....'],
-    ['........EW......', '........EE......'],
+    11,
+    ['.....LL..LL.....', '.....EW..WE.....', '.....WE..EW.....'],
+    ['.........LL.....', '..........EW....', '..........WE....'],
   ),
-  small: features('eyes.small', 9, ['......E..E......'], ['........E.......']),
+  small: features(
+    'eyes.small',
+    11,
+    ['......L..L......', '................', '......E..E......'],
+    ['.........L......', '................', '..........E.....'],
+  ),
 } as const satisfies Record<string, DirectionalArt>
 
-/** Three mouths, at rows 11–12. */
+/** Three mouths, at rows 15–16 — small, because a wide one reads as a wound. */
 export const MOUTHS = {
-  neutral: features('mouth.neutral', 12, ['.......MM.......'], ['.........MM.....']),
+  neutral: features('mouth.neutral', 16, ['.......MM.......'], ['.........MM.....']),
   smile: features(
     'mouth.smile',
-    11,
+    15,
     ['......M..M......', '.......MM.......'],
     ['.........M......', '.........MM.....'],
   ),
-  line: features('mouth.line', 12, ['......MMMM......'], ['........MMM.....']),
+  line: features('mouth.line', 16, ['......MMMM......'], ['........MMM.....']),
 } as const satisfies Record<string, DirectionalArt>
 
 export type FaceId = keyof typeof FACES
@@ -602,140 +818,156 @@ export type MouthId = keyof typeof MOUTHS
  * tops by **sleeve length, neckline and shading**, and the README says so rather
  * than claiming a wardrobe this cannot draw.
  *
- * Bottoms are authored full width because legs move sideways between frames and
- * the body silhouette does the clipping. Tops keep their columns, because sleeve
- * length is a column fact and arms stay in their columns across the cycle.
+ * ── Where the cloth lands ──────────────────────────────────────────────────
+ *
+ * ```
+ *  row  18      the neck            only a turtleneck or a hood reaches it
+ *  row  19      the shoulders       where the collar is drawn
+ *  rows 20–24   the chest           arms at columns 2–3 and 12–13 from row 21
+ *  rows 25–28   the bottom          columns 4–11, so a hem never paints a hand
+ * ```
+ *
+ * The third tone is what makes a garment read as a garment: `u` and `v` are the
+ * dark of the cloth, and every top spends them on one piece of tailoring —
+ * a neckline, a placket, a lapel, a drawstring, a rib. Two flat tones and a
+ * derived outline drew eight identical rectangles, which is what #938's art
+ * review saw.
+ *
+ * Columns 3 and 12 carry the **shoulder seam** on every sleeve that reaches them.
+ * Without it an arm is the same cloth as the chest it is beside and the figure
+ * comes out as a barrel; one shaded column is the whole of the difference.
+ *
+ * ⚠️ **No top paints row 24 outside columns 4–11**, whatever its sleeve length.
+ * That row is the hands, and a figure with its hands the colour of its shirt has
+ * no arms at all — the cuff is where a sleeve stops being a rectangle.
  */
 
 const top = (name: string, rows: readonly string[]): DirectionalArt =>
-  everyDirection(checkArt(`top.${name}`, { top: 15, rows }))
+  everyDirection(checkArt(`top.${name}`, { top: 18, rows }))
 
 const bottom = (name: string, rows: readonly string[]): DirectionalArt =>
-  everyDirection(checkArt(`bottom.${name}`, { top: 24, rows }))
+  everyDirection(checkArt(`bottom.${name}`, { top: 25, rows }))
 
 export const TOPS = {
+  /** Crew neck, sleeves to the elbow — the forearms stay skin. */
   tee: top('tee', [
     '................',
-    '....TTTTTTTT....',
-    '..TTTTTTTTTTTT..',
+    '....TTuuuuTT....',
+    '...TTTTTTTTTT...',
+    '..TtTTTTTTTTtT..',
     '..ttTTTTTTTTtt..',
     '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....tttttttt....',
+    '....tTTTTTTt....',
   ]),
+
+  /** Open collar and a placket down the middle. Long sleeves. */
   shirt: top('shirt', [
     '................',
-    '....TTTTTTTT....',
-    '..TTTTttttTTTT..',
-    '..TTTTtTTtTTTT..',
-    '..TTTTTTTTTTTT..',
-    '..TTTTTTTTTTTT..',
-    '..ttTTTTTTTTtt..',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....tttttttt....',
+    '....TuuuuuuT....',
+    '...TTuTTTTuTT...',
+    '..TtTTTuTTTTtT..',
+    '..TtTTTuTTTTtT..',
+    '..ttTTTuTTTTtt..',
+    '....TTTuTTTT....',
   ]),
+
+  /** A hood over the neck, drawstrings at the collar, a pocket at the hem. */
   hoodie: top('hoodie', [
-    '......TTTT......',
-    '...tTTTTTTTTt...',
-    '..TTTTTTTTTTTT..',
-    '..TTTTTTTTTTTT..',
-    '..TTTTTTTTTTTT..',
-    '..TTTTTTTTTTTT..',
-    '..ttTTTTTTTTtt..',
-    '....TTttttTT....',
-    '....TTttttTT....',
-    '....tttttttt....',
+    '......uuuu......',
+    '....TTTTTTTT....',
+    '...TTuTTTTuTT...',
+    '..TtTTTTTTTTtT..',
+    '..TtTTTTTTTTtT..',
+    '..ttTTuuuuTTtt..',
+    '....TTuuuuTT....',
   ]),
+
+  /** Worn open: lapels, and the dark of the cloth down the middle. */
   jacket: top('jacket', [
     '................',
-    '....TTTttTTT....',
-    '..TTTTTttTTTTT..',
-    '..TTTTTttTTTTT..',
-    '..TTTTTttTTTTT..',
-    '..TTTTTttTTTTT..',
-    '..ttTTTttTTTtt..',
-    '....TTTttTTT....',
-    '....TTTttTTT....',
-    '....tttttttt....',
+    '....TTuuuuTT....',
+    '...TTTuuuuTTT...',
+    '..TTTTTuuTTTTT..',
+    '..TTTTTuuTTTTT..',
+    '..ttTTTuuTTTtt..',
+    '....TTTuuTTT....',
   ]),
+
+  /** No sleeves at all — columns 2–3 and 12–13 are never painted. */
   vest: top('vest', [
     '................',
+    '....TTuuuuTT....',
+    '....TuTTTTuT....',
+    '....TTuTTuTT....',
+    '....TTTuuTTT....',
     '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....tttttttt....',
+    '....tTTTTTTt....',
   ]),
+
+  /** Ribbed: alternating rows of lit and shaded cloth. */
   knit: top('knit', [
     '................',
-    '....TTTTTTTT....',
-    '..TTTTTTTTTTTT..',
+    '....TTuuuuTT....',
+    '...TtTTTTTTtT...',
+    '..TtTTTTTTTTtT..',
     '..tttttttttttt..',
-    '..TTTTTTTTTTTT..',
     '..tttttttttttt..',
-    '..ttTTTTTTTTtt..',
-    '....tttttttt....',
-    '....TTTTTTTT....',
     '....tttttttt....',
   ]),
+
+  /** A polo: collar wings, two buttons, sleeves to the elbow. */
   collar: top('collar', [
     '................',
+    '....TuuuuuuT....',
+    '...TTuTTTTuTT...',
+    '..TtTTuTTTTTtT..',
+    '..ttTTuTTTTTtt..',
+    '....TTTTTTTT....',
     '....tTTTTTTt....',
-    '..TTTtTTTTtTTT..',
-    '..ttTTTTTTTTtt..',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....tttttttt....',
   ]),
+
+  /** The one top that reaches the neck. */
   turtleneck: top('turtleneck', [
     '......TTTT......',
-    '....TTTTTTTT....',
-    '..TTTTTTTTTTTT..',
-    '..TTTTTTTTTTTT..',
-    '..TTTTTTTTTTTT..',
-    '..TTTTTTTTTTTT..',
+    '....TtTTTTtT....',
+    '...TTTTTTTTTT...',
+    '..TtTTTTTTTTtT..',
+    '..TtTTTTTTTTtT..',
     '..ttTTTTTTTTtt..',
     '....TTTTTTTT....',
-    '....TTTTTTTT....',
-    '....tttttttt....',
   ]),
 } as const satisfies Record<string, DirectionalArt>
 
+/**
+ * Four lengths. The waistband is the bottom's dark tone on every one of them,
+ * which is what stops a shirt and a pair of trousers in similar colours reading
+ * as one long tube.
+ */
 export const BOTTOMS = {
   trousers: bottom('trousers', [
-    'BBBBBBBBBBBBBBBB',
-    'BBBBBBBBBBBBBBBB',
-    'BBBBBBBBBBBBBBBB',
-    'BBBBBBBBBBBBBBBB',
-    'BBBBBBBBBBBBBBBB',
-    'bbbbbbbbbbbbbbbb',
+    '....vvvvvvvv....',
+    '....BBBBBBBB....',
+    '....BBBBBBBB....',
+    '....BBbbbbBB....',
   ]),
   jeans: bottom('jeans', [
-    'BBBBBBBBBBBBBBBB',
-    'BBBBBBBBBBBBBBBB',
-    'BBBBBBBBBBBBBBBB',
-    'BBBBBBBBBBBBBBBB',
-    'bbbbbbbbbbbbbbbb',
-    'bbbbbbbbbbbbbbbb',
+    '....vvvvvvvv....',
+    '....BBBBBBBB....',
+    '....BBBBBBBB....',
+    '....bbbbbbbb....',
   ]),
   skirt: bottom('skirt', [
-    'BBBBBBBBBBBBBBBB',
-    'BBBBBBBBBBBBBBBB',
-    'BBBBBBBBBBBBBBBB',
-    'bbbbbbbbbbbbbbbb',
+    '....vvvvvvvv....',
+    '....BBBBBBBB....',
+    '....bbbbbbbb....',
+    '................',
   ]),
-  shorts: bottom('shorts', ['BBBBBBBBBBBBBBBB', 'BBBBBBBBBBBBBBBB', 'bbbbbbbbbbbbbbbb']),
+  shorts: bottom('shorts', [
+    '....vvvvvvvv....',
+    '....BBBBBBBB....',
+    '................',
+    '................',
+  ]),
 } as const satisfies Record<string, DirectionalArt>
 
 export type TopId = keyof typeof TOPS
@@ -751,6 +983,40 @@ export type BottomId = keyof typeof BOTTOMS
  * a bun, a bob, a bush of curls, a shaved head — survives at any size. That is
  * why `hair` has the longest list (ten) and why its colour ramp has eight steps:
  * `uniqueness.test.ts` measures how much of the portrait's spread comes from here.
+ *
+ * ── Volume, and the four tones that make it ────────────────────────────────
+ *
+ * Hair covers the skull from row 3 and stops somewhere between row 9 and row 16 —
+ * **and where it stops is the style**. Every one of the ten below is authored to
+ * be told apart at sixteen pixels *by its outline alone*: a tight cap that ends
+ * above the brows, a ragged crop, a sweep with a parting in it, a blunt fringe,
+ * curtains to the jaw, curtains past the shoulder, a tail, a bun, a scalloped
+ * mass. The second draft drew ten rounded caps that differed only in their last
+ * row, and at 16px that is one hairstyle drawn ten times — which is what #938's
+ * art review saw the second time.
+ *
+ * Every style is authored **two columns wider than the face it covers** (2–13
+ * against 3–12), which is what makes a hairstyle frame a head rather than paint
+ * it, and `curly` takes one more column again.
+ *
+ * ⛔ **Texture is drawn inside the mass, never cut out of its edge.** A notch in
+ * the silhouette is picked up by the derived ring and comes back as a dark wedge —
+ * two of them on a crown read as ears, which is exactly what the first pass at
+ * strand texture produced. So the partings below are single pixels of `h` and `g`
+ * *surrounded* by hair, and the outer edge of every style is unbroken.
+ *
+ * Four tones do the modelling, and every style uses all four:
+ *
+ * | role | what it is for |
+ * |---|---|
+ * | `G` | the highlight the room's light puts on the crown, top-left |
+ * | `H` | the mass |
+ * | `h` | the shadowed side and underside |
+ * | `g` | strand partings *inside* the mass — the texture |
+ *
+ * ⛔ No style draws its own outline. The dark ring is derived from the composed
+ * grid (`grid.ts`'s `OUTLINE_OF`) in the hair's own `g`, which is why a big style
+ * is authored to columns 1–14 and not 0–15: the ring needs the column.
  *
  * ── Two layers, not one ────────────────────────────────────────────────────
  *
@@ -773,80 +1039,63 @@ export interface HairArt {
 
 const NONE: DirectionalArt = { down: NO_ART, up: NO_ART, right: NO_ART }
 
-const art = (top: number, rows: readonly string[]): Art => ({ top, rows })
+// ── The shapes every style is cut from ─────────────────────────────────────
 
-// The back of a head is all hair, whatever the style does at the front. These
-// three fills differ only in how far down and how wide the mass goes.
-const SKULL_CROPPED = [
-  '.....HHHHHH.....',
-  '...HHHHHHHHHH...',
-  '...HHHHHHHHHH...',
-  '...HHHHHHHHHH...',
-  '...HHHHHHHHHH...',
-  '...HHHHHHHHHH...',
-  '...HHHHHHHHHH...',
-  '...HHHHHHHHHH...',
-  '...HHHHHHHHHH...',
-  '...HHHHHHHHHH...',
-  '....HHHHHHHH....',
-  '....HHHHHHHH....',
-  '.....HHHHHH.....',
+/**
+ * The mass, rows 5–10: a highlight down the left, a shadow down the right, and a
+ * diagonal parting walking through the middle. Those inner pixels are the whole
+ * of the texture — see the docblock on why none of it may touch the edge.
+ */
+const MASS = [
+  '..HGGHHHHHHHhh..',
+  '..HGGHHHhHHHhh..',
+  '..HGHHHHhHHHhh..',
+  '..HGHHHhHHHhhh..',
+  '..HHHHHhHHHhhh..',
+  '..HHHHhHHHhhhh..',
 ]
 
-const SKULL_FULL = [
-  '.....HHHHHH.....',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '...HHHHHHHHHH...',
-  '...HHHHHHHHHH...',
-  '....HHHHHHHH....',
-  '.....HHHHHH.....',
+/** Rows 3–10: the rounded top, then the mass. Where a style stops is its own. */
+const CROWN = ['....HHHHHHHH....', '..HHHHHHHHHHHH..', ...MASS]
+
+/** The back of a head is all hair, and it keeps the skull's taper to the nape. */
+const SKULL_BACK = [
+  ...CROWN,
+  '..HHHHhHHHhhhh..',
+  '..HGHHHhHHHhhh..',
+  '..HHHHhHHHhhhh..',
+  '..HHHHhHHHhhhh..',
+  '...HHHhHHHhhh...',
+  '....HHhHHhhh....',
+  '.....HHhhh......',
 ]
 
-const SKULL_BOB = [
-  '.....HHHHHH.....',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '..HHHHHHHHHHHH..',
-  '...HHHHHHHHHH...',
-  '....hHHHHHHh....',
+/** A nape cropped at the hairline, for the styles that end above the collar. */
+const SKULL_CROPPED = [...CROWN, '..HHHHhHHHhhhh..', '..HhhhhhhhhhhH..', '...hh......hh...']
+
+/** The profile mass: the same tones, the front edge left open for a face. */
+const PROFILE_MASS = [
+  '..HGGHHHHHHHHH..',
+  '..HGGHHHhHHHHH..',
+  '..HGHHHHhHHHHH..',
+  '..HGHHHhHHHHHH..',
+  '..HHHHHhHHHHHH..',
+  '..HHHHhHHHHHHH..',
 ]
 
-const SKULL_LONG = [
-  ...SKULL_BOB.slice(0, 12),
-  '.hHHHHHHHHHHHHh.',
-  '.hHHHHHHHHHHHHh.',
-  '.hHHHHHHHHHHHHh.',
-  '.hHHHHHHHHHHHHh.',
-  '.hHHHHHHHHHHHHh.',
-  '..hHHHHHHHHHHh..',
-  '...hHHHHHHHHh...',
-]
+const PROFILE_CROWN = ['....HHHHHHHH....', '..HHHHHHHHHHHH..', ...PROFILE_MASS]
 
-const PROFILE_LONG_SIDE = [
-  '...HHHh.........',
-  '...HHh..........',
-  '...HHh..........',
-  '...HHh..........',
-  '...HHh..........',
-  '...HHh..........',
-  '...HHh..........',
-  '...HHh..........',
-  '....Hh..........',
+/** How a profile falls away at the back when the hair is short at the front. */
+const PROFILE_SHORT_TAIL = ['..HHHHhHHHHHhh..', '..HHHHhHHHhh....', '..HHHhHHhh......']
+
+/** The curtain a bob or a length of long hair hangs down the side of a jaw. */
+const PROFILE_LONG_TAIL = [
+  '..HHHHhHHHHHhh..',
+  '..HHHHhHHHhh....',
+  '..HHHhHHhh......',
+  '..HHHhHh........',
+  '..HHHhHh........',
+  '..HHHhh.........',
 ]
 
 const hair = (name: string, back: DirectionalArt, front: DirectionalArt): HairArt => ({
@@ -855,250 +1104,313 @@ const hair = (name: string, back: DirectionalArt, front: DirectionalArt): HairAr
 })
 
 export const HAIR = {
-  /** No hair at all. The hair colour is still drawn — nowhere. */
-  bald: hair('bald', NONE, NONE),
+  /**
+   * No hair at all — and one row of shaded skin across the crown, which is the
+   * only thing between a shaved head and an egg. The hair colour is still drawn
+   * nowhere; `s` is the skin's own shade, so this costs no attribute.
+   */
+  bald: hair('bald', NONE, {
+    down: { top: 4, rows: ['....ssssssss....'] },
+    up: { top: 4, rows: ['....ssssssss....'] },
+    right: { top: 4, rows: ['....ssssssss....'] },
+  }),
 
+  /**
+   * Clipped to the skull and **ten columns wide, not twelve** — the one style
+   * that is no wider than the face under it. It stops at row 9, well above the
+   * brows, so a buzz cut shows forehead where every other style shows hair.
+   */
   buzz: hair('buzz', NONE, {
-    down: art(2, ['.....HHHHHH.....', '...HHHHHHHHHH...', '...HHHHHHHHHH...', '...Hhh....hhH...']),
-    up: art(2, SKULL_CROPPED),
-    right: art(2, ['....HHHHHH......', '...HHHHHHHHH....', '...HHHHHHHHH....', '...HHHh.........']),
+    down: { top: 3, rows: [...CROWN.slice(0, 6), '..Hhhhhhhhhhhh..'] },
+    up: { top: 3, rows: [...CROWN, '..HHHHhHHHhhhh..', '..HhhhhhhhhhhH..', '...hh......hh...'] },
+    right: { top: 3, rows: [...PROFILE_CROWN.slice(0, 6), '..Hhhhhhhhhhhh..'] },
   }),
 
+  /**
+   * A ragged crop: spiked on top, two tufts over the brow, and **a column wider
+   * than the crown at the temples** — the spikes alone do not survive the ring
+   * (it fills the gaps between them), so the shagginess has to be in the width.
+   */
   short: hair('short', NONE, {
-    down: art(2, [
-      '....HHHHHHHH....',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..HHhh....hhHH..',
-      '..Hh........hH..',
-    ]),
-    up: art(2, SKULL_FULL),
-    right: art(2, [
-      '....HHHHHH......',
-      '...HHHHHHHHH....',
-      '...HHHHHHHHH....',
-      '...HHHh.........',
-      '...HHh..........',
-    ]),
+    down: { top: 2, rows: ['.....H.H.H......', ...CROWN, '.HHHHh....hhhhh.', '.Hhh........hhh.'] },
+    up: { top: 2, rows: ['.....H.H.H......', ...SKULL_BACK] },
+    right: { top: 2, rows: ['.....H.H.HH.....', ...PROFILE_CROWN, ...PROFILE_SHORT_TAIL] },
   }),
 
+  /**
+   * A side part: one `g` column straight down the crown, and everything to the
+   * left of it swept across the brow and past the temple. The two sides of the
+   * head are different lengths, which no other style here is.
+   */
   parted: hair('parted', NONE, {
-    down: art(2, [
-      '....HHHHHHHH....',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHhhHHHHH..',
-      '..HHh....hhhHH..',
-      '..Hh.......hhH..',
-    ]),
-    up: art(2, [
-      '.....HHHHHH.....',
-      '..HHHHHhhHHHHH..',
-      '..HHHHHhhHHHHH..',
-      '..HHHHHhhHHHHH..',
-      ...SKULL_FULL.slice(4),
-    ]),
-    right: art(2, [
-      '....HHHHHH......',
-      '...HHHHHHHHH....',
-      '...HHHHhhHHH....',
-      '...HHHh....h....',
-      '...HHh..........',
-    ]),
+    down: {
+      top: 3,
+      rows: [
+        '.....HHHHHH.....',
+        '...HHHHHHHHHH...',
+        '..HGGHHHHgHHhh..',
+        '..HGGHHHHgHHhh..',
+        '..HGHHHHHgHHhh..',
+        '..HGHHHHHgHhhh..',
+        '..HHHHHHHgHhhh..',
+        '..HHHHHHHHhhhh..',
+        '..HHHHHHhhh.hh..',
+        '..HHhhh.........',
+        '..Hhh...........',
+      ],
+    },
+    up: { top: 3, rows: SKULL_BACK },
+    right: {
+      top: 3,
+      rows: [
+        '.....HHHHHH.....',
+        '...HHHHHHHHHH...',
+        '..HGGHHHHgHHHH..',
+        '..HGGHHHHgHHHH..',
+        '..HGHHHHHgHHHH..',
+        '..HGHHHHHgHHHh..',
+        '..HHHHHHHHHhhh..',
+        '..HHHHHHHhhh....',
+        '..HHHHhHHhh.....',
+        '..HHHhHh........',
+      ],
+    },
   }),
 
+  /**
+   * A blunt fringe, cut level one row above the eyes, with the sides stopping at
+   * the ear. Straight where `short` is ragged and symmetrical where `parted` is
+   * not — three crops, three outlines.
+   */
   fringe: hair('fringe', NONE, {
-    down: art(2, [
-      '....HHHHHHHH....',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..Hhhhhhhhhhhh..',
-      '..Hh........hH..',
-    ]),
-    up: art(2, SKULL_FULL),
-    right: art(2, [
-      '....HHHHHH......',
-      '...HHHHHHHHH....',
-      '...HHHHHHHHH....',
-      '...HHHHHHHHHh...',
-      '...HHh......h...',
-    ]),
+    down: { top: 3, rows: [...CROWN, '..HhHhHHhHhHhh..', '..Hh........hh..'] },
+    up: { top: 3, rows: SKULL_CROPPED },
+    right: {
+      top: 3,
+      rows: [...PROFILE_CROWN, '..HHHHhHHhHhHhh.', '..HHHhHHhh......', '..HHhhh.........'],
+    },
   }),
 
+  /**
+   * Curtains to the jaw on both sides, **tucked in** at rows 16–17 — that taper
+   * is the only thing between this and `long` inside a 16px portrait, so it is
+   * deliberate and not decoration.
+   */
   bob: hair('bob', NONE, {
-    down: art(2, [
-      '....HHHHHHHH....',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..HHHh....hHHH..',
-      '..HHh......hHH..',
-      '..HHh......hHH..',
-      '..HHh......hHH..',
-      '..HHh......hHH..',
-      '..HHh......hHH..',
-      '..HHh......hHH..',
-      '..HHh......hHH..',
-      '...Hh......hH...',
-    ]),
-    up: art(2, SKULL_BOB),
-    right: art(2, [
-      '....HHHHHH......',
-      '...HHHHHHHHH....',
-      '...HHHHHHHHH....',
-      ...PROFILE_LONG_SIDE,
-    ]),
+    down: {
+      top: 3,
+      rows: [
+        ...CROWN,
+        '..HHHh....hhhh..',
+        '..HGh......Hhh..',
+        '..HHh......Hhh..',
+        '...Hh......Hh...',
+        '...Hh......Hh...',
+        '....h......h....',
+      ],
+    },
+    up: { top: 3, rows: SKULL_BACK },
+    right: { top: 3, rows: [...PROFILE_CROWN, ...PROFILE_LONG_TAIL] },
   }),
 
+  /**
+   * The curtains of a bob, and the mass carried past the shoulders behind the
+   * body — the `back` layer is what makes this a different silhouette from `bob`
+   * rather than a longer one, because it is drawn below the chin in both flat
+   * views and the shirt is drawn over its middle.
+   */
   long: hair(
     'long',
     {
-      down: art(14, [
-        '.hHHHHHHHHHHHHh.',
-        '.hHHHHHHHHHHHHh.',
-        '.hHHHHHHHHHHHHh.',
-        '.hHHHHHHHHHHHHh.',
-        '.hHHHHHHHHHHHHh.',
-        '..hHHHHHHHHHHh..',
-        '...hHHHHHHHHh...',
-      ]),
-      up: NO_ART,
-      right: art(12, [
-        '..hHHHHHh.......',
-        '..hHHHHHh.......',
-        '..hHHHHHh.......',
-        '..hHHHHHh.......',
-        '..hHHHHh........',
-        '...hHHh.........',
-      ]),
+      down: {
+        top: 16,
+        rows: [
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '..hHHHHHHHHHHh..',
+          '...hHHHHHHHHh...',
+        ],
+      },
+      up: {
+        top: 16,
+        rows: [
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '.hHHHHHHHHHHHHh.',
+          '..hHHHHHHHHHHh..',
+          '...hHHHHHHHHh...',
+        ],
+      },
+      right: {
+        top: 16,
+        rows: [
+          '..hHHHHHh.......',
+          '..hHHHHHh.......',
+          '..hHHHHHh.......',
+          '..hHHHHHh.......',
+          '..hHHHHHh.......',
+          '..hHHHHh........',
+          '...hHHh.........',
+        ],
+      },
     },
     {
-      down: art(2, [
-        '....HHHHHHHH....',
-        '..HHHHHHHHHHHH..',
-        '..HHHHHHHHHHHH..',
-        '..HHHh....hHHH..',
-        '..HHh......hHH..',
-        '..HHh......hHH..',
-        '..HHh......hHH..',
-        '..HHh......hHH..',
-        '..HHh......hHH..',
-        '..HHh......hHH..',
-        '..HHh......hHH..',
-        '..HHh......hHH..',
-        '..HHh......hHH..',
-        '..HHh......hHH..',
-        '..HH........HH..',
-        '..Hh........hH..',
-      ]),
-      up: art(2, SKULL_LONG),
-      right: art(2, [
-        '....HHHHHH......',
-        '...HHHHHHHHH....',
-        '...HHHHHHHHH....',
-        ...PROFILE_LONG_SIDE,
-      ]),
+      down: {
+        top: 3,
+        rows: [
+          ...CROWN,
+          '..HHHh....hhhh..',
+          '..HGh......Hhh..',
+          '..HHh......Hhh..',
+          '.HHGh......Hhhh.',
+          '.HHHh......Hhhh.',
+          '.HHGh......Hhhh.',
+          '.HHHh......Hhhh.',
+        ],
+      },
+      up: { top: 3, rows: SKULL_BACK },
+      right: { top: 3, rows: [...PROFILE_CROWN, ...PROFILE_LONG_TAIL] },
     },
   ),
 
+  /**
+   * Gathered and tied. The tail is drawn where it can be seen from each side:
+   * past the right temple in front, down the back of the shirt from behind, and
+   * out behind the skull in profile — the same tail, three views of it.
+   */
   ponytail: hair(
     'ponytail',
     {
-      down: art(4, [
-        '.............HH.',
-        '............HHh.',
-        '............HHh.',
-        '............HHh.',
-        '............HHh.',
-        '............HHh.',
-        '............HHh.',
-        '.............Hh.',
-      ]),
-      up: art(4, [
-        '.............HH.',
-        '............HHh.',
-        '............HHh.',
-        '............HHh.',
-        '............HHh.',
-        '............HHh.',
-        '............HHh.',
-        '.............Hh.',
-      ]),
-      right: art(4, [
-        '...HH...........',
-        '..hHH...........',
-        '..hHH...........',
-        '..hHH...........',
-        '..hHH...........',
-        '..hHH...........',
-        '..hHH...........',
-        '..hH............',
-      ]),
+      down: {
+        top: 7,
+        rows: [
+          '.............HH.',
+          '............HHh.',
+          '............HHh.',
+          '............HHh.',
+          '............HHh.',
+          '............HHh.',
+          '............HHh.',
+          '.............Hh.',
+        ],
+      },
+      up: NO_ART,
+      right: {
+        top: 7,
+        rows: [
+          '..HH............',
+          '.hHH............',
+          '.hHH............',
+          '.hHH............',
+          '.hHH............',
+          '.hHH............',
+          '.hHH............',
+          '.hH.............',
+        ],
+      },
     },
     {
-      down: art(2, [
-        '....HHHHHHHH....',
-        '..HHHHHHHHHHHH..',
-        '..HHHHHHHHHHHH..',
-        '..HHhh....hhHH..',
-        '..Hh........hH..',
-      ]),
-      up: art(2, SKULL_FULL),
-      right: art(2, [
-        '....HHHHHH......',
-        '...HHHHHHHHH....',
-        '...HHHHHHHHH....',
-        '...HHHh.........',
-        '...HHh..........',
-      ]),
+      down: { top: 3, rows: [...CROWN, '..HHHh....hhhh..', '..Hhh......hhh..'] },
+      up: {
+        top: 3,
+        rows: [
+          ...SKULL_BACK,
+          '.....HHHH.......',
+          '.....HHHh.......',
+          '.....HHHh.......',
+          '.....HHHh.......',
+          '.....HHHh.......',
+          '......HHh.......',
+          '......Hh........',
+        ],
+      },
+      right: {
+        top: 3,
+        rows: [...PROFILE_CROWN, ...PROFILE_SHORT_TAIL],
+      },
     },
   ),
 
+  /** A cap with a round bun pinned above the crown: the one style taller than a head. */
   bun: hair('bun', NONE, {
-    down: art(1, [
-      '......HHHH......',
-      '.....HHHHHH.....',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..HHhh....hhHH..',
-      '..Hh........hH..',
-    ]),
-    up: art(1, ['......HHHH......', ...SKULL_FULL]),
-    right: art(1, [
-      '......HHHH......',
-      '.....HHHHHH.....',
-      '...HHHHHHHHH....',
-      '...HHHHHHHHH....',
-      '...HHHh.........',
-      '...HHh..........',
-    ]),
+    down: {
+      top: 2,
+      rows: [
+        '......HHHH......',
+        '.....HGHHHh.....',
+        '....HHHHHHHH....',
+        '..HHHHHHHHHHHH..',
+        ...MASS.slice(1),
+        '..HHHh....hhhh..',
+        '..Hhh......hhh..',
+      ],
+    },
+    up: { top: 2, rows: ['......HHHH......', '.....HGHHHh.....', ...SKULL_BACK] },
+    right: {
+      top: 2,
+      rows: [
+        '......HHHH......',
+        '.....HGHHHh.....',
+        '....HHHHHHHH....',
+        '..HHHHHHHHHHHH..',
+        ...PROFILE_MASS.slice(1),
+        ...PROFILE_SHORT_TAIL,
+      ],
+    },
   }),
 
+  /**
+   * A mass wider than every other style and **scalloped**: the outer column steps
+   * in and out row by row, so the ring around it comes back as bumps rather than
+   * as a straight side. That is the silhouette doing the work — there is no notch
+   * anywhere in it.
+   */
   curly: hair('curly', NONE, {
-    down: art(1, [
-      '...HH.HHHH.HH...',
-      '..HHHHHHHHHHHH..',
-      '.HHHHHHHHHHHHHH.',
-      '.HHhHHHhhHHHhHH.',
-      '.HHh........hHH.',
-      '.Hh..........hH.',
-      '.Hh..........hH.',
-    ]),
-    up: art(1, [
-      '...HH.HHHH.HH...',
-      '..HHHHHHHHHHHH..',
-      '.HHHHHHHHHHHHHH.',
-      '.HHhHHHhhHHHhHH.',
-      ...SKULL_FULL.slice(1),
-    ]),
-    right: art(1, [
-      '...HH.HHHH......',
-      '..HHHHHHHHHH....',
-      '.HHHHHHHHHHHH...',
-      '.HHhHHHhhHHHh...',
-      '.HHh............',
-      '.Hh.............',
-      '.Hh.............',
-    ]),
+    down: {
+      top: 2,
+      rows: [
+        '...HH.HH.HH.H...',
+        '..HHHHHHHHHHHH..',
+        '.HHHHHHHHHHHHHH.',
+        '..HGGHHHhHHHhh..',
+        '.HHGGHHHHHHHhhh.',
+        '..HGHHHhHHHHhh..',
+        '.HHGHHHhHHHhhhh.',
+        '..HHHHhHHHhhhh..',
+        '.HHHhhh....hhhh.',
+        '..Hhh......hhh..',
+      ],
+    },
+    up: {
+      top: 2,
+      rows: ['...HH.HH.HH.H...', '..HHHHHHHHHHHH..', '.HHHHHHHHHHHHHH.', ...SKULL_BACK.slice(2)],
+    },
+    right: {
+      top: 2,
+      rows: [
+        '...HH.HH.HH.H...',
+        '..HHHHHHHHHHHH..',
+        '.HHHHHHHHHHHHHH.',
+        '..HGGHHHhHHHHH..',
+        '.HHGGHHHHHHHHHH.',
+        '..HGHHHhHHHHHH..',
+        '.HHGHHHhHHHHHh..',
+        '..HHHHhHHHHhh...',
+        '.HHHhhhHHhh.....',
+        '..Hhhhhh........',
+      ],
+    },
   }),
 } as const satisfies Record<string, HairArt>
 
@@ -1116,6 +1428,10 @@ export type HairId = keyof typeof HAIR
  *
  * `none` is a member of the list, not an absence of one. One in six managers has
  * nothing on their head, which is the only way the other five read as a choice.
+ *
+ * ⚠️ Everything here is authored against the head band `parts/head.ts` fixes:
+ * crown at row 3, eyes at rows 12–13, chin at 17. An accessory that wandered a row
+ * would be a hat over an eye.
  */
 
 export interface AccessoryArt {
@@ -1131,73 +1447,78 @@ const accessory = (name: string, colours: Ramp, art: DirectionalArt): AccessoryA
 export const ACCESSORIES = {
   none: accessory(
     'none',
-    { base: '#000000', shade: '#000000' },
+    { base: '#000000', shade: '#000000', line: '#000000' },
     { down: NO_ART, up: NO_ART, right: NO_ART },
   ),
 
   /**
    * ⚠️ **The lens is empty, and that is the whole design of both spectacles.**
    *
-   * The widest pair of eyes (`closed`) spans columns 4–6 and 9–11 on rows 8–9.
-   * A frame with a rim above *and* below fills 24 of the 32 cells over that
-   * band, and posts drawn just inside it clip the outer pixel of `closed` —
-   * the first draft did both, so `eyes` went from six choices to one for a sixth
-   * of all managers. One accessory erasing a whole face attribute is the thing
-   * #938 asks this generator not to do.
+   * The widest pair of eyes (`closed`) spans columns 4–6 and 9–11 on row 13. A
+   * frame with a rim above *and* below fills most of the cells over that band, and
+   * posts drawn just inside it clip the outer pixel of `closed` — the first draft
+   * did both, so `eyes` went from six choices to one for a sixth of all managers.
+   * One accessory erasing a whole face attribute is the thing #938 asks this
+   * generator not to do.
    *
-   * So the lenses sit **outside** every eye column (posts at 3 and 12, or 3, 7,
-   * 8 and 12) and nothing at all is drawn on rows 8–9 between them.
+   * So the lenses sit **outside** every eye column (posts at 3 and 12, or 3, 7, 8
+   * and 12) and nothing at all is drawn on rows 12–13 between them.
    * `render.test.ts` measures it: under every accessory, the six pairs of eyes
    * still draw as many distinct faces as they do bare-faced.
    */
   glasses: accessory(
     'glasses',
-    { base: '#2B2F36', shade: '#14161A' },
+    { base: '#2B2F36', shade: '#14161A', line: '#080A0C' },
     {
       // Half-rim: one brow bar, two posts, hinges below. Rectangular at 16px.
       down: {
-        top: 7,
+        top: 11,
         rows: ['...AAAAAAAAAA...', '...A........A...', '...A........A...', '...a........a...'],
       },
       up: NO_ART,
       right: {
-        top: 7,
-        rows: ['......AAAAA.....', '.....aA...A.....', '......A...A.....', '......a...a.....'],
+        top: 11,
+        rows: ['.....AAAAAAA....', '.....aA....A....', '......A....A....', '......a....a....'],
       },
     },
   ),
 
   'round-glasses': accessory(
     'round-glasses',
-    { base: '#B08A3C', shade: '#7E6026' },
+    { base: '#B08A3C', shade: '#7E6026', line: '#4E3A14' },
     {
       // Full rim, but two pixels of arc top and bottom instead of a bar — the
       // outline reads as a circle beside the rectangle above.
       down: {
-        top: 7,
+        top: 11,
         rows: ['....AAA..AAA....', '...A...aa...A...', '...A...AA...A...', '....AAA..AAA....'],
       },
       up: NO_ART,
       right: {
-        top: 7,
-        rows: ['.......AAA......', '.....aA...A.....', '......A...A.....', '.......AAA......'],
+        top: 11,
+        rows: ['.........AAA....', '.....aA.....A...', '......A.....A...', '.........AAA....'],
       },
     },
   ),
 
   headphones: accessory(
     'headphones',
-    { base: '#3A3D44', shade: '#22242A' },
+    { base: '#3A3D44', shade: '#22242A', line: '#111316' },
     {
       down: {
         top: 2,
         rows: [
           '....AAAAAAAA....',
           '...A........A...',
-          '...AA......AA...',
-          '...Aa......aA...',
-          '...AA......AA...',
-          '...AA......AA...',
+          '..AA........AA..',
+          '..A..........A..',
+          '..A..........A..',
+          '..A..........A..',
+          '..AA........AA..',
+          '..AA........AA..',
+          '..Aa........aA..',
+          '..AA........AA..',
+          '..AA........AA..',
         ],
       },
       up: {
@@ -1205,10 +1526,15 @@ export const ACCESSORIES = {
         rows: [
           '....AAAAAAAA....',
           '...A........A...',
-          '...AA......AA...',
-          '...Aa......aA...',
-          '...AA......AA...',
-          '...AA......AA...',
+          '..AA........AA..',
+          '..A..........A..',
+          '..A..........A..',
+          '..A..........A..',
+          '..AA........AA..',
+          '..AA........AA..',
+          '..Aa........aA..',
+          '..AA........AA..',
+          '..AA........AA..',
         ],
       },
       right: {
@@ -1217,6 +1543,11 @@ export const ACCESSORIES = {
           '...AAAAAAA......',
           '..A.......A.....',
           '..AA......A.....',
+          '..A.............',
+          '..A.............',
+          '..A.............',
+          '..AA............',
+          '..AA............',
           '..Aa............',
           '..AA............',
           '..AA............',
@@ -1227,19 +1558,46 @@ export const ACCESSORIES = {
 
   cap: accessory(
     'cap',
-    { base: '#C1453F', shade: '#8C2B27' },
+    { base: '#C1453F', shade: '#8C2B27', line: '#561A17' },
     {
       down: {
-        top: 1,
-        rows: ['....AAAAAAAA....', '..AAAAAAAAAAAA..', '..AAAAAAAAAAAA..', '.aaaaaaaaaaaaaa.'],
+        top: 2,
+        rows: [
+          '.....AAAAAA.....',
+          '...AAAAAAAAAA...',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '.aaaaaaaaaaaaaa.',
+        ],
       },
       up: {
-        top: 1,
-        rows: ['....AAAAAAAA....', '..AAAAAAAAAAAA..', '..AAAAAAAAAAAA..', '..aaaaaaaaaaaa..'],
+        top: 2,
+        rows: [
+          '.....AAAAAA.....',
+          '...AAAAAAAAAA...',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..aaaaaaaaaaaa..',
+        ],
       },
       right: {
-        top: 1,
-        rows: ['...AAAAAA.......', '..AAAAAAAA......', '..AAAAAAAA......', '..aaaaaaaaaaa...'],
+        top: 2,
+        rows: [
+          '.....AAAAAA.....',
+          '...AAAAAAAAAA...',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..AAAAAAAAAAAA..',
+          '..aaaaaaaaaaaaa.',
+        ],
       },
     },
   ),
@@ -1251,11 +1609,11 @@ export const ACCESSORIES = {
    */
   earring: accessory(
     'earring',
-    { base: '#E0B84C', shade: '#A8862E' },
+    { base: '#E0B84C', shade: '#A8862E', line: '#6E5518' },
     {
-      down: { top: 11, rows: ['..A.............', '..a.............'] },
+      down: { top: 15, rows: ['...A............', '...a............'] },
       up: NO_ART,
-      right: { top: 11, rows: ['....A...........', '....a...........'] },
+      right: { top: 15, rows: ['......A.........', '......a.........'] },
     },
   ),
 } as const satisfies Record<string, AccessoryArt>
@@ -1283,21 +1641,48 @@ export type AccessoryId = keyof typeof ACCESSORIES
  * room draws when a manager is standing still. That is the whole reason it is
  * frame 1 and not frame 0.
  *
+ * ── The proportions, and where they come from ──────────────────────────────
+ *
+ * ```
+ *  rows 2–17   head        the outline, the skull, the hair and the face
+ *  rows 18–24  torso       neck, shoulders, arms at columns 2–3 and 12–13
+ *  rows 25–26  hips
+ *  rows 27–28  legs        columns 4–5 and 10–11, so the ring leaves a gap between them
+ *  rows 29–30  shoes
+ *  row  31     the outline under the soles
+ * ```
+ *
+ * Fifteen rows of head against fourteen of body is not a stylisation anyone
+ * invented here: it is what the office's own sprites do (`char_0.png`, standing:
+ * head rows 3–17, shoulders at 18, belt at 25, soles at 30), and a figure drawn
+ * to any other ratio stands in that room looking like it came from a different
+ * game. The first draft of this package gave the head twelve rows and the body
+ * seventeen — a small head on a long body — and that is the whole of what #938's
+ * art review rejected.
+ *
  * ── Why the body is bare skin ──────────────────────────────────────────────
  *
- * These frames draw skin, and shoes, and nothing else. Trousers and shirts are
- * **masks painted over the body's skin pixels** (`render.ts`), not drawings of
- * their own, so one authored shirt fits all twenty-one poses — including the
- * seated ones, where the lap is a solid block that no standing-pose garment
- * drawing would have covered. `render.test.ts` measures that no garment pixel
- * lands outside the body silhouette and that every seated frame is still dressed.
+ * These frames draw skin, and shoes, and the book the reading frames hold, and
+ * nothing else. Trousers and shirts are **masks painted over the body's skin
+ * pixels** (`render.ts`), not drawings of their own, so one authored shirt fits
+ * all twenty-one poses — including the seated ones, where a standing-pose garment
+ * drawing would have missed the arms entirely. `render.test.ts` measures that no
+ * garment pixel lands outside the body silhouette and that every seated frame is
+ * still dressed.
+ *
+ * ⛔ **Nothing here draws an outline.** The dark ring around the finished figure
+ * is derived from the composed grid (`grid.ts`'s `OUTLINE_OF`), which is why
+ * every shape below is authored one pixel *inside* the silhouette it ends up
+ * with: the legs at columns 4–5 read as 3–6 once the ring lands, which is also why
+ * they are two columns apart — a one-column gap would be filled by the ring from
+ * both sides and the two legs would come out as one block.
  *
  * ── Anchors ───────────────────────────────────────────────────────────────
  *
- * Head, torso and hip each carry an offset from the standing frame. The walk and
- * typing frames bob the upper body down a pixel while the feet stay planted:
- * `head` and `torso` move, `hip` does not. Hair, faces and accessories ride the
- * head anchor, so they bob with the skull instead of floating over it.
+ * Head, torso and hip each carry an offset from the standing frame. The walk
+ * frames bob the upper body down a pixel while the feet stay planted: `head` and
+ * `torso` move, `hip` does not. Hair, faces and accessories ride the head anchor,
+ * so they bob with the skull instead of floating over it.
  */
 
 export interface Point {
@@ -1324,8 +1709,9 @@ export const ANCHORS: Readonly<Record<'down' | 'up' | 'right', readonly FrameAnc
   right: PROFILE_ANCHORS,
 }
 
+/** Every body frame starts at row 18: the neck, one row under the chin. */
 const body = (name: string, rows: readonly string[]): Art =>
-  checkArt(`body.${name}`, { top: 15, rows })
+  checkArt(`body.${name}`, { top: 18, rows })
 
 // ── Front and back: the same silhouette ────────────────────────────────────
 // A 16-wide figure's torso, arms and legs read identically from behind; what
@@ -1335,140 +1721,126 @@ const body = (name: string, rows: readonly string[]): Art =>
 const FRONT_STAND = body('front.stand', [
   '......SSSs......',
   '....SSSSSSSs....',
-  '..SSSSSSSSSSSs..',
-  '..SSSSSSSSSSSs..',
-  '..SSSSSSSSSSSs..',
+  '...SSSSSSSSSs...',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '....SSSSSSSs....',
   '....SSSSSSSs....',
-  '....SSs..SSs....',
-  '....SSs..SSs....',
-  '....SSs..SSs....',
-  '....SSs..SSs....',
-  '...KKKk..KKKk...',
-  '...KKKk..KKKk...',
+  '....SS....SS....',
+  '....SS....SS....',
+  '....KK....KK....',
+  '....KK....KK....',
+  '................',
 ])
 
+// The stride is vertical, not lateral: one shoe lifts a row while the other
+// stays exactly where it stands. `render.test.ts` reads the planted one.
 const FRONT_STEP_LEFT = body('front.step-left', [
   '................',
   '......SSSs......',
   '....SSSSSSSs....',
+  '...SSSSSSSSSs...',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
-  '..SSSSSSSSSSSs..',
-  '....SSSSSSSSSs..',
   '....SSSSSSSs....',
   '....SSSSSSSs....',
-  '....SSs..SSs....',
-  '....SSs..SSs....',
-  '....SSs..SSs....',
-  '...KKKk..SSs....',
-  '...KKKk..KKKk...',
-  '.........KKKk...',
+  '....KK....SS....',
+  '....KK....KK....',
+  '..........KK....',
+  '................',
 ])
 
 const FRONT_STEP_RIGHT = body('front.step-right', [
   '................',
   '......SSSs......',
   '....SSSSSSSs....',
+  '...SSSSSSSSSs...',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
-  '..SSSSSSSSSSSs..',
-  '..SSSSSSSSSs....',
   '....SSSSSSSs....',
   '....SSSSSSSs....',
-  '....SSs..SSs....',
-  '....SSs..SSs....',
-  '....SSs..SSs....',
-  '....SSs..KKKk...',
-  '...KKKk..KKKk...',
-  '...KKKk.........',
+  '....SS....KK....',
+  '....KK....KK....',
+  '....KK..........',
+  '................',
 ])
 
+// Seated: the arms come down onto the desk a row at a time, which is the whole
+// of the typing animation at this size. The legs stay drawn — the engine puts
+// these frames six pixels lower, so the desk covers them.
 const FRONT_TYPE_A = body('front.type-a', [
   '................',
   '......SSSs......',
   '....SSSSSSSs....',
+  '...SSSSSSSSSs...',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '................',
-  '................',
+  '....SSSSSSSs....',
+  '....SSSSSSSs....',
+  '....SS....SS....',
+  '....KK....KK....',
+  '....KK....KK....',
 ])
 
 const FRONT_TYPE_B = body('front.type-b', [
   '................',
   '......SSSs......',
   '....SSSSSSSs....',
+  '...SSSSSSSSSs...',
+  '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
   '..SSSSSSSSSSSs..',
-  '..SSSSSSSSSSSs..',
   '...SSSSSSSSSs...',
-  '..SSSSSSSSSSSs..',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '................',
-  '................',
+  '....SSSSSSSs....',
+  '....SSSSSSSs....',
+  '....SS....SS....',
+  '....KK....KK....',
+  '....KK....KK....',
 ])
 
+// Reading: both hands hold a book out in front. `P`/`p` is a prop and not skin,
+// so no garment mask touches it — a shirt cannot swallow the pages.
 const FRONT_READ_A = body('front.read-a', [
   '......SSSs......',
   '....SSSSSSSs....',
+  '...SSSSSSSSSs...',
   '..SSSSSSSSSSSs..',
-  '..SSSSSSSSSSSs..',
-  '...SSSSSSSSSs...',
+  '..SSPPPppPPPSs..',
+  '..SSPPPppPPPSs..',
+  '..SSPPPppPPPSs..',
   '....SSSSSSSs....',
   '....SSSSSSSs....',
-  '....SSSSSSSs....',
-  '....SSSSSSSs....',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '................',
+  '....SS....SS....',
+  '....SS....SS....',
+  '....KK....KK....',
+  '....KK....KK....',
   '................',
 ])
 
 const FRONT_READ_B = body('front.read-b', [
   '......SSSs......',
   '....SSSSSSSs....',
-  '..SSSSSSSSSSSs..',
   '...SSSSSSSSSs...',
+  '..SSPPPppPPPSs..',
+  '..SSPPPppPPPSs..',
+  '..SSPPPppPPPSs..',
   '....SSSSSSSs....',
   '....SSSSSSSs....',
   '....SSSSSSSs....',
-  '....SSSSSSSs....',
-  '....SSSSSSSs....',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '...SSSSSSSSSs...',
-  '................',
+  '....SS....SS....',
+  '....SS....SS....',
+  '....KK....KK....',
+  '....KK....KK....',
   '................',
 ])
 
@@ -1485,16 +1857,13 @@ const SIDE_STAND = body('side.stand', [
   '.....SSSSSSs....',
   '.....SSSSSSs....',
   '.....SSSSSSs....',
-  '.....SSSSSSs....',
-  '.....SSSSSSs....',
   '.....SSSSSs.....',
   '.....SSSSSs.....',
   '.....SSSs.......',
   '.....SSSs.......',
-  '.....SSSs.......',
-  '.....SSSs.......',
-  '....KKKKKk......',
-  '....KKKKKk......',
+  '....KKKKk.......',
+  '....KKKKk.......',
+  '................',
 ])
 
 const SIDE_STEP_A = body('side.step-a', [
@@ -1505,16 +1874,13 @@ const SIDE_STEP_A = body('side.step-a', [
   '.....SSSSSSs....',
   '.....SSSSSSs....',
   '.....SSSSSSs....',
-  '.....SSSSSSs....',
-  '.....SSSSSSs....',
   '.....SSSSSs.....',
   '.....SSSSSs.....',
-  '....SSs.SSs.....',
-  '....SSs.SSs.....',
-  '....SSs..SSs....',
-  '...SSs...SSs....',
-  '..KKKk...KKKk...',
-  '..KKKk...KKKk...',
+  '...KKKk.SSs.....',
+  '...KKKk.KKKk....',
+  '...KKKk.KKKk....',
+  '........KKKk....',
+  '................',
 ])
 
 const SIDE_STEP_B = body('side.step-b', [
@@ -1525,16 +1891,13 @@ const SIDE_STEP_B = body('side.step-b', [
   '.....SSSSSSs....',
   '.....SSSSSSs....',
   '.....SSSSSSs....',
-  '.....SSSSSSs....',
-  '.....SSSSSSs....',
   '.....SSSSSs.....',
   '.....SSSSSs.....',
-  '.....SSs.SSs....',
-  '.....SSs.SSs....',
-  '....SSs...SSs...',
-  '....SSs...SSs...',
-  '...KKKk...KKKk..',
-  '...KKKk...KKKk..',
+  '....SSs.KKKk....',
+  '...KKKk.KKKk....',
+  '...KKKk.KKKk....',
+  '...KKKk.........',
+  '................',
 ])
 
 const SIDE_TYPE_A = body('side.type-a', [
@@ -1542,57 +1905,48 @@ const SIDE_TYPE_A = body('side.type-a', [
   '......SSSs......',
   '.....SSSSSs.....',
   '.....SSSSSSs....',
-  '.....SSSSSSs....',
   '.....SSSSSSSSs..',
   '.....SSSSSSSSs..',
   '.....SSSSSSs....',
   '.....SSSSSSs....',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSSSs..',
   '.....SSSSSs.....',
   '.....SSSSSs.....',
-  '.....SSSSSs.....',
-  '................',
-  '................',
+  '.....SSSs.......',
+  '.....SSSs.......',
+  '....KKKKk.......',
+  '....KKKKk.......',
 ])
 
 const SIDE_TYPE_B = body('side.type-b', [
   '................',
   '......SSSs......',
   '.....SSSSSs.....',
-  '.....SSSSSSs....',
   '.....SSSSSSSSs..',
   '.....SSSSSSSSs..',
   '.....SSSSSSs....',
   '.....SSSSSSs....',
   '.....SSSSSSs....',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSSSs..',
   '.....SSSSSs.....',
   '.....SSSSSs.....',
-  '.....SSSSSs.....',
-  '................',
-  '................',
+  '.....SSSs.......',
+  '.....SSSs.......',
+  '....KKKKk.......',
+  '....KKKKk.......',
 ])
 
 const SIDE_READ_A = body('side.read-a', [
   '......SSSs......',
   '.....SSSSSs.....',
   '.....SSSSSSs....',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSs....',
-  '.....SSSSSSs....',
-  '.....SSSSSSs....',
-  '.....SSSSSSs....',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSSSs..',
+  '.....SSSSSSSs...',
+  '.....SSSSPPPp...',
+  '.....SSSSPPPp...',
   '.....SSSSSs.....',
   '.....SSSSSs.....',
-  '.....SSSSSs.....',
+  '.....SSSs.......',
+  '.....SSSs.......',
+  '....KKKKk.......',
+  '....KKKKk.......',
   '................',
   '................',
 ])
@@ -1600,19 +1954,16 @@ const SIDE_READ_A = body('side.read-a', [
 const SIDE_READ_B = body('side.read-b', [
   '......SSSs......',
   '.....SSSSSs.....',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSSSs..',
   '.....SSSSSSs....',
+  '.....SSSSPPPp...',
+  '.....SSSSPPPp...',
   '.....SSSSSSs....',
-  '.....SSSSSSs....',
-  '.....SSSSSSs....',
-  '.....SSSSSSs....',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSSSs..',
-  '.....SSSSSSSSs..',
   '.....SSSSSs.....',
   '.....SSSSSs.....',
-  '.....SSSSSs.....',
+  '.....SSSs.......',
+  '.....SSSs.......',
+  '....KKKKk.......',
+  '....KKKKk.......',
   '................',
   '................',
 ])
@@ -1898,7 +2249,7 @@ export const attributeStream = (seed: string, attribute: string): number =>
 // ── packages/characters/src/render.ts ───────────────────────────────────────
 
 /**
- * Composition: nine layers, back to front, into a 16×32 grid of colours.
+ * Composition: ten layers, back to front, into a 16×32 grid of colours.
  *
  * ── The order, and the one place it differs from the design note ───────────
  *
@@ -1910,7 +2261,8 @@ export const attributeStream = (seed: string, attribute: string): number =>
  * 5 head        the skin of the skull, whose shape the `face` attribute picks
  * 6 face        eyes, then mouth
  * 7 hairFront   fringe and crown, over the head
- * 8 accessory   last, over all of it
+ * 8 accessory   over all of it
+ * 9 outline     the ring, derived from everything above
  * ```
  *
  * ⚠️ #938's design note listed `bottom` and `shoes` *before* the body's skin.
@@ -1980,30 +2332,148 @@ const paintOverSkin = (grid: RoleGrid, art: Art, at: Point): void => {
       if (col < 0 || col >= FRAME_WIDTH) continue
       const under = line[col]
       if (under !== 'S' && under !== 's') continue
-      // The body's own shading survives the change of material.
-      line[col] = under === 's' ? (role.toLowerCase() as Role) : role
+      // The body's own modelling survives the change of material.
+      line[col] = under === 's' ? SHADE_OF[role] : role
     }
   }
 }
 
-const frameRoles = (appearance: Appearance, direction: Direction, frame: number): RoleGrid => {
+/**
+ * Ring every drawn cell that touches empty space in the dark tone of its own
+ * material — the last layer, and the one that makes this look like a drawing.
+ *
+ * ⚠️ **Derived rather than authored, and that is the load-bearing part.** An
+ * outline spelled into `parts/` would have to be re-spelled by every hairstyle,
+ * every sleeve length and every walk frame, and the first one anybody forgot
+ * would be a figure with a hole in its edge that no test could name. Here there
+ * is one rule and nothing to forget: a part draws its filled shape, and the ring
+ * arrives afterwards in whatever material happens to be at the edge — hair in
+ * hair, a sleeve in its own cloth, a sole in leather. Never in black, which is
+ * what a single flat outline colour would have made of six skin tones.
+ *
+ * The neighbourhood is the four orthogonal cells. Eight would round every
+ * corner off by a pixel and swell a 12-wide head to 16; four keeps the
+ * silhouette the parts drew and only closes it.
+ *
+ * Cells outside the frame are not written, so a figure authored to the frame's
+ * edge simply has no ring on that side. Every part is drawn a column short of
+ * the edge for that reason.
+ */
+const paintOutline = (grid: RoleGrid): void => {
+  const ringed: { row: number; col: number; role: Role }[] = []
+  for (let row = 0; row < FRAME_HEIGHT; row += 1) {
+    for (let col = 0; col < FRAME_WIDTH; col += 1) {
+      if (grid[row]?.[col] !== '.') continue
+      const neighbours: (Role | undefined)[] = [
+        grid[row - 1]?.[col],
+        grid[row + 1]?.[col],
+        grid[row]?.[col - 1],
+        grid[row]?.[col + 1],
+      ]
+      const drawn = neighbours.find((neighbour) => neighbour !== undefined && neighbour !== '.')
+      if (drawn === undefined) continue
+      ringed.push({ row, col, role: OUTLINE_OF[drawn] })
+    }
+  }
+  // Collected first, written second: a ring cell must not be a neighbour of the
+  // next one, or the outline would grow outwards along the scan direction.
+  for (const cell of ringed) {
+    const line = grid[cell.row]
+    if (line !== undefined) line[cell.col] = cell.role
+  }
+}
+
+interface LayerStep {
+  readonly label: string
+  readonly draw: (grid: RoleGrid) => void
+}
+
+/**
+ * The ten layers of one frame, in the order this module's docblock lists.
+ *
+ * Split out of `frameRoles` so the order exists **once**. A playground that drew
+ * the stack from its own list of parts would be a second composition, free to
+ * drift from the one that ships — and the drift would look like art rather than
+ * like a bug.
+ */
+const layerSteps = (
+  appearance: Appearance,
+  direction: Direction,
+  frame: number,
+): readonly LayerStep[] => {
   const anchors = ANCHORS[direction][frame]
   const body = BODY[direction][frame]
   if (anchors === undefined || body === undefined) {
     throw new Error(`no frame ${frame} for ${direction}`)
   }
   const hair = HAIR[appearance.hair]
+  return [
+    {
+      label: `hairBack · ${appearance.hair}`,
+      draw: (g) => paint(g, hair.back[direction], anchors.head),
+    },
+    {
+      label: `body · ${appearance.skin} skin, ${appearance.shoes} shoes`,
+      draw: (g) => paint(g, body, NO_OFFSET),
+    },
+    {
+      label: `bottom · ${appearance.bottom} in ${appearance.bottomColour}`,
+      draw: (g) => paintOverSkin(g, BOTTOMS[appearance.bottom][direction], anchors.hip),
+    },
+    {
+      label: `top · ${appearance.top} in ${appearance.topColour}`,
+      draw: (g) => paintOverSkin(g, TOPS[appearance.top][direction], anchors.torso),
+    },
+    {
+      label: `head · ${appearance.face}`,
+      draw: (g) => paint(g, FACES[appearance.face][direction], anchors.head),
+    },
+    {
+      label: `eyes · ${appearance.eyes}`,
+      draw: (g) => paint(g, EYES[appearance.eyes][direction], anchors.head),
+    },
+    {
+      label: `mouth · ${appearance.mouth}`,
+      draw: (g) => paint(g, MOUTHS[appearance.mouth][direction], anchors.head),
+    },
+    {
+      label: `hairFront · ${appearance.hair} in ${appearance.hairColour}`,
+      draw: (g) => paint(g, hair.front[direction], anchors.head),
+    },
+    {
+      label: `accessory · ${appearance.accessory}`,
+      draw: (g) => paint(g, ACCESSORIES[appearance.accessory].art[direction], anchors.head),
+    },
+    { label: 'outline', draw: paintOutline },
+  ]
+}
+
+const frameRoles = (appearance: Appearance, direction: Direction, frame: number): RoleGrid => {
   const grid = blankRoles()
-  paint(grid, hair.back[direction], anchors.head)
-  paint(grid, body, NO_OFFSET)
-  paintOverSkin(grid, BOTTOMS[appearance.bottom][direction], anchors.hip)
-  paintOverSkin(grid, TOPS[appearance.top][direction], anchors.torso)
-  paint(grid, FACES[appearance.face][direction], anchors.head)
-  paint(grid, EYES[appearance.eyes][direction], anchors.head)
-  paint(grid, MOUTHS[appearance.mouth][direction], anchors.head)
-  paint(grid, hair.front[direction], anchors.head)
-  paint(grid, ACCESSORIES[appearance.accessory].art[direction], anchors.head)
+  for (const step of layerSteps(appearance, direction, frame)) step.draw(grid)
   return grid
+}
+
+/**
+ * The same frame, snapshotted after each layer — what a reader needs to see
+ * *why* a character looks like this, rather than only that it does.
+ *
+ * Each entry is cumulative: `[0]` is the first layer alone and the last entry is
+ * the finished frame, which `render.test.ts` asserts against `renderSheet`. It
+ * is exported for tooling (`scripts/playground.mjs`) and costs nothing at
+ * runtime — no consumer of a face calls it.
+ */
+export const renderLayers = (
+  appearance: Appearance,
+  direction: Direction,
+  frame: number,
+): readonly { readonly label: string; readonly rows: PixelRows }[] => {
+  const colours = roleColours(appearance, ACCESSORIES[appearance.accessory].colours)
+  const grid = blankRoles()
+  return layerSteps(appearance, direction, frame).map((step) => {
+    step.draw(grid)
+    return { label: step.label, rows: grid.map((line) => line.map((role) => colours[role])) }
+  })
 }
 
 const renderFrame = (
