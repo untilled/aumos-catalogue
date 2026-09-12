@@ -350,15 +350,54 @@ export function discoveryRun(input = {}) {
   // ── the decision table, verbatim from docs/contracts/discovery-run.md ────
   const produced = newCandidates + resumedCandidates > 0
   const everyRequiredLaneOpen = REQUIRED_LANES.every((lane) => lanes[lane] === 'open')
+  /**
+   * ⛔ **The precedence is part of the contract and this is the order it states:**
+   *
+   *   `discovery_not_run` > `discovery_incomplete` > `candidates_produced` > `no_candidate_qualified`
+   *
+   * ⚠️ **A failed or unreached range outranks a name that came through the gate.** More
+   * than one row of the table holds at once whenever a sweep produced a candidate and
+   * lost a range, and reporting it by the candidate is the #140 shape one step over:
+   * how much of the market this run actually read is the fact a later reader cannot
+   * reconstruct, and a partially unprocessed range is its own status rather than a
+   * footnote on a productive one. The name is not lost — it is still counted in
+   * `newCandidates` / `resumedCandidates`, still handed to the ledger, and
+   * `candidates_produced_within_incomplete_sweep` below says so out loud. What follows
+   * from the word is the cursor, which stays at the last fully succeeded range.
+   */
   let discoveryStatus
-  if (produced) {
-    discoveryStatus = 'candidates_produced'
-  } else if (!universeDeclared || budgetSpentOnHoldings || requiredDark) {
+  if (!universeDeclared || budgetSpentOnHoldings || requiredDark) {
     discoveryStatus = 'discovery_not_run'
-  } else if (everyRequiredLaneOpen && symbolsFailed.length === 0) {
-    discoveryStatus = 'no_candidate_qualified'
-  } else {
+  } else if (symbolsFailed.length > 0 || !everyRequiredLaneOpen) {
     discoveryStatus = 'discovery_incomplete'
+  } else if (produced) {
+    discoveryStatus = 'candidates_produced'
+  } else {
+    discoveryStatus = 'no_candidate_qualified'
+  }
+
+  if (discoveryStatus === 'discovery_incomplete' && produced) {
+    /**
+     * ⚠️ **`info`, never `unevaluated` or `warn`.** Nothing here is unread and nothing
+     * here is a warning about the names: they were measured on all three axes and they
+     * stand. What the entry records is the *shape* of the run — candidates beside an
+     * unfinished sweep — so that a reader who sees `discovery_incomplete` beside a
+     * non-zero `newCandidates` does not read it as a contradiction.
+     */
+    diagnostics.push(
+      diagnostic(
+        'candidates_produced_within_incomplete_sweep',
+        'info',
+        `${newCandidates + resumedCandidates} name(s) came through the three axes while part of this sweep was still unread. The candidates stand and are counted; the run is reported as \`discovery_incomplete\` and the cursor does not move, because the unread part is re-attempted before anything after it.`,
+        'discoveryStatus',
+        {
+          newCandidates,
+          resumedCandidates,
+          symbolsFailed,
+          requiredLanes: Object.fromEntries(REQUIRED_LANES.map((lane) => [lane, lanes[lane]])),
+        },
+      ),
+    )
   }
 
   /**

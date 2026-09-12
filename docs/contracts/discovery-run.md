@@ -95,6 +95,22 @@ A closed set of four. The decision table is the contract:
 | `discovery_not_run` | no universe declared, **or** the run's discovery budget was spent on holdings review, **or** every required lane is `dark` / `unstated` |
 | `discovery_incomplete` | a universe was declared and some range failed or was never reached — `symbolsFailed` is non-empty, or a required lane is `partial` |
 
+⚠️ **More than one row can hold at once, so the precedence is part of the contract:**
+
+```text
+discovery_not_run > discovery_incomplete > candidates_produced > no_candidate_qualified
+```
+
+A failed or unreached range **outranks a produced candidate**. A sweep that put one name
+through the gate and lost another range of the same sweep reports `discovery_incomplete`,
+because how much of the market this run actually read is the fact a later reader cannot
+reconstruct, and a partially unprocessed range is its own distinct status rather than a
+footnote on a productive one. ⚠️ **The candidate is not lost and is not hidden**: it is
+still counted in `newCandidates` / `resumedCandidates`, still carried into the candidate
+ledger, and a package may say so in a diagnostic of its own. What follows from the word is
+the cursor — it stays at the last fully succeeded range, so the unread part is re-attempted
+rather than stepped over.
+
 ⛔ **`no_candidate_qualified` is the only one of the four that is a claim about the
 market.** The other three are claims about the run. Reporting the first when one of the
 others holds is the defect this contract exists to refuse.

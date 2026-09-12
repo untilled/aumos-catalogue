@@ -175,10 +175,46 @@
         "cursorAfter": { "kind": "dart-receipt", "value": "20260226000742", "atEpochMs": 1772150400000 }
       },
       "expect": {
-        "discoveryStatus": "candidates_produced",
+        "discoveryStatus": "discovery_incomplete",
         "cursorAfterValue": "20260105000111",
-        "diagnosticCodes": ["cursor_advanced_past_incomplete_range"],
+        "diagnosticCodes": ["cursor_advanced_past_incomplete_range", "candidates_produced_within_incomplete_sweep"],
         "blocked": true
+      }
+    },
+    {
+      "name": "a-failed-range-outranks-a-name-that-came-through-the-gate",
+      "why": "The precedence of docs/contracts/discovery-run.md: `discovery_not_run` > `discovery_incomplete` > `candidates_produced` > `no_candidate_qualified`. One name cleared the three axes and another part of the same sweep was never read, so both rows of the decision table hold — and the word reported is the one about how much of the market this run actually read, because that is the fact a later reader cannot reconstruct. ⚠️ The candidate is not lost: it is still counted in `newCandidates` and still handed to the ledger, and `candidates_produced_within_incomplete_sweep` says so.",
+      "overrides": {
+        "symbolsSucceeded": 59,
+        "symbolsFailed": ["005930"],
+        "cursorAfter": null
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "gatePassed": 1,
+        "newCandidates": 1,
+        "resumedCandidates": 0,
+        "cursorAfterValue": "20260105000111",
+        "diagnosticCodes": ["candidates_produced_within_incomplete_sweep"],
+        "diagnosticSeverities": { "candidates_produced_within_incomplete_sweep": "info" },
+        "blocked": false
+      }
+    },
+    {
+      "name": "a-partial-required-lane-outranks-a-produced-candidate-too",
+      "why": "The same precedence reached by the other half of the `discovery_incomplete` condition: no symbol failed, but the filing lane answered for only part of the range. A lane that answered for some of the range is not a lane that answered, and a name found inside the half that was read does not make the other half read.",
+      "overrides": {
+        "lanes": { "price": "unstated", "filing": "partial", "web": "open" },
+        "cursorAfter": null
+      },
+      "expect": {
+        "discoveryStatus": "discovery_incomplete",
+        "gatePassed": 1,
+        "newCandidates": 1,
+        "filingLaneStatus": "partial",
+        "cursorAfterValue": "20260105000111",
+        "diagnosticCodes": ["candidates_produced_within_incomplete_sweep"],
+        "blocked": false
       }
     },
     {

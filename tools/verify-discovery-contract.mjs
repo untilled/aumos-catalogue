@@ -30,6 +30,11 @@
  *      per-situation check;
  *   ④ that `cursorAfter` never advances past a failed range, and equals
  *      `cursorBefore` outside the two complete statuses;
+ *   ⑨ the **precedence** of §«`discoveryStatus`, and the only way to say nothing
+ *      qualified» — `discovery_not_run` > `discovery_incomplete` >
+ *      `candidates_produced` > `no_candidate_qualified` — on situations that satisfy
+ *      two rows of the decision table at once, plus the half that is not about the
+ *      word: a candidate reported as an incomplete sweep is still counted;
  *   ⑤–⑧ the candidate ledger's read rules: `undefined` is `data_missing` and
  *      `null` seeds, vendor payload and account state are refused, a rerun on
  *      identical input is a fixed point, and the three migration answers
@@ -49,8 +54,8 @@
  *
  * ── Two kinds of difference, reported exactly as `shared-scenarios` reports them ──
  *
- *   **`expectedDisagreement`** — the packages answer differently *by policy*, or
- *   because the contract itself left the precedence open. Recorded against the
+ *   **`expectedDisagreement`** — the packages answer differently *by policy*, on a
+ *   question the contract leaves to each of them. Recorded against the
  *   situation with a reason, checked against the answer that package actually
  *   gives, and **green**. A situation is never skipped and never softened into an
  *   easier one to make three answers into one.
@@ -266,7 +271,7 @@ const SITUATIONS = [
   },
   {
     id: 'a-range-failed-while-a-name-qualified',
-    clause: '③ the precedence the contract left open',
+    clause: '③ the precedence, now stated',
     title: 'one name came through the gate and another range of the same sweep failed',
     universe: 'declared',
     requiredLanes: 'open',
@@ -275,25 +280,81 @@ const SITUATIONS = [
     qualifying: 1,
     proposeAdvance: true,
     expected: { discoveryStatus: 'discovery_incomplete', cursorAdvances: false },
-    why: 'Both rows of the decision table hold at once, and the contract states them as conditions rather than as a precedence. What is **not** open is the cursor: whichever word is reported, it does not move.',
-    /**
-     * ⚠️ **A real divergence, recorded rather than removed.**
-     * `docs/contracts/discovery-run.md` gives `candidates_produced` the condition
-     * «`newCandidates + resumedCandidates > 0`» and `discovery_incomplete` the
-     * condition «some range failed», and both are true here. FMR and CT resolve it
-     * towards the unfinished sweep and carry the names anyway (FMR says so out
-     * loud in its own `candidates_produced_within_incomplete_sweep` note); SR
-     * resolves it towards the names. Neither is wrong against the text, so this is
-     * a documented disagreement and not a defect — and #305's own reason for
-     * writing the contract down argues for tightening the text, in its own change.
-     */
-    expectedDisagreement: {
-      'shareholder-rerating': {
-        discoveryStatus: 'candidates_produced',
-        reason:
-          'SR evaluates `candidates_produced` first, so a sweep that produced a name and lost a range is reported by the name. FMR and CT evaluate the failed range first and report the unfinished sweep. The contract states both as conditions and no precedence between them, so all three are inside the text; the cursor rule, which is the part that can lose a slice of the market, holds identically in all three.',
-      },
+    why: 'Both rows of the decision table hold at once, and the contract now states which wins: `discovery_incomplete`. A partially unprocessed range is its own status and never a footnote on a productive run — the name is still counted in `newCandidates` / `resumedCandidates` and still reaches the ledger. The cursor, which is the part that can lose a slice of the market, does not move in any of the three.',
+  },
+]
+
+/**
+ * ── ⑨ the precedence, as the contract now states it ─────────────────────────
+ *
+ * `docs/contracts/discovery-run.md`, «`discoveryStatus`, and the only way to say
+ * nothing qualified»:
+ *
+ *   discovery_not_run > discovery_incomplete > candidates_produced > no_candidate_qualified
+ *
+ * ⛔ **Stated because more than one row of the decision table holds at once.** The
+ * table gives each word a *condition*, and a run whose universe was never declared
+ * and whose range also failed, or one that produced a name and lost a range, meets
+ * two of them. Without a precedence the three packages were each free to pick, and
+ * #305's whole reason for writing the contract down is that a reader cannot tell
+ * «part of the market is unread» from «the run was productive» after the fact.
+ *
+ * Each case below is a situation that satisfies **both** words' conditions, put to
+ * all three packages, and the higher-ranked word has to be the one reported.
+ */
+const PRECEDENCE = Object.freeze([
+  'discovery_not_run',
+  'discovery_incomplete',
+  'candidates_produced',
+  'no_candidate_qualified',
+])
+
+const PRECEDENCE_CASES = [
+  {
+    id: 'an-undeclared-universe-outranks-a-failed-range',
+    higher: 'discovery_not_run',
+    lower: 'discovery_incomplete',
+    situation: {
+      id: 'precedence-not-run-over-incomplete',
+      universe: 'undeclared',
+      requiredLanes: 'open',
+      optionalLane: 'unstated',
+      rangeFailed: true,
+      qualifying: 0,
+      proposeAdvance: false,
+      uncertainty: DISCLOSURE,
     },
+    why: 'A run with no denominator cannot report how much of a universe it failed to read, because there is no universe to have read part of.',
+  },
+  {
+    id: 'a-failed-range-outranks-a-produced-candidate',
+    higher: 'discovery_incomplete',
+    lower: 'candidates_produced',
+    situation: {
+      id: 'precedence-incomplete-over-produced',
+      universe: 'declared',
+      requiredLanes: 'open',
+      optionalLane: 'unstated',
+      rangeFailed: true,
+      qualifying: 1,
+      proposeAdvance: false,
+    },
+    why: '⚠️ The one #305 names: a partially unprocessed range is left as its own distinct status, and the candidate is reported by the counts rather than by the word.',
+  },
+  {
+    id: 'a-produced-candidate-outranks-an-empty-screen',
+    higher: 'candidates_produced',
+    lower: 'no_candidate_qualified',
+    situation: {
+      id: 'precedence-produced-over-nothing-qualified',
+      universe: 'declared',
+      requiredLanes: 'open',
+      optionalLane: 'unstated',
+      rangeFailed: false,
+      qualifying: 1,
+      proposeAdvance: true,
+    },
+    why: 'The bottom of the order, and the control for the other two: without it «reports the higher word» would be satisfied by a package that reports the same word to everything.',
   },
 ]
 
@@ -762,6 +823,52 @@ for (const adapter of ADAPTERS) {
     problems.push(`a complete screen, a run with no universe and a failed range collapsed onto ${new Set(triple).size} answer(s): ${triple.join(' | ')}`)
   }
   record({ id: 'three-situations-three-answers' }, adapter.PACKAGE, problems, null, null, `reached ${distinct.size} of 4: ${[...distinct].join(', ')}`)
+}
+
+console.log(`\n══ ⑨ the precedence — ${PRECEDENCE.join(' > ')} ══`)
+for (const entry of PRECEDENCE_CASES) {
+  console.log(`\n── ${entry.id} — ${entry.higher} beats ${entry.lower} ───────────────`)
+  console.log(`   ${entry.why}`)
+  for (const adapter of ADAPTERS) {
+    const run = adapter.discovery(entry.situation)
+    const problems = []
+    checks += 2
+    if (run.discoveryStatus !== entry.higher) {
+      problems.push(
+        `both conditions hold and this run reported ${show(run.discoveryStatus)}; the contract ranks ${entry.higher} above ${entry.lower}`,
+      )
+    }
+    /**
+     * ⛔ **The rank is checked as a rank, not as one expected word.** A package that
+     * answered some *third* status here would satisfy «is not the lower word» and
+     * still be outside the contract.
+     */
+    const rank = PRECEDENCE.indexOf(run.discoveryStatus)
+    if (rank < 0 || rank > PRECEDENCE.indexOf(entry.lower)) {
+      problems.push(`${show(run.discoveryStatus)} ranks below ${entry.lower}, and one of the two conditions that hold here is ${entry.lower}'s`)
+    }
+    record(entry, adapter.PACKAGE, problems, null, null, `status=${run.discoveryStatus}`)
+  }
+}
+
+/**
+ * ⚠️ **And the half that is not about the word.** Whatever the precedence reports,
+ * a candidate that came out of the gate is still *counted* — the contract keeps it
+ * in `newCandidates` / `resumedCandidates` precisely so that reporting the unfinished
+ * sweep never hides the name. A package that resolved the tie by dropping the count
+ * would pass every check above.
+ */
+console.log('\n══ ⑨ a candidate reported as an incomplete sweep is still counted ══')
+for (const adapter of ADAPTERS) {
+  const run = adapter.discovery(SITUATIONS.find((row) => row.id === 'a-range-failed-while-a-name-qualified'))
+  const problems = []
+  checks += 1
+  if (run.newCandidates + run.resumedCandidates < 1) {
+    problems.push(
+      `reported ${run.discoveryStatus} with newCandidates=${run.newCandidates} resumedCandidates=${run.resumedCandidates} — the name that came through the gate was dropped along with the word`,
+    )
+  }
+  record({ id: 'the-name-survives-the-precedence' }, adapter.PACKAGE, problems, null, null, `new=${run.newCandidates} resumed=${run.resumedCandidates} gatePassed=${run.gatePassed}`)
 }
 
 console.log('\n══ ③ no_candidate_qualified is reported only under its full condition ══')

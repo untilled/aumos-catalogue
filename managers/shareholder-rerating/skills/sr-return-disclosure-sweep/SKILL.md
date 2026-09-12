@@ -70,6 +70,11 @@ speaks in stock codes; skipping the join means sweeping whoever happens to share
 1. **You classify `report_nm` yourself.** Nothing upstream does it.
 2. **Incrementality is yours too.** You hold the last `rcept_no` you fully processed and you stop
    when you reach it. That is why this package's cursor kind is `dart-receipt`.
+3. ⛔ **A range you could not process leaves the sweep `discovery_incomplete`, even if a name came
+   out of the part you did read.** The precedence is `discovery_not_run` > `discovery_incomplete` >
+   `candidates_produced` > `no_candidate_qualified`, so the candidate is still counted and still
+   written to the ledger, and the cursor stays on the last `rcept_no` you fully processed — the
+   unread range is re-attempted rather than stepped over.
 
 `rcept_no` begins with the receipt date and `rcept_dt` repeats it, which makes the receipt number
 both the identity and the ordering. A business year is **not** a disclosure date.

@@ -221,6 +221,18 @@ web lane has not looked for it.
 | `discovery_not_run` | no universe declared, **or** the discovery budget went on the holdings review, **or** every required lane is `dark`/`unstated` |
 | `discovery_incomplete` | a universe was declared and some range failed or was never reached |
 
+⚠️ **More than one row can hold at once, so the precedence is part of the rule:**
+
+```text
+discovery_not_run > discovery_incomplete > candidates_produced > no_candidate_qualified
+```
+
+A failed or unreached range **outranks a name that came through the gate**. If one company cleared
+the three axes and another part of the same sweep was never read, write `discovery_incomplete` — a
+partially unprocessed range is its own status, not a footnote on a productive run. ⚠️ **The name is
+not lost and is not hidden**: it stays counted in `newCandidates` / `resumedCandidates` and it stays
+in the candidate ledger. What follows from the word is the cursor, which does not move.
+
 ⛔ **`no_candidate_qualified` is the only one of the four that says anything about the market.** The
 other three say something about the run, and reporting the first when one of the others holds is
 the single defect this section exists to refuse. ⛔ **`cursorAfter` equals `cursorBefore` whenever

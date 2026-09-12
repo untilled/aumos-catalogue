@@ -21,7 +21,7 @@ rather than well argued, and each module is one of those conditions:
 | `sizing.mjs` | the loss to invalidation, and the weight under every cap | it decides how much of somebody's book moves |
 | `staged-plan.mjs` | what a stage proposes given what is already held and proposed | the re-run property is arithmetic; a promise not to double up is not |
 | `concentration.mjs` | the account-wide fold, and the minimum-not-sum rule | three managers can each show correct working and hold 30% of one name |
-| `discovery.mjs` | which names this run looked at, the three lane statuses, the cursor rule, and which of four `discoveryStatus` words the run ended on | «zero candidates» and «zero reads» are the same output and opposite facts, and only a label a fixture can assert keeps them apart (#305) |
+| `discovery.mjs` | which names this run looked at, the three lane statuses, the cursor rule, and which of four `discoveryStatus` words the run ended on — in the contract's precedence, `discovery_not_run` > `discovery_incomplete` > `candidates_produced` > `no_candidate_qualified`, so a range that failed outranks a name that qualified | «zero candidates» and «zero reads» are the same output and opposite facts, and only a label a fixture can assert keeps them apart (#305) |
 | `candidate-memory.mjs` | the roster carried between runs: read, migrate, fold, cap, and refuse what may never be stored | four reruns must not create a second row, and «nobody read the key» is not «the key is empty» |
 | `programme.mjs` | the join from 취득 결정 to 결과보고서 to 소각 to 철회, and the three counters that are never one | an announcement and an execution are two documents, and a model reading a headline gets the first and reports the second |
 | `attestation.mjs` | whose word a web reading is, and what makes one citable at all | a search-result snippet and a document somebody opened are indistinguishable once either is written down |
@@ -160,9 +160,11 @@ risk budget; a stage that does not fit the remaining budget waits rather than be
 dividend and the untaxed one. `fixtures/staged-plans.json` — eleven states of one plan, including
 both re-run cases, the price-only stage, the exhausted budget and the expired stage.
 
-`fixtures/discovery.json` — sixteen scenarios over `discoveryRun`: each of the four `discoveryStatus`
+`fixtures/discovery.json` — eighteen scenarios over `discoveryRun`: each of the four `discoveryStatus`
 words, the required/optional lane split, one axis never making a candidate, the token a
-`discovery_not_run` proposal has to carry verbatim, and four ways the cursor may not move.
+`discovery_not_run` proposal has to carry verbatim, the precedence
+`discovery_not_run` > `discovery_incomplete` > `candidates_produced` > `no_candidate_qualified`
+reached from both halves of the incomplete condition, and four ways the cursor may not move.
 `fixtures/candidate-memory.json` — nineteen over `candidateLedger`: `undefined` vs `null`, the two
 refused reads and the two degraded ones, the four reruns that must not create a second anything, the
 two shapes of forbidden payload, and an idempotency assertion that feeds the run's own output back
